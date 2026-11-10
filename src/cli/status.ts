@@ -21,7 +21,7 @@ export interface StatusReport {
   /** Remote access is set to direct only (or this network only): no relay at all. */
   readonly relayDisabled?: boolean;
   /** What keeps it running from boot (`beluga service install`), if anything. */
-  readonly service?: 'systemd' | 'launchd';
+  readonly service?: 'systemd' | 'launchd' | 'task';
   /** Opening Beluga in a browser: its web port, its address and how many browsers are let in. */
   readonly web: { readonly on: boolean; readonly url?: string; readonly sessions: number; readonly public?: WebStatus['public']; readonly tailscale?: WebStatus['tailscale'] };
 }
@@ -82,7 +82,7 @@ export function describe(r: StatusReport, now = Date.now()): string {
     for (const p of r.phones) lines.push(`  ${p.name} (${p.platform}), ${p.linked ? 'linked now' : p.lastSeen ? `last seen ${ago(now - p.lastSeen)} ago` : 'not seen yet'}`);
   }
   lines.push(`Phone relay: ${relayWords(r)}`);
-  lines.push(r.service ? `Keeps running: yes (${r.service === 'systemd' ? 'a systemd user service' : 'a launchd agent'})` : 'Keeps running: only until this computer restarts. `beluga service install` starts it at boot.');
+  lines.push(r.service ? `Keeps running: yes (${r.service === 'systemd' ? 'a systemd user service' : r.service === 'task' ? 'a scheduled task' : 'a launchd agent'})` : 'Keeps running: only until this computer restarts. `beluga service install` starts it at boot.');
   lines.push(`Browser access: ${webWords(r.web)}`);
   return `${lines.join('\n')}\n`;
 }
@@ -92,7 +92,7 @@ export async function status(flags: { json?: boolean }, io: Io): Promise<Exit> {
   const found = (await withDaemon(async (client, info) => report(info, client.store.getDomain(), await client.call('web.sessions.list').catch(() => undefined)))) ?? { running: false, projects: [], phones: [], web: { on: false, sessions: 0 } };
   const { serviceEnv, serviceInstalled } = await import('./service.js');
   const env = serviceEnv();
-  const r: StatusReport = serviceInstalled(env) ? { ...found, service: env.platform === 'linux' ? 'systemd' : 'launchd' } : found;
+  const r: StatusReport = serviceInstalled(env) ? { ...found, service: env.platform === 'linux' ? 'systemd' : env.platform === 'win32' ? 'task' : 'launchd' } : found;
   io.out(flags.json ? `${JSON.stringify(r, null, 2)}\n` : describe(r));
   return r.running ? 0 : 1;
 }

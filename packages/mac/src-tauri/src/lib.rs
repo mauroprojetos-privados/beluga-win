@@ -5,6 +5,7 @@
 //! the menu bar, the tray, notifications, `beluga://` (and the older `klaud://`) links, and
 //! keeping Beluga's daemon running. Everything Beluga does happens in the daemon.
 
+mod badge;
 mod daemon;
 mod export;
 mod focus;
@@ -151,6 +152,10 @@ fn set_tray_status(
         let _ = tray.set_tooltip(Some(tray_tip(waiting, working, unread)));
     }
     if let Some(window) = app.get_webview_window("main") {
+        // Windows has no badge count; the taskbar button carries it as an overlay icon.
+        #[cfg(windows)]
+        badge::show(&window, unread);
+        #[cfg(not(windows))]
         let _ = window.set_badge_count((unread > 0).then_some(i64::from(unread)));
     }
 }

@@ -16,10 +16,33 @@ The same Beluga runs on Linux and Windows. Some things stay Mac only.
 | Moving to the Trash | Finder / trash | gio trash | Recycle Bin |
 | Window | blur, traffic lights | solid, the desktop's own title bar | solid, the system title bar |
 | Packages | .dmg | AppImage (updates itself), .deb, .rpm | installer (updates itself) |
+| What's new, on the app's icon | Dock badge | the desktop's own (when it shows one) | a count over the taskbar button |
+| `beluga service install` | launchd agent, at login | systemd user service, from boot with lingering | Task Scheduler task, at sign-in |
 
-Mac only: desktop widgets, Focus, the macOS permission steps in the welcome, the Dock badge,
-sleeping only after the outbox is mailed (BLG-277), and notification sounds played from files
-(on Linux and Windows the window plays them).
+Mac only: desktop widgets, Focus, the macOS permission steps in the welcome, sleeping only after
+the outbox is mailed (BLG-277), and notification sounds played from files (on Linux and Windows
+the window plays them).
+
+On Windows, `beluga service install` registers a task named "Beluga" for you (no admin, no saved
+password): at sign-in it runs a hidden PowerShell script in `%LOCALAPPDATA%\Beluga\service` that
+keeps `beluga up --foreground` going, starting it again 5 seconds after a failure and leaving it
+stopped after `beluga stop`. It runs while you're signed in; for a PC that restarts by itself,
+turn on automatic sign-in. `beluga service remove` stops it and deletes the task.
+
+## Developing on Windows
+
+- Turn on **Developer Mode** (Settings › System › For developers) so Git and the tests can make
+  symbolic links. Without it, about a hundred tests fail with `EPERM ... symlink`.
+- Check the repository out with LF endings (`git config core.autocrlf input` before cloning, or
+  `git clone -c core.autocrlf=input`). With `true`, tests that read fixtures back see `\r\n`.
+- A few tests format money with the system's locale; run them with `LANG=en_US.UTF-8` on a PC
+  set to another language.
+- The Rust shell needs Rust (MSVC) and the Visual Studio C++ Build Tools; the app needs WebView2
+  (already on Windows 11).
+- The phone app's APKs build here too (`npm run apk` in `packages/companion`): the key's password
+  is in Credential Manager as the generic credential `beluga-android-release`
+  (`cmdkey /generic:beluga-android-release /user:beluga /pass`), the SDK in
+  `%LOCALAPPDATA%\Android\Sdk`, and Java is Android Studio's own (`JAVA_HOME` overrides either).
 
 Shortcuts that use ⌃ on a Mac have their own keys elsewhere: Toggle Sidebar is Ctrl+B,
 Approve / Decline / Always Allow are Alt+Shift+Y / N / A, Move Project is Alt+Shift+↑/↓, and
@@ -48,4 +71,8 @@ Archive has no key (it's in the menu and ⌘K).
   `linux-x86_64` and `windows-x86_64` to its `latest.json`. `release-mac.mjs` keeps those
   entries when it uploads again.
 - The repository needs the `TAURI_SIGNING_PRIVATE_KEY` (and `_PASSWORD`) secrets for update
-  signatures. Windows code signing isn't set up yet, so SmartScreen warns on the first install.
+  signatures.
+- Windows code signing: put a code-signing certificate in the `WINDOWS_CERTIFICATE` secret (the
+  `.pfx`, base64) and its password in `WINDOWS_CERTIFICATE_PASSWORD`. `release-desktop.yml` then
+  imports it for the run and Tauri signs the app and the installer (SHA-256, DigiCert's
+  timestamp). Without them the installer stays unsigned and SmartScreen warns on the first install.

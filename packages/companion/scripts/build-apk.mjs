@@ -21,43 +21,72 @@ const fail = (msg) => {
   process.exit(1);
 };
 
+const windows = process.platform === 'win32';
+
+// Windows keeps the password in Credential Manager instead of the Keychain, as a generic
+// credential named beluga-android-release (`cmdkey /generic:beluga-android-release /user:beluga /pass`).
+const CRED_READ_PS = [
+  "$ErrorActionPreference = 'Stop'",
+  'Add-Type -TypeDefinition @"',
+  'using System; using System.Runtime.InteropServices;',
+  'public static class BelugaCred {',
+  '  [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] struct C { public int Flags, Type; public string Target, Comment; public long Written; public int BlobSize; public IntPtr Blob; public int Persist, AttrCount; public IntPtr Attrs; public string Alias, User; }',
+  '  [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern bool CredReadW(string t, int type, int flags, out IntPtr c);',
+  '  [DllImport("advapi32.dll")] static extern void CredFree(IntPtr c);',
+  '  public static string Read(string t) { IntPtr p; if (!CredReadW(t, 1, 0, out p)) return null; try { var c = (C)Marshal.PtrToStructure(p, typeof(C)); return Marshal.PtrToStringUni(c.Blob, c.BlobSize / 2); } finally { CredFree(p); } }',
+  '}',
+  '"@',
+  "$p = [BelugaCred]::Read('beluga-android-release'); if ($p -eq $null) { exit 1 }; [Console]::Out.Write($p)",
+].join('\n');
+
+const savedPassword = () =>
+  windows
+    ? execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', CRED_READ_PS], { encoding: 'utf8' })
+    : execFileSync('security', ['find-generic-password', '-s', 'beluga-android-release', '-w'], { encoding: 'utf8' }).trim();
+
 const keystore = process.env.BELUGA_ANDROID_KEYSTORE ?? path.join(home, '.beluga-release', 'beluga-android.p12');
 if (!fs.existsSync(keystore)) fail(`no signing key at ${keystore}`);
 let password = process.env.BELUGA_ANDROID_KEY_PASSWORD;
 if (!password) {
   try {
-    password = execFileSync('security', ['find-generic-password', '-s', 'beluga-android-release', '-w'], { encoding: 'utf8' }).trim();
+    password = savedPassword();
   } catch {
-    fail('the key’s password isn’t in the Keychain (beluga-android-release)');
+    password = '';
   }
+  if (!password) fail(`the key’s password isn’t in ${windows ? 'Credential Manager' : 'the Keychain'} (beluga-android-release)`);
 }
 
-const sdk = process.env.ANDROID_HOME ?? path.join(home, 'Library', 'Android', 'sdk');
+const local = process.env.LOCALAPPDATA ?? path.join(home, 'AppData', 'Local');
+const sdk = process.env.ANDROID_HOME ?? (windows ? path.join(local, 'Android', 'Sdk') : path.join(home, 'Library', 'Android', 'sdk'));
+// Android Studio's own JDK on Windows; Homebrew's on a Mac.
+const java = windows ? path.join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Android', 'Android Studio', 'jbr') : '/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home';
 const env = {
   ...process.env,
   CI: '1',
   ANDROID_HOME: sdk,
-  JAVA_HOME: process.env.JAVA_HOME ?? '/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home',
+  JAVA_HOME: process.env.JAVA_HOME ?? java,
   BELUGA_ANDROID_KEYSTORE: keystore,
   BELUGA_ANDROID_KEY_PASSWORD: password,
 };
 
+// npm, npx, gradlew and apksigner are .cmd/.bat files on Windows, which only a shell runs.
 const run = (cmd, args, cwd = root) => {
   console.log(`$ ${cmd} ${args.join(' ')}`);
-  const r = spawnSync(cmd, args, { cwd, env, stdio: 'inherit' });
+  const r = spawnSync(cmd, args, { cwd, env, stdio: 'inherit', shell: windows });
   if (r.status !== 0) fail(`${cmd} ${args[0] ?? ''} failed`);
 };
 
 run('npm', ['run', 'worklet:bundle']);
 run('npx', ['expo', 'prebuild', '--platform', 'android', '--no-install', '--clean']);
-fs.writeFileSync(path.join(root, 'android', 'local.properties'), `sdk.dir=${sdk}\n`);
-run('./gradlew', ['assembleRelease'], path.join(root, 'android'));
+// Gradle reads local.properties as Java properties, where \ escapes: forward slashes work everywhere.
+fs.writeFileSync(path.join(root, 'android', 'local.properties'), `sdk.dir=${sdk.replace(/\\/g, '/')}\n`);
+run(windows ? 'gradlew.bat' : './gradlew', ['assembleRelease'], path.join(root, 'android'));
 
 const tools = path.join(sdk, 'build-tools');
 const latest = fs.readdirSync(tools).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).at(-1);
-const apksigner = path.join(tools, latest, 'apksigner');
+const apksigner = path.join(tools, latest, windows ? 'apksigner.bat' : 'apksigner');
 const signer = (apk) => {
-  const out = execFileSync(apksigner, ['verify', '--print-certs', apk], { env, encoding: 'utf8' });
+  const out = execFileSync(windows ? `"${apksigner}"` : apksigner, ['verify', '--print-certs', windows ? `"${apk}"` : apk], { env, encoding: 'utf8', shell: windows });
   const hex = /certificate SHA-256 digest: ([0-9a-f]+)/i.exec(out)?.[1];
   return hex?.match(/../g)?.join(':').toLowerCase();
 };

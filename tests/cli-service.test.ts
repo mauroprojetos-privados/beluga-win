@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { Io } from '../src/cli/io.js';
-import { type Exec, LAUNCHD_LABEL, type ServiceEnv, installService, launchdPlist, removeService, serviceInstalled, serviceStatus, startService, systemdUnit } from '../src/cli/service.js';
+import { type Exec, LAUNCHD_LABEL, type ServiceEnv, TASK_NAME, installService, launchdPlist, removeService, serviceInstalled, serviceStatus, startService, systemdUnit, windowsTaskScript, windowsTaskXml } from '../src/cli/service.js';
 
 function capture(): Io & { readonly text: () => string; readonly errors: () => string } {
   let out = '';
@@ -127,11 +127,57 @@ describe('beluga service on a Mac', () => {
   });
 });
 
-describe('beluga service elsewhere', () => {
-  it('says it needs systemd or launchd, and removing nothing is fine', async () => {
+describe('beluga service on Windows', () => {
+  it('the task runs a hidden script at sign-in that starts Beluga again only after a failure', () => {
+    const e = { ...envFor('win32', fakeExec()), domain: 'DESK', command: ["C:\\Program Files\\Beluga\\node.exe", "C:\\it's\\cli.js"] };
+    const script = windowsTaskScript(e, 'C:\\logs\\service.log');
+    expect(script).toContain("& 'C:\\Program Files\\Beluga\\node.exe' 'C:\\it''s\\cli.js' 'up' '--foreground'");
+    expect(script).toContain("$env:BELUGA_HOME = '/data/beluga'");
+    expect(script).toContain('if ($LASTEXITCODE -eq 0) { exit 0 }');
+    const task = windowsTaskXml(e);
+    expect(task).toContain('<UserId>DESK\\kay</UserId>');
+    expect(task).toContain('<LogonTrigger>');
+    expect(task).toContain('-WindowStyle Hidden');
+    expect(task).toContain('<ExecutionTimeLimit>PT0S</ExecutionTimeLimit>');
+    expect(task).toContain('<DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>');
+  });
+
+  it('registers the task with schtasks, starts it, and deletes it', async () => {
+    const exec = fakeExec();
+    const e = envFor('win32', exec);
     const io = capture();
-    expect(await installService(envFor('win32', fakeExec()), io)).toBe(1);
-    expect(io.errors()).toContain('systemd on Linux and launchd on a Mac');
+    expect(await installService(e, io)).toBe(0);
+    const dir = path.join(e.home, 'AppData', 'Local', 'Beluga', 'service');
+    const xmlFile = path.join(dir, 'beluga-task.xml');
+    expect(readFileSync(xmlFile).subarray(0, 2)).toEqual(Buffer.from([0xff, 0xfe]));
+    expect(readFileSync(xmlFile).toString('utf16le')).toContain(`<Task version="1.2"`);
+    expect(exec.calls).toEqual([`schtasks /Create /TN ${TASK_NAME} /XML ${xmlFile} /F`, `schtasks /Run /TN ${TASK_NAME}`]);
+    expect(io.text()).toContain('scheduled task');
+    expect(serviceInstalled(e)).toBe(true);
+    const status = capture();
+    serviceStatus(e, status);
+    expect(status.text()).toContain('scheduled task');
+    await startService(e);
+    expect(exec.calls.at(-1)).toBe(`schtasks /Run /TN ${TASK_NAME}`);
+    expect(await removeService(e, capture())).toBe(0);
+    expect(exec.calls.slice(-2)).toEqual([`schtasks /End /TN ${TASK_NAME}`, `schtasks /Delete /TN ${TASK_NAME} /F`]);
+    expect(existsSync(dir)).toBe(false);
+  });
+
+  it('says why when Task Scheduler won’t take it, and leaves nothing behind', async () => {
+    const e = envFor('win32', fakeExec({ 'schtasks /Create': { code: 1, out: 'ERROR: Access is denied.' } }));
+    const io = capture();
+    expect(await installService(e, io)).toBe(1);
+    expect(io.errors()).toContain('Access is denied');
+    expect(serviceInstalled(e)).toBe(false);
+  });
+});
+
+describe('beluga service elsewhere', () => {
+  it('says what it needs, and removing nothing is fine', async () => {
+    const io = capture();
+    expect(await installService(envFor('freebsd', fakeExec()), io)).toBe(1);
+    expect(io.errors()).toContain('Task Scheduler on Windows');
     const none = capture();
     expect(await removeService(envFor('linux', fakeExec()), none)).toBe(0);
     expect(none.text()).toContain('No Beluga service is installed');
