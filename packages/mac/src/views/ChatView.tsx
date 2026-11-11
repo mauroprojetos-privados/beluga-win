@@ -21,6 +21,7 @@ import { useWorktreeFlag } from './worktree-info-state.js';
 import { AskBanner } from '../chat/AskBanner.js';
 import { TriageLine } from '../chat/TriageLine.js';
 import { ConnectionStatus } from './room/ConnectionStatus.js';
+import { BotTabs } from '../bots/BotTabs.js';
 import { AssistantTabs } from '../chat/AssistantTabs.js';
 import { DrivingBanner } from '../agent-term/DrivingBanner.js';
 import { computerWord, yourComputer } from '../lib/os-words.js';
@@ -146,6 +147,7 @@ export function ChatView() {
       {other ? <OtherWorktreeBanner ws={other} /> : null}
       {view.kind === 'room' ? <ConnectionStatus /> : null}
       {view.kind === 'assistant' ? <AssistantTabs /> : null}
+      {view.kind === 'bot' ? <BotTabs id={view.id} /> : null}
       {view.kind === 'workspace' ? <PlanStrip workspaceId={view.id} /> : null}
       {view.kind === 'workspace' ? <TaskStrip workspaceId={view.id} /> : null}
       {view.kind === 'workspace' ? <DrivenStrip workspaceId={view.id} /> : null}

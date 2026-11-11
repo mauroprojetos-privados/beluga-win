@@ -9,6 +9,7 @@ import type { Session } from '../session.js';
 import type { Store } from '../store.js';
 import { Bots } from '../bots/bots.js';
 import { attachBots, detachBots } from '../bots/registry.js';
+import { triggers as sentinelTriggers } from '../sentinel/launch.js';
 import { MacAssistant } from './assistant.js';
 import { attachAssistant, detachAssistant } from './registry.js';
 
@@ -63,6 +64,9 @@ export function launchAssistant(host: { readonly session: Session; readonly stor
       return plans.createWritten(input);
     },
     watch: !host.demo,
+    // A bot’s trigger says its message in the bot’s chat as you would; its events are watched where Sentinels’ are (the demo: schedules only).
+    submit: (channel, text) => session.submit(text, { channel }),
+    ...(host.demo ? {} : { triggerEvents: sentinelTriggers(session, store) }),
   });
   attachBots(session, bots);
   // A bot's plan routes each task by its category (the pilot asks; dispatch.ts answers).

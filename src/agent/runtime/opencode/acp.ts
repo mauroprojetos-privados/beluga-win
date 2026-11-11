@@ -11,6 +11,8 @@ export interface InitializeResponse {
     readonly loadSession?: boolean;
     readonly promptCapabilities?: { readonly image?: boolean; readonly embeddedContext?: boolean };
     readonly sessionCapabilities?: { readonly fork?: object; readonly resume?: object; readonly close?: object; readonly list?: object };
+    /** The MCP transports it takes from a client besides stdio. */
+    readonly mcpCapabilities?: { readonly http?: boolean; readonly sse?: boolean };
   };
   readonly agentInfo?: { readonly name?: string; readonly version?: string };
 }

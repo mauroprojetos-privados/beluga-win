@@ -733,6 +733,10 @@ export const PHONE: Record<Method, Side> = {
   // their conversation); making, editing, knowledge, tools, versions, export and import are Bot Studio's, on the Mac
   'bots.list': 'phone',
   'bots.status': 'phone',
+  // A bot's chats, like Your Mac's: the phone starts and deletes them (chatting); which is open is the Mac's tabs.
+  'bots.newChat': 'phone',
+  'bots.openChat': 'mac',
+  'bots.deleteChat': 'phone',
   'bots.get': 'mac',
   'bots.create': 'mac',
   'bots.delete': 'mac',
@@ -749,10 +753,13 @@ export const PHONE: Record<Method, Side> = {
   'bots.knowledge.addFile': 'mac',
   'bots.knowledge.addText': 'mac',
   'bots.knowledge.addUrl': 'mac',
+  'bots.knowledge.addRepo': 'mac',
   'bots.knowledge.remove': 'mac',
   'bots.knowledge.reindex': 'mac',
   'bots.knowledge.search': 'mac',
   'bots.validate': 'mac',
+  // Run Now of a trigger is Bot Studio's (the phone shows the next run on the bot's row).
+  'bots.triggers.run': 'mac',
   'bots.versions': 'mac',
   'bots.undo': 'mac',
   'bots.restore': 'mac',

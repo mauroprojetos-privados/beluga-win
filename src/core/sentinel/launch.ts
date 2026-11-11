@@ -99,8 +99,8 @@ async function sourceRows(source: Source, cwd: string, _signal: AbortSignal, opt
   return { rows: got.rows, columns: got.columns };
 }
 
-/** Where the event triggers look: gh, the web, Earnings' Stripe keys, your variables, a Cloudflare quick tunnel. */
-function triggers(session: Session, store: Store): Omit<TriggerDeps, 'store' | 'selfId'> {
+/** Where the event triggers look: gh, the web, Earnings' Stripe keys, your variables, a Cloudflare quick tunnel. Bots' triggers look there too (core/bots/triggers.ts). */
+export function triggers(session: Session, store: Store): Omit<TriggerDeps, 'store' | 'selfId'> {
   const rootOf = (id: string | undefined): string | undefined => (id ? store.getState().projects.find((p) => p.id === id)?.root : undefined);
   return {
     gh: runGhCli,

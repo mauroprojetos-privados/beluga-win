@@ -22,6 +22,8 @@ const make = <M extends PhoneMethod>(method: M, args: PhoneArgs<M>, label: strin
 
 /** One of Your Mac's chats' topics → its id (`main` is the first, `conv:mac:assistant`). */
 const macChatOf = (topic: Topic): string => (topic === 'conv:mac:assistant' ? 'main' : topic.slice('conv:mac:assistant:'.length));
+/** One of a bot's chats' topics → its id (`main` is its first, `conv:bot:<id>`). */
+const botChatOf = (topic: Topic): string => topic.split(':')[3] ?? 'main';
 /** `conv:<channel>` → the channel the daemon's session methods take. */
 export const channelOf = (topic: Topic): string => topic.replace(/^conv:/, '');
 /** `chat:dm:<peerId>` → `dm:<peerId>` (what the network methods call a conversation). */
@@ -45,6 +47,11 @@ export const calls = {
   /** 1.14: a new empty chat on Your Mac (open on the Mac now) → its id; one deleted for good. */
   newMacChat: (): Call => make('assistant.newChat', [], 'New chat'),
   deleteMacChat: (topic: Topic): Call => make('assistant.deleteChat', [macChatOf(topic)], 'Delete the chat'),
+  /** 1.55 (docs/bots.md): a new chat of a bot (open on the Mac now) → its id; one deleted for good. */
+  newBotChat: (bot: string): Call => make('bots.newChat', [bot], 'New chat'),
+  deleteBotChat: (bot: string, topic: Topic): Call => make('bots.deleteChat', [bot, botChatOf(topic)], 'Delete the chat'),
+  /** A bot's chat id → its topic: its first (`main`) is `conv:bot:<id>`. */
+  botChatTopic: (bot: string, id: string): Topic => (id === 'main' ? `conv:bot:${bot}` : `conv:bot:${bot}:${id}`) as Topic,
   /** A chat's id → its topic: the first (`main`) keeps `conv:mac:assistant`. */
   macChatTopic: (id: string): Topic => (id === 'main' ? 'conv:mac:assistant' : `conv:mac:assistant:${id}`) as Topic,
   /** 1.44 (BLG-74): a chat's category, as its sheet in Work changes it. The setting itself stays the Mac's. */

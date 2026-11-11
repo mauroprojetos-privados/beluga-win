@@ -6,6 +6,7 @@ import Animated, { LinearTransition, FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ConvCard, convHref, StepTicker } from '../../components/Conv';
 import { MacChatsSheet } from '../../components/MacChats';
+import { BotChatsSheet } from '../../components/BotChats';
 import { Mark } from '../../components/Mark';
 import { NeedsStack } from '../../components/Needs';
 import { NumbersHome } from '../../components/Dashboard';
@@ -15,7 +16,7 @@ import { UpdatePill, UpdateSheet } from '../../components/Update';
 import { UsageCard, UsageSheet } from '../../components/Usage';
 import { Card, IconBadge, Pill, Press, Section, StatusDot, T } from '../../components/ui';
 import { useLink, useSupports, useView, useAllNeeds } from '../../lib/hooks';
-import { useT } from '../../lib/language';
+import { formatRelative, useT } from '../../lib/language';
 import type { BotSummary, ConvSummary, HomeView, PlansView } from '../../lib/link/protocol';
 import { displayName } from '../../lib/names';
 import { color, TAB_BAR_H } from '../../lib/theme';
@@ -218,17 +219,21 @@ function AskYourMac({ c, chats, onChats }: { readonly c: ConvSummary; readonly c
 /**
  * Your bots (1.53, docs/bots.md): Your Mac first, then the ones you made, each with what it's doing
  * ("2 of 6 done · waiting on Contrast check"). A tap opens its chat; its plan, when it has one, is a
- * chip. Making and editing bots is Bot Studio's, on the Mac.
+ * chip. Making and editing bots is Bot Studio's, on the Mac. 1.55: a long-press lists its chats (its tabs on
+ * the Mac), and a bot that acts on its own says when it runs next.
  */
 function BotsHome({ bots }: { readonly bots: readonly BotSummary[] }) {
   const t = useT();
+  const [chatsOf, setChatsOf] = useState<string>();
+  const next = (b: BotSummary): string | undefined => (b.nextRun === undefined ? undefined : b.nextRunName ? t('phone.bots.nextRunNamed', { name: b.nextRunName, when: formatRelative(b.nextRun) }) : t('phone.bots.nextRun', { when: formatRelative(b.nextRun) }));
+  const chatsLine = (b: BotSummary): string | undefined => (b.chats && b.chats.length > 1 ? t('phone.bots.chats', { count: b.chats.length }) : undefined);
   return (
     <Section title={t('phone.home.bots')}>
       <View style={{ gap: 8 }}>
         {bots.map((b) => {
           const working = b.status === 'working' || b.status === 'waiting';
           return (
-            <Press key={b.id} scaleTo={0.985} onPress={() => router.push(convHref(b.topic) as never)} accessibilityLabel={t('phone.home.openBot', { name: b.name })} style={{ marginHorizontal: 16 }}>
+            <Press key={b.id} scaleTo={0.985} onPress={() => router.push(convHref(b.topic) as never)} onLongPress={!b.mac ? () => setChatsOf(b.id) : undefined} delayLongPress={350} accessibilityLabel={t('phone.home.openBot', { name: b.name })} style={{ marginHorizontal: 16 }}>
               <Card style={{ paddingVertical: 12, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 <IconBadge Icon={b.mac ? Laptop : Bot} tone={b.mac ? 'sky' : 'lavender'} size={34} />
                 <View style={{ flex: 1 }}>
@@ -238,6 +243,11 @@ function BotsHome({ bots }: { readonly bots: readonly BotSummary[] }) {
                   <T v="caption" numberOfLines={1} c={working ? color.text : undefined}>
                     {b.line ?? b.description ?? (working ? t('phone.home.botWorking') : t('phone.home.botReady'))}
                   </T>
+                  {next(b) || chatsLine(b) ? (
+                    <T v="caption" numberOfLines={1}>
+                      {[next(b), chatsLine(b)].filter(Boolean).join(' · ')}
+                    </T>
+                  ) : null}
                 </View>
                 {b.plan ? (
                   <Press onPress={() => router.push(`/plan/${b.plan!.slice(5)}` as never)} accessibilityLabel={t('phone.home.botPlan', { name: b.name })} hitSlop={8} style={{ height: 32, paddingHorizontal: 10, borderRadius: 16, backgroundColor: color.sunken, alignItems: 'center', justifyContent: 'center' }}>
@@ -251,6 +261,7 @@ function BotsHome({ bots }: { readonly bots: readonly BotSummary[] }) {
           );
         })}
       </View>
+      <BotChatsSheet bot={bots.find((b) => b.id === chatsOf)} visible={Boolean(chatsOf)} onClose={() => setChatsOf(undefined)} />
     </Section>
   );
 }

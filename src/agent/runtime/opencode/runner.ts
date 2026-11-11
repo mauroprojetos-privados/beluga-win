@@ -26,6 +26,7 @@ import { listOpenCodeModels } from './models.js';
 import { RETRIES_BEFORE_FAILING, isRateLimit, providerErrorOf } from './provider.js';
 import { mapOpenCodeSlash } from './skills.js';
 import { belugaCalls, belugaTool } from './tools.js';
+import { acpHttpServers, acpStartedServers } from '../place-mcp.js';
 
 export interface OpenCodeBackendOptions {
   readonly cwd: string;
@@ -201,7 +202,8 @@ export function createOpenCodeBackend(opts: OpenCodeBackendOptions): AgentBacken
           return undefined;
         };
 
-        const servers = acpServers(mounted.servers);
+        // A bot’s own servers too (docs/bots.md): its started ones, and its HTTP ones when OpenCode takes them.
+        const servers = [...acpServers(mounted.servers), ...acpStartedServers(place?.mcp), ...(link.init.agentCapabilities?.mcpCapabilities?.http ? acpHttpServers(place?.mcp) : [])];
         const forked = Boolean(place?.forkSession && place.resume);
         const resume = place ? place.resume : sessionId;
         let opened: SessionResponse | undefined;

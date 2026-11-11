@@ -137,7 +137,7 @@ export function MacChatsSheet({ visible, onClose, current, window = false }: { r
   );
 }
 
-function ChatRow({ c, current, onPress, onLongPress }: { readonly c: ConvSummary; readonly current: boolean; readonly onPress: () => void; readonly onLongPress: () => void }) {
+export function ChatRow({ c, current, onPress, onLongPress }: { readonly c: ConvSummary; readonly current: boolean; readonly onPress: () => void; readonly onLongPress: () => void }) {
   const st = statusIcon(c.needsYou ? 'waiting' : c.status);
   return (
     <Press scaleTo={0.98} onPress={onPress} onLongPress={onLongPress} delayLongPress={350} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 10, paddingHorizontal: 10, borderRadius: 16, backgroundColor: current ? color.sunken : undefined }}>

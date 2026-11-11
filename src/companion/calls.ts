@@ -222,6 +222,9 @@ export const PhoneCalls = {
   // 1.53 (docs/bots.md): your bots and what each is doing; editing them is the Mac's.
   'bots.list': entry('bots.list', z.array(BotResult)),
   'bots.status': entry('bots.status', z.object({ status: BotResult.shape.status, line: z.string().optional() })),
+  // 1.55: a bot's own chats, started and deleted from the phone (which is open is the Mac's).
+  'bots.newChat': entry('bots.newChat', z.string()),
+  'bots.deleteChat': entry('bots.deleteChat', done),
 } as const;
 
 export type PhoneMethod = keyof typeof PhoneCalls;

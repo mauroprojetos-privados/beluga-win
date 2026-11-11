@@ -102,9 +102,13 @@ describe('channels, status and checks', () => {
   it('names Your Mac’s conversation as the assistant’s, another bot’s as bot:<id>', () => {
     expect(botChannel(MAC_BOT)).toBe(ASSISTANT_CHANNEL);
     expect(botChannel('supa')).toBe('bot:supa');
-    expect(botOfChannel('bot:supa')).toEqual({ id: 'supa', test: false });
-    expect(botOfChannel(botTestChannel('supa'))).toEqual({ id: 'supa', test: true });
-    expect(botOfChannel('bot:supa:other')).toBeUndefined();
+    expect(botOfChannel('bot:supa')).toEqual({ id: 'supa', test: false, chat: 'main' });
+    expect(botOfChannel(botTestChannel('supa'))).toEqual({ id: 'supa', test: true, chat: 'test' });
+    // Another of its chats (its tabs); never a name that isn't a chat's, nor `main` spelled out.
+    expect(botOfChannel('bot:supa:ab12c')).toEqual({ id: 'supa', test: false, chat: 'ab12c' });
+    expect(botOfChannel('bot:supa:other-chat')).toBeUndefined();
+    expect(botOfChannel('bot:supa:main')).toBeUndefined();
+    expect(botOfChannel('bot:supa:a:b')).toBeUndefined();
     expect(botOfChannel('ws:1')).toBeUndefined();
   });
 
