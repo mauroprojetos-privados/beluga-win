@@ -35,9 +35,9 @@ export function engineOptions(distros: readonly string[], st: Pick<EngineStatus,
 
 /** The line under the choice. */
 export function engineDetail(st: EngineStatus): string {
-  if (st.place !== 'wsl' || !st.distro) return 'Beluga’s engine runs here, on Windows. Pick a WSL distro to use the projects, tools and Claude you have in Linux instead.';
+  if (st.place !== 'wsl' || !st.distro) return 'Beluga’s engine runs here, on Windows. Pick a WSL distro to use the projects, tools and agents you have in Linux instead.';
   const via = st.route ? `, reached at 127.0.0.1 through ${st.route}` : '';
-  return `Beluga’s engine runs in ${st.distro}${via}. Your projects, terminals and Claude are the ones in Linux.`;
+  return `Beluga’s engine runs in ${st.distro}${via}. Your projects, terminals and agents are the ones in Linux.`;
 }
 
 /** What it says while it moves. */
