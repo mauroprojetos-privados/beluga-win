@@ -15,6 +15,7 @@ import { usePlanActions, usePlanView, usePlans } from './use-plans.js';
 import p from './plans.module.css';
 import { chordLabel } from '../lib/shortcuts-model.js';
 import { useActions } from '../lib/actions.js';
+import { useT } from '../lib/i18n.js';
 
 const AUTONOMY_ICON: Record<Autonomy, IconName> = { step: 'hand', gated: 'flag', autopilot: 'wand' };
 
@@ -40,21 +41,22 @@ export function NewPlanSheet({ projectId, close }: { projectId?: string; close: 
   const runtimes = useApp((s) => s.runtimes);
   const [agent, setAgent] = useState(YOUR_AGENT);
   const [more, setMore] = useState(false);
+  const t = useT();
   if (!projects.length) {
     // The sidebar's own "Add a Project…", one click away (every OS has it; not every one has a File menu).
     const addProject = (): void => {
       close();
       actions.run({ type: 'add_project' });
     };
-    return <FormSheet title="New Plan" intro="Plans belong to a project: a folder with your code. Add one first." submitLabel="Add a Project…" onSubmit={addProject} onCancel={close} />;
+    return <FormSheet title={t('plans.s.newPlan')} intro={t('plans.s.needsProject')} submitLabel={t('tasks.n.addProject')} onSubmit={addProject} onCancel={close} />;
   }
   const name = projects.find((p) => p.id === project)?.name;
   return (
     <FormSheet
-      title={name ? `Plan in ${name}` : 'New Plan'}
+      title={name ? t('plans.s.planIn', { name }) : t('plans.s.newPlan')}
       icon="flag"
-      intro="Say what you want built. Your agent reads the code and cuts it into milestones and tasks; you talk it through, and nothing reaches the board until you approve."
-      submitLabel="Plan with Your Agent"
+      intro={t('plans.s.intro')}
+      submitLabel={t('plans.s.planWithAgent')}
       width={600}
       canSubmit={Boolean(goal.trim() && project)}
       onCancel={close}
@@ -71,38 +73,38 @@ export function NewPlanSheet({ projectId, close }: { projectId?: string; close: 
     >
       <div className={p.newPlan}>
         <label className={p.newPlanLabel} htmlFor="plan-goal">
-          Goal
+          {t('plans.d.goal')}
         </label>
         <GoalBox value={goal} onChange={setGoal} />
-        <div className={p.newPlanHint}>What it’s for and what done looks like. {chordLabel('Cmd+Enter')} starts planning.</div>
+        <div className={p.newPlanHint}>{t('plans.s.goalHint', { keys: chordLabel('Cmd+Enter') })}</div>
         {known ? null : (
           <div className={p.newPlanRow}>
-            <span className={p.newPlanLabel}>Project</span>
-            <Popup label="Project" value={project} options={projects.map((p) => ({ value: p.id, label: p.name }))} onChange={setProject} />
+            <span className={p.newPlanLabel}>{t('tasks.project')}</span>
+            <Popup label={t('tasks.project')} value={project} options={projects.map((p) => ({ value: p.id, label: p.name }))} onChange={setProject} />
           </div>
         )}
         {/* Where it runs (BLG-786): the plan and its worktrees. Only with a computer paired. */}
         <RunsOnRow project={project} className={p.newPlanRow} labelClassName={p.newPlanLabel} />
         <div className={p.newPlanLabel} id="plan-runs">
-          How it runs
+          {t('plans.s.howItRuns')}
         </div>
         <AutonomyCards value={autonomy} onChange={setAutonomy} />
         <div className={p.newPlanRow}>
-          <span className={p.newPlanLabel}>When to run tests</span>
-          <Popup label="When to run tests" value={testsAt} options={TESTS_AT.map((t) => ({ value: t, label: TESTS_AT_INFO[t].label }))} onChange={setTestsAt} />
+          <span className={p.newPlanLabel}>{t('plans.s.whenTests')}</span>
+          <Popup label={t('plans.s.whenTests')} value={testsAt} options={TESTS_AT.map((x) => ({ value: x, label: TESTS_AT_INFO[x].label }))} onChange={setTestsAt} />
         </div>
         <div className={p.newPlanHint}>{TESTS_AT_INFO[testsAt].hint}.</div>
         <button type="button" className={p.newPlanMore} aria-expanded={more} onClick={() => setMore(!more)}>
           <Icon name={more ? 'chevronDown' : 'chevronRight'} size={10} />
-          More options
+          {t('plans.s.moreOptions')}
         </button>
         {more ? (
           <>
             <div className={p.newPlanRow}>
-              <span className={p.newPlanLabel}>Agent</span>
-              <Popup label="Agent" value={agent} options={agents} onChange={setAgent} />
+              <span className={p.newPlanLabel}>{t('tasks.agent')}</span>
+              <Popup label={t('tasks.agent')} value={agent} options={agents} onChange={setAgent} />
             </div>
-            <div className={p.newPlanHint}>Who works its milestones and tasks: each worktree runs this agent and model.</div>
+            <div className={p.newPlanHint}>{t('plans.s.agentHint')}</div>
           </>
         ) : null}
       </div>
@@ -113,6 +115,7 @@ export function NewPlanSheet({ projectId, close }: { projectId?: string; close: 
 /** The goal: six lines to start, growing with what you write (to about 60% of the sheet, then it scrolls). */
 function GoalBox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const t = useT();
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -127,7 +130,7 @@ function GoalBox({ value, onChange }: { value: string; onChange: (v: string) => 
       value={value}
       onChange={onChange}
       rows={6}
-      placeholder={'Let customers pay by card: a checkout page, webhooks that never double-charge, and refunds from the admin.\nDone when a test card goes through end to end and a refund shows up in Stripe.'}
+      placeholder={t('plans.s.goalPlaceholder')}
       data-autofocus
     />
   );
@@ -136,6 +139,7 @@ function GoalBox({ value, onChange }: { value: string; onChange: (v: string) => 
 /** Step by Step, Check-ins, Autopilot: three cards you can read without hovering (a radio group; the arrows move). */
 function AutonomyCards({ value, onChange, current }: { value: Autonomy; onChange: (a: Autonomy) => void; current?: Autonomy }) {
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
+  const t = useT();
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
     const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
     if (!step) return;
@@ -164,7 +168,7 @@ function AutonomyCards({ value, onChange, current }: { value: Autonomy; onChange
             </span>
             <span className={p.modeName}>{AUTONOMY_INFO[a].label}</span>
             <span className={p.modeSummary}>{AUTONOMY_INFO[a].summary}</span>
-            {a === current ? <span className={p.modeNow}>Now</span> : null}
+            {a === current ? <span className={p.modeNow}>{t('plans.d.flowNow')}</span> : null}
           </button>
         );
       })}
@@ -181,30 +185,31 @@ export function PlanModeSheet({ planId, close }: { planId: string; close: () => 
   const view = usePlanView(plan);
   const { api, act } = usePlanActions();
   const [mode, setMode] = useState<Autonomy>(plan?.autonomy ?? DEFAULT_AUTONOMY);
-  if (!plan || !view) return <FormSheet title="How It Runs" intro="This plan is gone." submitLabel="OK" hideSubmit onSubmit={close} onCancel={close} />;
+  const t = useT();
+  if (!plan || !view) return <FormSheet title={t('plans.s.howItRunsTitle')} intro={t('plans.s.planGone')} submitLabel={t('common.ok')} hideSubmit onSubmit={close} onCancel={close} />;
   const mixed = plan.body?.milestones.some((m) => m.autonomy && m.autonomy !== plan.autonomy);
   const change = mode !== plan.autonomy || mixed ? modeChange(view, mode) : undefined;
   return (
     <FormSheet
-      title="How It Runs"
+      title={t('plans.s.howItRunsTitle')}
       icon="flag"
-      intro={`“${plan.body?.title ?? plan.draft?.title ?? 'This plan'}” runs on ${AUTONOMY_INFO[plan.autonomy].label} now. Pick how it runs from here on.`}
-      submitLabel={change?.title ?? 'Switch'}
+      intro={t('plans.s.modeIntro', { title: plan.body?.title ?? plan.draft?.title ?? t('plans.s.thisPlan'), mode: AUTONOMY_INFO[plan.autonomy].label })}
+      submitLabel={change?.title ?? t('plans.s.switch')}
       canSubmit={Boolean(change)}
       width={600}
       onCancel={close}
       onSubmit={async () => {
         close();
-        await act(() => api.setAutonomy(plan.id, mode), `Runs on ${AUTONOMY_INFO[mode].label} now`);
+        await act(() => api.setAutonomy(plan.id, mode), t('plans.s.runsOnNow', { mode: AUTONOMY_INFO[mode].label }));
       }}
     >
       <div className={p.newPlan}>
         <div className={p.newPlanLabel} id="plan-runs">
-          How it runs
+          {t('plans.s.howItRuns')}
         </div>
         <AutonomyCards value={mode} onChange={setMode} current={plan.autonomy} />
         {change ? (
-          <div className={p.modeConfirm} role="status" aria-label="What changes">
+          <div className={p.modeConfirm} role="status" aria-label={t('plans.s.whatChanges')}>
             <p>{change.from}</p>
             {change.now ? <p className={p.modeConfirmNow}>{change.now}</p> : null}
           </div>
@@ -221,20 +226,21 @@ export function PlanStyleSheet({ close }: { close: () => void }) {
   const style = usePlans().style;
   const { api, act } = usePlanActions();
   const [text, setText] = useState(style);
+  const t = useT();
   return (
     <FormSheet
-      title="Planning Style"
+      title={t('plans.s.styleTitle')}
       icon="flag"
-      intro="How you like plans cut: task size, when to add a review, what every milestone must prove. Your agent follows it whenever it plans."
-      submitLabel="Save"
+      intro={t('plans.s.styleIntro')}
+      submitLabel={t('common.save')}
       onCancel={close}
       onSubmit={async () => {
         close();
-        await act(() => api.setStyle(text), 'Planning style saved');
+        await act(() => api.setStyle(text), t('plans.s.styleSaved'));
       }}
     >
-      <Field label="Style" htmlFor="plan-style" hint="Markdown. Kept in ~/.beluga/planning.md.">
-        <TextArea id="plan-style" value={text} onChange={setText} rows={9} placeholder={'- Tasks are at most a day of work\n- Every milestone ends with screenshots of what changed\n- Tests before code; no task without them'} data-autofocus />
+      <Field label={t('plans.s.style')} htmlFor="plan-style" hint={t('plans.s.styleHint')}>
+        <TextArea id="plan-style" value={text} onChange={setText} rows={9} placeholder={t('plans.s.stylePlaceholder')} data-autofocus />
       </Field>
     </FormSheet>
   );
@@ -242,15 +248,16 @@ export function PlanStyleSheet({ close }: { close: () => void }) {
 
 /** Not yet: what a milestone still needs. The plan's head Claude adds the work for it. */
 export function SendBackSheet({ planId, milestone, close }: { planId: string; milestone: string; close: () => void }) {
-  const title = usePlans().plans.find((p) => p.id === planId)?.body?.milestones.find((m) => m.id === milestone)?.title ?? 'this milestone';
+  const t = useT();
+  const title = usePlans().plans.find((p) => p.id === planId)?.body?.milestones.find((m) => m.id === milestone)?.title ?? t('plans.s.thisMilestone');
   const { api, act } = usePlanActions();
   const [note, setNote] = useState('');
   return (
     <FormSheet
-      title={`Not Yet: ${title}`}
+      title={t('plans.s.notYetTitle', { title })}
       icon="flag"
-      intro="Say what’s missing. Your agent adds the tasks that fix it to this milestone, for you to approve."
-      submitLabel="Send to Your Agent"
+      intro={t('plans.s.notYetIntro')}
+      submitLabel={t('plans.s.sendToAgent')}
       canSubmit={Boolean(note.trim())}
       onCancel={close}
       onSubmit={async () => {
@@ -258,8 +265,8 @@ export function SendBackSheet({ planId, milestone, close }: { planId: string; mi
         await act(() => api.sendBack(planId, milestone, note.trim()));
       }}
     >
-      <Field label="What’s missing" htmlFor="plan-note">
-        <TextArea id="plan-note" value={note} onChange={setNote} rows={4} placeholder="Refunds work, but the admin doesn’t show partial refunds yet." data-autofocus />
+      <Field label={t('plans.s.whatsMissing')} htmlFor="plan-note">
+        <TextArea id="plan-note" value={note} onChange={setNote} rows={4} placeholder={t('plans.s.missingPlaceholder')} data-autofocus />
       </Field>
     </FormSheet>
   );

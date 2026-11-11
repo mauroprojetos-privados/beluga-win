@@ -1,7 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AUTONOMIES, AUTONOMY_INFO, type Autonomy, MAX_PARALLEL, type Plan, TESTS_AT, TESTS_AT_INFO, reviewState, shownBody } from '@beluga/core/plans/model.js';
 import { type PlanView, tidyOffer } from '@beluga/core/plans/progress.js';
-import { CONTINUE_PROMPT, decodeFailure, resetWords } from '@beluga/shared/run-failure.js';
+import { CONTINUE_PROMPT, decodeFailure, resetWhen } from '@beluga/shared/run-failure.js';
 import { formatDuration } from '@beluga/shared/text.js';
 import { activityOf } from '@beluga/ui/workspace-models.js';
 import { useNow } from '../chat/Items.js';
@@ -133,7 +133,7 @@ function LimitPause({ view }: { view: PlanView }) {
     <div className={p.changes} role="status">
       <Icon name="clock" size={13} />
       <strong>{t('plans.pausedLimit')}</strong>
-      <span>{until > Date.now() ? t('plans.resumesAt', { when: resetWords(until) }) : t('plans.resumingAsUsage')}</span>
+      <span>{until > Date.now() ? t('plans.resumesAt', { when: resetWhen(until) }) : t('plans.resumingAsUsage')}</span>
       <span className={p.grow} />
       <Button size="small" variant="primary" icon="play" onClick={resume}>
         {t('plans.resumeNow')}

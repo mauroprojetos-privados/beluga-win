@@ -6,6 +6,7 @@ import { inApp, webServed } from '../lib/boot.js';
 import { toast, useApi, useBeluga } from '../lib/beluga.js';
 import { type Box, MAX_DROPPED, droppedFiles, sameBox } from '../chat/drop-model.js';
 import t from './tasks.module.css';
+import { useT } from '../lib/i18n.js';
 
 /**
  * Files dragged from Finder onto a task (its page, its card on the board, its row in the list): each
@@ -40,6 +41,7 @@ const message = (err: unknown): string => (err instanceof Error ? err.message.re
 export function useTaskFileDrop(): ReactNode {
   const api = useApi();
   const { client } = useBeluga();
+  const tr = useT();
   const [over, setOver] = useState<Over>();
 
   const add = async (target: Over, paths: readonly string[]): Promise<void> => {
@@ -47,21 +49,21 @@ export function useTaskFileDrop(): ReactNode {
     try {
       picked = droppedFiles(await api.local.statFiles(paths.slice(0, MAX_DROPPED)));
     } catch (err) {
-      return toast(client, `Couldn’t add what you dropped: ${message(err)}`, 'error');
+      return toast(client, tr('tasks.d.couldntAddDropped', { error: message(err) }), 'error');
     }
     const { files, skipped } = picked;
-    if (!files.length) return toast(client, 'Only files can be added to a task (not folders)', 'warn');
+    if (!files.length) return toast(client, tr('tasks.d.onlyFiles'), 'warn');
     let added = 0;
     for (const f of files) {
       try {
         await api.board.addProof(target.id, { kind: f.image ? 'image' : 'file', title: f.name.slice(0, 120), path: f.path, context: true });
         added++;
       } catch (err) {
-        toast(client, `Couldn’t add ${f.name}: ${message(err)}`, 'error');
+        toast(client, tr('tasks.d.couldntAdd', { name: f.name, error: message(err) }), 'error');
       }
     }
-    const left = skipped ? ` (${skipped} folder${skipped === 1 ? '' : 's'} left out)` : '';
-    if (added) toast(client, `Added ${added === 1 ? files[0]!.name : `${added} files`} to ${target.key}${left}`, 'success');
+    const left = skipped ? tr('tasks.d.foldersLeft', { count: skipped }) : '';
+    if (added) toast(client, tr('tasks.d.added', { what: added === 1 ? files[0]!.name : tr('tasks.d.nFiles', { n: added }), key: target.key, left }), 'success');
   };
   const latest = useRef(add);
   latest.current = add;
@@ -89,7 +91,7 @@ export function useTaskFileDrop(): ReactNode {
       e.preventDefault();
       const files = [...(e.dataTransfer?.files ?? [])].slice(0, MAX_DROPPED);
       void import('../lib/web-files.js')
-        .then(({ uploadFiles }) => uploadFiles(files, (file, err) => toast(client, `Couldn’t upload ${file.name}: ${message(err)}`, 'error')))
+        .then(({ uploadFiles }) => uploadFiles(files, (file, err) => toast(client, tr('tasks.t.couldntUpload', { name: file.name, error: message(err) }), 'error')))
         .then((sent) => (sent.length ? latest.current(here, sent.map((u) => u.path)) : undefined));
     };
     document.addEventListener('dragover', onOver);
@@ -134,7 +136,7 @@ export function useTaskFileDrop(): ReactNode {
     <div className={cx(t.fileDrop, small && t.fileDropSmall)} style={{ left: box.left, top: box.top, width: box.right - box.left, height: box.bottom - box.top }} aria-hidden>
       <div className={t.fileDropLabel}>
         <Icon name="file" size={small ? 12 : 16} />
-        Add to {over.key}
+        {tr('tasks.d.addTo', { key: over.key })}
       </div>
     </div>,
     document.body,

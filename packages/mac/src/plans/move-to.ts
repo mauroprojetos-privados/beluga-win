@@ -9,6 +9,7 @@ import { type MoveTarget, useMoveTargets } from '../machines/move-targets.js';
 import { onMachine } from '../machines/pane-model.js';
 import { stepSays } from './use-plans.js';
 import { placeMark } from '../machines/MachineMark.js';
+import { useT } from '../lib/i18n.js';
 
 /**
  * Move To ▸ in a plan's ••• (BLG-806): your other computers (and This Mac, from a computer's page)
@@ -28,11 +29,12 @@ export function useMoveTo(plan: Plan, view: PlanView, step: Step): ActionItem | 
   const { home } = useBeluga();
   const actions = useActions();
   const where = useMoveTargets();
+  const t = useT();
   if (where.none || plan.movedTo || plan.status === 'done') return undefined;
   const runs = somethingRuns(view);
 
   const go = (target: MoveTarget, opts: { readonly pause?: boolean; readonly commit?: boolean }): void =>
-    void step.run(`move the plan to ${target.place.name}`, `Moving to ${target.place.name}…`, async () => {
+    void step.run(t('plans.mv.what', { name: target.place.name }), t('plans.mv.moving', { name: target.place.name }), async () => {
       const to = await where.clientFor(target);
       try {
         const moved = await movePlan({
@@ -45,7 +47,7 @@ export function useMoveTo(plan: Plan, view: PlanView, step: Step): ActionItem | 
           ...opts,
           onStep: (_s, words) => stepSays(plan.id, words),
         });
-        toast(home, moved.warning ?? `Moved to ${target.place.name}: it carries on there`, moved.warning ? 'warn' : 'success');
+        toast(home, moved.warning ?? t('plans.mv.moved', { name: target.place.name }), moved.warning ? 'warn' : 'success');
         const page = { kind: 'plan' as const, id: moved.planId };
         actions.run({ type: 'view', view: target.machine ? onMachine(target.machine.id, page) : page });
       } catch (err) {
@@ -53,15 +55,15 @@ export function useMoveTo(plan: Plan, view: PlanView, step: Step): ActionItem | 
         // Asked first: nothing has moved, and the plan is as it was.
         openSheet(
           err.kind === 'running'
-            ? { kind: 'confirm', title: `Pause and move it to ${target.place.name}?`, message: `${err.message.split(':')[0]}. The plan pauses now, waits for that turn to end, then moves; it carries on there.`, confirm: 'Pause and Move', run: () => go(target, { ...opts, pause: true }) }
-            : { kind: 'confirm', title: 'Commit the changes and move it?', message: `${err.message.split(':')[0]}. They’re committed on their branch, which moves with the plan; nothing is dropped.`, confirm: 'Commit Them and Move', run: () => go(target, { ...opts, commit: true }) },
+            ? { kind: 'confirm', title: t('plans.mv.pauseTitle', { name: target.place.name }), message: t('plans.mv.pauseMessage', { why: err.message.split(':')[0] ?? '' }), confirm: t('plans.mv.pauseMove'), run: () => go(target, { ...opts, pause: true }) }
+            : { kind: 'confirm', title: t('plans.mv.commitTitle'), message: t('plans.mv.commitMessage', { why: err.message.split(':')[0] ?? '' }), confirm: t('plans.mv.commitMove'), run: () => go(target, { ...opts, commit: true }) },
         );
       }
     });
 
   return {
-    label: runs ? 'Pause and Move To' : 'Move To',
-    hint: runs ? 'Its agents finish their turn first' : 'Its chat, tasks and progress go with it',
+    label: runs ? t('plans.mv.pauseMoveTo') : t('plans.mv.moveTo'),
+    hint: runs ? t('plans.mv.pauseHint') : t('plans.mv.moveHint'),
     separate: true,
     disabled: !where.targets.length,
     submenu: where.targets.map((t) => ({ label: t.place.name, mark: placeMark(t.machine), onSelect: () => go(t, runs ? { pause: true } : {}) })),

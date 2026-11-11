@@ -8,16 +8,18 @@ import { checklist } from './tasks-model.js';
 import { useTaskActions } from './use-tasks.js';
 import { FixItButton, IssueMark } from '../issues/task-bits.js';
 import t from './tasks.module.css';
+import { useT } from '../lib/i18n.js';
 
 /** Above a worktree's conversation: the task it's doing (click to open it), and how far along it is. */
 export function TaskStrip({ workspaceId }: { workspaceId: string }) {
   const issue = useApp((s) => issueForWorkspace(s.board, workspaceId));
   const { open } = useTaskActions();
+  const tr = useT();
   if (!issue) return null;
   const ticks = checklist(issue.brief.acceptance);
   return (
     <div className={t.strip}>
-      <Tip label="Open the task this worktree is doing">
+      <Tip label={tr('tasks.st.openTask')}>
         <button type="button" className={t.stripMain} onClick={() => open(issue)}>
           <StatusIcon status={issue.status} size={13} labelled />
           <span className={t.key}>{issue.key}</span>
@@ -28,7 +30,7 @@ export function TaskStrip({ workspaceId }: { workspaceId: string }) {
               {tallyWords(ticks)}
             </span>
           ) : null}
-          {issue.needsChecks ? <span className={t.needsChecks}>Needs its checks</span> : null}
+          {issue.needsChecks ? <span className={t.needsChecks}>{tr('tasks.p.needsChecks')}</span> : null}
         </button>
       </Tip>
       <IssueMark issue={issue} />

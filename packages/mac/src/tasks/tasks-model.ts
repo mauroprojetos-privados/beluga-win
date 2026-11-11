@@ -2,6 +2,8 @@ import type { Assignee, BoardState, Issue, IssueStatus } from '../../../../src/c
 import { ISSUE_STATUSES, STATUS_INFO, boardName, boardOf, childrenOf, filterIssues, isOpen, isOwnBoard, openBlockers, reposOf, showsOn } from '../../../../src/core/board/model.js';
 import { type Tally, parseCriterion, tally } from '../../../../src/core/board/criteria.js';
 import type { Graph, GraphNode, GraphEdge } from '../../../../src/shared/graph-spec.js';
+import { type Key, t } from '../../../../src/shared/i18n/index.js';
+import { formatDateWith } from '../../../../src/shared/i18n/format.js';
 
 /**
  * The Tasks screen's pure parts (no DOM): what you're looking at (remembered per window), the
@@ -33,11 +35,22 @@ export interface TasksPrefs {
 
 export const DEFAULT_TASKS_PREFS: TasksPrefs = { scope: 'active', display: 'board', project: '', board: '', repos: [], who: '', folded: ['canceled'], opened: [] };
 
+/** A scope, its words said when read (so a language change shows at once). */
+const scope = (value: Scope, label: Key, hint: Key): { readonly value: Scope; readonly label: string; readonly hint: string } => ({
+  value,
+  get label() {
+    return t(label);
+  },
+  get hint() {
+    return t(hint);
+  },
+});
+
 export const SCOPES: ReadonlyArray<{ readonly value: Scope; readonly label: string; readonly hint: string }> = [
-  { value: 'active', label: 'Active', hint: 'Ready, In Progress and In Review' },
-  { value: 'backlog', label: 'Backlog', hint: 'Not planned yet' },
-  { value: 'all', label: 'All', hint: 'Everything open, and what finished this week' },
-  { value: 'archived', label: 'Archive', hint: 'Finished tasks you archived: their words and history kept' },
+  scope('active', 'tasks.m.active', 'tasks.m.activeHint'),
+  scope('backlog', 'tasks.m.backlog', 'tasks.m.backlogHint'),
+  scope('all', 'tasks.m.all', 'tasks.m.allHint'),
+  scope('archived', 'tasks.m.archive', 'tasks.m.archiveHint'),
 ];
 
 /** Saved prefs, read kindly (anything odd falls back to the default). */
@@ -186,8 +199,8 @@ export const pickedRepos = (picked: readonly string[], repos: readonly string[])
 
 /** A repo filter's words: "All repos", one's name, or "2 repos". */
 export function reposLabel(picked: readonly string[], name: (id: string) => string | undefined): string {
-  if (!picked.length) return 'All repos';
-  return picked.length === 1 ? (name(picked[0]!) ?? '1 repo') : `${picked.length} repos`;
+  if (!picked.length) return t('tasks.m.allRepos');
+  return picked.length === 1 ? (name(picked[0]!) ?? t('tasks.m.repos', { count: 1 })) : t('tasks.m.repos', { count: picked.length });
 }
 
 /**
@@ -214,7 +227,7 @@ export function isSolo(board: BoardState, projectId: string | undefined, selfId:
 export function assigneesIn(board: BoardState, boardId: string | undefined, selfId: string): ReadonlyArray<{ readonly key: string; readonly label: string; readonly assignee: Assignee }> {
   const seen = new Map<string, Assignee>();
   for (const i of board.issues) if (boardId !== undefined && showsOn(i, boardId) && i.assignee) seen.set(assigneeKey(i.assignee), i.assignee);
-  const label = (a: Assignee): string => (a.id === selfId ? 'You' : a.name);
+  const label = (a: Assignee): string => (a.id === selfId ? t('tasks.m.you') : a.name);
   const mine = (a: Assignee): number => (a.id === selfId ? 0 : 1);
   return [...seen.entries()].map(([key, assignee]) => ({ key, label: label(assignee), assignee })).sort((x, y) => mine(x.assignee) - mine(y.assignee) || x.label.localeCompare(y.label));
 }
@@ -232,7 +245,7 @@ export function assigneeChoices(self: Person, people: readonly Person[], current
   const all = current && current.id !== self.id && !people.some((p) => p.id === current.id) ? [...people, { id: current.id, name: current.name }] : people;
   const others = all.filter((p) => p.id !== self.id).sort((a, b) => a.name.localeCompare(b.name));
   return [
-    { key: `person:${self.id}`, label: 'You', assignee: { kind: 'person', id: self.id, name: self.name } },
+    { key: `person:${self.id}`, label: t('tasks.m.you'), assignee: { kind: 'person', id: self.id, name: self.name } },
     ...others.map((p) => ({ key: `person:${p.id}`, label: p.name, assignee: { kind: 'person', id: p.id, name: p.name } as Assignee })),
   ];
 }
@@ -299,7 +312,7 @@ export function taskGraph(board: BoardState, issues: readonly Issue[]): Graph {
         return { id: `${b}->${i.id}`, from: b, to: i.id, kind: isOpen(blocker.status) ? ('blocks' as const) : ('depends' as const) };
       }),
   );
-  return { title: 'What waits on what', direction: 'right', nodes, edges, steps: [] };
+  return { title: t('tasks.m.whatWaits'), direction: 'right', nodes, edges, steps: [] };
 }
 
 /** The tasks being worked on (in progress, in review), else the ones up next: where a busy graph opens. */
@@ -311,11 +324,11 @@ export function workGoingOn(issues: readonly Issue[]): string[] {
 /** "just now", "5 min ago", "3 h ago", "Yesterday", "Oct 12". */
 export function ago(ts: number, now = Date.now()): string {
   const s = Math.max(0, Math.round((now - ts) / 1000));
-  if (s < 60) return 'just now';
-  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
-  if (s < 86_400) return `${Math.floor(s / 3600)} h ago`;
-  if (s < 2 * 86_400) return 'Yesterday';
-  return new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric' });
+  if (s < 60) return t('tasks.m.justNow');
+  if (s < 3600) return t('tasks.m.minAgo', { n: Math.floor(s / 60) });
+  if (s < 86_400) return t('tasks.m.hAgo', { n: Math.floor(s / 3600) });
+  if (s < 2 * 86_400) return t('tasks.m.yesterday');
+  return formatDateWith(ts, { month: 'short', day: 'numeric' });
 }
 
 /** A due date in words: "Today", "Tomorrow", "In 3 days", "2 days late", "Nov 3". */
@@ -324,11 +337,11 @@ export function dueText(day: string, now = Date.now()): { readonly text: string;
   const due = new Date(y!, m! - 1, d!).getTime();
   const today = new Date(new Date(now).toDateString()).getTime();
   const days = Math.round((due - today) / 86_400_000);
-  if (days === 0) return { text: 'Today', late: false };
-  if (days === 1) return { text: 'Tomorrow', late: false };
-  if (days < 0) return { text: `${-days} day${days === -1 ? '' : 's'} late`, late: true };
-  if (days < 7) return { text: `In ${days} days`, late: false };
-  return { text: new Date(due).toLocaleDateString([], { month: 'short', day: 'numeric' }), late: false };
+  if (days === 0) return { text: t('tasks.m.today'), late: false };
+  if (days === 1) return { text: t('tasks.m.tomorrow'), late: false };
+  if (days < 0) return { text: t('tasks.m.daysLate', { count: -days }), late: true };
+  if (days < 7) return { text: t('tasks.m.inDays', { count: days }), late: false };
+  return { text: formatDateWith(due, { month: 'short', day: 'numeric' }), late: false };
 }
 
 /** Acceptance criteria: ticked, deferred and not done (with a reason), and open, out of all of them. */
@@ -370,11 +383,11 @@ export function onIt(self: Person, mine: { readonly here: boolean; readonly runn
 /** "You · working", "You and Ata · on it": a card's line for who's on it (what Claude is doing stays in the tooltip). */
 export function onItWords(people: readonly OnIt[]): string {
   if (!people.length) return '';
-  const names = people.map((p) => (p.you ? 'You' : p.name));
-  const who = names.length <= 2 ? names.join(' and ') : `${names[0]}, ${names[1]} and ${names.length - 2} more`;
-  return `${who} · ${people.some((p) => p.running) ? 'working' : 'on it'}`;
+  const names = people.map((p) => (p.you ? t('tasks.m.you') : p.name));
+  const who = names.length <= 2 ? names.join(` ${t('common.and')} `) : t('tasks.m.namesMore', { first: names[0]!, second: names[1]!, count: names.length - 2 });
+  return `${who} · ${people.some((p) => p.running) ? t('tasks.m.working') : t('tasks.m.onIt')}`;
 }
 
 /** One face's tooltip: whose Claude is at work, or whose worktree has it. */
 export const onItTip = (p: OnIt, doing?: string): string =>
-  p.running ? (p.you ? `Your agent is working${doing ? `: ${doing}` : ''}` : `${p.name}’s agent is working on it`) : p.you ? 'Your worktree has it' : `${p.name} is on it`;
+  p.running ? (p.you ? (doing ? t('tasks.m.agentWorkingOn', { doing }) : t('tasks.m.agentWorking')) : t('tasks.m.theirAgentWorking', { name: p.name })) : p.you ? t('tasks.m.yourWorktree') : t('tasks.m.isOnIt', { name: p.name });

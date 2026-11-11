@@ -6,6 +6,8 @@ import { Icon, type IconName } from '../components/Icon.js';
 import { useApp } from '../lib/beluga.js';
 import { Avatar, Tip, cx } from '../components/ui.js';
 import t from './tasks.module.css';
+import { useT } from '../lib/i18n.js';
+import { t as tx } from '@beluga/shared/i18n/index.js';
 
 /**
  * The small marks tasks are read by, the same everywhere (lists, cards, pages, menus): a status
@@ -79,13 +81,14 @@ function labelLook(def: LabelDef | undefined, label: string): { readonly icon: I
 /** A label: its icon in its color, and its name ("Bug"); one outside the set is a plain outlined tag. */
 export function LabelChip({ label, projectId, onRemove, iconOnly }: { label: string; projectId: string; onRemove?: () => void; iconOnly?: boolean }) {
   const def = useApp((s) => labelDef(s.board, projectId, label));
+  const tr = useT();
   const look = labelLook(def, label);
   const chip = (
     <span className={cx(t.label, def ? t.labelKnown : t.labelOther, iconOnly && t.labelIconOnly)} style={look.style} aria-label={iconOnly ? labelTitle(label) : undefined}>
       <Icon name={look.icon} size={11} className={t.labelIcon} />
       {iconOnly ? null : labelTitle(label)}
       {onRemove ? (
-        <button type="button" className={t.labelRemove} aria-label={`Remove ${labelTitle(label)}`} onClick={onRemove}>
+        <button type="button" className={t.labelRemove} aria-label={tr('tasks.t.removeWhat', { what: labelTitle(label) })} onClick={onRemove}>
           <Icon name="x" size={9} />
         </button>
       ) : null}
@@ -106,8 +109,8 @@ export function LabelMark({ def, label }: { def: LabelDef | undefined; label: st
 
 /** Who a task is for, in words: "For you", "For Mia", "For no one yet". */
 export function assigneeWords(assignee: Assignee | undefined, selfId: string): string {
-  if (!assignee) return 'For no one yet';
-  return assignee.id === selfId ? 'For you' : `For ${assignee.name}`;
+  if (!assignee) return tx('tasks.mk.forNoOne');
+  return assignee.id === selfId ? tx('plans.d.forYou') : tx('tasks.mk.forName', { name: assignee.name });
 }
 
 /**
@@ -115,8 +118,9 @@ export function assigneeWords(assignee: Assignee | undefined, selfId: string): s
  * `changeable`: a click on it picks someone else, and its hover says so.
  */
 export function AssigneeMark({ assignee, selfId, size = 18, changeable }: { assignee: Assignee | undefined; selfId: string; size?: number; changeable?: boolean }) {
+  useT();
   const words = assigneeWords(assignee, selfId);
-  const tip = changeable ? `${words} · Click to change` : words;
+  const tip = changeable ? tx('tasks.mk.clickToChange', { words }) : words;
   if (!assignee) {
     return (
       <Tip label={tip}>
@@ -138,9 +142,10 @@ export function AssigneeMark({ assignee, selfId, size = 18, changeable }: { assi
 /** A pull request: its number, colored by where it is (merged, failing checks, changes asked…). */
 export function PrChip({ pr }: { pr: IssuePr }) {
   const tone = pr.state === 'MERGED' ? 'merged' : pr.state === 'CLOSED' ? 'closed' : pr.checks === 'failing' || pr.review === 'CHANGES_REQUESTED' ? 'attention' : pr.review === 'APPROVED' ? 'approved' : 'open';
-  const words = pr.state === 'MERGED' ? 'Merged' : pr.state === 'CLOSED' ? 'Closed' : pr.draft ? 'Draft' : pr.review === 'CHANGES_REQUESTED' ? 'Changes requested' : pr.review === 'APPROVED' ? 'Approved' : pr.checks === 'failing' ? 'Checks failing' : pr.checks === 'pending' ? 'Checks running' : 'Open';
+  const tr = useT();
+  const words = pr.state === 'MERGED' ? tr('tasks.mk.merged') : pr.state === 'CLOSED' ? tr('tasks.mk.closed') : pr.draft ? tr('plans.m.draft') : pr.review === 'CHANGES_REQUESTED' ? tr('tasks.mk.changesRequested') : pr.review === 'APPROVED' ? tr('tasks.mk.approved') : pr.checks === 'failing' ? tr('tasks.mk.checksFailing') : pr.checks === 'pending' ? tr('tasks.mk.checksRunning') : tr('tasks.mk.open');
   return (
-    <Tip label={`Pull request #${pr.number}: ${words}`}>
+    <Tip label={tr('tasks.mk.prTip', { number: pr.number, words })}>
       <span className={cx(t.pr, t[`pr_${tone}`])}>
         <Icon name={pr.state === 'MERGED' ? 'merge' : 'pr'} size={11} />#{pr.number}
       </span>

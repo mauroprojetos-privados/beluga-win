@@ -12,6 +12,7 @@ import { type Need, type Signal, signalOf } from '../layout/attention-model.js';
 import { SignalMark } from '../layout/signal-marks.js';
 import { type Headline, type Tone, type Who, TASK_STATE, prWords } from './plans-model.js';
 import p from './plans.module.css';
+import { useT } from '../lib/i18n.js';
 
 /** Small marks shared by the plan's graph, outline and lists: a task's state, a tone pill, progress. */
 
@@ -122,7 +123,8 @@ export function PlanProgress({ columns }: { columns: ReadonlyArray<readonly Bar[
 /** Whose turn a sentence is: your initial, your agent's mark, or Beluga's (the plan itself). */
 function WhoMark({ who, size = 20 }: { who: Who; size?: number }) {
   const id = useApp((s) => s.selfId);
-  const name = useApp((s) => s.self?.name ?? s.network.self?.name ?? 'You');
+  const t = useT();
+  const name = useApp((s) => s.self?.name ?? s.network.self?.name) ?? t('tasks.m.you');
   const agent = useMyAgent();
   if (who === 'you') return <Avatar name={name} id={id} size={size} />;
   if (who === 'claude') return <Avatar name={agentName(agent)} id={id} agent={agent} size={size} />;
@@ -145,11 +147,12 @@ export function ActorMark({ by, size = 18 }: { by: Actor; size?: number }) {
 
 /** The plan's sentence: who, then what (“You: pass “API” — Claude checked all 4 criteria”). */
 export function Said({ line, className }: { line: Headline; className?: string }) {
+  const t = useT();
   return (
     <span className={cx(p.said, className)} data-who={line.who}>
       <WhoMark who={line.who} />
       <span className={p.saidText}>
-        {line.who === 'you' ? <strong className={p.saidYou}>You: </strong> : null}
+        {line.who === 'you' ? <strong className={p.saidYou}>{t('plans.mk.you')}</strong> : null}
         {line.who === 'you' ? line.text.charAt(0).toLowerCase() + line.text.slice(1) : line.text}
       </span>
     </span>
@@ -189,9 +192,10 @@ export function TaskChatMark({ worktree }: { worktree?: string }) {
 
 /** The plan's pull request, one click from GitHub, with what stands in its way (the page's header, and above its conversation). */
 export function PlanPrChip({ pr }: { pr: PlanPr }) {
+  const t = useT();
   return (
-    <Button size="small" variant="quiet" icon="pr" title={`#${pr.number} ${pr.title}: ${prWords(pr)}. Open on GitHub`} onClick={() => void openExternal(pr.url)} className={p.prChip} data-state={pr.state === 'OPEN' ? (pr.conflicts || pr.checks === 'failing' ? 'problem' : 'open') : pr.state.toLowerCase()}>
-      #{pr.number} · {pr.state === 'OPEN' ? prWords(pr) : pr.state === 'MERGED' ? 'Merged' : 'Closed'}
+    <Button size="small" variant="quiet" icon="pr" title={t('plans.mk.prTitle', { number: pr.number, title: pr.title, words: prWords(pr) })} onClick={() => void openExternal(pr.url)} className={p.prChip} data-state={pr.state === 'OPEN' ? (pr.conflicts || pr.checks === 'failing' ? 'problem' : 'open') : pr.state.toLowerCase()}>
+      #{pr.number} · {pr.state === 'OPEN' ? prWords(pr) : pr.state === 'MERGED' ? t('tasks.mk.merged') : t('tasks.mk.closed')}
     </Button>
   );
 }
