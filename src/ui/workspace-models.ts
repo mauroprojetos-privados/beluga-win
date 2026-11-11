@@ -13,6 +13,7 @@ import { steerWaiting } from '../shared/claude-notices.js';
 import { type Line, type Seg, formatDuration, lineWidth, pad, plain, truncate } from './text.js';
 import { SPINNER, glyph, theme } from './theme.js';
 import { handoffPeople, worktreeShareRows } from './worktree-share.js';
+import { t } from '../shared/i18n/index.js';
 
 /** Something clickable, in coordinates relative to the model's own top-left corner. */
 export interface Zone {
@@ -134,10 +135,10 @@ export const isCompacting = (state: AppState, now = Date.now()): boolean =>
 
 const ago = (ts: number, now: number): string => {
   const s = Math.max(0, Math.round((now - ts) / 1000));
-  if (s < 60) return 'just now';
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86_400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86_400)}d ago`;
+  if (s < 60) return t('helpers.ago.justNow');
+  if (s < 3600) return t('helpers.ago.minShort', { n: Math.floor(s / 60) });
+  if (s < 86_400) return t('helpers.ago.hShort', { n: Math.floor(s / 3600) });
+  return t('helpers.ago.dShort', { n: Math.floor(s / 86_400) });
 };
 
 export interface Activity {

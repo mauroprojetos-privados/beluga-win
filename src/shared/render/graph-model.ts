@@ -1,4 +1,6 @@
 import type { EdgeKind, Graph, GraphDirection, GraphEdge, GraphNode, GraphStatus, GraphStep, NodeKind } from '../graph-spec.js';
+import { t } from '../i18n/index.js';
+import { wordRecord, wordTable } from '../i18n/words.js';
 
 /**
  * The pure half of drawing a `beluga-graph` (no DOM, no React Flow): what each kind looks like,
@@ -28,47 +30,48 @@ export const KIND_ICON: Readonly<Record<NodeKind, string>> = {
 };
 
 /** What a kind is called in the details panel. */
-export const KIND_NAME: Readonly<Record<NodeKind, string>> = {
-  client: 'App',
-  service: 'Service',
-  database: 'Database',
-  queue: 'Queue',
-  storage: 'Storage',
-  external: 'External',
-  actor: 'Actor',
-  person: 'Person',
-  function: 'Function',
-  file: 'File',
-  decision: 'Decision',
-  note: 'Note',
-  task: 'Task',
-  milestone: 'Milestone',
-  image: 'Picture',
-  metric: 'Metric',
-  group: 'Group',
-};
+export const KIND_NAME: Readonly<Record<NodeKind, string>> = wordRecord({
+  client: 'helpers.graph.kind.client',
+  service: 'helpers.graph.kind.service',
+  database: 'helpers.graph.kind.database',
+  queue: 'helpers.graph.kind.queue',
+  storage: 'helpers.graph.kind.storage',
+  external: 'helpers.graph.kind.external',
+  actor: 'helpers.graph.kind.actor',
+  person: 'helpers.graph.kind.person',
+  function: 'helpers.graph.kind.function',
+  file: 'helpers.graph.kind.file',
+  decision: 'helpers.graph.kind.decision',
+  note: 'helpers.graph.kind.note',
+  task: 'helpers.graph.kind.task',
+  milestone: 'helpers.graph.kind.milestone',
+  image: 'helpers.graph.kind.image',
+  metric: 'helpers.graph.kind.metric',
+  group: 'helpers.graph.kind.group',
+});
 
 export type Tone = 'muted' | 'claude' | 'info' | 'ok' | 'warn' | 'error';
 
 export const STATUS_INFO: Readonly<Record<GraphStatus, { readonly label: string; readonly tone: Tone }>> = {
-  todo: { label: 'To do', tone: 'muted' },
-  active: { label: 'In progress', tone: 'claude' },
-  review: { label: 'In review', tone: 'info' },
-  done: { label: 'Done', tone: 'ok' },
-  blocked: { label: 'Blocked', tone: 'warn' },
-  failed: { label: 'Failed', tone: 'error' },
-  idle: { label: 'Idle', tone: 'muted' },
+  // Labels in the app's language, read when they're said (src/shared/i18n/areas/helpers.ts).
+  todo: { get label() { return t('helpers.graph.todo'); }, tone: 'muted' },
+  active: { get label() { return t('helpers.graph.active'); }, tone: 'claude' },
+  review: { get label() { return t('helpers.graph.review'); }, tone: 'info' },
+  done: { get label() { return t('helpers.graph.done'); }, tone: 'ok' },
+  blocked: { get label() { return t('helpers.graph.blocked'); }, tone: 'warn' },
+  failed: { get label() { return t('helpers.graph.failed'); }, tone: 'error' },
+  idle: { get label() { return t('helpers.graph.idle'); }, tone: 'muted' },
 };
 
 /** How a line reads in words, for the details panel ("calls", "sends data to"…). */
-export const EDGE_VERB: Readonly<Record<EdgeKind, { readonly out: string; readonly in: string }>> = {
-  flow: { out: 'Leads to', in: 'Comes from' },
-  call: { out: 'Calls', in: 'Called by' },
-  data: { out: 'Sends data to', in: 'Gets data from' },
-  async: { out: 'Notifies', in: 'Notified by' },
-  depends: { out: 'Depends on', in: 'Needed by' },
-  blocks: { out: 'Blocks', in: 'Blocked by' },
-};
+export const EDGE_VERB: Readonly<Record<EdgeKind, { readonly out: string; readonly in: string }>> = wordTable({
+  flow: { out: 'helpers.graph.edge.flow.out', in: 'helpers.graph.edge.flow.in' },
+  call: { out: 'helpers.graph.edge.call.out', in: 'helpers.graph.edge.call.in' },
+  data: { out: 'helpers.graph.edge.data.out', in: 'helpers.graph.edge.data.in' },
+  async: { out: 'helpers.graph.edge.async.out', in: 'helpers.graph.edge.async.in' },
+  depends: { out: 'helpers.graph.edge.depends.out', in: 'helpers.graph.edge.depends.in' },
+  blocks: { out: 'helpers.graph.edge.blocks.out', in: 'helpers.graph.edge.blocks.in' },
+});
 
 export type Side = 'left' | 'right' | 'top' | 'bottom';
 

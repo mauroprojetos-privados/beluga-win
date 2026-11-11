@@ -12,7 +12,7 @@ import { agentLabel, agentName } from '../shared/agent-label.js';
 import { waitingNote } from '../core/friend-share-people.js';
 import { criteria, tally } from '../core/board/criteria.js';
 import { OFFER_DETAIL, offerWords, waitingOn, waitingWords, workingOn, workingWords } from '../core/team/model.js';
-import { type Issue, STATUS_INFO, actorName, activityText, assigneeName, boardName, boardOf, byStatus, isArchived, isEpic, isOwnBoard, isStartable, isVisiting, issueById, progressOf as boardProgress, reposOf, showsOn } from '../core/board/model.js';
+import { type Issue, actorName, activityText, assigneeName, boardName, boardOf, byStatus, isArchived, isEpic, isOwnBoard, isStartable, isVisiting, issueById, progressOf as boardProgress, reposOf, showsOn } from '../core/board/model.js';
 import type { CcAgent } from '../core/claude-code/model.js';
 import type { PendingQuestion } from '../core/collab-store.js';
 import { type TaskView as GwTask, isFinal, requestGist, stateLabel, stateTone, targetLabel } from '../core/gateway/model.js';
@@ -28,6 +28,7 @@ import { sentinelGraph } from '../core/sentinel/workflow.js';
 import { widgetSnapshot } from '../core/sentinel/widgets.js';
 import { COMPARE, changeText, deltaOf, formatMetric } from '../core/sentinel/metrics.js';
 import type { Workspace } from '../workspaces/types.js';
+import { statusLabel } from '../shared/i18n/words.js';
 import { type MilestoneView, type PlanView as PlanProgress, agentNowWords, liveFrom, planView } from '../core/plans/progress.js';
 import { triageFacts } from '../core/triage/facts.js';
 import { categoryOf, triageKey } from '../core/triage/model.js';
@@ -1090,7 +1091,7 @@ export function tasksView(state: DomainState, ctx?: ViewContext): TasksView {
         const list = g.status === 'done' ? [...g.issues].sort((a, b) => (b.closedAt ?? b.updatedAt) - (a.closedAt ?? a.updatedAt)) : g.issues;
         const max = g.status === 'done' ? DONE_SHOWN : PER_GROUP;
         const tasks = list.slice(0, max).flatMap((i) => taskSummary(state, i, id) ?? []);
-        return { status: g.status, label: STATUS_INFO[g.status].label, tasks, ...(list.length > max ? { more: list.length - max } : {}) };
+        return { status: g.status, label: statusLabel(g.status), tasks, ...(list.length > max ? { more: list.length - max } : {}) };
       });
     const icon = reposOf(state.board, id)[0] ?? id;
     return [{ id: clip(id, 200), name: clip(boardName(state.board, id, repoName), 200), ...iconOf(ctx, icon), groups }];
@@ -1146,7 +1147,7 @@ export function taskPageView(state: DomainState, id: string, ctx?: ViewContext):
     })),
     ...(worktree ? { worktree: clip(worktree, 200) } : {}),
     ...(i.pr ? { pr: { number: i.pr.number, state: i.pr.state, title: clip(plainLine(i.pr.title, 300), 300), checks: i.pr.checks } } : {}),
-    moves: MOVES.filter((s) => s !== i.status).map((s) => ({ status: s, label: STATUS_INFO[s].label })),
+    moves: MOVES.filter((s) => s !== i.status).map((s) => ({ status: s, label: statusLabel(s) })),
     // Who works it (BLG-498), shown only (BLG-569): with a worktree on it, the agent and model running
     // there (changed in its conversation); else its own (none: your default). The list is for Start with….
     ...(live ? { agent: agentRefView(live) } : i.agent ? { agent: agentRefView(i.agent) } : {}),

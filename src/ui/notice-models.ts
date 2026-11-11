@@ -4,17 +4,23 @@ import { botOfChannel } from '../core/bots/schema.js';
 import { sentinelChatOf } from '../core/sentinel/model.js';
 import type { Notice } from '../core/work-store.js';
 import { findWorkspace } from './workspace-models.js';
+import { t } from '../shared/i18n/index.js';
+import { formatDateWith } from '../shared/i18n/format.js';
 
 // The inbox as the app shows it: filters, Today / Earlier, how each notice looks, where it goes.
 
 export type NoticeFilter = 'all' | 'unread' | 'needsYou' | 'mentions';
 
-export const NOTICE_FILTERS: ReadonlyArray<{ readonly value: NoticeFilter; readonly label: string }> = [
-  { value: 'all', label: 'All' },
-  { value: 'unread', label: 'Unread' },
-  { value: 'needsYou', label: 'Needs you' },
-  { value: 'mentions', label: 'Mentions' },
-];
+/** The bell's filters; each label in the app's language, read when it's said. */
+export const NOTICE_FILTERS: ReadonlyArray<{ readonly value: NoticeFilter; readonly label: string }> = (['all', 'unread', 'needsYou', 'mentions'] as const).map((value) => ({
+  value,
+  get label() {
+    return t(`helpers.bell.${value}`);
+  },
+}));
+
+/** A group's heading (Today, Earlier) in the app's language. */
+export const noticeGroupTitle = (label: NoticeGroup['label']): string => t(label === 'Today' ? 'helpers.bell.today' : 'helpers.bell.earlier');
 
 export function filterNotices(inbox: readonly Notice[], filter: NoticeFilter): readonly Notice[] {
   switch (filter) {
@@ -65,22 +71,20 @@ export function foldPlanNotices(list: readonly Notice[]): readonly NoticeEntry[]
   return out;
 }
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
 /** "now", "4m", "2h", then "Yesterday", a weekday, or a date. */
 export function noticeAgo(ts: number, now = Date.now()): string {
   const s = Math.max(0, Math.round((now - ts) / 1000));
-  if (s < 60) return 'now';
-  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  if (s < 60) return t('helpers.ago.now');
+  if (s < 3600) return t('helpers.age.m', { n: Math.floor(s / 60) });
   const d = new Date(ts);
   const today = new Date(now);
-  if (d.toDateString() === today.toDateString()) return `${Math.floor(s / 3600)}h`;
+  if (d.toDateString() === today.toDateString()) return t('helpers.age.h', { n: Math.floor(s / 3600) });
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
-  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
-  if (s < 6 * 86_400) return DAYS[d.getDay()]!;
-  return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  if (d.toDateString() === yesterday.toDateString()) return t('helpers.ago.yesterdayTitle');
+  // "Wed", "11 Nov" / "qua.", "11 nov."
+  if (s < 6 * 86_400) return formatDateWith(d, { weekday: 'short' });
+  return t('helpers.bell.date', { day: d.getDate(), month: formatDateWith(d, { month: 'short' }) });
 }
 
 /** What a notice is about, for its icon (each screen draws its own). */

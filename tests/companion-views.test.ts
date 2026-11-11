@@ -694,8 +694,8 @@ describe('the views of a known Mac', () => {
     expect(item).toMatchObject({ kind: 'decision', title: 'Merge the fix for #48?', from: 'Fix what broke', topic: 'sentinel:sn_fix', askedAt: T0 + 75 });
     expect(item.detail).toBe('Checks passed · Claude’s review: ship, a two-line fix with a test\nPull request #53');
     expect(item.actions).toEqual([
-      { label: 'Merge', tone: 'main', method: 'sentinel.decide', args: ['run_f1', 'merge'] },
-      { label: 'Not Now', tone: 'danger', method: 'sentinel.decide', args: ['run_f1', 'skip'] },
+      { label: 'Merge', key: 'daemon.needs.merge', tone: 'main', method: 'sentinel.decide', args: ['run_f1', 'merge'] },
+      { label: 'Not Now', key: 'daemon.needs.notNow', tone: 'danger', method: 'sentinel.decide', args: ['run_f1', 'skip'] },
     ]);
   });
 

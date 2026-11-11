@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { sayNeed } from './language';
+import { sayNeed, t } from './language';
 import type { NeedsYou, OutputView, Topic } from './link/protocol';
 import { kv } from './kv';
 import type { ComputerLinkState } from './link/computers';
@@ -168,12 +168,12 @@ export const asOf = (at: number): string => `as of ${new Date(at).toLocaleTimeSt
 export function ago(ts: number | undefined, now = Date.now()): string {
   if (!ts) return '';
   const s = Math.max(0, Math.round((now - ts) / 1000));
-  if (s < 45) return 'now';
+  if (s < 45) return t('helpers.ago.now');
   const m = Math.round(s / 60);
-  if (m < 60) return `${m}m`;
+  if (m < 60) return t('helpers.age.m', { n: m });
   const h = Math.round(m / 60);
-  if (h < 24) return `${h}h`;
-  return `${Math.round(h / 24)}d`;
+  if (h < 24) return t('helpers.age.h', { n: h });
+  return t('helpers.age.d', { n: Math.round(h / 24) });
 }
 
 export function until(ts: number | undefined, now = Date.now()): string {

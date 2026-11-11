@@ -7,7 +7,7 @@ import type { View } from '@beluga/core/store.js';
 import type { Method } from '@beluga/ipc/api.js';
 import type { Notice } from '@beluga/core/work-store.js';
 import { dndActive, dndLabel } from '@beluga/shared/quiet.js';
-import { type NoticeFilter, type NoticeLook, NOTICE_FILTERS, filterNotices, foldPlanNotices, groupNotices, noticeAgo, noticeLook } from '@beluga/ui/notice-models.js';
+import { type NoticeFilter, type NoticeLook, NOTICE_FILTERS, filterNotices, foldPlanNotices, groupNotices, noticeAgo, noticeGroupTitle, noticeLook } from '@beluga/ui/notice-models.js';
 import { planTitle } from '@beluga/core/plans/model.js';
 import { Icon, type IconName } from '../components/Icon.js';
 import { Button, IconButton, Tip, cx } from '../components/ui.js';
@@ -326,8 +326,8 @@ function Center({ close }: { close: () => void }) {
         {filter === 'mentions' ? null : <RemoteWaiting close={close} now={now} />}
         {groups.length ? (
           groups.map((g) => (
-            <section key={g.label} className={s.group} aria-label={g.label}>
-              <h3 className={s.groupTitle}>{g.label}</h3>
+            <section key={g.label} className={s.group} aria-label={noticeGroupTitle(g.label)}>
+              <h3 className={s.groupTitle}>{noticeGroupTitle(g.label)}</h3>
               <ul className={s.list}>
                 {foldPlanNotices(g.notices).map((e) =>
                   e.kind === 'one' ? <Row key={e.notice.id} n={e.notice} now={now} onOpen={open} /> : <PlanFold key={`plan:${e.plan}`} plan={e.plan} notices={e.notices} now={now} onOpen={open} />,
