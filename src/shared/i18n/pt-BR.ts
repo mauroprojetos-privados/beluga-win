@@ -82,6 +82,7 @@ export const ptBR: Partial<Record<Key, Message>> = {
   'needs.ask': 'Perguntar',
   'needs.notNow': 'Agora não',
   'needs.resume': 'Retomar',
+  // agent-wording: claude (a plan's merge fixer is Claude, as needs-you.ts always said)
   'needs.askClaudeAgain': 'Pedir ao Claude de novo',
   'needs.fix': 'Corrigir',
   'needs.approveAnyway': 'Aprovar mesmo assim',
@@ -99,6 +100,7 @@ export const ptBR: Partial<Record<Key, Message>> = {
   'needs.askAgent': 'Perguntar a {agent}?',
   'needs.aTask': 'Uma tarefa',
   'needs.taskStalled': '“{title}” parou duas vezes: retomar?',
+  // agent-wording: claude
   'needs.conflictStuck': 'Um conflito de merge que o Claude não conseguiu resolver',
   'needs.reviewFound': { one: 'O revisor achou uma coisa para corrigir em “{title}”', other: 'O revisor achou {count} coisas para corrigir em “{title}”' },
   'needs.approvePlan': 'Aprovar o plano “{title}”?',

@@ -87,6 +87,7 @@ export const en = {
   'needs.ask': 'Ask',
   'needs.notNow': 'Not now',
   'needs.resume': 'Resume',
+  // agent-wording: claude (a plan's merge fixer is Claude, as needs-you.ts always said)
   'needs.askClaudeAgain': 'Ask Claude again',
   'needs.fix': 'Fix',
   'needs.approveAnyway': 'Approve anyway',
@@ -104,6 +105,7 @@ export const en = {
   'needs.askAgent': 'Ask {agent}?',
   'needs.aTask': 'A task',
   'needs.taskStalled': '“{title}” stopped twice: resume it?',
+  // agent-wording: claude
   'needs.conflictStuck': 'A merge conflict Claude couldn’t fix',
   'needs.reviewFound': { one: 'The reviewer found one thing to fix in “{title}”', other: 'The reviewer found {count} things to fix in “{title}”' },
   'needs.approvePlan': 'Approve the plan “{title}”?',

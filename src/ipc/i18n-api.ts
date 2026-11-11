@@ -8,5 +8,5 @@ import { LANGUAGE_CHOICES, LOCALES } from '../shared/i18n/locales.js';
  */
 export const I18N_API = {
   'settings.language': { args: z.tuple([z.enum(LANGUAGE_CHOICES)]) },
-  'settings.commitLanguage': { args: z.tuple([z.string().min(1).max(80), z.enum(LOCALES).nullable()]) },
+  'settings.commitLanguage': { args: z.tuple([z.string().min(1).max(80), z.enum(LOCALES).nullable().optional()]) },
 } as const;

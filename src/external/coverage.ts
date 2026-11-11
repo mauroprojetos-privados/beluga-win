@@ -21,6 +21,7 @@ const SIGN_IN = 'A sign-in is a person\'s, in a browser.';
 const PHONE_LINK = 'The phone\'s own link: an agent uses the chat, file and board tools for the same work.';
 const YOUR_MAC = 'The owner gave agents the sidebar\'s chats, not the Your Mac chats (BLG-243).';
 const OTHERS_RUNS = 'It stops runs that are not this agent\'s: beluga_chat_interrupt stops its own.';
+const LANGUAGE = 'The language a person reads and their commits are written in is theirs to pick, in Settings.';
 const INBOX = 'The inbox marks what a person has read, and an agent\'s mark would hide it from them.';
 const NO_SCOPE = 'A file name does not say which chat the image is in, so a grant cannot check it.';
 const VIEW_SOURCE = 'It runs a view\'s source, which can be a command: sentinel_try_source tries one under its own class.';
@@ -285,8 +286,8 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'stripe.disconnect': 'gated',
   'stripe.refresh': 'gated',
   'support.answer': 'gated',
-  'settings.language': 'gated',
-  'settings.commitLanguage': 'gated',
+  'settings.language': { refused: LANGUAGE },
+  'settings.commitLanguage': { refused: LANGUAGE },
   'claudeCode.steps': 'gated',
   'claudeCode.step': 'gated',
   'claudeCode.findAgent': 'gated',
