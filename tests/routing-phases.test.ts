@@ -79,7 +79,7 @@ describe('tokens and cost by combo and target', () => {
 
   it('adds them up by combo and target, and says them short', () => {
     const agent = (runtime: string, label: string, model?: string): AgentRef => ({ runtime, label, ...(model ? { model } : {}), combo: 'economy', comboName: 'Economy' });
-    const card = (a: AgentRef, tokens: number, cost: number, status = 'done'): LimitCard => ({ type: 'agent', owner: 'me', status, ts: 1, endTs: 2, agent: a, text: status === 'error' ? encodeFailure({ kind: 'usage_limit', detail: 'x' }) : 'ok', usage: { tokens, cost } });
+    const card = (a: AgentRef, tokens: number, cost: number, status = 'done'): LimitCard & { readonly agent: AgentRef } => ({ type: 'agent', owner: 'me', status, ts: 1, endTs: 2, agent: a, text: status === 'error' ? encodeFailure({ kind: 'usage_limit', detail: 'x' }) : 'ok', usage: { tokens, cost } });
     const u = comboUsage([card(agent('codex', 'Codex'), 800_000, 0), card(agent('claude', 'Claude', 'sonnet'), 350_000, 3.4, 'error'), card(agent('codex', 'Codex'), 50_000, 0)], 'me');
     expect(u[0]).toMatchObject({ tokens: 1_200_000, runs: 3, limited: 1 });
     expect(u[0]!.cost).toBeCloseTo(3.4);
