@@ -7,6 +7,7 @@ import { useClock } from '../lib/window-active.js';
 import { netChat, roomChat } from './call-chat.js';
 import { PopClock, popsNow } from './chat-pops.js';
 import { PopList } from './PopList.js';
+import { useT } from '../lib/i18n.js';
 import s from './chatpops.module.css';
 
 /** The reply line steps aside after this long without the pointer moving (unless there's something to answer). */
@@ -33,6 +34,7 @@ function usePointerAwake(ms: number): boolean {
 
 /** A line to answer in, under the messages: it goes in the same chat. Shown while there's something to answer, you type, or the pointer moves. */
 function Reply({ conversation, place, dark, wanted }: { conversation: string; place: string; dark?: boolean; wanted: boolean }) {
+  const t = useT();
   const { client } = useBeluga();
   const actions = useActions();
   const [text, setText] = useState('');
@@ -45,7 +47,7 @@ function Reply({ conversation, place, dark, wanted }: { conversation: string; pl
     if (conversation === 'room') return actions.submit(words);
     void client.api.network.post(conversation, { text: words }).catch((err: unknown) => {
       setText(words);
-      client.store.dispatch({ type: 'toast', text: `Couldn’t send: ${err instanceof Error ? err.message : String(err)}`, level: 'error' });
+      client.store.dispatch({ type: 'toast', text: t('network.pops.couldntSend', { error: err instanceof Error ? err.message : String(err) }), level: 'error' });
     });
   };
   return (
@@ -70,8 +72,8 @@ function Reply({ conversation, place, dark, wanted }: { conversation: string; pl
             setText('');
           }
         }}
-        placeholder={`Message ${place}`}
-        aria-label={`Message ${place}`}
+        placeholder={t('network.conv.messageTo', { name: place })}
+        aria-label={t('network.conv.messageTo', { name: place })}
         maxLength={8_000}
       />
     </form>
@@ -84,6 +86,7 @@ function Reply({ conversation, place, dark, wanted }: { conversation: string; pl
  * Anywhere the chat shows beside the call, this isn't drawn: the chat is right there.
  */
 export function CallChatPops({ conversation, place, dark, className }: { conversation: string; place: string; dark?: boolean; className?: string }) {
+  const t = useT();
   useClock(true);
   const log = useApp((st) => (conversation === 'room' ? st.log : undefined));
   const messages = useApp((st) => (conversation === 'room' ? undefined : st.network.messages[conversation]));
@@ -96,7 +99,7 @@ export function CallChatPops({ conversation, place, dark, className }: { convers
   const pops = popsNow(clock.current.stamp(all, now), now);
   const awake = usePointerAwake(REPLY_IDLE_MS);
   return (
-    <div className={cx(s.chat, className)} role="complementary" aria-label="The chat">
+    <div className={cx(s.chat, className)} role="complementary" aria-label={t('network.pops.theChat')}>
       <PopList pops={pops} now={now} dark={dark} />
       <Reply conversation={conversation} place={place} dark={dark} wanted={awake || pops.length > 0} />
     </div>

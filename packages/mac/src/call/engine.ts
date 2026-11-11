@@ -2,6 +2,7 @@ import type { SocketClient } from '@beluga/ipc/socket-client.js';
 import type { Intent } from '@beluga/core/intents.js';
 import { type CallView, type ShareMode, type StageMessage, CLIP_PART, HEARTBEAT_MS, SHARE_KBPS, parseStage, shareChildren, shareTreeBy, sharerOf } from '@beluga/shared/calls.js';
 import { inApp } from '../lib/boot.js';
+import { t } from '@beluga/shared/i18n/index.js';
 import { Levels } from './levels.js';
 import { type CameraSize, type LineState, Peer } from './peer.js';
 import { demoCamera, demoPointer, demoScreen, demoVoice } from './demo-media.js';
@@ -153,7 +154,7 @@ export class CallEngine {
   async devices(): Promise<AudioDevices> {
     const all = await navigator.mediaDevices?.enumerateDevices().catch(() => []) ?? [];
     const named = (kind: MediaDeviceKind): AudioDevice[] =>
-      all.filter((d) => d.kind === kind && d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications').map((d, i) => ({ id: d.deviceId, label: d.label || (kind === 'audioinput' ? `Microphone ${i + 1}` : `Speaker ${i + 1}`) }));
+      all.filter((d) => d.kind === kind && d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications').map((d, i) => ({ id: d.deviceId, label: d.label || (kind === 'audioinput' ? t('network.engine.mic', { n: i + 1 }) : t('network.engine.speaker', { n: i + 1 })) }));
     return {
       mics: named('audioinput'),
       speakers: named('audiooutput'),
@@ -219,7 +220,7 @@ export class CallEngine {
       oldFilter?.stop();
       oldRaw?.getTracks().forEach((t) => t.stop());
     } catch {
-      this.patch({ problem: 'Couldn’t switch to that microphone. Check it’s plugged in, then pick it again.' });
+      this.patch({ problem: t('network.engine.micSwitch') });
     }
   }
 
@@ -281,7 +282,7 @@ export class CallEngine {
       this.reconcile();
     } catch (err) {
       const name = err instanceof Error ? err.name : '';
-      if (name !== 'NotAllowedError' && name !== 'AbortError') this.patch({ problem: 'Couldn’t share your screen. Check Screen Recording in System Settings › Privacy & Security.' });
+      if (name !== 'NotAllowedError' && name !== 'AbortError') this.patch({ problem: t('network.engine.share') });
     }
   }
 
@@ -466,7 +467,7 @@ export class CallEngine {
       this.reconcile();
     } catch {
       this.cam = undefined;
-      this.patch({ problem: 'Beluga can’t use your camera. Allow it in System Settings › Privacy & Security › Camera.' });
+      this.patch({ problem: t('network.engine.camera') });
     }
   }
 
@@ -536,7 +537,7 @@ export class CallEngine {
       })
       .catch(() => {
         this.micAsked = undefined;
-        this.patch({ problem: 'Beluga can’t hear your microphone. Allow it in System Settings › Privacy & Security › Microphone.' });
+        this.patch({ problem: t('network.engine.microphone') });
         return undefined;
       });
     return this.micAsked;

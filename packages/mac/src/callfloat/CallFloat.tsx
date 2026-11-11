@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon.js';
 import { Avatar, cx } from '../components/ui.js';
 import { type FloatAction, type FloatPerson, type FloatState, faceOrder } from '../call/float-model.js';
 import { useClock } from '../lib/window-active.js';
+import { useT } from '../lib/i18n.js';
 import s from './callfloat.module.css';
 
 /** Hear what the card shows (now, and as it changes), from Beluga's window through the shell. */
@@ -223,6 +224,7 @@ function useDrag(): { onPointerDown: (e: ReactPointerEvent) => void; dragged: ()
  * call in Beluga. Ringing, it stays whole: who calls, decline and join.
  */
 export function CallFloat() {
+  const t = useT();
   const state = useFloatState();
   // The card's window is never the one you're in: its clock always runs (watchWindow isn't started here).
   const now = useClock(true);
@@ -253,14 +255,14 @@ export function CallFloat() {
               <Avatar name={state.by.name} id={state.by.peerId} size={30} />
             </span>
             <span className={s.text}>
-              <strong>{state.by.name} is calling</strong>
-              <span>{state.group ? state.place : 'Voice call'}</span>
+              <strong>{t('network.call.isCalling', { name: state.by.name })}</strong>
+              <span>{state.group ? state.place : t('network.float.voiceCall')}</span>
             </span>
           </button>
-          <button type="button" className={s.decline} aria-label="Decline" onClick={() => act('decline', state.conversation)}>
+          <button type="button" className={s.decline} aria-label={t('network.group.decline')} onClick={() => act('decline', state.conversation)}>
             <Icon name="callEnd" size={16} />
           </button>
-          <button type="button" className={s.join} aria-label="Join" onClick={() => act('join', state.conversation)}>
+          <button type="button" className={s.join} aria-label={t('network.call.join')} onClick={() => act('join', state.conversation)}>
             <Icon name="call" size={15} />
           </button>
         </div>
@@ -269,7 +271,7 @@ export function CallFloat() {
   }
 
   const talking = state.people.find((p) => p.speaking);
-  const status = state.youShare ? null : talking ? `${talking.name} is talking` : state.sharing ? `${state.sharing} is sharing` : state.people.length ? callLength(now - state.startedAt) : 'Ringing…';
+  const status = state.youShare ? null : talking ? t('network.call.isTalking', { name: talking.name }) : state.sharing ? t('network.call.isSharing', { name: state.sharing }) : state.people.length ? callLength(now - state.startedAt) : t('network.call.ringing');
   const faces = ordered.slice(0, 3);
   const more = state.people.length - faces.length;
   return (
@@ -285,40 +287,40 @@ export function CallFloat() {
               // You're sharing: the card says so for as long as it lasts, whoever talks.
               <span className={s.onShow}>
                 <span className={s.liveDot} aria-hidden="true" />
-                Sharing your screen
+                {t('network.float.sharingScreen')}
               </span>
             )}
           </span>
         </button>
         {state.youShare ? (
-          <button type="button" className={s.stop} aria-label="Stop Sharing" tabIndex={tab} onClick={() => act('stop-sharing', state.conversation)}>
+          <button type="button" className={s.stop} aria-label={t('network.call.stopSharing')} tabIndex={tab} onClick={() => act('stop-sharing', state.conversation)}>
             <Icon name="screenShare" size={13} />
-            Stop
+            {t('common.stop')}
           </button>
         ) : null}
-        <button type="button" className={cx(s.round, state.muted && s.off)} aria-label={state.muted ? 'Unmute' : 'Mute'} tabIndex={tab} onClick={() => act(state.muted ? 'unmute' : 'mute', state.conversation)}>
+        <button type="button" className={cx(s.round, state.muted && s.off)} aria-label={state.muted ? t('network.call.unmute') : t('network.call.mute')} tabIndex={tab} onClick={() => act(state.muted ? 'unmute' : 'mute', state.conversation)}>
           <Icon name={state.muted ? 'micOff' : 'mic'} size={15} />
         </button>
-        <button type="button" className={s.decline} aria-label="Leave Call" tabIndex={tab} onClick={() => act('leave', state.conversation)}>
+        <button type="button" className={s.decline} aria-label={t('network.call.leave')} tabIndex={tab} onClick={() => act('leave', state.conversation)}>
           <Icon name="callEnd" size={16} />
         </button>
         {/* Out of the way until you're back in Beluga (the frame around a shared screen stays). */}
-        <button type="button" className={s.tuck} aria-label="Hide" title="Hide until you’re back in Beluga" tabIndex={tab} onClick={() => act('hide', state.conversation)}>
+        <button type="button" className={s.tuck} aria-label={t('network.float.hide')} title={t('network.float.hideTitle')} tabIndex={tab} onClick={() => act('hide', state.conversation)}>
           <Icon name="chevronUp" size={13} />
         </button>
       </div>
       {/* Compact: who's there and who's talking, and whether you share or are muted. */}
       <div ref={compactRef} className={s.compact} aria-hidden={open}>
-        {state.youShare ? <span className={s.liveDot} aria-label="Sharing your screen" /> : null}
+        {state.youShare ? <span className={s.liveDot} aria-label={t('network.float.sharingScreen')} /> : null}
         {faces.length ? (
           <Faces people={faces} size={22} more={more} />
         ) : (
-          <span className={s.waiting} aria-label="Ringing">
+          <span className={s.waiting} aria-label={t('network.float.ringingAria')}>
             <Icon name="call" size={13} />
           </span>
         )}
         {state.muted ? (
-          <span className={s.mutedMark} aria-label="Muted">
+          <span className={s.mutedMark} aria-label={t('network.float.muted')}>
             <Icon name="micOff" size={12} />
           </span>
         ) : null}

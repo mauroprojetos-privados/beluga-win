@@ -9,6 +9,7 @@ import { isOpen } from '../../../../src/core/board/model.js';
 import type { TeamState } from '../../../../src/core/team/model.js';
 import { sharedTasks } from '../../../../src/core/team/mentions.js';
 import { yourComputer } from '../lib/os-words.js';
+import { t } from '../../../../src/shared/i18n/index.js';
 
 /**
  * What the chats say and decide, as plain functions (no React, no daemon): whose Claude a
@@ -20,9 +21,9 @@ export type Ask = { readonly kind: 'me' } | { readonly kind: 'all' } | { readonl
 
 /** "Asking your Claude" (or, short for the button: "Your Claude"). */
 export function askLabel(ask: Ask, short = false): string {
-  if (ask.kind === 'me') return short ? 'Your agent' : 'Asking your agent';
-  if (ask.kind === 'all') return short ? 'Everyone’s agent' : 'Asking everyone’s agent';
-  return short ? `${ask.name}’s agent` : `Asking ${ask.name}’s agent`;
+  if (ask.kind === 'me') return short ? t('network.conv.yourAgent') : t('network.chat.askingYours');
+  if (ask.kind === 'all') return short ? t('network.chat.everyonesAgent') : t('network.chat.askingEveryone');
+  return short ? t('network.conv.theirAgent', { name: ask.name }) : t('network.chat.askingTheirs', { name: ask.name });
 }
 
 /** What the message tells the network: everyone, or these people's Claudes. */
@@ -47,11 +48,11 @@ export interface ChannelSuggestion extends Suggestion {
   readonly command?: ChannelCommand;
 }
 
-const COMMANDS: ReadonlyArray<{ name: ChannelCommand; hint: string; when?: 'others' | 'admin' }> = [
-  { name: 'claude', hint: 'Your agent answers this message' },
-  { name: 'claudes', hint: 'Everyone’s agent answers, each from their own computer', when: 'others' },
-  { name: 'files', hint: `Send files from ${yourComputer()}…` },
-  { name: 'add-people', hint: 'Add people to this channel…', when: 'admin' },
+const commands = (): ReadonlyArray<{ name: ChannelCommand; hint: string; when?: 'others' | 'admin' }> => [
+  { name: 'claude', hint: t('network.chat.cmdClaude') },
+  { name: 'claudes', hint: t('network.chat.cmdClaudes'), when: 'others' },
+  { name: 'files', hint: t('network.chat.cmdFiles', { computer: yourComputer() }) },
+  { name: 'add-people', hint: t('network.chat.cmdAddPeople'), when: 'admin' },
 ];
 
 /**
@@ -62,29 +63,29 @@ const COMMANDS: ReadonlyArray<{ name: ChannelCommand; hint: string; when?: 'othe
 export function channelSuggestions(text: string, ctx: { people: readonly Member[]; admin?: boolean; friends?: readonly Member[]; tasks?: readonly TaskMention[] }): ChannelSuggestion[] {
   if (/^\/[\w-]*$/.test(text)) {
     const typed = text.slice(1).toLowerCase();
-    const commands: ChannelSuggestion[] = COMMANDS.filter((c) => c.name.startsWith(typed) && (c.when !== 'others' || ctx.people.length > 0) && (c.when !== 'admin' || ctx.admin)).map((c) => ({ label: `/${c.name}`, hint: c.hint, value: '', enter: 'complete', command: c.name }));
+    const listed: ChannelSuggestion[] = commands().filter((c) => c.name.startsWith(typed) && (c.when !== 'others' || ctx.people.length > 0) && (c.when !== 'admin' || ctx.admin)).map((c) => ({ label: `/${c.name}`, hint: c.hint, value: '', enter: 'complete', command: c.name }));
     // /invite: a friend link on its own, or "/invite @ata" adds ata here (BLG-203). It's written out, then sent.
-    return 'invite'.startsWith(typed) ? [...commands, { label: '/invite', hint: 'Add a friend, or @name to add them here', value: '/invite @', enter: 'complete' }] : commands;
+    return 'invite'.startsWith(typed) ? [...listed, { label: '/invite', hint: t('network.chat.cmdInvite'), value: '/invite @', enter: 'complete' }] : listed;
   }
   const inviting = /^\/invite\s+@?([\p{L}\p{N}_.-]*)$/iu.exec(text);
   if (inviting) {
-    const t = (inviting[1] ?? '').toLowerCase();
+    const start = (inviting[1] ?? '').toLowerCase();
     return (ctx.friends ?? [])
-      .filter((f) => handle(f.name) && handle(f.name).toLowerCase().startsWith(t) && !ctx.people.some((p) => p.peerId === f.peerId))
-      .map((f) => ({ label: f.name, hint: `/invite @${handle(f.name)} · add ${f.name} here`, value: `/invite @${handle(f.name)}`, enter: 'complete' }));
+      .filter((f) => handle(f.name) && handle(f.name).toLowerCase().startsWith(start) && !ctx.people.some((p) => p.peerId === f.peerId))
+      .map((f) => ({ label: f.name, hint: `/invite @${handle(f.name)} · ${t('network.chat.addHere', { name: f.name })}`, value: `/invite @${handle(f.name)}`, enter: 'complete' }));
   }
   const typed = typedMention(text);
   if (typed === undefined) return [];
   const before = text.slice(0, text.length - typed.length - 1);
   const options = [
-    { label: 'Your agent', insert: '@claude', hint: `answers here, from ${yourComputer()}` },
-    ...ctx.people.map((p) => ({ label: `${p.name}’s agent`, insert: `@claude:${handle(p.name)}`, hint: `answers from ${p.name}’s computer` })),
-    ...(ctx.people.length ? [{ label: 'Everyone’s agent', insert: '@claudes', hint: 'each answers from their own computer' }] : []),
-    ...ctx.people.filter((p) => handle(p.name)).map((p) => ({ label: p.name, insert: `@${handle(p.name)}`, hint: 'the person, not their agent' })),
+    { label: t('network.conv.yourAgent'), insert: '@claude', hint: t('network.chat.answersHere', { computer: yourComputer() }) },
+    ...ctx.people.map((p) => ({ label: t('network.conv.theirAgent', { name: p.name }), insert: `@claude:${handle(p.name)}`, hint: t('network.chat.answersFrom', { name: p.name }) })),
+    ...(ctx.people.length ? [{ label: t('network.chat.everyonesAgent'), insert: '@claudes', hint: t('network.chat.eachAnswers') }] : []),
+    ...ctx.people.filter((p) => handle(p.name)).map((p) => ({ label: p.name, insert: `@${handle(p.name)}`, hint: t('network.chat.thePerson') })),
   ];
-  const t = typed.toLowerCase();
+  const lower = typed.toLowerCase();
   const named: ChannelSuggestion[] = options
-    .filter((o) => o.insert.slice(1).toLowerCase().startsWith(t) || o.label.toLowerCase().startsWith(t))
+    .filter((o) => o.insert.slice(1).toLowerCase().startsWith(lower) || o.label.toLowerCase().startsWith(lower))
     .map((o) => ({ label: o.label, hint: `${o.insert} · ${o.hint}`, value: `${before}${o.insert} `, enter: 'complete' }));
   const tasks: ChannelSuggestion[] = matchTasks(typed, ctx.tasks ?? []).map((task) => ({ label: `@${task.key}`, hint: task.title, value: `${before}@${task.key} `, enter: 'complete' }));
   return [...named, ...tasks];
@@ -140,17 +141,18 @@ export const channelWorld = (me: Member | undefined, people: readonly Member[], 
 export function askedLine(m: Pick<MessageView, 'ask' | 'mine' | 'from'>, nameOf: (peerId: string) => string, me: string | undefined): string | undefined {
   const to = m.ask?.to;
   if (!to) return undefined;
-  if (to === 'all') return 'Asked everyone’s agent';
-  const names = to.map((p) => (p === me ? (m.mine ? 'their own' : 'your') : `${nameOf(p)}’s`));
-  if (m.mine) return `Asked ${to.length === 1 && to[0] === me ? 'your' : names.join(' and ')} agent`;
-  if (to.length === 1 && to[0] === m.from) return 'Asked their agent';
-  return `Asked ${names.join(' and ')} agent`;
+  if (to === 'all') return t('network.chat.askedEveryone');
+  const names = to.map((p) => (p === me ? (m.mine ? t('network.chat.theirOwn') : t('network.call.ownerYours')) : t('network.call.ownerTheirs', { name: nameOf(p) })));
+  const and = ` ${t('common.and')} `;
+  if (m.mine) return to.length === 1 && to[0] === me ? t('network.chat.askedYours') : t('network.chat.askedNames', { names: names.join(and) });
+  if (to.length === 1 && to[0] === m.from) return t('network.chat.askedTheirs');
+  return t('network.chat.askedNames', { names: names.join(and) });
 }
 
 /** Who wrote it, as the chat shows it: "You", "bob", "Your Claude", "bob’s Claude". */
 export function authorLabel(m: Pick<MessageView, 'mine' | 'name' | 'claude'>): string {
-  if (m.claude) return m.mine ? `Your ${agentName(m.claude.agent)}` : `${m.name}’s ${agentName(m.claude.agent)}`;
-  return m.mine ? 'You' : m.name;
+  if (m.claude) return m.mine ? t('network.chat.yourNamedAgent', { agent: agentName(m.claude.agent) }) : t('network.chat.theirNamedAgent', { name: m.name, agent: agentName(m.claude.agent) });
+  return m.mine ? t('network.conv.you') : m.name;
 }
 
 export function sizeLabel(bytes: number): string {
@@ -163,7 +165,7 @@ export function sizeLabel(bytes: number): string {
 /** "PDF", "ZIP", "PNG" (from the name), or "File". */
 export function kindLabel(f: Pick<ChatFile, 'name'>): string {
   const ext = /\.([a-z0-9]{1,6})$/i.exec(f.name)?.[1];
-  return ext ? ext.toUpperCase() : 'File';
+  return ext ? ext.toUpperCase() : t('network.chat.file');
 }
 
 /** Claudes answering in this conversation now (newest last), without stale ones. */
@@ -173,10 +175,10 @@ export function liveIn(state: Pick<NetworkState, 'live'>, conversation: string, 
 
 /** "bob’s Claude is answering…", "Your Claude and mia’s Claude are answering…". */
 export function liveLine(live: readonly LiveClaude[], me: string | undefined): string {
-  const names = [...new Set(live.map((l) => (l.peerId === me ? 'Your agent' : `${l.name}’s agent`)))];
+  const names = [...new Set(live.map((l) => (l.peerId === me ? t('network.conv.yourAgent') : t('network.conv.theirAgent', { name: l.name }))))];
   if (!names.length) return '';
-  const list = names.length <= 2 ? names.join(' and ') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
-  return `${list} ${names.length === 1 ? 'is' : 'are'} answering…`;
+  const list = names.length === 1 ? names[0]! : t('network.model.andLast', { names: names.slice(0, -1).join(', '), last: names.at(-1) ?? '' });
+  return t('network.chat.answering', { names: list, count: names.length });
 }
 
 // ---- runs of messages (BLG-210)
@@ -223,4 +225,4 @@ export function closeTab(open: readonly string[], id: string): { open: string[];
 export const isMain = (state: Pick<NetworkState, 'main'>, g: Pick<GroupView, 'id'> | undefined): boolean => Boolean(g && state.main === g.id);
 
 /** A channel's name as you see it: yours is "All Friends". */
-export const channelName = (state: Pick<NetworkState, 'main'>, g: Pick<GroupView, 'id' | 'name'>): string => (isMain(state, g) ? 'All Friends' : g.name);
+export const channelName = (state: Pick<NetworkState, 'main'>, g: Pick<GroupView, 'id' | 'name'>): string => (isMain(state, g) ? t('network.allFriends') : g.name);

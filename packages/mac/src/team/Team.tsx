@@ -13,6 +13,8 @@ import { offerSent, shownState } from '../network/net-model.js';
 import { answerOffer } from '../network/use-net.js';
 import type { AppState } from '@beluga/core/store.js';
 import type { SocketClient } from '@beluga/ipc/socket-client.js';
+import { t } from '@beluga/shared/i18n/index.js';
+import { useT } from '../lib/i18n.js';
 import s from './team.module.css';
 
 /**
@@ -29,6 +31,7 @@ function useSay(): (p: Promise<unknown>) => void {
 
 /** Offers to team up on this project waiting on you (or on them, quietly). */
 export function TeamOffers({ projectId }: { projectId: string }) {
+  const t = useT();
   const offers = useApp((st) => st.team.offers.filter((o) => o.projectId === projectId), sameDeep);
   const api = useApi();
   const say = useSay();
@@ -36,21 +39,21 @@ export function TeamOffers({ projectId }: { projectId: string }) {
   return (
     <div className={s.list}>
       {offers.map((o) => {
-        const more: ActionItem[] = [{ label: o.state === 'asked' ? 'Take Back' : 'Not Now', onSelect: () => say(api.team.answer(o.peerId, o.projectId, false)) }];
+        const more: ActionItem[] = [{ label: o.state === 'asked' ? t('network.team.takeBack') : t('common.notNow'), onSelect: () => say(api.team.answer(o.peerId, o.projectId, false)) }];
         return (
           <section key={`${o.peerId}:${o.projectId}`} className={s.offer} aria-label={offerWords(o)}>
             <Avatar name={o.name} id={o.peerId} size={26} />
             <div className={s.offerText}>
               <span className={s.offerTitle}>{offerWords(o)}</span>
-              <span className={s.offerDetail}>{o.state === 'asked' ? 'The team forms when they say yes too.' : OFFER_DETAIL}</span>
+              <span className={s.offerDetail}>{o.state === 'asked' ? t('network.team.formsWhen') : OFFER_DETAIL}</span>
             </div>
             {o.state === 'asked' ? null : (
               <Button variant="primary" icon="people" onClick={() => say(api.team.answer(o.peerId, o.projectId, true))}>
-                Team Up
+                {t('network.team.teamUp')}
               </Button>
             )}
             <ActionsDropdown items={more}>
-              <IconButton icon="more" label="More" />
+              <IconButton icon="more" label={t('common.more')} />
             </ActionsDropdown>
           </section>
         );
@@ -64,12 +67,13 @@ export function TeamOffers({ projectId }: { projectId: string }) {
  * A green dot on it when at least one of them is online; names in its tip.
  */
 export function TeamBadge({ projectId }: { projectId: string }) {
+  const t = useT();
   const team = useApp((st) => st.team.teams[projectId], sameDeep);
   const online = useApp((st) => (team ? team.mates.filter((m) => st.network.friends.some((f) => f.peerId === m.peerId && shownState(f) === 'online')).map((m) => m.name) : []), sameDeep);
   const [open, setOpen] = useState(false);
   if (!team?.mates.length) return null;
   const names = andNames(team.mates.map((m) => m.name));
-  const tip = `Team on ${team.repo}: you and ${names}${online.length ? ` · ${online.join(', ')} online` : ''}`;
+  const tip = `${t('network.team.badgeTip', { repo: team.repo, names })}${online.length ? t('network.team.online', { names: online.join(', ') }) : ''}`;
   // Click: who's on the team, and Add Friend for anyone on it who isn't a friend yet (BLG-510).
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
@@ -82,7 +86,7 @@ export function TeamBadge({ projectId }: { projectId: string }) {
         </Popover.Trigger>
       </Tip>
       <Popover.Portal>
-        <Popover.Content className={s.teamCard} side="right" align="start" sideOffset={8} collisionPadding={12} aria-label={`Team on ${team.repo}`} onClick={(e) => e.stopPropagation()}>
+        <Popover.Content className={s.teamCard} side="right" align="start" sideOffset={8} collisionPadding={12} aria-label={t('network.team.teamOn', { repo: team.repo })} onClick={(e) => e.stopPropagation()}>
           <TeamCard projectId={projectId} />
         </Popover.Content>
       </Popover.Portal>
@@ -92,6 +96,7 @@ export function TeamBadge({ projectId }: { projectId: string }) {
 
 /** Everyone on a project's team: friends, and the rest with Add Friend (they're asked; added only if they accept). */
 export function TeamCard({ projectId }: { projectId: string }) {
+  const t = useT();
   const team = useApp((st) => st.team.teams[projectId], sameDeep);
   const friends = useApp((st) => st.network.friends.map((f) => f.peerId), sameDeep);
   const offers = useApp((st) => st.network.offers, sameDeep);
@@ -103,7 +108,7 @@ export function TeamCard({ projectId }: { projectId: string }) {
     <div className={s.teamList}>
       <div className={s.teamHead}>
         <Icon name="people" size={13} />
-        Team on {team.repo}
+        {t('network.team.teamOn', { repo: team.repo })}
       </div>
       {team.mates.map((m) => {
         const friend = friends.includes(m.peerId);
@@ -114,15 +119,15 @@ export function TeamCard({ projectId }: { projectId: string }) {
             <Avatar name={m.name} id={m.peerId} size={22} />
             <span className={s.teamWho}>
               <span className={s.teamName}>{m.name}</span>
-              <span className={s.teamSub}>{friend ? 'Friend' : 'On the team, not a friend yet'}</span>
+              <span className={s.teamSub}>{friend ? t('network.team.friend') : t('network.team.notFriendYet')}</span>
             </span>
             {friend ? null : theyAsked ? (
               <Button size="small" variant="primary" onClick={() => void answerOffer(client, m.peerId, m.name, true)}>
-                Accept
+                {t('network.sidebar.accept')}
               </Button>
             ) : (
-              <Button size="small" disabled={asked} onClick={() => say(api.team.befriend(projectId, m.peerId).then(() => toast(client, `Asked ${m.name} to be friends`, 'success')))}>
-                {asked ? 'Asked' : 'Add Friend'}
+              <Button size="small" disabled={asked} onClick={() => say(api.team.befriend(projectId, m.peerId).then(() => toast(client, t('network.team.askedFriends', { name: m.name }), 'success')))}>
+                {asked ? t('network.team.asked') : t('network.add.addFriend')}
               </Button>
             )}
           </div>
@@ -137,6 +142,7 @@ export function TeamCard({ projectId }: { projectId: string }) {
  * on it; anyone on the team can), and Leave Team (off it for everyone; your tasks stay yours).
  */
 export function useTeamMenuItems(projectId: string): readonly ActionItem[] {
+  useT();
   const mates = useApp((st) => teammatesOf(st.team, projectId), sameDeep);
   const invitable = useApp((st) => st.team.teams[projectId]?.invitable ?? [], sameDeep);
   const api = useApi();
@@ -145,15 +151,15 @@ export function useTeamMenuItems(projectId: string): readonly ActionItem[] {
   const invite: ActionItem[] = invitable.length
     ? [
         {
-          label: 'Invite to Team',
+          label: t('network.team.invite'),
           icon: 'plus',
           separate: true,
-          submenu: invitable.map((f) => ({ label: f.name, hint: f.state === 'asked' ? 'Invited' : 'Has this repository', disabled: f.state === 'asked', onSelect: () => say(api.team.answer(f.peerId, projectId, true)) })),
+          submenu: invitable.map((f) => ({ label: f.name, hint: f.state === 'asked' ? t('network.team.invited') : t('network.team.hasRepo'), disabled: f.state === 'asked', onSelect: () => say(api.team.answer(f.peerId, projectId, true)) })),
           onSelect: () => undefined,
         },
       ]
     : [];
-  const leave: ActionItem = { label: mates.length === 1 ? `Leave Team with ${mates[0]!.name}` : 'Leave Team', icon: 'people', separate: !invite.length, hint: mates.length > 1 ? `Off it for ${andNames(mates.map((m) => m.name))}; your tasks stay` : undefined, onSelect: () => say(api.team.leave(projectId)) };
+  const leave: ActionItem = { label: mates.length === 1 ? t('network.team.leaveWith', { name: mates[0]!.name }) : t('network.team.leave'), icon: 'people', separate: !invite.length, hint: mates.length > 1 ? t('network.team.leaveHint', { names: andNames(mates.map((m) => m.name)) }) : undefined, onSelect: () => say(api.team.leave(projectId)) };
   return [...invite, leave];
 }
 
@@ -181,6 +187,7 @@ export function WorkingOn({ issueId }: { issueId: string }) {
  * Then it says how it stands: waiting (Take Back), let in (Open), or not now (Knock Again).
  */
 export function KnockToJoin({ issueId }: { issueId: string }) {
+  const t = useT();
   const people = useApp((st) => workingOn(st.team, issueId).filter((p) => p.peerId !== st.selfId), sameDeep);
   const mine = useApp((st) => myKnockOn(st.team, issueId), sameDeep);
   const there = useApp((st) => Boolean(mine?.workspaceId && st.shared.some((w) => w.id === mine.workspaceId && w.owner === mine.peerId)));
@@ -192,7 +199,7 @@ export function KnockToJoin({ issueId }: { issueId: string }) {
   const again = mine && (mine.state === 'declined' || mine.state === 'gone');
   const button = (label: string) =>
     people.length > 1 ? (
-      <ActionsDropdown items={people.map((p) => ({ label: `${p.name}’s Worktree`, onSelect: () => knock(p.peerId) }))}>
+      <ActionsDropdown items={people.map((p) => ({ label: t('network.team.theirWorktree', { name: p.name }), onSelect: () => knock(p.peerId) }))}>
         <Button size="small" icon="hand" className={s.knockButton}>
           {label}
         </Button>
@@ -202,20 +209,20 @@ export function KnockToJoin({ issueId }: { issueId: string }) {
         {label}
       </Button>
     ) : null;
-  if (!mine) return <span className={s.knock}>{button('Knock to Join')}</span>;
+  if (!mine) return <span className={s.knock}>{button(t('network.team.knock'))}</span>;
   return (
     <span className={s.knock}>
       <span className={mine.state === 'waiting' ? s.knockWaiting : s.knockWords}>{myKnockWords(mine)}</span>
       {mine.state === 'waiting' ? (
         <Button size="small" onClick={() => say(api.team.cancelKnock(mine.id))}>
-          Take Back
+          {t('network.team.takeBack')}
         </Button>
       ) : mine.state === 'in' && there ? (
         <Button size="small" icon="arrowRight" className={s.knockButton} onClick={() => actions.run({ type: 'open_shared', owner: mine.peerId, id: mine.workspaceId!, tab: 'chat' })}>
-          Open
+          {t('common.open')}
         </Button>
       ) : again ? (
-        button('Knock Again')
+        button(t('network.team.knockAgain'))
       ) : null}
     </span>
   );
@@ -226,26 +233,27 @@ export function KnockToJoin({ issueId }: { issueId: string }) {
  * Not Now behind •••. Once answered it's the plain line it was.
  */
 export function KnockCard({ id, text, children }: { id: string; text: string; children: ReactNode }) {
+  const t = useT();
   const k = useApp((st) => (id ? knockOf(st.team, id) : undefined), sameDeep);
   const api = useApi();
   const say = useSay();
   if (!k) return <>{children}</>;
-  const more: ActionItem[] = [{ label: 'Not Now', onSelect: () => say(api.team.answerKnock(k.id, 'decline')) }];
+  const more: ActionItem[] = [{ label: t('common.notNow'), onSelect: () => say(api.team.answerKnock(k.id, 'decline')) }];
   return (
     <section className={s.offer} aria-label={knockWords(k)}>
       <Avatar name={k.name} id={k.peerId} size={26} />
       <div className={s.offerText}>
         <span className={s.offerTitle}>{knockWords(k)}</span>
-        <span className={s.offerDetail}>{k.note ? `“${k.note}” · ` : ''}{k.key}: {k.title}. An editor can talk to your agent here; a viewer follows along.</span>
+        <span className={s.offerDetail}>{k.note ? `“${k.note}” · ` : ''}{t('network.team.knockDetail', { key: k.key, title: k.title })}</span>
       </div>
       <Button variant="quiet" onClick={() => say(api.team.answerKnock(k.id, 'view'))}>
-        Let In as Viewer
+        {t('network.team.letViewer')}
       </Button>
       <Button variant="primary" icon="people" onClick={() => say(api.team.answerKnock(k.id, 'contribute'))}>
-        Let In as Editor
+        {t('network.team.letEditor')}
       </Button>
       <ActionsDropdown items={more}>
-        <IconButton icon="more" label={`More for ${text.slice(0, 40)}`} />
+        <IconButton icon="more" label={t('network.splans.moreFor', { title: text.slice(0, 40) })} />
       </ActionsDropdown>
     </section>
   );
@@ -268,12 +276,13 @@ export function WorkingMark({ issueId }: { issueId: string }) {
  * and the row, nothing at all once everyone has it. Hover says who.
  */
 export function WaitingMark({ issueId }: { issueId: string }) {
+  const t = useT();
   const people = useApp((st) => waitingOn(st.team, issueId), sameDeep);
   const words = waitingWords(people);
   if (!words) return null;
   const mailed = people.every((p) => p.mailed);
   return (
-    <Tip label={`${words}. ${mailed ? 'It’s in their mailbox.' : 'It goes when their computer is on.'}`}>
+    <Tip label={`${words}. ${mailed ? t('network.team.inMailbox') : t('network.team.goesWhenOn')}`}>
       <span className={s.waiting} aria-label={words} role="img">
         <Icon name="clock" size={12} />
         {people.length > 1 ? <span className={s.waitingCount}>{people.length}</span> : null}
@@ -284,6 +293,7 @@ export function WaitingMark({ issueId }: { issueId: string }) {
 
 /** On a task's page: who doesn't have the latest yet, and where it is for each of them. */
 export function WaitingFor({ issueId }: { issueId: string }) {
+  const t = useT();
   const people = useApp((st) => waitingOn(st.team, issueId), sameDeep);
   const words = waitingWords(people);
   if (!words) return null;
@@ -298,7 +308,7 @@ export function WaitingFor({ issueId }: { issueId: string }) {
           <li key={p.peerId}>
             <Avatar name={p.name} id={p.peerId} size={16} />
             <span className={s.waitingWho}>{waitingDetail(p)}</span>
-            <span className={s.waitingSince}>changed {ago(p.since)}</span>
+            <span className={s.waitingSince}>{t('network.team.changed', { when: ago(p.since) })}</span>
           </li>
         ))}
       </ul>
@@ -308,19 +318,20 @@ export function WaitingFor({ issueId }: { issueId: string }) {
 
 /** A teammate gave you this task: a quiet strip with Got It, until you've seen it. */
 export function AssignedToYou({ issueId }: { issueId: string }) {
+  const t = useT();
   const a = useApp((st) => st.team.assigned.find((x) => x.issueId === issueId), sameDeep);
   const api = useApi();
   const say = useSay();
   if (!a) return null;
   return (
-    <section className={s.offer} aria-label={`${a.by} gave you this task`}>
+    <section className={s.offer} aria-label={t('network.team.gaveYou', { name: a.by })}>
       <Avatar name={a.by} id={a.byId} size={22} />
       <div className={s.offerText}>
-        <span className={s.offerTitle}>{a.by} gave you this task</span>
-        <span className={s.offerDetail}>It’s in My Tasks. Start it when you’re ready.</span>
+        <span className={s.offerTitle}>{t('network.team.gaveYou', { name: a.by })}</span>
+        <span className={s.offerDetail}>{t('network.team.inMyTasks')}</span>
       </div>
       <Button variant="primary" onClick={() => say(api.team.ackAssignment(a.issueId))}>
-        Got It
+        {t('network.team.gotIt')}
       </Button>
     </section>
   );
@@ -354,22 +365,23 @@ export function shareWithTeamItems(state: Pick<AppState, 'team' | 'members'>, cl
   const stop = (peerId: string): void => say(api.sharing.unshareFriend({ peerId, workspaceId: wsId }));
   const everyone = choices.mates.filter((m) => !m.shared);
   const submenu: ActionItem[] = [
-    ...(choices.mates.length > 1 && everyone.length ? [{ label: 'Everyone on the Team', onSelect: () => everyone.forEach((m) => share(m.peerId)) }] : []),
+    ...(choices.mates.length > 1 && everyone.length ? [{ label: t('network.team.everyone'), onSelect: () => everyone.forEach((m) => share(m.peerId)) }] : []),
     ...choices.mates.map((m) => ({ label: m.name, checked: m.shared, onSelect: () => (m.shared ? stop(m.peerId) : share(m.peerId)) })),
   ];
   return [
-    { label: 'Share with Team', icon: 'people', separate: true, submenu, onSelect: () => undefined },
-    ...(choices.sharedWith.length ? [{ label: 'Stop Sharing', icon: 'x' as const, onSelect: () => choices.sharedWith.forEach(stop) }] : []),
+    { label: t('network.team.shareWithTeam'), icon: 'people', separate: true, submenu, onSelect: () => undefined },
+    ...(choices.sharedWith.length ? [{ label: t('network.call.stopSharing'), icon: 'x' as const, onSelect: () => choices.sharedWith.forEach(stop) }] : []),
   ];
 }
 
 /** A team project's conversation nobody else can see: a quiet lock that says so. */
 export function PrivateMark({ wsId, projectId }: { wsId: string; projectId: string | undefined }) {
+  const t = useT();
   const choices = useApp((st) => teamShareChoices(st.team, st.members[wsId], projectId ?? ''), sameDeep);
   if (!projectId || !choices.mates.length || choices.sharedWith.length) return null;
   return (
-    <Tip label="Only you can see this conversation. Your teammates see the board, not your chats. Use More › Share with Team to work on it together.">
-      <span className={s.badge} aria-label="Only you can see this conversation" role="img">
+    <Tip label={t('network.team.privateTip')}>
+      <span className={s.badge} aria-label={t('network.team.privateAria')} role="img">
         <Icon name="lock" size={12} />
       </span>
     </Tip>

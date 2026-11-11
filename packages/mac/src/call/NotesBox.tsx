@@ -8,6 +8,9 @@ import { useApp, useBeluga } from '../lib/beluga.js';
 import { useMyAgentName } from '../lib/agent-words.js';
 import { namesOf } from './CallStrip.js';
 import { clockOf, findTurns, lengthOf, marks, minuteMarks, timeline, turns, wordCount } from './notes-model.js';
+import { t } from '@beluga/shared/i18n/index.js';
+import { formatNumber } from '@beluga/shared/i18n/format.js';
+import { useT } from '../lib/i18n.js';
 import c from './notes.module.css';
 
 /* ---------- Which notes are open (one reader at a time, over its conversation) ---------- */
@@ -28,7 +31,7 @@ const useOpenNotes = (): string | undefined =>
   );
 
 /** Who was in it, you last: "bob, mia and you". */
-const peopleWords = (people: CallNotesView['people']): string => namesOf([...people.filter((p) => p.name !== 'You'), ...people.filter((p) => p.name === 'You').map(() => ({ name: 'you' }))]);
+const peopleWords = (people: CallNotesView['people']): string => namesOf([...people.filter((p) => p.name !== 'You'), ...people.filter((p) => p.name === 'You').map(() => ({ name: t('network.notes.you') }))]);
 
 const dayOf = (at: number): string => new Date(at).toLocaleDateString([], { month: 'short', day: 'numeric' });
 
@@ -37,7 +40,7 @@ export function notesMarkdown(v: CallNotesView, place: string): string {
   const time = new Date(v.startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   const lines = turns(v.lines).map((t) => `**${t.name}** (${clockOf(v.startedAt, t.at)}): ${t.text}`);
   // The first line names the chat it opens: short.
-  return [`Call in ${place} · ${dayOf(v.startedAt)}`, '', `${time}, ${lengthOf(v)}, with ${peopleWords(v.people)}.`, '', ...lines].join('\n');
+  return [t('network.notes.callIn', { place, day: dayOf(v.startedAt) }), '', t('network.notes.mdLine', { time, length: lengthOf(v), people: peopleWords(v.people) }), '', ...lines].join('\n');
 }
 
 /**
@@ -45,20 +48,21 @@ export function notesMarkdown(v: CallNotesView, place: string): string {
  * thousands of lines. A click opens them in the reader beside the chat.
  */
 export function NotesBox({ notes }: { notes: CallNotesView; place: string }) {
+  const t = useT();
   const open = useOpenNotes() === notes.id;
   const waiting = notes.people.filter((p) => !p.sent && p.name !== 'You');
   const words = wordCount(notes.lines);
   return (
     <div className={c.chipRow}>
-      <button type="button" className={cx(c.chip, open && c.chipOpen)} aria-label="Call notes" aria-expanded={open} onClick={() => setOpen(open ? undefined : notes.id)}>
+      <button type="button" className={cx(c.chip, open && c.chipOpen)} aria-label={t('network.notes.callNotes')} aria-expanded={open} onClick={() => setOpen(open ? undefined : notes.id)}>
         <span className={c.mark} aria-hidden="true">
           <Icon name="book" size={13} />
         </span>
-        <strong>Call notes</strong>
+        <strong>{t('network.notes.callNotes')}</strong>
         <span className={c.chipMeta}>
           {lengthOf(notes)} · {peopleWords(notes.people)}
-          {words ? ` · ${words.toLocaleString()} words` : ''}
-          {waiting.length ? ` · waiting for ${namesOf(waiting)}` : ''}
+          {words ? t('network.notes.wordsSuffix', { words: formatNumber(words) }) : ''}
+          {waiting.length ? t('network.notes.waitingFor', { names: namesOf(waiting) }) : ''}
         </span>
         <Icon name="chevronRight" size={12} className={c.chipGo} />
       </button>
@@ -71,6 +75,7 @@ export function NotesBox({ notes }: { notes: CallNotesView; place: string }) {
  * where and how long; a click opens the notes beside their chat.
  */
 export function CallNotesChip({ id }: { id: string }) {
+  const t = useT();
   const { client } = useBeluga();
   // Two plain picks (the store's own objects), so nothing new is made on each read.
   const conversation = useApp((st) => Object.entries(st.network.callNotes ?? {}).find(([, list]) => list.some((x) => x.id === id))?.[0]);
@@ -79,15 +84,15 @@ export function CallNotesChip({ id }: { id: string }) {
   const place = useApp((st) => {
     const c = found?.conversation;
     if (!c) return '';
-    if (c === 'room') return 'the room';
-    if (c.startsWith('dm:')) return st.network.friends.find((f) => f.peerId === c.slice(3))?.name ?? 'a friend';
-    return `#${st.network.groups.find((g) => g.id === c.slice(6))?.name ?? 'channel'}`;
+    if (c === 'room') return t('network.notes.theRoom');
+    if (c.startsWith('dm:')) return st.network.friends.find((f) => f.peerId === c.slice(3))?.name ?? t('network.notes.aFriend');
+    return `#${st.network.groups.find((g) => g.id === c.slice(6))?.name ?? t('network.notes.channel')}`;
   });
   if (!found) {
     return (
-      <span className={cx(c.inlineChip, c.inlineGone)} title="These notes aren’t on this Mac">
+      <span className={cx(c.inlineChip, c.inlineGone)} title={t('network.notes.notHere')}>
         <Icon name="book" size={11} />
-        Call notes
+        {t('network.notes.callNotes')}
       </span>
     );
   }
@@ -97,9 +102,9 @@ export function CallNotesChip({ id }: { id: string }) {
     setOpen(found.notes.id);
   };
   return (
-    <button type="button" className={c.inlineChip} onClick={open} title="Open the notes beside their chat">
+    <button type="button" className={c.inlineChip} onClick={open} title={t('network.notes.openBeside')}>
       <Icon name="book" size={11} />
-      Call in {place} · {dayOf(found.notes.startedAt)} · {lengthOf(found.notes)}
+      {t('network.notes.callIn', { place, day: dayOf(found.notes.startedAt) })} · {lengthOf(found.notes)}
     </button>
   );
 }
@@ -136,6 +141,7 @@ function Said({ text, query }: { text: string; query: string }) {
  * along: each turn a stripe in its speaker's color, the part you're reading shown on it.
  */
 function NotesReader({ notes, place }: { notes: CallNotesView; place: string }) {
+  const say = useT();
   const { client } = useBeluga();
   const agent = useMyAgentName();
   const all = useMemo(() => turns(notes.lines), [notes.lines]);
@@ -199,32 +205,32 @@ function NotesReader({ notes, place }: { notes: CallNotesView; place: string }) 
   const talk = (): void => {
     // A chip, never the transcript: the agent looks up what it needs with its call notes tools.
     // Its first words name the chat (Call in #launch · Nov 5); the chip says which call.
-    const prompt = `Call in ${place} · ${dayOf(notes.startedAt)}: let’s talk about it. \`call:${notes.id}\`, with ${peopleWords(notes.people)}. Look up what was said with your call notes tools. Start with a short summary: what was decided, who’s doing what, and what’s still open.`;
-    void client.api.workspaces.startChat('chats', prompt).catch((err: unknown) => client.store.dispatch({ type: 'toast', text: `Couldn’t open the chat: ${err instanceof Error ? err.message : String(err)}`, level: 'error' }));
+    const prompt = say('network.notes.talkPrompt', { place, day: dayOf(notes.startedAt), chip: `\`call:${notes.id}\``, people: peopleWords(notes.people) });
+    void client.api.workspaces.startChat('chats', prompt).catch((err: unknown) => client.store.dispatch({ type: 'toast', text: say('network.notes.couldntOpen', { error: err instanceof Error ? err.message : String(err) }), level: 'error' }));
   };
   const items: ActionItem[] = [
-    { label: `Talk About It with ${agent}`, icon: 'sparkles', hint: 'A chat of your own, that only you see', onSelect: talk },
-    { label: 'Copy the Notes', icon: 'copy', separate: true, onSelect: () => void copyText(notesMarkdown(notes, place)).then(() => client.store.dispatch({ type: 'toast', text: 'Copied the notes', level: 'success' })) },
-    { label: 'Forget These Notes…', icon: 'trash', danger: true, separate: true, onSelect: () => void client.api.calls.forgetNotes(notes.id).then(() => setOpen(undefined)) },
+    { label: say('network.notes.talkAbout', { agent }), icon: 'sparkles', hint: say('network.notes.talkHint'), onSelect: talk },
+    { label: say('network.notes.copy'), icon: 'copy', separate: true, onSelect: () => void copyText(notesMarkdown(notes, place)).then(() => client.store.dispatch({ type: 'toast', text: say('network.notes.copied'), level: 'success' })) },
+    { label: say('network.notes.forget'), icon: 'trash', danger: true, separate: true, onSelect: () => void client.api.calls.forgetNotes(notes.id).then(() => setOpen(undefined)) },
   ];
   const meId = notes.people.find((p) => p.name === 'You')?.peerId;
 
   return (
-    <aside className={c.reader} aria-label="Call notes reader">
+    <aside className={c.reader} aria-label={say('network.notes.reader')}>
       <header className={c.readerHead}>
         <span className={c.mark} aria-hidden="true">
           <Icon name="book" size={14} />
         </span>
         <div className={c.readerTitle}>
-          <strong>Call notes</strong>
+          <strong>{say('network.notes.callNotes')}</strong>
           <span>
-            {dayOf(notes.startedAt)} · {lengthOf(notes)} · {peopleWords(notes.people)} · {wordCount(notes.lines).toLocaleString()} words
+            {dayOf(notes.startedAt)} · {lengthOf(notes)} · {peopleWords(notes.people)} · {say('network.notes.words', { words: formatNumber(wordCount(notes.lines)) })}
           </span>
         </div>
         <ActionsDropdown items={items}>
-          <IconButton icon="more" label="More for these notes" />
+          <IconButton icon="more" label={say('network.notes.moreFor')} />
         </ActionsDropdown>
-        <IconButton icon="x" label="Close the Notes" onClick={() => setOpen(undefined)} />
+        <IconButton icon="x" label={say('network.notes.close')} onClick={() => setOpen(undefined)} />
       </header>
 
       <div className={c.tools}>
@@ -233,8 +239,8 @@ function NotesReader({ notes, place }: { notes: CallNotesView; place: string }) 
           <input
             ref={search}
             value={query}
-            placeholder="Search the call"
-            aria-label="Search the call"
+            placeholder={say('network.notes.search')}
+            aria-label={say('network.notes.search')}
             onChange={(e) => {
               setQuery(e.target.value);
               setHit(0);
@@ -251,19 +257,19 @@ function NotesReader({ notes, place }: { notes: CallNotesView; place: string }) 
           />
           {query ? (
             <span className={c.found} aria-live="polite">
-              {found.length ? `${hit + 1} of ${found.length}` : 'None'}
-              <button type="button" aria-label="Previous" onClick={() => step(-1)} disabled={!found.length}>
+              {found.length ? say('network.notes.nOf', { n: hit + 1, total: found.length }) : say('network.notes.none')}
+              <button type="button" aria-label={say('network.notes.previous')} onClick={() => step(-1)} disabled={!found.length}>
                 <Icon name="chevronUp" size={12} />
               </button>
-              <button type="button" aria-label="Next" onClick={() => step(1)} disabled={!found.length}>
+              <button type="button" aria-label={say('network.notes.next')} onClick={() => step(1)} disabled={!found.length}>
                 <Icon name="chevronDown" size={12} />
               </button>
             </span>
           ) : null}
         </label>
-        <div className={c.people} role="radiogroup" aria-label="Whose words">
+        <div className={c.people} role="radiogroup" aria-label={say('network.notes.whose')}>
           <button type="button" role="radio" aria-checked={!only} className={cx(c.person, !only && c.personOn)} onClick={() => setOnly(undefined)}>
-            Everyone
+            {say('network.notes.everyone')}
           </button>
           {speakers.map((p) => (
             <button key={p.peerId} type="button" role="radio" aria-checked={only === p.peerId} className={cx(c.person, only === p.peerId && c.personOn)} onClick={() => setOnly(only === p.peerId ? undefined : p.peerId)}>
@@ -275,13 +281,13 @@ function NotesReader({ notes, place }: { notes: CallNotesView; place: string }) 
       </div>
 
       {/* The whole call at a glance: a stripe per turn in its speaker's color; click to jump there. */}
-      <div className={c.timeline} role="group" aria-label="The call’s timeline">
+      <div className={c.timeline} role="group" aria-label={say('network.notes.timeline')}>
         {stripes.map((s) => (
           <button
             key={s.index}
             type="button"
             tabIndex={-1}
-            aria-label={`${all[s.index]!.name} at ${clockOf(notes.startedAt, all[s.index]!.at)}`}
+            aria-label={say('network.notes.at', { name: all[s.index]!.name, clock: clockOf(notes.startedAt, all[s.index]!.at) })}
             className={cx(c.stripe, only && only !== s.by && c.stripeDim, found.includes(s.index) && c.stripeHit)}
             style={{ left: `${s.from * 100}%`, width: `${s.width * 100}%`, background: personColor(s.by) }}
             onClick={() => goTo(s.index)}
@@ -325,10 +331,10 @@ function NotesReader({ notes, place }: { notes: CallNotesView; place: string }) 
             );
           })
         ) : (
-          <li className={c.empty}>{notes.lines.length ? 'Nothing from them in this call.' : 'Nothing was written down.'}</li>
+          <li className={c.empty}>{notes.lines.length ? say('network.notes.nothingFrom') : say('network.notes.nothingWritten')}</li>
         )}
       </ol>
-      <footer className={c.readerFoot}>Each person’s own words, written down on their Mac: expect small mistakes.</footer>
+      <footer className={c.readerFoot}>{say('network.notes.foot')}</footer>
     </aside>
   );
 }

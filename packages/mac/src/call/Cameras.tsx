@@ -6,6 +6,7 @@ import { Avatar, Tip, cx } from '../components/ui.js';
 import { CallControls } from './CallStrip.js';
 import { CallChatPops } from './ChatPops.js';
 import { useCallEngine, useCallLive, useCallPlace, useSecond } from './use-call.js';
+import { useT } from '../lib/i18n.js';
 import c from './call.module.css';
 
 /** A camera's picture, playing (yours mirrored, as a mirror would). */
@@ -22,18 +23,19 @@ function Picture({ stream, mirrored, className }: { stream: MediaStream; mirrore
 
 /** One camera: the picture, the name, muted, a ring while they talk. */
 function Tile({ person, stream, speaking, onOpen }: { person: CallPersonView; stream: MediaStream; speaking: boolean; onOpen?: () => void }) {
+  const t = useT();
   const tile = (
-    <figure className={cx(c.tile, speaking && !person.muted && c.tileSpeaking)} aria-label={person.me ? 'Your camera' : `${person.name}’s camera`}>
+    <figure className={cx(c.tile, speaking && !person.muted && c.tileSpeaking)} aria-label={person.me ? t('network.cams.yours') : t('network.cams.theirs', { name: person.name })}>
       <Picture stream={stream} mirrored={Boolean(person.me)} className={c.tileVideo} />
       <figcaption className={c.tileName}>
         {person.muted ? <Icon name="micOff" size={10} /> : null}
-        {person.me ? 'You' : person.name}
+        {person.me ? t('network.conv.you') : person.name}
       </figcaption>
     </figure>
   );
   if (!onOpen) return tile;
   return (
-    <button type="button" className={c.tileButton} onClick={onOpen} aria-label={`Face to face with ${person.me ? 'everyone' : person.name}`}>
+    <button type="button" className={c.tileButton} onClick={onOpen} aria-label={t('network.cams.faceWith', { name: person.me ? t('network.cams.everyone') : person.name })}>
       {tile}
     </button>
   );
@@ -44,20 +46,21 @@ function Tile({ person, stream, speaking, onOpen }: { person: CallPersonView; st
  * goes face to face), or, while someone shares their screen, a small filmstrip over its corner.
  */
 export function CameraStrip({ call, floating }: { call: CallView; floating?: boolean }) {
+  const t = useT();
   const engine = useCallEngine();
   const live = useCallLive();
   const on = call.people.filter((p) => live.cameras[p.peerId]);
   if (!on.length) return null;
   return (
-    <div className={floating ? c.filmstrip : c.faces} role="list" aria-label="Cameras" onPointerDown={floating ? (e) => e.stopPropagation() : undefined}>
+    <div className={floating ? c.filmstrip : c.faces} role="list" aria-label={t('network.cams.cameras')} onPointerDown={floating ? (e) => e.stopPropagation() : undefined}>
       {on.map((p) => (
         <div key={p.peerId} role="listitem" className={c.tileWrap}>
           <Tile person={p} stream={live.cameras[p.peerId]!} speaking={live.speaking.has(p.peerId)} {...(floating ? {} : { onOpen: () => engine.setFaces(true) })} />
         </div>
       ))}
       {floating ? null : (
-        <Tip label="Face to Face">
-          <button type="button" className={c.facesOpen} aria-label="Face to Face" onClick={() => engine.setFaces(true)}>
+        <Tip label={t('network.cams.faceToFace')}>
+          <button type="button" className={c.facesOpen} aria-label={t('network.cams.faceToFace')} onClick={() => engine.setFaces(true)}>
             <Icon name="expand" size={14} />
           </button>
         </Tip>
@@ -87,6 +90,7 @@ type Corner = 'br' | 'bl' | 'tr' | 'tl';
  * can drag to another one. The call's buttons sit at the bottom; Esc or Back to Chat comes back.
  */
 export function FaceView({ call }: { call: CallView }) {
+  const t = useT();
   const engine = useCallEngine();
   const live = useCallLive();
   const place = useCallPlace(call.conversation);
@@ -129,12 +133,12 @@ export function FaceView({ call }: { call: CallView }) {
   };
 
   return (
-    <section className={c.faceView} aria-label="Face to face">
+    <section className={c.faceView} aria-label={t('network.cams.faceAria')}>
       <header className={c.faceHead}>
-        <strong>{place.replace(/^the room$/, 'The room')}</strong>
+        <strong>{place === t('network.notes.theRoom') ? t('network.cams.theRoom') : place}</strong>
         <span>{callLength(now - call.startedAt)}</span>
       </header>
-      <div className={cx(c.collage, others.length === 1 && c.solo)} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)` }} role="list" aria-label="People in the call">
+      <div className={cx(c.collage, others.length === 1 && c.solo)} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)` }} role="list" aria-label={t('network.cams.people')}>
         {others.length ? (
           others.map((p) => {
             const stream = live.cameras[p.peerId];
@@ -142,7 +146,7 @@ export function FaceView({ call }: { call: CallView }) {
             return (
               <div key={p.peerId} role="listitem" className={c.collageCell}>
                 {stream ? (
-                  <figure className={cx(c.faceTile, speaking && !p.muted && c.tileSpeaking)} aria-label={`${p.name}’s camera`}>
+                  <figure className={cx(c.faceTile, speaking && !p.muted && c.tileSpeaking)} aria-label={t('network.cams.theirs', { name: p.name })}>
                     <Picture stream={stream} className={c.faceVideo} />
                     <figcaption className={c.tileName}>
                       {p.muted ? <Icon name="micOff" size={10} /> : null}
@@ -156,7 +160,7 @@ export function FaceView({ call }: { call: CallView }) {
             );
           })
         ) : (
-          <p className={c.faceWaiting}>Waiting for them to pick up</p>
+          <p className={c.faceWaiting}>{t('network.call.waitingPickUp')}</p>
         )}
       </div>
       {me ? (
@@ -166,9 +170,9 @@ export function FaceView({ call }: { call: CallView }) {
           onPointerDown={down}
           onPointerMove={move}
           onPointerUp={up}
-          aria-label="Your camera"
+          aria-label={t('network.cams.yours')}
         >
-          {myCam ? <Picture stream={myCam} mirrored className={c.faceVideo} /> : <Avatar name="You" id={me.peerId} size={48} />}
+          {myCam ? <Picture stream={myCam} mirrored className={c.faceVideo} /> : <Avatar name={t('network.conv.you')} id={me.peerId} size={48} />}
         </div>
       ) : null}
       {/* The whole window is faces: the chat pops up on the right. */}
@@ -177,7 +181,7 @@ export function FaceView({ call }: { call: CallView }) {
         <CallControls call={call} />
         <button type="button" className={c.faceBack} onClick={() => engine.setFaces(false)}>
           <Icon name="chat" size={14} />
-          Back to Chat
+          {t('network.cams.back')}
         </button>
       </footer>
     </section>

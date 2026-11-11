@@ -1,6 +1,6 @@
 import type { PresenceState } from '@beluga/net/mesh/views.js';
 import { Avatar, cx, personColor } from '../components/ui.js';
-import { STATE_LABEL } from './net-model.js';
+import { stateLabel } from './net-model.js';
 import s from './network.module.css';
 
 /**
@@ -8,7 +8,7 @@ import s from './network.module.css';
  * offline. On an avatar it sits in the corner with a ring of the background around it.
  */
 export function PresenceDot({ state, size = 9, label }: { state: PresenceState; size?: number; label?: string }) {
-  return <span className={cx(s.dot, s[`dot_${state}`])} style={{ width: size, height: size }} role="img" aria-label={label ?? STATE_LABEL[state]} />;
+  return <span className={cx(s.dot, s[`dot_${state}`])} style={{ width: size, height: size }} role="img" aria-label={label ?? stateLabel(state)} />;
 }
 
 /** Someone's avatar with their presence in the corner. */
@@ -22,7 +22,7 @@ export function PersonAvatar({ name, id, state, size = 22 }: { name: string; id:
       <Avatar name={name} id={id} size={size} />
       {state ? (
         <span className={s.avatarDot} style={small ? { padding: 1, right: -1, bottom: -1 } : undefined}>
-          <PresenceDot state={state} size={dot} label={`${name}: ${STATE_LABEL[state]}`} />
+          <PresenceDot state={state} size={dot} label={`${name}: ${stateLabel(state)}`} />
         </span>
       ) : null}
     </span>

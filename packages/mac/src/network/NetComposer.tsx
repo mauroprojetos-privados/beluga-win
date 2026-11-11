@@ -28,6 +28,8 @@ export function useChannelTasks(people: ReadonlyArray<{ readonly peerId: string;
   const team = useApp((st) => st.team);
   return useMemo(() => channelTasks(issues, team, people), [issues, team, people]);
 }
+import { t } from '@beluga/shared/i18n/index.js';
+import { useT } from '../lib/i18n.js';
 import c from '../chat/composer.module.css';
 import s from './network.module.css';
 
@@ -62,7 +64,7 @@ export interface Person {
 async function pickFiles(client: ReturnType<typeof useBeluga>['client'], id: string, input: HTMLInputElement | null): Promise<void> {
   if (!inApp()) return void input?.click();
   const { open } = await import('@tauri-apps/plugin-dialog');
-  const picked = await open({ multiple: true, title: 'Send Files' });
+  const picked = await open({ multiple: true, title: t('network.composer.sendFiles') });
   const paths = Array.isArray(picked) ? picked : picked ? [picked] : [];
   if (paths.length) await addPaths(client, id, paths);
 }
@@ -76,30 +78,31 @@ const askMark = (ask: Ask | undefined, mine: AgentMark): AgentMark | 'people' | 
  * person's; once picked, the toggle says whose ("Ask: mia's Claude") and a click takes it back.
  */
 function AskButton({ ask, setAsk, people, me }: { ask: Ask | undefined; setAsk: (a: Ask | undefined) => void; people: readonly Person[]; me?: Person }) {
+  const t = useT();
   const mine = ask?.kind === 'me';
   const myMark = agentMark(useMyAgent());
-  const whose = ask && ask.kind !== 'me' ? askLabel(ask, true) : 'your agent';
+  const whose = ask && ask.kind !== 'me' ? askLabel(ask, true) : t('network.conv.yourAgentLower');
   const toggle = (
-    <Tip label={ask ? `${askLabel(ask, true)} answers this message · click to just send it` : 'Your agent answers this message, from this conversation · or type @claude, which asks your agent whichever it is'}>
-      <button type="button" className={cx(c.chip, people.length > 0 && s.askMain, ask && c.chipOn)} aria-label={`Ask: ${whose}`} aria-pressed={Boolean(ask)} disabled={!me} onClick={() => setAsk(ask ? undefined : { kind: 'me' })}>
+    <Tip label={ask ? t('network.composer.answersThis', { who: askLabel(ask, true) }) : t('network.composer.yourAgentAnswers')}>
+      <button type="button" className={cx(c.chip, people.length > 0 && s.askMain, ask && c.chipOn)} aria-label={t('network.composer.askWhose', { whose })} aria-pressed={Boolean(ask)} disabled={!me} onClick={() => setAsk(ask ? undefined : { kind: 'me' })}>
         <Icon name={askMark(ask, myMark)} size={13} />
         {/* Beside a shared screen the box is narrow: the words step aside, Send stays in it. */}
-        <span className={c.chipLabel}>Ask: {whose}</span>
+        <span className={c.chipLabel}>{t('network.composer.askWhose', { whose })}</span>
       </button>
     </Tip>
   );
   if (!people.length) return toggle;
   const items: ActionItem[] = [
-    { label: 'Your Agent', icon: myMark, checked: mine, hint: `It answers here, from ${yourComputer()}`, onSelect: () => setAsk({ kind: 'me' }) },
-    { label: people.length === 1 ? 'Both Agents' : 'Everyone’s Agent', icon: 'people', checked: ask?.kind === 'all', hint: 'Each answers from their own computer', onSelect: () => setAsk({ kind: 'all' }) },
-    ...people.map((p, i) => ({ label: `${p.name}’s Agent`, separate: i === 0, checked: ask?.kind === 'person' && ask.peerId === p.peerId, hint: `From ${p.name}’s computer`, onSelect: () => setAsk({ kind: 'person', peerId: p.peerId, name: p.name }) })),
-    ...(ask ? [{ label: 'Don’t Ask an Agent', separate: true, onSelect: () => setAsk(undefined) }] : []),
+    { label: t('network.composer.yourAgent'), icon: myMark, checked: mine, hint: t('network.composer.answersFrom', { computer: yourComputer() }), onSelect: () => setAsk({ kind: 'me' }) },
+    { label: people.length === 1 ? t('network.composer.bothAgents') : t('network.composer.everyonesAgent'), icon: 'people', checked: ask?.kind === 'all', hint: t('network.composer.eachAnswers'), onSelect: () => setAsk({ kind: 'all' }) },
+    ...people.map((p, i) => ({ label: t('network.composer.theirAgent', { name: p.name }), separate: i === 0, checked: ask?.kind === 'person' && ask.peerId === p.peerId, hint: t('network.composer.fromComputer', { name: p.name }), onSelect: () => setAsk({ kind: 'person', peerId: p.peerId, name: p.name }) })),
+    ...(ask ? [{ label: t('network.composer.dontAsk'), separate: true, onSelect: () => setAsk(undefined) }] : []),
   ];
   return (
-    <span className={s.askSplit} role="group" aria-label="Ask an agent">
+    <span className={s.askSplit} role="group" aria-label={t('network.composer.askAnAgent')}>
       {toggle}
       <ActionsDropdown items={items} align="start">
-        <button type="button" className={cx(c.chip, s.askMore, ask && c.chipOn)} aria-label="Ask Someone Else’s Agent" disabled={!me}>
+        <button type="button" className={cx(c.chip, s.askMore, ask && c.chipOn)} aria-label={t('network.composer.askElse')} disabled={!me}>
           <Icon name="chevronDown" size={9} />
         </button>
       </ActionsDropdown>
@@ -113,6 +116,7 @@ function AskButton({ ask, setAsk, people, me }: { ask: Ask | undefined; setAsk: 
  * (or ⌘Return, as in Settings); a failed send puts everything back.
  */
 export function NetComposer({ id, placeholder, people, me, send, addPeople, note }: { id: string; placeholder: string; people: readonly Person[]; me?: Person; send: (out: Outgoing) => Promise<unknown>; addPeople?: () => void; note?: string }) {
+  const t = useT();
   const { client, ui } = useBeluga();
   const prefs = usePrefs();
   const [text, setText] = useState(() => drafts.get(id) ?? '');
@@ -195,7 +199,7 @@ export function NetComposer({ id, placeholder, people, me, send, addPeople, note
       // Nothing is lost: the words and files come back (ahead of anything new).
       setText((t) => (t.trim() ? `${body}\n${t}` : body));
       restorePending(id, files);
-      client.store.dispatch({ type: 'toast', text: 'Your message wasn’t sent. It’s back in the box.', level: 'warn' });
+      client.store.dispatch({ type: 'toast', text: t('network.composer.notSent'), level: 'warn' });
     });
   };
   // Speaking instead of typing (Settings › Voice): the words come here when this is the box you're in.
@@ -210,7 +214,7 @@ export function NetComposer({ id, placeholder, people, me, send, addPeople, note
           <span className={c.askChip}>
             <Icon name={askMark(ask, myMark)} size={12} />
             {askLabel(ask)}
-            <button type="button" aria-label="Don’t ask an agent" onClick={() => setAsk(undefined)}>
+            <button type="button" aria-label={t('network.composer.dontAskAria')} onClick={() => setAsk(undefined)}>
               <Icon name="x" size={10} />
             </button>
           </span>
@@ -224,7 +228,7 @@ export function NetComposer({ id, placeholder, people, me, send, addPeople, note
             className={`${c.input} ${c.overHighlight} selectable`}
             rows={1}
             value={text}
-            placeholder={ask ? `${askLabel(ask)}: write a question, or just send and it reads the conversation` : placeholder}
+            placeholder={ask ? t('network.composer.askPlaceholder', { who: askLabel(ask) }) : placeholder}
             aria-label={placeholder}
             spellCheck
             onChange={(e) => write(e.target.value)}
@@ -254,22 +258,22 @@ export function NetComposer({ id, placeholder, people, me, send, addPeople, note
         <div className={c.bar}>
           <AskButton ask={ask} setAsk={setAsk} people={people} {...(me ? { me } : {})} />
           {people.length ? (
-            <Tip label="Mention someone here, or their agent · or type @">
+            <Tip label={t('network.composer.mentionTip')}>
               <button
                 type="button"
                 className={c.chip}
-                aria-label="Friends"
+                aria-label={t('network.sidebar.friends')}
                 onClick={() => {
                   write(text && !/\s$/.test(text) ? `${text} @` : `${text}@`);
                   ref.current?.focus();
                 }}
               >
                 <Icon name="people" size={13} />
-                <span className={c.chipLabel}>Friends</span>
+                <span className={c.chipLabel}>{t('network.sidebar.friends')}</span>
               </button>
             </Tip>
           ) : null}
-          <IconButton icon="clip" label="Send Files…" onClick={() => void pickFiles(client, id, picker.current)} />
+          <IconButton icon="clip" label={t('network.composer.sendFilesMenu')} onClick={() => void pickFiles(client, id, picker.current)} />
           <input
             ref={picker}
             type="file"
@@ -291,8 +295,8 @@ export function NetComposer({ id, placeholder, people, me, send, addPeople, note
           ) : null}
           {text.length > MAX - 500 ? <span className={cx(s.counter, over && s.counterOver)}>{MAX - text.length}</span> : null}
           <MicButton box={ref} />
-          <Tip label={`${label}${prefs.sendWith === 'enter' ? `Send · Shift+${returnName()} for a new line` : `Send · ${cmdReturn()}`}`} keys={sendKeys}>
-            <button type="button" className={cx(c.send, canSend && c.sendReady)} onClick={submit} aria-label={ask ? `Send and ${askLabel(ask).toLowerCase()}` : 'Send'} disabled={!canSend}>
+          <Tip label={`${label}${prefs.sendWith === 'enter' ? t('network.composer.sendShift', { key: returnName() }) : t('network.composer.sendKeys', { keys: cmdReturn() })}`} keys={sendKeys}>
+            <button type="button" className={cx(c.send, canSend && c.sendReady)} onClick={submit} aria-label={ask ? t('network.composer.sendAnd', { ask: askLabel(ask).toLowerCase() }) : t('common.send')} disabled={!canSend}>
               <Icon name="send" size={14} />
             </button>
           </Tip>
