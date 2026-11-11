@@ -23,6 +23,7 @@ import { findCodex } from './app-server.js';
 import { CodexMcp } from './mcp.js';
 import { type MappedPrompt, mapSlash } from './skills.js';
 import { claudeHome } from '../../../core/claude-code/launch.js';
+import { codexPlaceConfig } from '../place-mcp.js';
 
 export interface CodexBackendOptions {
   readonly cwd: string;
@@ -270,7 +271,8 @@ export function createCodexBackend(opts: CodexBackendOptions): AgentBackend {
             throw new Error(`${method} isn’t supported in Beluga`);
           });
           // A friend's task gets none of your own Codex MCP servers: their names, to switch them off.
-          const yourServers = trustRow(origin, input.scope).yourTools ? [] : await rpc.request<{ config?: { mcp_servers?: Record<string, unknown> } }>('config/read', {}).then((r) => Object.keys(r.config?.mcp_servers ?? {}), () => []);
+          // A bot’s run (docs/bots.md) has only its own servers: yours are turned off for it too.
+          const yourServers = trustRow(origin, input.scope).yourTools && !place?.mcp ? [] : await rpc.request<{ config?: { mcp_servers?: Record<string, unknown> } }>('config/read', {}).then((r) => Object.keys(r.config?.mcp_servers ?? {}), () => []);
           const writableRoots = planning || !autoEdit ? (fixup ? [fixup] : []) : [cwd, ...extraDirs, ...(fixup ? [fixup] : [])];
           const confined = codexConfinement(origin, input.scope, { cwd, folders: [...extraDirs, ...(fixup ? [fixup] : [])], writable: writableRoots, yourServers });
           approval = approvalFor(confined.row, { planning, ...(input.askBeforeCommands ? { askBeforeCommands: true } : {}) });
@@ -278,7 +280,7 @@ export function createCodexBackend(opts: CodexBackendOptions): AgentBackend {
             settled = true;
             await settle(rpc, input.model ?? place?.model ?? opts.model);
           }
-          const params = { cwd, ...(model ? { model } : {}), developerInstructions: runInstructions(input, opts.bridge.selfName(), CODEX_AGENT), config: { ...confined.config, ...PROJECT_DOCS, ...runFeatures(confined.row.yourTools), ...mcpConfig(mounted.servers) }, approvalPolicy: approval };
+          const params = { cwd, ...(model ? { model } : {}), developerInstructions: runInstructions(input, opts.bridge.selfName(), CODEX_AGENT), config: { ...confined.config, ...PROJECT_DOCS, ...runFeatures(confined.row.yourTools), ...codexPlaceConfig(place?.mcp, yourServers), ...mcpConfig(mounted.servers) }, approvalPolicy: approval };
           let thread: ThreadStartResponse | undefined;
           if (resume) {
             thread = await rpc.request<ThreadStartResponse>('thread/resume', { threadId: resume, ...params }).catch(() => undefined);

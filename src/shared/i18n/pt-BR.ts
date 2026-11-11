@@ -6,6 +6,7 @@ import * as settings from './areas/settings.js';
 import * as tasks from './areas/tasks.js';
 import * as plans from './areas/plans.js';
 import * as phone from './areas/phone.js';
+import * as botAutonomy from './areas/bot-autonomy.js';
 
 /**
  * Brazilian Portuguese. A key missing here is said in English (never blank); tests/i18n.test.ts
@@ -116,4 +117,5 @@ export const ptBR: Partial<Record<Key, Message>> = {
   ...tasks.ptBR,
   ...plans.ptBR,
   ...phone.ptBR,
+  ...botAutonomy.ptBR,
 };

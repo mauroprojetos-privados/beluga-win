@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { BOT_AUTONOMIES, BOT_ID, BotTarget, CATEGORY, SKILL_NAME } from '../core/bots/schema.js';
+import { BOT_AUTONOMIES, BOT_ID, BotTarget, BotTrigger, CATEGORY, MAX_BOT_TRIGGERS, SKILL_NAME, TRIGGER_ID } from '../core/bots/schema.js';
+import { CHAT_ID } from '../shared/assistant.js';
 import { COMBO_ID, DifficultyCombos } from '../core/routing/model.js';
 
 /**
@@ -27,6 +28,8 @@ const BotPatch = z
     difficulty: DifficultyCombos.nullable(),
     autonomy: z.enum(BOT_AUTONOMIES).nullable(),
     projects: z.array(z.string().min(1).max(200)).max(50).nullable(),
+    // The Triggers tab: the whole list (Sentinels' trigger shapes, each with its message).
+    triggers: z.array(BotTrigger).max(MAX_BOT_TRIGGERS).nullable(),
   })
   .partial()
   .strict();
@@ -37,6 +40,11 @@ export const BOTS_API = {
   'bots.list': { args: z.tuple([]) },
   // One bot's status: the plan it dispatched last and the sidebar's line. → { status?, line? }
   'bots.status': { args: z.tuple([bot]) },
+  // Its chats, like Your Mac's tabs (another bot's: Your Mac's are assistant.*). A new one after the others, open now → its id;
+  // open one (kept across restarts); delete one for good (its run stopped, its messages and agent transcript gone; the last leaves a fresh one).
+  'bots.newChat': { args: z.tuple([bot]) },
+  'bots.openChat': { args: z.tuple([bot, z.string().regex(CHAT_ID)]) },
+  'bots.deleteChat': { args: z.tuple([bot, z.string().regex(CHAT_ID)]) },
 
   // ---- Bot Studio (the Mac and the web)
   // A bot's files as its tabs show them, with each file's fingerprint. → BotView
@@ -69,11 +77,15 @@ export const BOTS_API = {
   'bots.knowledge.addFile': { args: z.tuple([bot, z.string().min(1).max(4000)]) },
   'bots.knowledge.addText': { args: z.tuple([bot, z.string().trim().min(1).max(200), z.string().min(1).max(2_200_000)]) },
   'bots.knowledge.addUrl': { args: z.tuple([bot, z.string().url().max(2000)]) },
+  // A repository or folder: a folder on this computer, or a git address (cloned shallow beside the index). Its text files are indexed, never its secrets.
+  'bots.knowledge.addRepo': { args: z.tuple([bot, z.string().trim().min(1).max(2000)]) },
   'bots.knowledge.remove': { args: z.tuple([bot, z.string().regex(/^[a-z0-9-]{1,48}$/)]) },
   'bots.knowledge.reindex': { args: z.tuple([bot]) },
   'bots.knowledge.search': { args: z.tuple([bot, z.string().min(1).max(500)]) },
   // Whether each of its MCP servers connects, with the reason when one doesn't. → [{ name, status, error?, tools? }]
   'bots.validate': { args: z.tuple([bot]) },
+  // One of its triggers now, as if it fired: its message in the bot's chat. → whether it went
+  'bots.triggers.run': { args: z.tuple([bot, z.string().regex(TRIGGER_ID)]) },
   // Its saves (each a commit in its folder's git), newest first; Undo the last; back to one.
   'bots.versions': { args: z.tuple([bot]) },
   'bots.undo': { args: z.tuple([bot]) },

@@ -50,3 +50,4 @@ export function useT(): (key: Key, params?: Params) => string {
 }
 
 export { sayNeed, t } from '../../../src/shared/i18n/index';
+export { formatRelative } from '../../../src/shared/i18n/format';

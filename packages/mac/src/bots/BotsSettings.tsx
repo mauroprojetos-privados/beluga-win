@@ -12,6 +12,8 @@ import { sameDeep } from '../lib/stable.js';
 import { Group, Row } from '../dialogs/settings-controls.js';
 import { botIcon, pickBot, usePickedBot } from './BotsNav.js';
 import b from './bots.module.css';
+import { useT } from '../lib/i18n.js';
+import { RepoSource, Reach, TriggersTab } from './BotAutonomy.js';
 
 /**
  * Settings › Bots (docs/bots.md): Your Mac first, then the bots you made, and Bot Studio for the one
@@ -21,10 +23,11 @@ import b from './bots.module.css';
  * The same pane works in `beluga web`: nothing here needs the app's own windows.
  */
 
-type Tab = 'identity' | 'model' | 'tools' | 'skills' | 'knowledge' | 'memory' | 'test';
+type Tab = 'identity' | 'model' | 'triggers' | 'tools' | 'skills' | 'knowledge' | 'memory' | 'test';
 const TABS: ReadonlyArray<{ readonly id: Tab; readonly label: string; readonly icon: IconName }> = [
   { id: 'identity', label: 'Identity', icon: 'person' },
   { id: 'model', label: 'Model', icon: 'spark' },
+  { id: 'triggers', label: 'Triggers', icon: 'bolt' },
   { id: 'tools', label: 'Tools', icon: 'plug' },
   { id: 'skills', label: 'Skills', icon: 'book' },
   { id: 'knowledge', label: 'Knowledge', icon: 'search' },
@@ -331,6 +334,7 @@ function DraftDiff({ draft, current, onCancel, onAccept }: { draft: { files: Rec
 // ------------------------------------------------------------------ one bot
 
 function Studio({ bot }: { bot: BotInfo }) {
+  const tr = useT();
   const api = useApi();
   const { client } = useBeluga();
   const [tab, setTab] = useState<Tab>('identity');
@@ -399,12 +403,13 @@ function Studio({ bot }: { bot: BotInfo }) {
       <div className={b.tabs} role="tablist">
         {TABS.map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className={cx(b.tab, tab === t.id && b.tabOn)} onClick={() => setTab(t.id)}>
-            <Icon name={t.icon} size={12} /> {t.label}
+            <Icon name={t.icon} size={12} /> {t.id === 'triggers' ? tr('botStudio.triggers.tab') : t.label}
           </button>
         ))}
       </div>
       {tab === 'identity' ? <IdentityTab bot={bot} view={view} /> : null}
       {tab === 'model' ? <ModelTab bot={bot} view={view} /> : null}
+      {tab === 'triggers' ? <TriggersTab bot={bot} view={view} /> : null}
       {tab === 'tools' ? <ToolsTab bot={bot} view={view} /> : null}
       {tab === 'skills' ? <SkillsTab bot={bot} view={view} /> : null}
       {tab === 'knowledge' ? <KnowledgeTab bot={bot} view={view} /> : null}
@@ -547,6 +552,7 @@ function ToolsTab({ bot, view }: { bot: BotInfo; view: BotView }) {
             {saving.busy ? 'Connecting…' : 'Check Them'}
           </Button>
         </Row>
+        <Reach view={view} />
         {view.servers.map((name) => {
           const c = checks?.find((x) => x.name === name);
           return (
@@ -667,12 +673,13 @@ function KnowledgeTab({ bot, view }: { bot: BotInfo; view: BotView }) {
         <div className={b.list}>
           {k.sources.map((src) => (
             <div key={src.id} className={b.item}>
-              <Icon name={src.kind === 'url' ? 'globe' : src.kind === 'text' ? 'pencil' : 'file'} size={13} />
+              <Icon name={src.kind === 'url' ? 'globe' : src.kind === 'text' ? 'pencil' : src.kind === 'repo' ? 'branch' : 'file'} size={13} />
               <span className={b.grow}>
                 <strong>{src.name}</strong>
                 <span>
                   {src.origin ?? 'pasted'} · {Math.max(1, Math.round(src.size / 1024))} KB · added {new Date(src.addedAt).toLocaleDateString()}
                 </span>
+                {src.kind === 'repo' ? <RepoSource.Status id={src.id} view={view} /> : null}
               </span>
               <Button size="small" variant="quiet" icon="trash" aria-label={`Remove ${src.name}`} onClick={() => saving.run(() => api.bots['knowledge.remove'](bot.id, src.id))} />
             </div>
@@ -701,6 +708,7 @@ function KnowledgeTab({ bot, view }: { bot: BotInfo; view: BotView }) {
             Add
           </Button>
         </Row>
+        <RepoSource bot={bot} view={view} />
         <Row label="Try a search" detail="What its knowledge_search tool would find.">
           <input className={b.area} style={{ minHeight: 0, height: 26, width: 200 }} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && query.trim() && saving.run(async () => setFound((await api.bots['knowledge.search'](bot.id, query.trim())) as never))} aria-label="Search its knowledge" />
           <Button size="small" icon="search" disabled={!query.trim() || saving.busy} onClick={() => saving.run(async () => setFound((await api.bots['knowledge.search'](bot.id, query.trim())) as never))}>

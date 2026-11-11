@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { COMBO_ID, DIFFICULTIES, type Difficulty, DifficultyCombos } from '../routing/model.js';
-import { ASSISTANT_CHANNEL } from '../../shared/assistant.js';
+import { ASSISTANT_CHANNEL, CHAT_ID } from '../../shared/assistant.js';
+import { TriggerSchema } from '../sentinel/schema.js';
+import type { Trigger } from '../sentinel/model.js';
 
 /**
  * Bots (docs/bots.md, routing Phases 6, 6b and 6c): persistent, named conversations that plan and
@@ -58,6 +60,62 @@ export const targetOf = (t: string): { readonly kind: 'combo' | 'bot'; readonly 
   return m ? { kind: m[1] as 'combo' | 'bot', id: m[2]! } : undefined;
 };
 
+// ---------------------------------------------------------------- triggers
+
+/**
+ * The Sentinel triggers a bot can act on by itself (docs/bots.md, Triggers): a schedule, Run Now
+ * only, or an event Sentinels already watch. Not `after` (that's a sentinel's run) nor `webhook` (its
+ * address and secret are a sentinel's): a sentinel with a "Message" step covers those.
+ */
+export const BOT_TRIGGER_KINDS = ['schedule', 'manual', 'beluga', 'github', 'stripe', 'uptime', 'sentry'] as const;
+export type BotTriggerKind = (typeof BOT_TRIGGER_KINDS)[number];
+
+/** The most triggers a bot keeps. */
+export const MAX_BOT_TRIGGERS = 20;
+
+/** A trigger's id: short, a slug (bot.json's key for it, and its state's). */
+export const TRIGGER_ID = /^[a-z0-9][a-z0-9-]{0,31}$/;
+
+/**
+ * One of a bot's triggers: the same shape a sentinel's trigger has (`trigger`), plus what the bot is
+ * told when it fires (`message`), the project its event is watched in (GitHub, Stripe, Sentry), and
+ * whether it's off. A run is a turn in the bot's chat, within its autonomy.
+ */
+export const BotTrigger = z.object({
+  id: z.string().regex(TRIGGER_ID),
+  /** Its name in the Triggers tab ("Nightly deploy"); the trigger's own sentence when unset. */
+  name: z.string().trim().min(1).max(80).optional(),
+  trigger: TriggerSchema.refine((t) => (BOT_TRIGGER_KINDS as readonly string[]).includes(t.kind), { message: 'a bot’s trigger is a schedule, Run Now or an event (not after a sentinel or a webhook)' }),
+  /** What the bot gets when it fires ("check staging and deploy if green"). */
+  message: z.string().trim().min(1).max(4000),
+  /** The project whose events it watches (GitHub, Stripe, Sentry); none: the bot's first project. */
+  projectId: z.string().min(1).max(200).optional(),
+  /** Off: kept, never fires. */
+  off: z.boolean().optional(),
+});
+export type BotTrigger = z.infer<typeof BotTrigger>;
+
+/** What a trigger is doing, as the Triggers tab and the phone show it. */
+export interface BotTriggerInfo {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: BotTriggerKind;
+  readonly off: boolean;
+  /** The next scheduled run (schedules only). */
+  readonly next?: number;
+  /** When it last fired, and what it said. */
+  readonly last?: number;
+  readonly lastWhat?: string;
+  /** Why it can't watch (no gh, no key), in words. */
+  readonly trouble?: string;
+}
+
+/** The soonest run of a bot's triggers that are on (the phone's "Next run"). */
+export const nextRunOf = (triggers: readonly BotTriggerInfo[]): number | undefined =>
+  triggers.reduce<number | undefined>((soonest, t) => (!t.off && t.next !== undefined && (soonest === undefined || t.next < soonest) ? t.next : soonest), undefined);
+
+export type { Trigger };
+
 /** A colour of the phone's and the Mac's soft palette (`#rrggbb`). */
 const COLOR = /^#[0-9a-fA-F]{6}$/;
 
@@ -80,6 +138,8 @@ export const BotFile = z.object({
   autonomy: z.enum(BOT_AUTONOMIES).optional(),
   /** Projects it may act in (ids); empty: any, as Your Mac. */
   projects: z.array(z.string().min(1).max(200)).max(50).optional(),
+  /** What it does on its own: on a schedule or an event (Sentinels' triggers), each with its message. */
+  triggers: z.array(BotTrigger).max(MAX_BOT_TRIGGERS).optional(),
 });
 export type BotFile = z.infer<typeof BotFile>;
 
@@ -124,6 +184,16 @@ export function parseBotFile(text: string | undefined): ParsedBot {
         else problems.push(`bot.json: category “${k}” was left out (its target should be combo:<id> or bot:<id>)`);
       }
       if (Object.keys(kept).length) out.categories = kept;
+    } else if (key === 'triggers' && Array.isArray(obj.triggers)) {
+      // One bad trigger is dropped alone (and two with one id keep the first).
+      const kept: BotTrigger[] = [];
+      for (const [i, raw] of obj.triggers.slice(0, MAX_BOT_TRIGGERS).entries()) {
+        const t = BotTrigger.safeParse(raw);
+        const label = raw && typeof raw === 'object' && typeof (raw as { id?: unknown }).id === 'string' ? (raw as { id: string }).id : `#${i + 1}`;
+        if (t.success && !kept.some((k) => k.id === t.data.id)) kept.push(t.data);
+        else problems.push(`bot.json: trigger “${label}” was left out (${t.success ? 'another has its id' : (t.error.issues[0]?.message ?? 'it doesn’t fit')})`);
+      }
+      if (kept.length) out.triggers = kept;
     } else problems.push(`bot.json: “${key}” was left out (${field.error.issues[0]?.message ?? 'it doesn’t fit'})`);
   }
   return { bot: out as BotFile, problems };
@@ -131,7 +201,7 @@ export function parseBotFile(text: string | undefined): ParsedBot {
 
 /** bot.json as Beluga writes it: stable key order, two-space indent, a newline at the end. */
 export function botFileText(bot: BotFile): string {
-  const order: Array<keyof BotFile> = ['version', 'name', 'icon', 'color', 'description', 'combo', 'categories', 'difficulty', 'autonomy', 'projects'];
+  const order: Array<keyof BotFile> = ['version', 'name', 'icon', 'color', 'description', 'combo', 'categories', 'difficulty', 'autonomy', 'projects', 'triggers'];
   const out: Record<string, unknown> = {};
   for (const k of order) if (bot[k] !== undefined && !(Array.isArray(bot[k]) && !(bot[k] as unknown[]).length) && !(k === 'categories' && !Object.keys(bot.categories ?? {}).length)) out[k] = bot[k];
   out.version = BOT_FILE_VERSION;
@@ -146,18 +216,36 @@ export const orchestrates = (bot: BotFile, persona: string): boolean =>
 
 const BOT_PREFIX = 'bot:';
 
-/** A bot's conversation: Your Mac's is its own (`mac:assistant`); another's is `bot:<id>`. */
-export const botChannel = (id: string): string => (id === MAC_BOT ? ASSISTANT_CHANNEL : `${BOT_PREFIX}${id}`);
+/** A bot's first chat (the conversation it had before it had several), and its Test chat's key. */
+export const MAIN_CHAT = 'main';
+export const TEST_CHAT = 'test';
+
+/** The most chats a bot keeps open (its Test chat aside); Settings' Open chats limit counts them too. */
+export const MAX_BOT_CHATS = 40;
+
+/**
+ * A bot's conversation: Your Mac's is its own (`mac:assistant`); another's first chat is `bot:<id>`,
+ * its others `bot:<id>:<chat>` (like Your Mac's tabs), and its Test chat `bot:<id>:test`.
+ */
+export const botChannel = (id: string, chat: string = MAIN_CHAT): string => (id === MAC_BOT && chat === MAIN_CHAT ? ASSISTANT_CHANNEL : chat === MAIN_CHAT ? `${BOT_PREFIX}${id}` : `${BOT_PREFIX}${id}:${chat}`);
 
 /** Bot Studio's Test chat for a bot: a conversation of its own that touches no project. */
-export const botTestChannel = (id: string): string => `${BOT_PREFIX}${id}:test`;
+export const botTestChannel = (id: string): string => `${BOT_PREFIX}${id}:${TEST_CHAT}`;
 
-/** The bot a `bot:` channel is (its conversation or its Test chat); Your Mac's channels are the assistant's. */
-export function botOfChannel(channel: string | undefined): { readonly id: string; readonly test: boolean } | undefined {
+/** The bot a `bot:` channel is (one of its chats or its Test chat); Your Mac's channels are the assistant's. */
+export function botOfChannel(channel: string | undefined): { readonly id: string; readonly test: boolean; readonly chat: string } | undefined {
   if (!channel?.startsWith(BOT_PREFIX)) return undefined;
-  const [id, rest] = channel.slice(BOT_PREFIX.length).split(':');
-  if (!id || !BOT_ID.test(id) || (rest !== undefined && rest !== 'test')) return undefined;
-  return { id, test: rest === 'test' };
+  const parts = channel.slice(BOT_PREFIX.length).split(':');
+  const [id, rest] = parts;
+  if (parts.length > 2 || !id || !BOT_ID.test(id) || (rest !== undefined && (!CHAT_ID.test(rest) || rest === MAIN_CHAT))) return undefined;
+  return { id, test: rest === TEST_CHAT, chat: rest ?? MAIN_CHAT };
+}
+
+/** One of a bot's chats (not its Test chat), as the screens list them. */
+export interface BotChat {
+  readonly id: string;
+  readonly channel: string;
+  readonly createdAt: number;
 }
 
 export const isBotChannel = (channel: string | undefined): boolean => botOfChannel(channel) !== undefined;
@@ -194,8 +282,13 @@ export interface BotInfo {
   readonly icon: string;
   readonly color?: string;
   readonly description?: string;
-  /** Its conversation (Your Mac: its first chat's). */
+  /** Its conversation: the chat open now (Your Mac: its first chat's). */
   readonly channel: string;
+  /** Its chats in tab order (another bot's; Your Mac's are the assistant's own). */
+  readonly chats?: readonly BotChat[];
+  /** What it does on its own, and when it runs next. */
+  readonly triggers?: readonly BotTriggerInfo[];
+  readonly nextRun?: number;
   /** Its folder, `~`-shortened. */
   readonly dir: string;
   readonly mac: boolean;
@@ -217,6 +310,35 @@ export interface BotInfo {
 export function botBehind(bots: readonly BotInfo[], channel: string | undefined): BotInfo | undefined {
   if (!channel) return undefined;
   return bots.find((b) => b.channel === channel || botOfChannel(channel)?.id === b.id) ?? bots.find((b) => b.behind.includes(channel));
+}
+
+// ---------------------------------------------------------------- its tools on other runtimes
+
+/**
+ * Which of a bot's MCP servers each runtime takes for one run (docs/bots.md): Claude Code
+ * (`--mcp-config`, strictly), Codex (`mcp_servers.<name>` overrides, your own turned off) and
+ * OpenCode (ACP's session/new) take started and HTTP servers; Copilot only HTTP ones (it turns a
+ * client's started servers down). Any other runtime (a local model) takes none.
+ */
+export const MCP_REACH: Readonly<Record<string, 'all' | 'http'>> = { claude: 'all', codex: 'all', opencode: 'all', copilot: 'http' };
+
+/** A server of .mcp.json: its name and whether it's reached over HTTP (`url`) rather than started (`command`). */
+export interface McpServerKind {
+  readonly name: string;
+  readonly http: boolean;
+}
+
+/** What one runtime gets of a bot's servers: all, some (the rest named) or none. */
+export interface McpReach {
+  readonly runtime: string;
+  readonly gets: 'all' | 'some' | 'none';
+  readonly missing: readonly string[];
+}
+
+export function mcpReach(runtime: string, servers: readonly McpServerKind[]): McpReach {
+  const takes = MCP_REACH[runtime];
+  const missing = servers.filter((s) => !takes || (takes === 'http' && !s.http)).map((s) => s.name);
+  return { runtime, gets: !missing.length ? 'all' : missing.length === servers.length ? 'none' : 'some', missing };
 }
 
 export interface BotsState {

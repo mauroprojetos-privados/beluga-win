@@ -5,6 +5,7 @@ import * as settings from './areas/settings.js';
 import * as tasks from './areas/tasks.js';
 import * as plans from './areas/plans.js';
 import * as phone from './areas/phone.js';
+import * as botAutonomy from './areas/bot-autonomy.js';
 
 /**
  * English, the source catalog: every key is here first (docs/i18n.md). Keys are `area.thing`;
@@ -122,6 +123,7 @@ export const en = {
   ...tasks.en,
   ...plans.en,
   ...phone.en,
+  ...botAutonomy.en,
 } as const satisfies Record<string, Message>;
 
 /** Every key the app may say. */

@@ -236,6 +236,7 @@ function botSummaries(state: DomainState, waiting: ReadonlySet<string>, ctx?: Vi
     const channel = b.mac ? activeAssistantChannel(state.assistant) : b.channel;
     const conv = summaryOf(state, { channel, title: b.name, mine: true }, waiting, ctx);
     const line = botStatusLine(b.status);
+    const nextName = b.nextRun !== undefined ? b.triggers?.find((t) => t.next === b.nextRun)?.name : undefined;
     return {
       id: clip(b.id, 40),
       name: clip(b.name, 100),
@@ -248,6 +249,10 @@ function botSummaries(state: DomainState, waiting: ReadonlySet<string>, ctx?: Vi
       ...(b.status ? { plan: `plan:${b.status.planId}` } : {}),
       ...(conv ? { status: conv.status } : {}),
       ...(b.problems.length ? { problems: b.problems.length } : {}),
+      // 1.55: its own chats (Your Mac's are macChats), and when it next acts on its own.
+      ...(b.chats && b.chats.length > 1 ? { chats: b.chats.slice(0, 40).flatMap((c) => summaryOf(state, { channel: c.channel, title: assistantChatTitle(c.channel, state.log, 60), mine: true }, waiting, ctx) ?? []) } : {}),
+      ...(b.nextRun !== undefined ? { nextRun: Math.max(0, Math.round(b.nextRun)) } : {}),
+      ...(nextName ? { nextRunName: clip(nextName, 80) } : {}),
     };
   });
 }
@@ -279,7 +284,10 @@ export function conversations(state: DomainState): Conversation[] {
     .map((t) => ({ channel: `task:${t.id}`, title: plainLine(t.summary ?? t.ask, 300) || 'A question', project: 'Asked of friends', projectId: 'asked', mine: false }));
   const seen = new Set<string>();
   // Your bots besides Your Mac (docs/bots.md, 1.53): each its own conversation, opened and written in like Your Mac's.
-  const bots = state.bots.bots.filter((b) => !b.mac).map((b) => ({ channel: b.channel, title: b.name, mine: true }));
+  // 1.55: each of a bot's chats (its tabs on the Mac), the one open first.
+  const bots = state.bots.bots
+    .filter((b) => !b.mac)
+    .flatMap((b) => [{ channel: b.channel, title: b.name, mine: true }, ...(b.chats ?? []).filter((c) => c.channel !== b.channel).map((c) => ({ channel: c.channel, title: `${b.name} · ${assistantChatTitle(c.channel, state.log)}`, mine: true }))]);
   return [...assistantConversations(state), ...bots, ...own, ...shared, ...room, ...asked].filter((c) => !seen.has(c.channel) && Boolean(seen.add(c.channel)));
 }
 
@@ -677,7 +685,8 @@ export function homeView(state: DomainState, ctx: ViewContext): HomeView {
     // 1.14: all of Your Mac's chats, for the phone's chat list.
     ...(macChats.length ? { macChats } : {}),
     // 1.53: your bots, Your Mac first (docs/bots.md).
-    ...(bots.length > 1 || bots[0]?.line ? { bots } : {}),
+    // 1.55: Your Mac alone shows too once it acts on its own (its next run).
+    ...(bots.length > 1 || bots[0]?.line || bots[0]?.nextRun !== undefined ? { bots } : {}),
     me: { name: clip(myName(state), 64), peerId: myId(state) },
     usage: usageViews(state.peers.find((p) => p.peerId === state.self?.peerId) ?? state.self, state.prefs.defaultAgent),
     needsYou: items,
