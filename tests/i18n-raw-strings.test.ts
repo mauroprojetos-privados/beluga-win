@@ -16,6 +16,9 @@ const MIGRATED: readonly string[] = [
   'packages/mac/src/layout/NotificationCenter.tsx',
   'packages/mac/src/chat/Attention.tsx',
   'packages/mac/src/popup/RequestPopup.tsx',
+  // The Mac's composer and Settings
+  'packages/mac/src/chat/Composer.tsx',
+  'packages/mac/src/dialogs/Settings.tsx',
   // The Mac's task and plan pages
   'packages/mac/src/tasks/TaskPage.tsx',
   'packages/mac/src/plans/PlanPage.tsx',
