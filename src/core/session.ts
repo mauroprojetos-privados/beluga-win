@@ -946,6 +946,11 @@ export class Session {
     return routeSideCall(this.sideRoute(), (on) => on.draftTask?.(text, ctx), undefined);
   }
 
+  /** What kind of work a task made by hand is (Phase 3, docs/routing.md): a quick Haiku look, like the other side calls. */
+  async classifyTask(task: { readonly title: string; readonly goal?: string }): Promise<import('../agent/task-drafter.js').TaskKind | undefined> {
+    return routeSideCall(this.sideRoute(), (on) => on.classifyTask?.(task), undefined);
+  }
+
   /** An agent here can write what a project is about (About This Project). */
   get describesProjects(): boolean {
     return Boolean(this.agent?.describeProject);

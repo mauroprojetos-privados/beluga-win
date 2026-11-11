@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { type Combo, type ComboPrivacy, type Difficulty, type Role, type RouteTarget, DIFFICULTIES, ROLES, DEFAULT_COMBOS, MAX_COMBOS, MAX_TARGETS, comboIdFor, comboUsage, comboUsageWords, combosOf, targetLabel } from '@beluga/core/routing/model.js';
+import { type CategoryRoute, type Combo, type ComboPrivacy, type Difficulty, type Role, type RouteTarget, type WorkCategory, CATEGORY_INFO, WORK_CATEGORIES, DIFFICULTIES, ROLES, DEFAULT_COMBOS, MAX_COMBOS, MAX_TARGETS, comboIdFor, comboUsage, comboUsageWords, combosOf, targetLabel } from '@beluga/core/routing/model.js';
 import { LOCAL_RUNTIME, OLLAMA_ID, parseLocalModel } from '@beluga/shared/local-endpoints.js';
+import { DEFAULT_BASELINE, SAVINGS_BASELINES, baselineWords } from '@beluga/core/routing/outcomes.js';
 import type { RuntimeChoice } from '@beluga/shared/agent-runtimes.js';
 import { useComboChoices } from '../components/agent-options.js';
 import { Select } from '../components/Select.js';
@@ -16,6 +17,17 @@ const PRIVACY: ReadonlyArray<{ readonly value: ComboPrivacy; readonly label: str
 ];
 
 const DIFFICULTY_LABEL: Readonly<Record<Difficulty, string>> = { simple: 'Simple', normal: 'Normal', hard: 'Hard' };
+
+const EFFORTS: ReadonlyArray<{ readonly value: NonNullable<CategoryRoute['effort']>; readonly label: string }> = [
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+  { value: 'xhigh', label: 'Extra High' },
+  { value: 'max', label: 'Max' },
+];
+
+/** Two pickers side by side (a kind's combo and its effort). */
+const PAIR = { display: 'flex', gap: 6, alignItems: 'center' } as const;
 
 const ROLE_LABEL: Readonly<Record<Role, string>> = { planHead: 'Plan head', milestone: 'Milestones', checker: 'Checker', reviewer: 'PR reviewer' };
 
@@ -75,6 +87,13 @@ export function CombosSettings() {
   const options = targetChoices(runtimes, claudeModels);
   const byDifficulty = useApp((st) => st.prefs.difficultyCombos);
   const byRole = useApp((st) => st.prefs.roleCombos);
+  const byKind = useApp((st) => st.prefs.categoryCombos);
+  const baseline = useApp((st) => st.prefs.savingsBaseline ?? DEFAULT_BASELINE);
+  const setKind = (k: WorkCategory, route: CategoryRoute | undefined): void => {
+    const { [k]: _old, ...rest } = byKind ?? {};
+    const next = route ? { ...rest, [k]: route } : rest;
+    void api.session.setPrefs({ categoryCombos: Object.keys(next).length ? next : null });
+  };
   const setRole = (r: Role, id: string): void => {
     const { [r]: _old, ...rest } = byRole ?? {};
     const next = id ? { ...rest, [r]: id } : rest;
@@ -203,6 +222,22 @@ export function CombosSettings() {
             <Select key={d} label={`${DIFFICULTY_LABEL[d]} tasks`} value={byDifficulty?.[d] ?? ''} options={[{ value: '', label: `${DIFFICULTY_LABEL[d]}: your agent` }, ...combos.map((c) => ({ value: c.id, label: `${DIFFICULTY_LABEL[d]}: ${c.name}` }))]} onChange={(v) => setDifficulty(d, v)} />
           ))}
         </div>
+      </Row>
+      <Row label="By kind of work" detail="A task also says what kind of work it is (its drafter, or a quick look for one you made by hand). One that names no agent of its own starts on this combo, at this effort, over the one for how hard it is.">
+        <div style={STACK}>
+          {WORK_CATEGORIES.map((k) => {
+            const route = byKind?.[k];
+            return (
+              <div key={k} style={PAIR}>
+                <Select label={`${CATEGORY_INFO[k].label} work`} value={route?.combo ?? ''} options={[{ value: '', label: `${CATEGORY_INFO[k].label}: by difficulty`, description: CATEGORY_INFO[k].hint }, ...combos.map((c) => ({ value: c.id, label: `${CATEGORY_INFO[k].label}: ${c.name}`, description: CATEGORY_INFO[k].hint }))]} onChange={(v) => setKind(k, v ? { combo: v, ...(route?.effort ? { effort: route.effort } : {}) } : undefined)} />
+                {route ? <Select label={`${CATEGORY_INFO[k].label} effort`} value={route.effort ?? ''} options={[{ value: '', label: 'Its own effort' }, ...EFFORTS.map((e) => ({ value: e.value, label: e.label }))]} onChange={(v) => setKind(k, { combo: route.combo, ...(v ? { effort: v as CategoryRoute['effort'] } : {}) })} /> : null}
+              </div>
+            );
+          })}
+        </div>
+      </Row>
+      <Row label="Savings against" detail="Usage › Combos says what your runs saved, priced against running everything on one model.">
+        <Select label="Savings against" value={baseline} options={SAVINGS_BASELINES.map((b) => ({ value: b, label: baselineWords(b).replace(/^e/, 'E') }))} onChange={(v) => void api.session.setPrefs({ savingsBaseline: v === DEFAULT_BASELINE ? null : (v as (typeof SAVINGS_BASELINES)[number]) })} />
       </Row>
       <Row label="By role" detail="The combo each role of a plan, and the pull-request reviewer, runs on. Pick one of another vendor for the checker to have work checked by a different model.">
         <div style={STACK}>

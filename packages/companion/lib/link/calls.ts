@@ -74,6 +74,8 @@ export const calls = {
   stop: (topic: Topic): Call => make('host.stopRun', [channelOf(topic)], 'Stop'),
   /** 1.38 (BLG-122): external agents: who holds a grant, what they did, and stopping them. */
   externalAgents: (): Call => make('external.agents', [], 'External agents'),
+  // 1.52 (docs/routing.md): your runs through combos, how tasks went, savings and suggestions (read-only).
+  routingUsage: (): Call => make('routing.usage', [], 'Routing'),
   externalActivity: (kind?: 'allowed' | 'asked' | 'refused'): Call => make('external.activity', [kind ? { kind } : {}], 'Activity'),
   externalStop: (agent: string, name: string): Call => make('external.stopAgent', [agent], `Stop ${short(name)}`),
   externalStopAll: (): Call => make('external.stopAll', [], 'Stop all agents'),

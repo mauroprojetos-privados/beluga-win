@@ -97,11 +97,16 @@ export default function Task() {
                 <Pill label={t.assignee ?? 'No one'} Icon={User} tone={t.assignee ? 'lavender' : 'plain'} />
                 {/* On a combo (docs/routing.md): the combo, and the target its newest run went to ("Economy · Codex"). */}
                 {t.difficulty ? <Pill label={DIFFICULTY_WORDS[t.difficulty]} tone="plain" /> : null}
+                {/* 1.52 (docs/routing.md): its kind of work and what it starts on ("Visual · Strong"); changed on the Mac. */}
+                {t.kind?.category ? <Pill label={t.kind.words} Icon={Route} tone="plain" /> : null}
+                {t.kind?.ok !== undefined ? <Pill label={t.kind.ok ? 'Went well' : 'Didn’t go well'} Icon={t.kind.ok ? Check : CircleSlash} tone={t.kind.ok ? 'mint' : 'butter'} /> : null}
                 {t.agent || t.agents ? <Pill label={agentWords} Icon={t.agent?.comboName ? Route : markIcon(runtimeMark(agentRuntime))} tone="plain" /> : null}
                 {t.working ? <Pill label={t.working} Icon={User} tone="mint" /> : null}
                 {t.waiting ? <Pill label={t.waiting} Icon={Clock} tone="butter" /> : null}
                 {t.checks ? <Pill label={`${t.checks.done} of ${t.checks.total} checked`} Icon={Check} tone={t.checks.done === t.checks.total ? 'mint' : 'plain'} /> : null}
               </View>
+
+              {t.kind?.why || t.kind?.outcome ? <T v="caption">{[t.kind.why, t.kind.outcome].filter(Boolean).join(' · ')}</T> : null}
 
               {canStart ? <Button label={starting ? 'Starting…' : startLabel} Icon={Play} disabled={starting} onPress={() => void start()} /> : null}
               {t.conv ? <Button label="Open its conversation" Icon={MessageSquare} quiet onPress={() => router.push(convHref(t.conv!))} /> : null}

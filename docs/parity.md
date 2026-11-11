@@ -323,7 +323,7 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `routing.runRoute` | – read by the phone; a run's card on the Mac says it in its badge ("Economy · Codex") from the run's own agent |
 | `routing.setCombos` | Settings › Agent › Combos: New Combo, Edit… (rename, add, reorder and remove targets, privacy), Delete |
 | `routing.retry` | Needs You's Try Again on a used-up combo (the bell on the Mac, the phone's card): on now with the first target that can run |
-| `routing.usage` | Usage › Combos (runs, tokens and cost by the target each went to), and under each combo in Settings › Agent › Combos |
+| `routing.usage` | Usage › Combos (runs, tokens and cost by the target each went to; how tasks went, by kind too; savings against the baseline Settings › Agent › Combos › Savings against picks; read-only suggestions), and under each combo in Settings › Agent › Combos; the phone's Settings › Routing |
 | `routing.resetCombos` | Settings › Agent › Combos › Use the Defaults |
 | `voice.models` | Settings › Voice: the models on this Mac, here or coming |
 | `voice.prepare` | Settings › Voice › Get now |
@@ -551,7 +551,7 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `gateway.setCapabilities` | ✓ Settings › People & access › What your friends’ agents can do here (per capability and trust level, the folders) |
 | `gateway.image` | ✓ screenshots on a task card's result |
 | `board.create` | ✓ New Task (⌘N in Tasks, C, the + in a status group, ⌘K › New Task…; on a board of several repos, its Repo picker), sub-tasks on a task page; its Agent pop-up (BLG-497) picks the agent and model its worktree runs when it starts |
-| `board.update` | ✓ a task's properties (status, priority, assignee, labels, estimate, due date, parent, and the repo it runs in on a board of several), its title in place, row and card menus |
+| `board.update` | ✓ a task's properties (status, priority, assignee, labels, estimate, due date, parent, its Kind of work (one click, kept as a correction; docs/routing.md), and the repo it runs in on a board of several), its title in place, row and card menus |
 | `board.setPrivate` | ✓ a task's ⋯ › Make Private / Share with Team (only offered when teammates or Linear would see it), the Share with Team button on a private task's page, New Task's Who Sees It |
 | `board.move` | ✓ dragging a card between columns on the board, or within one |
 | `board.editBrief` | ✓ a section of the brief on a task page (click to edit, ⌘↩ saves) |
