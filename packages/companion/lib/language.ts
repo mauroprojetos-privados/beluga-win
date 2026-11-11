@@ -49,4 +49,4 @@ export function useT(): (key: Key, params?: Params) => string {
   return t;
 }
 
-export { t };
+export { sayNeed, t } from '../../../src/shared/i18n/index';

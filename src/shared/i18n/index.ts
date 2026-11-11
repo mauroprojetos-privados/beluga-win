@@ -73,6 +73,20 @@ export const translator =
     translate(locale, key, params);
 
 /**
+ * A Needs You item (src/companion/protocol.ts) said in this screen's language: its title, buttons
+ * and send button by their keys where the Mac sent them and we know them; the rest as sent.
+ */
+export function sayNeed<N extends { readonly title: string; readonly key?: string; readonly params?: Params; readonly actions: readonly { readonly label: string; readonly key?: string }[]; readonly answer?: { readonly label?: string; readonly key?: string } }>(n: N): N {
+  if (!n.key && !n.actions.some((a) => a.key) && !n.answer?.key) return n;
+  return {
+    ...n,
+    title: sayKeyed({ text: n.title, ...(n.key ? { key: n.key } : {}), ...(n.params ? { params: n.params } : {}) }),
+    actions: n.actions.map((a) => (a.key && isKey(a.key) ? { ...a, label: t(a.key) } : a)),
+    ...(n.answer ? { answer: n.answer.key && isKey(n.answer.key) ? { ...n.answer, label: t(n.answer.key) } : n.answer } : {}),
+  };
+}
+
+/**
  * What the daemon sent, said here (protocol.ts `key`/`params` beside `text`): its key in this
  * screen's language when we know the key, else the daemon's own `text`.
  */

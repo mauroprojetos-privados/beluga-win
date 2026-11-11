@@ -254,6 +254,14 @@ export const UsageView = z.object({
 });
 export type UsageView = z.infer<typeof UsageView>;
 
+/**
+ * 1.52 (docs/i18n.md): what a text says as a catalog key (src/shared/i18n) and what fills it, beside
+ * the text itself. A phone that knows the key says it in its own language; an older one, or one
+ * that doesn't know the key, shows the text (in the Mac's language).
+ */
+export const TextKey = z.string().max(80);
+export const TextParams = z.record(z.string().max(40), z.union([z.string().max(1000), z.number()]));
+
 export const Choice = z.object({ label: z.string().max(200), description: z.string().max(1000).optional() });
 
 /**
@@ -264,6 +272,9 @@ export const NeedsYou = z.object({
   id,
   kind: z.union([z.enum(['approval', 'question', 'request', 'decision', 'confirm']), z.string().max(40)]),
   title: z.string().max(500),
+  /** 1.52: the title as a key and its params (TextKey). */
+  key: TextKey.optional(),
+  params: TextParams.optional(),
   detail: text.optional(),
   /** Who is asking ("your Claude", "mia's Claude"). */
   from: z.string().max(100).optional(),
@@ -280,7 +291,7 @@ export const NeedsYou = z.object({
   freeText: z.boolean().optional(),
   /** Buttons: what they say and the call they make. `tone` main is the swipe-right one, danger the swipe-left. */
   actions: z
-    .array(z.object({ label: z.string().max(40), tone: z.enum(['main', 'danger', 'plain']), method: z.string().max(80), args: z.array(z.unknown()).max(8) }))
+    .array(z.object({ label: z.string().max(40), key: TextKey.optional(), tone: z.enum(['main', 'danger', 'plain']), method: z.string().max(80), args: z.array(z.unknown()).max(8) }))
     .max(4),
   /**
    * How to send an answer of your own (picked options, or words): call `method` with `args`, after
@@ -298,8 +309,9 @@ export const NeedsYou = z.object({
       list: z.boolean().optional(),
       text: z.boolean(),
       picks: z.boolean(),
-      /** What the send button says ("Send", "Send back"). */
+      /** What the send button says ("Send", "Send back"), and since 1.52 its key. */
       label: z.string().max(40).optional(),
+      key: TextKey.optional(),
     })
     .optional(),
 });

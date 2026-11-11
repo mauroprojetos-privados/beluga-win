@@ -147,7 +147,7 @@ describe('pairing a phone and its link', () => {
     const before = views.length;
     store.dispatch({ type: 'approval_add', approval: { id: 'a1', kind: 'tool', title: 'Run npm test?', detail: 'npm test', askedAt: 5 } });
     const next = await waitFor(() => views.slice(before).find((v) => v.topic === 'home'), 5_000);
-    expect(HomeView.parse(next.data).needsYou[0]?.actions[0]).toEqual({ label: 'Approve', tone: 'main', method: 'host.answerApproval', args: ['yes', 'a1'] });
+    expect(HomeView.parse(next.data).needsYou[0]?.actions[0]).toEqual({ label: 'Approve', key: 'needs.approve', tone: 'main', method: 'host.answerApproval', args: ['yes', 'a1'] });
 
     // Allowed calls go to the API as the phone; Mac-only ones are refused before they're parsed.
     expect(await client.call('host.answerApproval', ['yes', 'a1'])).toBe('did host.answerApproval');

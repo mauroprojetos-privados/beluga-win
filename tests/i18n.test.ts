@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { formatDate, formatDateTime, formatList, formatMoney, formatNumber, formatPercent, formatRelative, formatTime } from '../src/shared/i18n/format.js';
-import { CATALOGS, LOCALES, type Message, en, getLocale, isKey, matchLocale, onLocaleChange, ptBR, resolveLocale, sayKeyed, setLocale, t, translate, translator } from '../src/shared/i18n/index.js';
+import { CATALOGS, LOCALES, type Message, en, getLocale, isKey, matchLocale, onLocaleChange, ptBR, resolveLocale, sayKeyed, sayNeed, setLocale, t, translate, translator } from '../src/shared/i18n/index.js';
 
 const slots = (m: Message): string[] =>
   [...new Set((typeof m === 'string' ? [m] : Object.values(m)).flatMap((s) => [...(s as string).matchAll(/\{(\w+)\}/g)].map((x) => x[1]!)))].sort();
@@ -135,5 +135,18 @@ describe('format', () => {
   it('follows the chosen language when none is given', () => {
     setLocale('pt-BR');
     expect(formatNumber(1234.5)).toBe('1.234,5');
+  });
+});
+
+describe('what the daemon sends by key (protocol 1.52)', () => {
+  it('says a Needs You item in this screen’s language, and leaves one without keys as it is', () => {
+    const sent = { title: 'Approve the plan “Ship”?', key: 'needs.approvePlan', params: { title: 'Ship' }, actions: [{ label: 'Approve', key: 'needs.approve' }, { label: 'Option A' }], answer: { label: 'Send', key: 'needs.send' } };
+    setLocale('pt-BR');
+    const said = sayNeed(sent);
+    expect(said.title).toBe('Aprovar o plano “Ship”?');
+    expect(said.actions.map((a) => a.label)).toEqual(['Aprovar', 'Option A']);
+    expect(said.answer?.label).toBe('Enviar');
+    const plain = { title: 'Something', actions: [{ label: 'OK' }] };
+    expect(sayNeed(plain)).toBe(plain);
   });
 });
