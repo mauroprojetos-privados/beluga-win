@@ -5,7 +5,7 @@
 > acaba a cota ou falha. É a ideia do 9router (combos com fallback), mas no nível da **tarefa**, que
 > é onde o Beluga tem contexto que um proxy não tem.
 
-Status: proposta · 2026-11-11
+Status: fases 1 a 5 feitas · fases 6, 6b, 6c e 7 propostas · atualizado em 2026-11-11
 
 ## 1. O que o Beluga já tem (não reinventar)
 
@@ -585,13 +585,28 @@ Beluga de hoje.
 | Fase 0: sub-agentes Haiku `explorador`, `testador` e `documentador` | ✅ em `~/.claude/agents/` no WSL; o `explorador` foi testado |
 | Fase 0: padrão `opusplan` ou Sonnet em Settings | a fazer (você) |
 | Fase 0: Magpie ou 9router como endpoint | o Magpie está rodando no WSL; faltam os provedores, a chave e o Add Endpoint |
-| Fase 1: combos | em andamento, sessão "Fase 1: combos de agentes e modelos", worktree a partir da `main` |
-| Fases 2 a 6c | não iniciadas |
+| Fase 1: combos | ✅ feita: Settings › Agent › Combos (Economy, Strong, Local first), combos nos seletores, o combo e o alvo de cada execução; doc em `docs/routing.md` |
+| Fase 2: troca quando acaba a cota | ✅ feita (`src/core/routing/failover.ts`): o próximo alvo continua a conversa, que é levada junto quando o runtime muda; com o combo esgotado, vira Needs You `combo` com Try Again, também no celular |
+| Fase 3: classificar a tarefa | ✅ em parte: o redator marca `simple` / `normal` / `hard` (`Issue.difficulty`) e cada nível aponta para um combo. **Falta:** as categorias por nome (`quick`, `deep`, `visual`…) |
+| Fase 4: modelo por papel | ✅ feita: Settings › Agent › Combos › By role, com plano, etapas, verificador (o de outro fornecedor depende do combo escolhido) e revisor de PR |
+| Fase 5: medir | ✅ em parte: tokens e custo por combo e por alvo em Usage › Combos (`comboUsage`, `routing.usage` para o celular). **Falta:** taxa de sucesso, economia em relação a "tudo no Opus" e sugestões |
+| Fases 6, 6b e 6c: bots, bots especialistas e Bot Studio | não iniciadas |
+| Código das fases 1 a 5 | na branch `feat/windows-port` (commits `10ab8653`, `cb7fcab5`, `659a0631`, `b2636afb`), que também está no GitHub (fork privado); no ar no motor do WSL |
+| Pendências para o celular | o telefone mostra o combo e o alvo de cada resposta, a dificuldade da tarefa e o Needs You de combo esgotado; editar combos é só no Mac, como manda o `CLAUDE.md` |
 | Fase 7: idiomas (pt-BR) | não iniciada; hoje não há biblioteca de tradução, e os textos estão escritos direto no código |
 | Navegador para os agentes | Playwright MCP registrado no Claude do WSL (escopo de usuário), com o Chromium já baixado, sem tela; vale para todas as conversas do Beluga do WSL |
 | OpenViking (base do conhecimento da 6b) | instalado no WSL; falta `openviking-server init` |
-| Modo WSL do app do Windows (pré-requisito para usar o app nativo) | commit `cd0a8c4c` na branch `feat/wsl-engine`; ainda não testado no app compilado |
-| Uso atual | o Beluga do WSL pelo navegador, em `127.0.0.1:7777` |
+| Modo WSL do app do Windows (pré-requisito para usar o app nativo) | commit `cd0a8c4c`, unificado na `feat/windows-port`; ainda não testado num app compilado |
+| Branches | tudo unificado na `feat/windows-port` (porte para Windows, modo WSL, combos e roadmap), enviada ao GitHub; as branches e worktrees antigas foram apagadas |
+| Testes (Windows) | typecheck limpo; suíte com 7.116 aprovados e 113 falhas do ambiente desta máquina (91 de links simbólicos sem o Modo de Desenvolvedor; o resto de locale pt-BR, CRLF, `tar`, Python e tempo esgotado) |
+| Uso atual | o Beluga do WSL pelo navegador, em `127.0.0.1:7777`, já com as fases 1 a 5 |
+
+**Próximos passos:**
+1. Usar os combos por algumas semanas e olhar Usage › Combos. É o dado para calibrar os níveis e as categorias.
+2. Completar a fase 3 com as categorias por nome e a fase 5 com a taxa de sucesso e a economia.
+3. Testar o modo WSL num app compilado (`npm run tauri build`) e, se funcionar, usar o app nativo em vez do navegador.
+4. Fase 7 (pt-BR), que pode correr em paralelo; o idioma dos agentes primeiro.
+5. Fases 6, 6b e 6c (bots).
 
 **Cuidados já descobertos:**
 - No WSL, um `bash -c` sem login acha primeiro o `claude` do Windows (`/mnt/c`), que não enxerga os
