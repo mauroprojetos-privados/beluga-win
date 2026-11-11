@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { type Combo, type ComboPrivacy, type Difficulty, type Role, type RouteTarget, DIFFICULTIES, ROLES, MAX_COMBOS, MAX_TARGETS, comboIdFor, comboUsage, comboUsageWords, combosOf, targetLabel } from '@beluga/core/routing/model.js';
+import { type Combo, type ComboPrivacy, type Difficulty, type Role, type RouteTarget, DIFFICULTIES, ROLES, DEFAULT_COMBOS, MAX_COMBOS, MAX_TARGETS, comboIdFor, comboUsage, comboUsageWords, combosOf, targetLabel } from '@beluga/core/routing/model.js';
 import { LOCAL_RUNTIME, OLLAMA_ID, parseLocalModel } from '@beluga/shared/local-endpoints.js';
 import type { RuntimeChoice } from '@beluga/shared/agent-runtimes.js';
 import { useComboChoices } from '../components/agent-options.js';
@@ -18,6 +18,9 @@ const PRIVACY: ReadonlyArray<{ readonly value: ComboPrivacy; readonly label: str
 const DIFFICULTY_LABEL: Readonly<Record<Difficulty, string>> = { simple: 'Simple', normal: 'Normal', hard: 'Hard' };
 
 const ROLE_LABEL: Readonly<Record<Role, string>> = { planHead: 'Plan head', milestone: 'Milestones', checker: 'Checker', reviewer: 'PR reviewer' };
+
+/** Several pickers in one row, one under the other. */
+const STACK = { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 } as const;
 
 const errorText = (err: unknown): string => (err instanceof Error ? err.message.replace(/^Bad arguments for [\w.]+: /, '') : String(err));
 
@@ -96,10 +99,12 @@ export function CombosSettings() {
     }
   };
 
+  // The first change saves the whole list: a default you didn't touch keeps all its targets (the ones this computer can't run now are skipped when a run starts, not dropped).
+  const whole = (list: readonly Combo[], changed?: string): Combo[] => list.map((c) => (saved || c.id === changed ? c : (DEFAULT_COMBOS.find((x) => x.id === c.id) ?? c)));
   const saveDraft = (d: Combo & { readonly isNew?: boolean }): void => {
     const { isNew: _n, ...combo } = d;
     const named = { ...combo, name: combo.name.trim() };
-    void saveAll(d.isNew ? [...combos, named] : combos.map((c) => (c.id === named.id ? named : c)));
+    void saveAll(whole(d.isNew ? [...combos, named] : combos.map((c) => (c.id === named.id ? named : c)), named.id));
   };
 
   const move = (i: number, by: number): void => {
@@ -172,16 +177,6 @@ export function CombosSettings() {
           New Combo
         </Button>
       </Row>
-      <Row label="By how hard a task is" detail="A task names how hard it looks when your agent writes it. One that names no agent of its own starts on this combo.">
-        {DIFFICULTIES.map((d) => (
-          <Select key={d} label={`${DIFFICULTY_LABEL[d]} tasks`} value={byDifficulty?.[d] ?? ''} options={[{ value: '', label: `${DIFFICULTY_LABEL[d]}: your agent` }, ...combos.map((c) => ({ value: c.id, label: `${DIFFICULTY_LABEL[d]}: ${c.name}` }))]} onChange={(v) => setDifficulty(d, v)} />
-        ))}
-      </Row>
-      <Row label="By role" detail="The combo each role of a plan, and the pull-request reviewer, runs on. Pick one of another vendor for the checker to have work checked by a different model.">
-        {ROLES.map((r) => (
-          <Select key={r} label={ROLE_LABEL[r]} value={byRole?.[r] ?? ''} options={[{ value: '', label: `${ROLE_LABEL[r]}: as now` }, ...combos.map((c) => ({ value: c.id, label: `${ROLE_LABEL[r]}: ${c.name}` }))]} onChange={(v) => setRole(r, v)} />
-        ))}
-      </Row>
       {draft?.isNew ? form : null}
       {combos.map((c) => {
         if (draft?.id === c.id && !draft.isNew) return <div key={c.id}>{form}</div>;
@@ -189,18 +184,33 @@ export function CombosSettings() {
         const privacy = c.privacy && c.privacy !== 'any' ? ` · ${PRIVACY.find((p) => p.value === c.privacy)?.label}` : '';
         const used = usage.find((u) => u.combo === c.id);
         return (
-          <Row key={c.id} label={c.name} detail={`${now?.summary ?? ''}${privacy}${now?.now ? ` · now: ${now.now}` : now?.why ? ` · ${now.why}` : ''}${used ? ` · ${comboUsageWords(used)}` : ''}`}>
+          <Row key={c.id} label={c.name} detail={`${now?.summary ?? ''}${privacy}${now?.now ? ` · now: ${now.now}` : now?.why ? ` · Can’t run now: ${now.why.replace(/^Nothing in .+? can run now: /, '')}` : ''}${used ? ` · ${comboUsageWords(used)}` : ''}`}>
             <Dot tone={now?.now ? 'ok' : 'warn'} />
             <Button size="small" variant="quiet" disabled={busy} onClick={() => (setError(''), setDraft(c))}>
               Edit…
             </Button>
-            <Button size="small" variant="quiet" disabled={busy} onClick={() => void saveAll(combos.filter((x) => x.id !== c.id))}>
+            <Button size="small" variant="quiet" disabled={busy} onClick={() => void saveAll(whole(combos.filter((x) => x.id !== c.id)))}>
               Delete
             </Button>
           </Row>
         );
       })}
       {error && !draft ? <div className={s.endpointError}>{error}</div> : null}
+      {/* The pickers stack, one per line: side by side they squeeze the words to a word a line. */}
+      <Row label="By how hard a task is" detail="A task names how hard it looks when your agent writes it. One that names no agent of its own starts on this combo.">
+        <div style={STACK}>
+          {DIFFICULTIES.map((d) => (
+            <Select key={d} label={`${DIFFICULTY_LABEL[d]} tasks`} value={byDifficulty?.[d] ?? ''} options={[{ value: '', label: `${DIFFICULTY_LABEL[d]}: your agent` }, ...combos.map((c) => ({ value: c.id, label: `${DIFFICULTY_LABEL[d]}: ${c.name}` }))]} onChange={(v) => setDifficulty(d, v)} />
+          ))}
+        </div>
+      </Row>
+      <Row label="By role" detail="The combo each role of a plan, and the pull-request reviewer, runs on. Pick one of another vendor for the checker to have work checked by a different model.">
+        <div style={STACK}>
+          {ROLES.map((r) => (
+            <Select key={r} label={ROLE_LABEL[r]} value={byRole?.[r] ?? ''} options={[{ value: '', label: `${ROLE_LABEL[r]}: as now` }, ...combos.map((c) => ({ value: c.id, label: `${ROLE_LABEL[r]}: ${c.name}` }))]} onChange={(v) => setRole(r, v)} />
+          ))}
+        </div>
+      </Row>
     </Group>
   );
 }

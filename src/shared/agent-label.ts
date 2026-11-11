@@ -19,7 +19,10 @@ export interface AgentLabelOptions {
 
 /** Model ids as people say them: "opus" → "Opus", "gpt-5" → "GPT-5", "claude-sonnet-4-5" → "Sonnet 4.5", OpenCode's "anthropic/claude-sonnet-4-5" the same (its provider isn't said). */
 export function modelName(model: string): string {
-  const m = model.trim().replace(/^[\w.@-]+\//, '').replace(/^claude-/i, '');
+  // A 1M-context pick ("fable-5[1m]") says so after the name.
+  const long = /\[1m\]$/i.test(model.trim());
+  const m = model.trim().replace(/\[1m\]$/i, '').replace(/^[\w.@-]+\//, '').replace(/^claude-/i, '');
+  if (long) return `${modelName(m)} (1M)`;
   if (/^gpt/i.test(m)) return m.replace(/^gpt/i, 'GPT');
   // A dated id's date ("-20250929") isn't said.
   const [first = '', ...rest] = m.split('-').filter((p) => !/^\d{8}$/.test(p));

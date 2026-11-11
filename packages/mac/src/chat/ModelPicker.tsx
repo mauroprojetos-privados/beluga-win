@@ -189,9 +189,10 @@ export function ModelPicker({ channel, draft, onDraft }: { channel: string; draf
   const comboRows = (
     <div className={s.models} role="radiogroup" aria-label="Combos">
       {combos.map((c) => {
-        const desc = c.why ?? `${c.summary}${c.now ? ` · now ${c.now}` : ''}`;
+        // Why it can't run, target by target, is long: the tooltip has it, the row says it short.
+        const desc = c.why ? `${c.summary} · nothing can run now` : `${c.summary}${c.now ? ` · now ${c.now}` : ''}`;
         return (
-          <button key={c.id} type="button" role="radio" aria-checked={c.on} disabled={Boolean(c.why) && !c.on} title={desc} className={cx(s.model, c.on && s.modelOn, c.why && s.modelOff)} onClick={() => pickOne(c)}>
+          <button key={c.id} type="button" role="radio" aria-checked={c.on} disabled={Boolean(c.why) && !c.on} title={c.why ?? desc} className={cx(s.model, c.on && s.modelOn, c.why && s.modelOff)} onClick={() => pickOne(c)}>
             <span className={s.radio}>{c.on ? <Icon name="check" size={9} /> : null}</span>
             <span className={s.modelName}>{c.name}</span>
             <span className={s.modelDesc}>{desc}</span>

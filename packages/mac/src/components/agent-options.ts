@@ -45,7 +45,7 @@ export function useAgentEntries(opts: { readonly combos?: boolean } = {}): Selec
 }
 
 /** A combo as a pop-up row: its name, its chain (or why none of it can run now), greyed when none can. */
-const comboOption = (c: ComboChoice): SelectOption<string> => ({ value: comboValue(c.id), label: c.name, icon: 'branch', description: c.why ?? c.summary, ...(c.why ? { disabled: true } : {}) });
+const comboOption = (c: ComboChoice): SelectOption<string> => ({ value: comboValue(c.id), label: c.name, icon: 'branch', description: c.why ? `${c.summary} · nothing can run now (Settings › Agent › Combos says why)` : c.summary, ...(c.why ? { disabled: true } : {}) });
 
 const sameChoices = (a: readonly ComboChoice[], b: readonly ComboChoice[]): boolean => JSON.stringify(a) === JSON.stringify(b);
 
