@@ -60,3 +60,30 @@ describe('Phase 5: usage by combo and target', () => {
     expect(PHONE['routing.usage']).toBe('phone');
   });
 });
+
+describe('tokens and cost by combo and target', () => {
+  it('a run’s usage reports add up on its card; reports for no card, or none, change nothing', async () => {
+    const { Store, initialState } = await import('../src/core/store.js');
+    const store = new Store(initialState('room'));
+    const me = store.getState().selfId;
+    const ev = (event: string, text: string, requestId = 'r1') => store.dispatch({ type: 'agent_event', owner: me, requestId, requester: me, event, text, ts: 1, channel: 'ws:w1' } as never);
+    ev('started', '');
+    ev('usage', JSON.stringify({ tokens: 1200, cost: 0.02 }));
+    ev('usage', JSON.stringify({ tokens: 800, cost: 0.01 }));
+    ev('usage', 'not json');
+    ev('usage', JSON.stringify({ tokens: 5 }), 'other');
+    const card = store.getState().log.find((l) => l.type === 'agent');
+    expect(card).toMatchObject({ usage: { tokens: 2000 } });
+    expect((card as { usage: { cost: number } }).usage.cost).toBeCloseTo(0.03);
+  });
+
+  it('adds them up by combo and target, and says them short', () => {
+    const agent = (runtime: string, label: string, model?: string): AgentRef => ({ runtime, label, ...(model ? { model } : {}), combo: 'economy', comboName: 'Economy' });
+    const card = (a: AgentRef, tokens: number, cost: number, status = 'done'): LimitCard => ({ type: 'agent', owner: 'me', status, ts: 1, endTs: 2, agent: a, text: status === 'error' ? encodeFailure({ kind: 'usage_limit', detail: 'x' }) : 'ok', usage: { tokens, cost } });
+    const u = comboUsage([card(agent('codex', 'Codex'), 800_000, 0), card(agent('claude', 'Claude', 'sonnet'), 350_000, 3.4, 'error'), card(agent('codex', 'Codex'), 50_000, 0)], 'me');
+    expect(u[0]).toMatchObject({ tokens: 1_200_000, runs: 3, limited: 1 });
+    expect(u[0]!.cost).toBeCloseTo(3.4);
+    expect(u[0]!.targets.map((t) => [t.target, t.tokens])).toEqual([['Codex', 850_000], ['Claude · Sonnet', 350_000]]);
+    expect(comboUsageWords(u[0]!)).toBe('3 runs · 1.2M tokens · $3.40: Codex 2 (850k), Claude · Sonnet 1 (350k, 1 at its limit)');
+  });
+});

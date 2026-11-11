@@ -1520,7 +1520,9 @@ export class Session {
     // Only your own Claude writes into your workspaces; in one shared with you, only its owner's Claude.
     if (body.channel !== 'room' && from !== this.selfId && this.sharing.sharedFor(body.channel)?.owner !== from) return;
     if (body.event === 'usage') {
-      if (from === this.selfId) this.workbench?.onUsage(body.channel, body.text);
+      // What it added goes on the run's card too (usage by combo and target, docs/routing.md).
+      const added = from === this.selfId ? this.workbench?.onUsage(body.channel, body.text) : undefined;
+      if (added && (added.tokens || added.cost)) this.store.dispatch({ type: 'agent_event', owner: from, requestId: body.requestId, requester: body.requester, event: 'usage', text: JSON.stringify(added), ts, channel: body.channel });
       return;
     }
     const waiter = this.agentWaiters.get(body.requestId);

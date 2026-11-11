@@ -1790,16 +1790,23 @@ export class Workbench {
   // ------------------------------------------------------- usage & space
 
   /** Claude reported tokens and cost for a run in a workspace. */
-  onUsage(channel: string, json: string): void {
+  /** A run's usage report, added to its workspace. → what it added (tokens and cost), for the run's card; undefined: not a workspace's, or not usage. */
+  onUsage(channel: string, json: string): { readonly tokens: number; readonly cost: number } | undefined {
     const id = channel.startsWith('ws:') ? channel.slice(3) : undefined;
-    if (!id) return;
+    if (!id) return undefined;
     try {
       const u = JSON.parse(json) as { input?: number; output?: number; cacheRead?: number; cacheWrite?: number; cost?: number; session?: string; free?: boolean; tps?: number };
       const num = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : 0);
-      this.manager.addUsage(id, { input: num(u.input), output: num(u.output), cacheRead: num(u.cacheRead), cacheWrite: num(u.cacheWrite), cost: num(u.cost), session: typeof u.session === 'string' ? u.session : undefined, ...(u.free === true ? { free: true, ...(num(u.tps) ? { tps: num(u.tps) } : {}) } : {}) });
+      const before = this.manager.find(id)?.usage;
+      const after = this.manager.addUsage(id, { input: num(u.input), output: num(u.output), cacheRead: num(u.cacheRead), cacheWrite: num(u.cacheWrite), cost: num(u.cost), session: typeof u.session === 'string' ? u.session : undefined, ...(u.free === true ? { free: true, ...(num(u.tps) ? { tps: num(u.tps) } : {}) } : {}) });
       void this.deps.controller.refresh();
+      if (!after) return undefined;
+      // The growth: the reports are running totals per conversation (manager.addUsage works it out).
+      const total = (x: { input: number; output: number; cacheWrite: number } | undefined): number => (x ? x.input + x.output + x.cacheWrite : 0);
+      return { tokens: Math.max(0, total(after) - total(before)), cost: Math.max(0, after.cost - (before?.cost ?? 0)) };
     } catch {
       // Not usage we understand.
+      return undefined;
     }
   }
 
