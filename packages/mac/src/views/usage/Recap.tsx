@@ -8,6 +8,7 @@ import { Mark } from '../../onboarding/Mark.js';
 import { type Slide, recapSlides } from './recap-model.js';
 import type { Title } from './titles.js';
 import s from './recap.module.css';
+import { useLocale, useT } from '../../lib/i18n.js';
 
 /** How long a slide stays before the next (paused while you hold the pointer down). */
 const SLIDE_MS = 6000;
@@ -126,9 +127,11 @@ function Shapes({ at, still }: { at: number; still: boolean }) {
  * your pass swinging beside it (and your stats to share).
  */
 export function Recap({ state, stats, now, title, pass, onShare, onClose }: { state: AppState; stats: StatsSnapshot; now: number; title: Title; pass?: ReactNode; onShare?: () => void; onClose: () => void }) {
+  const t = useT();
+  const locale = useLocale();
   const still = useReducedMotion() ?? false;
-  const name = state.network.self?.name || state.self?.name || 'You';
-  const slides = useMemo(() => recapSlides(stats, state, name, now, title), [stats, state.projects, name, now, title]); // eslint-disable-line react-hooks/exhaustive-deps
+  const name = state.network.self?.name || state.self?.name || t('usage.card.you');
+  const slides = useMemo(() => recapSlides(stats, state, name, now, title), [stats, state.projects, name, now, title, locale]); // eslint-disable-line react-hooks/exhaustive-deps
   const [at, setAt] = useState(0);
   const [held, setHeld] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -142,9 +145,9 @@ export function Recap({ state, stats, now, title, pass, onShare, onClose }: { st
   useEffect(() => {
     if (held || last) return;
     const started = performance.now();
-    const t = setTimeout(() => go(at + 1), left.current);
+    const timer = setTimeout(() => go(at + 1), left.current);
     return () => {
-      clearTimeout(t);
+      clearTimeout(timer);
       left.current = Math.max(0, left.current - (performance.now() - started));
     };
   }, [at, held, last, go]);
@@ -172,7 +175,7 @@ export function Recap({ state, stats, now, title, pass, onShare, onClose }: { st
       className={s.recap}
       role="dialog"
       aria-modal="true"
-      aria-label="Your recap"
+      aria-label={t('usage.recap.label')}
       tabIndex={-1}
       style={{ '--c': slide.color } as React.CSSProperties}
       initial={still ? { opacity: 0 } : { opacity: 0, scale: 0.985 }}
@@ -181,14 +184,14 @@ export function Recap({ state, stats, now, title, pass, onShare, onClose }: { st
     >
       <Shapes at={at} still={still} />
       <div className={s.top}>
-        <div className={s.progress} role="tablist" aria-label="Slides">
+        <div className={s.progress} role="tablist" aria-label={t('usage.recap.slides')}>
           {slides.map((x, i) => (
-            <button key={x.id} type="button" role="tab" aria-selected={i === at} aria-label={`Slide ${i + 1}`} className={s.segment} onClick={() => go(i)}>
+            <button key={x.id} type="button" role="tab" aria-selected={i === at} aria-label={t('usage.recap.slide', { n: i + 1 })} className={s.segment} onClick={() => go(i)}>
               <span className={cx(s.segmentFill, i < at && s.segmentDone, i === at && s.segmentNow, held && s.segmentHeld)} style={i === at ? { animationDuration: `${SLIDE_MS}ms` } : undefined} key={i === at ? `${at}` : undefined} />
             </button>
           ))}
         </div>
-        <IconButton icon="x" label="Close the recap" onClick={onClose} />
+        <IconButton icon="x" label={t('usage.recap.close')} onClick={onClose} />
       </div>
       <div className={cx(s.stage, last && Boolean(pass) && s.stageWithPass)} onClick={onClick} onPointerDown={() => setHeld(true)} onPointerUp={() => setHeld(false)} onPointerLeave={() => setHeld(false)}>
         <AnimatePresence mode="wait" initial={false}>
@@ -206,15 +209,15 @@ export function Recap({ state, stats, now, title, pass, onShare, onClose }: { st
         {last ? (
           <motion.div key="end" className={s.end} initial={{ opacity: 0, y: still ? 0 : 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.5, delay: still ? 0 : 0.9, ease: EASE }}>
             <Button variant="plain" icon="refresh" onClick={() => go(0)}>
-              Play Again
+              {t('usage.recap.playAgain')}
             </Button>
             {onShare ? (
               <Button variant="plain" icon="share" onClick={onShare}>
-                Share…
+                {t('usage.card.share')}
               </Button>
             ) : null}
             <Button variant="primary" onClick={onClose}>
-              Back to Your Stats
+              {t('usage.recap.back')}
             </Button>
           </motion.div>
         ) : null}

@@ -11,6 +11,7 @@ import { playTestSound } from '../../lib/sounds/native.js';
 import { Row } from '../settings-controls.js';
 import s from './sound.module.css';
 import { keyPlatform } from '../../lib/shortcuts-model.js';
+import { say, useT } from '../../lib/i18n.js';
 
 export interface TestNotificationProps {
   readonly n: NotifySettings;
@@ -25,6 +26,7 @@ export interface TestNotificationProps {
  * that fixes it when something's in the way.
  */
 export function TestNotification({ n, onChecked, onAction }: TestNotificationProps) {
+  const t = useT();
   const api = useApi();
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<TestOutcome>();
@@ -41,7 +43,7 @@ export function TestNotification({ n, onChecked, onAction }: TestNotificationPro
       onChecked(access);
       setOutcome(testOutcome(access, tone.kind === 'none' ? null : soundTitle(tone), keyPlatform()));
     } catch (e) {
-      setOutcome({ tone: 'warn', text: `Couldn’t send it: ${e instanceof Error ? e.message : String(e)}` });
+      setOutcome({ tone: 'warn', text: t('sheets.sound.couldntSend', { error: e instanceof Error ? e.message : String(e) }) });
     } finally {
       setBusy(false);
     }
@@ -49,13 +51,13 @@ export function TestNotification({ n, onChecked, onAction }: TestNotificationPro
 
   return (
     <>
-      <Row label="Test notification" detail="Plays your sound here and shows a banner, whatever your other settings say.">
+      <Row label={say('Test notification')} detail={say('Plays your sound here and shows a banner, whatever your other settings say.')}>
         <Button icon="bell" disabled={busy} onClick={() => void send()}>
-          {busy ? 'Sending…' : 'Send Test Notification'}
+          {busy ? t('sheets.sound.sending') : t('sheets.sound.sendTest')}
         </Button>
       </Row>
       {outcome ? (
-        <div className={cx(s.outcome, s[`outcome_${outcome.tone}`])} role="status" aria-label="Test result">
+        <div className={cx(s.outcome, s[`outcome_${outcome.tone}`])} role="status" aria-label={t('sheets.sound.testResult')}>
           <Icon name={outcome.tone === 'ok' ? 'check' : 'alert'} size={14} />
           <span className={s.outcomeText}>{outcome.text}</span>
           {outcome.action ? (

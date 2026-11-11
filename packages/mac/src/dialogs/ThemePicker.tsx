@@ -5,7 +5,8 @@ import { useDocTheme } from '../components/markdown/use-doc-theme.js';
 import { ACCENTS, type UiPrefs, pickTheme, useChosenPrefs } from '../lib/prefs.js';
 import { type AppTheme, type ThemeBase, THEMES, themeFor } from '../lib/themes.js';
 import { Group } from './settings-controls.js';
-import t from './themes.module.css';
+import tm from './themes.module.css';
+import { say } from '../lib/i18n.js';
 
 /** The accent a theme shows with your Accent: its own while that's System or Theme, else yours. */
 const accentFor = (theme: AppTheme, accent: UiPrefs['accent']): string => (accent === 'system' || accent === 'theme' ? (theme.accent ?? 'AccentColor') : ACCENTS[accent]);
@@ -15,26 +16,26 @@ function ThemeCard({ theme, on, accent }: { readonly theme: AppTheme; readonly o
   const k = theme.colors;
   const vars = { '--p-bg': k.bg, '--p-side': k.sidebar, '--p-raised': k.raised, '--p-text': k.text, '--p-text2': k.text2, '--p-text3': k.text3, '--p-accent': accent, '--p-claude': k.claude, '--p-line': theme.base === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' } as CSSProperties;
   return (
-    <button type="button" role="radio" aria-checked={on} aria-label={theme.name} className={cx(t.card, on && t.cardOn)} onClick={() => pickTheme(theme.id)}>
-      <span className={cx(t.window, theme.lit && t.lit)} style={vars} aria-hidden>
-        <span className={t.side}>
-          <i className={t.sideRow} />
-          <i className={cx(t.sideRow, t.sideOn)} />
-          <i className={t.sideRow} />
-          <i className={t.sideRow} />
+    <button type="button" role="radio" aria-checked={on} aria-label={theme.name} className={cx(tm.card, on && tm.cardOn)} onClick={() => pickTheme(theme.id)}>
+      <span className={cx(tm.window, theme.lit && tm.lit)} style={vars} aria-hidden>
+        <span className={tm.side}>
+          <i className={tm.sideRow} />
+          <i className={cx(tm.sideRow, tm.sideOn)} />
+          <i className={tm.sideRow} />
+          <i className={tm.sideRow} />
         </span>
-        <span className={t.main}>
-          <span className={t.mine}>
+        <span className={tm.main}>
+          <span className={tm.mine}>
             <i style={{ width: '62%' }} />
           </span>
-          <span className={t.answer}>
+          <span className={tm.answer}>
             <b />
             <span>
               <i style={{ width: '88%' }} />
-              <i className={t.dim} style={{ width: '64%' }} />
+              <i className={tm.dim} style={{ width: '64%' }} />
             </span>
           </span>
-          <span className={t.states}>
+          <span className={tm.states}>
             {[k.ok, k.warn, k.error, k.info].map((color) => (
               <i key={color} style={{ background: color }} />
             ))}
@@ -42,7 +43,7 @@ function ThemeCard({ theme, on, accent }: { readonly theme: AppTheme; readonly o
           </span>
         </span>
       </span>
-      <span className={t.name}>
+      <span className={tm.name}>
         {theme.name}
         {on ? <Icon name="check" size={12} /> : null}
       </span>
@@ -54,7 +55,7 @@ function ThemeGrid({ base, prefs }: { readonly base: ThemeBase; readonly prefs: 
   const picked = themeFor(base, prefs).id;
   const list = THEMES.filter((th) => th.base === base);
   return (
-    <div className={t.grid} role="radiogroup" aria-label={base === 'dark' ? 'Dark theme' : 'Light theme'}>
+    <div className={tm.grid} role="radiogroup" aria-label={base === 'dark' ? say('Dark theme') : say('Light theme')}>
       {list.map((th) => (
         <ThemeCard key={th.id} theme={th} on={th.id === picked} accent={accentFor(th, prefs.accent)} />
       ))}
@@ -73,7 +74,7 @@ export function ThemeGroups() {
   return (
     <>
       {order.map((base) => (
-        <Group key={base} title={base === 'dark' ? 'Dark theme' : 'Light theme'}>
+        <Group key={base} title={base === 'dark' ? say('Dark theme') : say('Light theme')}>
           <ThemeGrid base={base} prefs={prefs} />
         </Group>
       ))}

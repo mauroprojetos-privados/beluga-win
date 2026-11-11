@@ -8,6 +8,7 @@ import { Button, cx } from '../components/ui.js';
 import { useActions } from '../lib/actions.js';
 import { useApp, useBeluga, useUi } from '../lib/beluga.js';
 import { guiHint, paragraphs } from '../lib/gui-copy.js';
+import { useT } from '../lib/i18n.js';
 import s from './sheet.module.css';
 
 /**
@@ -17,6 +18,7 @@ import s from './sheet.module.css';
  * instead (dialogs/native); this is for the rest.
  */
 export function MenuSheet() {
+  const t = useT();
   const { ui } = useBeluga();
   const actions = useActions();
   const open = useUi((u) => u.menu);
@@ -60,7 +62,7 @@ export function MenuSheet() {
         >
           <div className={s.head}>
             <Dialog.Title className={s.title}>{spec.title}</Dialog.Title>
-            <Dialog.Close className={s.close} aria-label="Close">
+            <Dialog.Close className={s.close} aria-label={t('common.close')}>
               <Icon name="x" size={12} />
             </Dialog.Close>
           </div>
@@ -97,7 +99,7 @@ export function MenuSheet() {
             ))}
           </div>
           <div className={s.footer}>
-            <Button onClick={close}>Cancel</Button>
+            <Button onClick={close}>{t('common.cancel')}</Button>
           </div>
         </Dialog.Content>
       </Dialog.Portal>

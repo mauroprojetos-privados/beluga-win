@@ -10,6 +10,7 @@ import { GitHubMark } from '../components/GitHubMark.js';
 import { COFFEE_AMOUNTS, COFFEE_LINKS, COFFEE_WORDS, type CoffeeAmount, GITHUB_URL, exactLink, MAINTAINER, closeSupport, useOpenedSupport } from '../lib/support.js';
 import { openExternal } from '../lib/system.js';
 import { useClock, windowActive } from '../lib/window-active.js';
+import { useT } from '../lib/i18n.js';
 import s from './support.module.css';
 
 /**
@@ -54,8 +55,9 @@ function useCalmMoment(waiting: boolean): boolean {
 
 /** The maker, as a GitHub chip: their avatar and handle; it opens their profile. */
 export function MaintainerChip() {
+  const t = useT();
   return (
-    <button type="button" className={s.chip} onClick={() => void openExternal(MAINTAINER.url)} title={`${MAINTAINER.login} on GitHub`}>
+    <button type="button" className={s.chip} onClick={() => void openExternal(MAINTAINER.url)} title={t('sheets.support.onGitHub', { login: MAINTAINER.login })}>
       <img src={avatar} alt="" className={s.chipAvatar} draggable={false} />
       <span>{MAINTAINER.login}</span>
       <GitHubMark className={s.mark} />
@@ -110,14 +112,15 @@ function Promises({ items }: { items: ReadonlyArray<[IconName, string]> }) {
 }
 
 function StarSheet({ onAnswer }: { onAnswer: (a: SupportAnswer) => void }) {
+  const t = useT();
   return (
     <>
       <Confetti />
-      <SupportShell tone="star" art={<StarArt />} title="Your first merge with Beluga!" label="Maybe later" onClose={() => onAnswer('later')}>
+      <SupportShell tone="star" art={<StarArt />} title={t('sheets.support.firstMerge')} label={t('sheets.support.maybeLater')} onClose={() => onAnswer('later')}>
         <p className={s.lead}>
-          Work you made in Beluga just landed. Beluga is free software and a passion project by <MaintainerChip />
+          {t('sheets.support.starLead')} <MaintainerChip />
         </p>
-        <p className={s.why}>Stars are how other people find Beluga, and every single one truly matters. If it has helped you, a star would mean a lot.</p>
+        <p className={s.why}>{t('sheets.support.starWhy')}</p>
         <button
           type="button"
           data-main
@@ -128,11 +131,11 @@ function StarSheet({ onAnswer }: { onAnswer: (a: SupportAnswer) => void }) {
           }}
         >
           <Icon name="star" size={14} />
-          Star Beluga on GitHub
+          {t('sheets.support.starOnGitHub')}
         </button>
         <div className={s.quiet}>
           <button type="button" className={s.quietButton} onClick={() => onAnswer('later')}>
-            Maybe later
+            {t('sheets.support.maybeLater')}
           </button>
         </div>
       </SupportShell>
@@ -141,25 +144,26 @@ function StarSheet({ onAnswer }: { onAnswer: (a: SupportAnswer) => void }) {
 }
 
 function CoffeeSheet({ merges, byHand, onAnswer }: { merges: number; byHand: boolean; onAnswer: (a: SupportAnswer) => void }) {
+  const t = useT();
   const [amount, setAmount] = useState<CoffeeAmount>(10);
   const give = (link: string): void => {
     void openExternal(link);
     onAnswer('yes');
   };
   return (
-    <SupportShell tone="coffee" art={<CupArt />} title="Keep Beluga brewing" label={byHand ? 'Close' : 'Not now'} onClose={() => onAnswer('later')}>
+    <SupportShell tone="coffee" art={<CupArt />} title={t('sheets.support.keepBrewing')} label={byHand ? t('common.close') : t('sheets.support.notNow')} onClose={() => onAnswer('later')}>
       <p className={s.lead}>
-        {byHand || merges < 2 ? '' : `You’ve shipped ${merges} pieces of work with Beluga. `}
-        Beluga is a passion project, built and maintained by <MaintainerChip />
+        {byHand || merges < 2 ? '' : `${t('sheets.support.shipped', { count: merges })} `}
+        {t('sheets.support.coffeeLead')} <MaintainerChip />
       </p>
       <Promises
         items={[
-          ['heart', 'Free, always'],
-          ['branch', 'Open source'],
-          ['check', 'No ads, no paywalls'],
+          ['heart', t('sheets.support.free')],
+          ['branch', t('sheets.support.openSource')],
+          ['check', t('sheets.support.noAds')],
         ]}
       />
-      <div className={s.amounts} role="radiogroup" aria-label="Amount">
+      <div className={s.amounts} role="radiogroup" aria-label={t('sheets.support.amount')}>
         {COFFEE_AMOUNTS.map((a) => (
           <button
             key={a}
@@ -177,25 +181,25 @@ function CoffeeSheet({ merges, byHand, onAnswer }: { merges: number; byHand: boo
       </div>
       <button type="button" data-main className={s.main} onClick={() => give(COFFEE_LINKS[amount])}>
         <Icon name="cup" size={15} />
-        Buy a coffee · ${amount}
+        {t('sheets.support.buyCoffee', { amount: `$${amount}` })}
       </button>
       <button type="button" className={s.other} onClick={() => give(COFFEE_LINKS.other)}>
-        Or choose your own amount
+        {t('sheets.support.ownAmount')}
         <Icon name="arrowRight" size={11} />
       </button>
       <div className={s.fine}>
         <Icon name="lock" size={11} />
-        {exactLink(amount) ? 'Secure checkout by Stripe, in your browser' : `Secure checkout by Stripe: enter $${amount} there`}
+        {exactLink(amount) ? t('sheets.support.secureCheckout') : t('sheets.support.secureCheckoutEnter', { amount: `$${amount}` })}
       </div>
       <div className={s.quiet}>
         <button type="button" className={s.quietButton} onClick={() => onAnswer('later')}>
-          {byHand ? 'Close' : 'Not now'}
+          {byHand ? t('common.close') : t('sheets.support.notNow')}
         </button>
         {byHand ? null : (
           <>
             <span className={s.dot} aria-hidden="true" />
             <button type="button" className={s.quietButton} onClick={() => onAnswer('never')}>
-              Don’t ask again
+              {t('sheets.support.dontAsk')}
             </button>
           </>
         )}

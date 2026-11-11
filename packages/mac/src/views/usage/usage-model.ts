@@ -1,3 +1,4 @@
+import { t as tt } from '@beluga/shared/i18n/index.js';
 import type { AppState } from '@beluga/core/store.js';
 import { activityOf } from '@beluga/ui/workspace-models.js';
 import { worktreeOrigin } from '@beluga/workspaces/origin.js';
@@ -162,13 +163,13 @@ export function compact(n: number): string {
 /** "just now", "12 min ago", "3 h ago", "yesterday", "5 d ago", "3 wk ago". */
 export function ago(ts: number, now: number): string {
   const m = Math.round((now - ts) / 60_000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m} min ago`;
+  if (m < 1) return tt('usage.ago.justNow');
+  if (m < 60) return tt('usage.ago.minutes', { n: m });
   const h = Math.round(m / 60);
-  if (h < 24) return `${h} h ago`;
+  if (h < 24) return tt('usage.ago.hours', { n: h });
   const d = Math.round(h / 24);
-  if (d === 1) return 'yesterday';
-  return d < 14 ? `${d} d ago` : `${Math.round(d / 7)} wk ago`;
+  if (d === 1) return tt('usage.ago.yesterday');
+  return d < 14 ? tt('usage.ago.days', { n: d }) : tt('usage.ago.weeks', { n: Math.round(d / 7) });
 }
 
 /** When a plan window resets: "3:10 PM" today, else "Thu 9 AM". */
@@ -178,9 +179,18 @@ export function resetsAt(ts: number, now: number): string {
   return ts - now < DAY && d.getDate() === new Date(now).getDate() ? time : `${d.toLocaleDateString([], { weekday: 'short' })} ${time}`;
 }
 
-export const REASON: Record<CleanupReason, string> = {
-  merged: 'Merged',
-  nothing_new: 'Nothing new on its branch',
-  idle: 'Idle two weeks',
-  agents: 'Left by sub-agents',
+/** Why a worktree could go, in the app's language (read when shown). */
+export const REASON: Readonly<Record<CleanupReason, string>> = {
+  get merged() {
+    return tt('usage.reason.merged');
+  },
+  get nothing_new() {
+    return tt('usage.reason.nothingNew');
+  },
+  get idle() {
+    return tt('usage.reason.idle');
+  },
+  get agents() {
+    return tt('usage.reason.agents');
+  },
 };

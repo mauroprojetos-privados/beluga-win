@@ -12,23 +12,25 @@ import { TrendChart, type TrendMode } from './TrendChart.js';
 import { trendOf } from './trend-model.js';
 import { type GotStats, usePicked } from './use-stats.js';
 import s from './stats.module.css';
+import { useT } from '../../lib/i18n.js';
+import { t as tt } from '@beluga/shared/i18n/index.js';
 
-const RANGES: ReadonlyArray<{ value: StatRange; label: string; hint: string }> = [
-  { value: 'week', label: 'Week', hint: 'The last 7 days' },
-  { value: 'month', label: 'Month', hint: 'The last 30 days' },
-  { value: 'year', label: 'Year', hint: 'The last 52 weeks' },
-  { value: 'all', label: 'All Time', hint: 'Since Beluga started counting' },
+const RANGES = (): ReadonlyArray<{ value: StatRange; label: string; hint: string }> => [
+  { value: 'week', label: tt('usage.stats.week'), hint: tt('usage.stats.weekHint') },
+  { value: 'month', label: tt('usage.stats.month'), hint: tt('usage.stats.monthHint') },
+  { value: 'year', label: tt('usage.stats.year'), hint: tt('usage.stats.yearHint') },
+  { value: 'all', label: tt('usage.stats.allTime'), hint: tt('usage.stats.allTimeHint') },
 ];
-const GROUPS: ReadonlyArray<{ value: GroupBy; label: string; icon: 'folder' | 'bot' }> = [
-  { value: 'project', label: 'Projects', icon: 'folder' },
-  { value: 'agent', label: 'Agents', icon: 'bot' },
+const GROUPS = (): ReadonlyArray<{ value: GroupBy; label: string; icon: 'folder' | 'bot' }> => [
+  { value: 'project', label: tt('usage.stats.projects'), icon: 'folder' },
+  { value: 'agent', label: tt('usage.stats.agents'), icon: 'bot' },
 ];
-const MODES: ReadonlyArray<{ value: TrendMode; label: string; hint: string }> = [
-  { value: 'stacked', label: 'Stacked', hint: 'How much, each one on top of the other' },
-  { value: 'share', label: 'Share', hint: 'Who did what part of each step' },
+const MODES = (): ReadonlyArray<{ value: TrendMode; label: string; hint: string }> => [
+  { value: 'stacked', label: tt('usage.stats.stacked'), hint: tt('usage.stats.stackedHint') },
+  { value: 'share', label: tt('usage.stats.share'), hint: tt('usage.stats.shareHint') },
 ];
-const BEFORE: Record<StatRange, string> = { week: 'the week before', month: 'the month before', year: 'the year before', all: '' };
-const STEP: Record<StatRange, string> = { week: 'a day', month: 'a day', year: 'a week', all: 'a month' };
+const BEFORE = (): Record<StatRange, string> => ({ week: tt('usage.stats.weekBefore'), month: tt('usage.stats.monthBefore'), year: tt('usage.stats.yearBefore'), all: '' });
+const STEP = (): Record<StatRange, string> => ({ week: tt('usage.stats.aDay'), month: tt('usage.stats.aDay'), year: tt('usage.stats.aWeek'), all: tt('usage.stats.aMonth') });
 
 /** One number on the strip: pressing it shows it in the calendar and the ranking. */
 function StatCell({
@@ -60,7 +62,7 @@ function StatCell({
       <span className={s.cellAside}>
         <span className={s.cellAsideText}>{asideOf(m, totals, noGitHub)}</span>
         {delta ? (
-          <span className={cx(s.delta, delta.up ? s.deltaUp : s.deltaDown)} title={`Against ${BEFORE[range]}`}>
+          <span className={cx(s.delta, delta.up ? s.deltaUp : s.deltaDown)} title={tt('usage.stats.against', { before: BEFORE()[range] })}>
             {delta.text}
           </span>
         ) : null}
@@ -76,6 +78,7 @@ function StatCell({
  * (core/stats/); this only draws what it sent.
  */
 export function StatsSection({ state, got }: { state: AppState; got: GotStats }) {
+  const t = useT();
   const { stats, at: now, failed } = got;
   // Projects change with every git status: the charts only care about their roots, names and order.
   const projectsKey = state.projects.map((p) => `${p.id}\t${p.root}\t${p.name}`).join('\n');
@@ -100,46 +103,46 @@ export function StatsSection({ state, got }: { state: AppState; got: GotStats })
   }, [data, m, now]);
   const rows = useMemo(() => groupRows(data, projects, by, m, range, now), [data, projects, by, m, range, now]);
   const since = data.since ? new Date(data.since).toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' }) : undefined;
-  const byWord = by === 'agent' ? 'agent' : 'project';
+  const byWord = by === 'agent' ? t('usage.stats.agent') : t('usage.stats.project');
   // Pull requests come from GitHub: without its CLI, say so instead of an empty chart.
-  const why = m.github && data.noGitHub ? 'Pull requests are counted with the GitHub CLI (gh). Sign in to it and they show up here.' : undefined;
+  const why = m.github && data.noGitHub ? t('usage.stats.needsGh') : undefined;
   return (
-    <section className={s.section} aria-label="Your stats">
+    <section className={s.section} aria-label={t('usage.stats.yourStats')}>
       <Chapter
-        title="What you did"
-        sub={failed ? 'Couldn’t get your stats from Beluga' : data.backfilling ? 'Counting what came before…' : since ? `Counted since ${since}. Press a number to see it below.` : 'Counting from today. Press a number to see it below.'}
+        title={t('usage.stats.whatYouDid')}
+        sub={failed ? t('usage.stats.failed') : data.backfilling ? t('usage.stats.backfilling') : since ? t('usage.stats.countedSince', { since }) : t('usage.stats.countingToday')}
         aside={
           <>
-            <Segmented label="Group by" value={by} options={GROUPS} onChange={setBy} />
-            <Segmented label="Range" value={range} options={RANGES} onChange={setRange} />
+            <Segmented label={t('usage.stats.groupBy')} value={by} options={GROUPS()} onChange={setBy} />
+            <Segmented label={t('usage.stats.range')} value={range} options={RANGES()} onChange={setRange} />
           </>
         }
       >
         <div className={s.stripFit}>
-          <div className={s.strip} role="tablist" aria-label="What to show">
+          <div className={s.strip} role="tablist" aria-label={t('usage.stats.whatToShow')}>
             {METRICS.map((x) => (
               <StatCell key={x.id} m={x} totals={totals.now} {...(totals.before ? { before: totals.before } : {})} on={x.id === metric} onPick={() => setMetric(x.id)} range={range} noGitHub={Boolean(data.noGitHub)} />
             ))}
           </div>
         </div>
         <Card
-          label={`${m.label} over time`}
+          label={t('usage.stats.overTime', { metric: m.label })}
           title={
             <span className={s.cardTitle}>
-              <Icon name="chartArea" size={14} /> {m.label} by {byWord}, {STEP[range]} at a time
+              <Icon name="chartArea" size={14} /> {t('usage.stats.trendTitle', { metric: m.label, by: byWord, step: STEP()[range] })}
             </span>
           }
-          aside={<Segmented label="Chart" value={mode} options={MODES} onChange={setMode} />}
+          aside={<Segmented label={t('usage.stats.chart')} value={mode} options={MODES()} onChange={setMode} />}
         >
           <TrendChart key={by} trend={trend} m={m} mode={mode} animate={`${range}|${metric}|${mode}`} {...(why ? { why } : {})} />
         </Card>
       </Chapter>
-      <Chapter title="Your rhythm" sub={`Streaks, your year and your week, and who did what part of the ${m.label.toLowerCase()}.`}>
+      <Chapter title={t('usage.stats.rhythm')} sub={t('usage.stats.rhythmSub', { metric: m.label.toLowerCase() })}>
         <Highlights stats={data} now={now} rows={rows} by={by} />
         <Card
           title={
             <span className={s.cardTitle}>
-              <Icon name="calendar" size={14} /> {m.label} every day, the last year
+              <Icon name="calendar" size={14} /> {t('usage.stats.everyDay', { metric: m.label })}
             </span>
           }
         >
@@ -147,10 +150,10 @@ export function StatsSection({ state, got }: { state: AppState; got: GotStats })
         </Card>
         <div className={s.pairFit}>
           <div className={cx(s.pair, s.pairEven)}>
-            <Card title={`Share by ${byWord}`}>
+            <Card title={t('usage.stats.shareBy', { by: byWord })}>
               <Share rows={rows} m={m} by={by} {...(why ? { why } : {})} />
             </Card>
-            <Card title="When you work">
+            <Card title={t('usage.stats.whenYouWork')}>
               <Hours hours={data.hours} />
             </Card>
           </div>
