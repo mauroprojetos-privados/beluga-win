@@ -34,7 +34,7 @@ afterEach(() => vi.unstubAllEnvs());
 
 describe('Your Mac’s tools', () => {
   it('registers every tool under beluga_mac, and Beluga lets them run', () => {
-    const defs = createMacToolDefs({} as MacTools);
+    const defs = createMacToolDefs({ dispatchPlan: async () => '', knowledgeSearch: async () => '' } as unknown as MacTools);
     expect(defs.map((d) => `mcp__beluga_mac__${d.name}`)).toEqual(MAC_TOOL_NAMES);
     for (const name of MAC_TOOL_NAMES) expect(decideTool(name, {}, { cwd: '/tmp', roots: ['/tmp'], autoEdit: true })).toBe('allow');
   });

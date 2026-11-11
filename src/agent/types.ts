@@ -390,6 +390,36 @@ export interface MacTools {
   startPlan(input: { readonly project: string; readonly goal: string }): Promise<string>;
   /** Archive a worktree (by id or name), losslessly as the Archive button does; `confirmed` once the owner said yes to stopping its Claude. */
   archiveWorktree(input: { readonly worktree: string; readonly confirmed?: boolean }): Promise<string>;
+  /**
+   * A bot's (docs/bots.md): a plan written whole, each task with its category or difficulty, which
+   * route it to a combo or another bot. Only a bot that plans and dispatches has it.
+   */
+  dispatchPlan?(input: DispatchInput): Promise<string>;
+  /** A bot's: search its own knowledge (knowledge.json's sources), never another bot's. Only a bot with knowledge has it. */
+  knowledgeSearch?(query: string, limit?: number): Promise<string>;
+}
+
+/** A plan a bot writes for plan_dispatch (core/bots). */
+export interface DispatchInput {
+  readonly project: string;
+  readonly title: string;
+  readonly goal: string;
+  readonly milestones: ReadonlyArray<{
+    readonly id?: string;
+    readonly title: string;
+    readonly criteria?: readonly string[];
+    readonly dependsOn?: readonly string[];
+    readonly tasks: ReadonlyArray<{
+      readonly id: string;
+      readonly title: string;
+      readonly goal?: string;
+      readonly acceptance?: readonly string[];
+      readonly blockedBy?: readonly string[];
+      readonly touches?: readonly string[];
+      readonly category?: string;
+      readonly difficulty?: 'simple' | 'normal' | 'hard';
+    }>;
+  }>;
 }
 
 /** A message sent into a live run: while it waits on its background agents, or steering it. */
@@ -494,6 +524,12 @@ export interface AgentPlace {
    * target that can run now (`index`). None can: `problem` says why, and the run doesn't start.
    */
   readonly route?: { readonly combo: string; readonly index: number; readonly problem?: string };
+  /**
+   * A bot's run (docs/bots.md): only its own MCP servers (its folder's .mcp.json, secrets filled
+   * in), with `--strict-mcp-config` so neither yours nor another bot's reach it. Beluga's own tools
+   * still come. A runtime other than Claude Code doesn't load them (Bot Studio says so).
+   */
+  readonly mcp?: { readonly servers: Readonly<Record<string, Readonly<Record<string, unknown>>>>; readonly strict: true };
 }
 
 /** A worktree's open pull request, for its run's commit rules (BLG-840). */

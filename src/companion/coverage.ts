@@ -725,6 +725,38 @@ export const PHONE: Record<Method, Side> = {
   // Needs You's Try Again for a used-up combo: like Continue, phone-sized.
   'routing.retry': 'phone',
   'routing.usage': 'phone',
+
+  // ---- bots (docs/bots.md): seeing them and what they do is the phone's (chatting is session.submit in
+  // their conversation); making, editing, knowledge, tools, versions, export and import are Bot Studio's, on the Mac
+  'bots.list': 'phone',
+  'bots.status': 'phone',
+  'bots.get': 'mac',
+  'bots.create': 'mac',
+  'bots.delete': 'mac',
+  'bots.edit.bot': 'mac',
+  'bots.edit.persona': 'mac',
+  'bots.edit.mcp': 'mac',
+  'bots.edit.addMcp': 'mac',
+  'bots.edit.secret': 'mac',
+  'bots.edit.skill': 'mac',
+  'bots.edit.copySkill': 'mac',
+  'bots.edit.agent': 'mac',
+  'bots.edit.memory': 'mac',
+  'bots.installed': 'mac',
+  'bots.knowledge.addFile': 'mac',
+  'bots.knowledge.addText': 'mac',
+  'bots.knowledge.addUrl': 'mac',
+  'bots.knowledge.remove': 'mac',
+  'bots.knowledge.reindex': 'mac',
+  'bots.knowledge.search': 'mac',
+  'bots.validate': 'mac',
+  'bots.versions': 'mac',
+  'bots.undo': 'mac',
+  'bots.restore': 'mac',
+  'bots.export': 'mac',
+  'bots.import': 'mac',
+  'bots.draft': 'mac',
+  'bots.applyDraft': 'mac',
 };
 
 /** A method the phone may call (unknown names are not). */

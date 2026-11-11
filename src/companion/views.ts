@@ -39,6 +39,7 @@ import { type AgentRef, CLAUDE_AGENT, type Profile, defaultAgentOf } from '../pr
 import { threadNesting } from '../ui/thread-tree.js';
 import { providerCards } from '../ui/usage-cards.js';
 import {
+  type BotSummary,
   type BranchView,
   type ChatMessageView,
   type ChatsView,
@@ -74,6 +75,7 @@ import {
   VIEW_TURNS,
   type WorkView,
 } from './protocol.js';
+import { botStatusLine } from '../core/bots/schema.js';
 import { HIDDEN_STEP, humanizeDoing, humanizeStep, plainLine, stepWords, stripCode } from './strip.js';
 import { withMath } from './math-svg.js';
 import { agentRefView, chatTopic, clip, convTopic, dashboardTopic, myId, nameOf, needsYou, planTopic, progressOf, sentinelTopic, taskTopic } from './needs-you.js';
@@ -223,6 +225,32 @@ function macChatSummaries(state: DomainState, waiting: ReadonlySet<string>, ctx?
 }
 
 /**
+ * Your bots for the phone (1.52, docs/bots.md): Your Mac first (its open chat), then yours, each with
+ * what it's doing and its conversation's state. Only when there's something to show: another bot, or
+ * Your Mac at work on a plan it dispatched.
+ */
+function botSummaries(state: DomainState, waiting: ReadonlySet<string>, ctx?: ViewContext): BotSummary[] {
+  return state.bots.bots.slice(0, 40).map((b): BotSummary => {
+    const channel = b.mac ? activeAssistantChannel(state.assistant) : b.channel;
+    const conv = summaryOf(state, { channel, title: b.name, mine: true }, waiting, ctx);
+    const line = botStatusLine(b.status);
+    return {
+      id: clip(b.id, 40),
+      name: clip(b.name, 100),
+      icon: clip(b.icon, 40),
+      ...(b.color ? { color: b.color } : {}),
+      ...(b.description ? { description: clip(plainLine(b.description, 300), 300) } : {}),
+      topic: `conv:${channel}`,
+      mac: b.mac,
+      ...(line ? { line: clip(line, 200) } : {}),
+      ...(b.status ? { plan: `plan:${b.status.planId}` } : {}),
+      ...(conv ? { status: conv.status } : {}),
+      ...(b.problems.length ? { problems: b.problems.length } : {}),
+    };
+  });
+}
+
+/**
  * The conversation a channel the phone names is: an older phone knows only `mac:assistant`, so
  * once that first chat is deleted it means the chat open on the Mac. Anything else as it is.
  */
@@ -248,7 +276,9 @@ export function conversations(state: DomainState): Conversation[] {
     .slice(-TASKS_SHOWN)
     .map((t) => ({ channel: `task:${t.id}`, title: plainLine(t.summary ?? t.ask, 300) || 'A question', project: 'Asked of friends', projectId: 'asked', mine: false }));
   const seen = new Set<string>();
-  return [...assistantConversations(state), ...own, ...shared, ...room, ...asked].filter((c) => !seen.has(c.channel) && Boolean(seen.add(c.channel)));
+  // Your bots besides Your Mac (docs/bots.md, 1.52): each its own conversation, opened and written in like Your Mac's.
+  const bots = state.bots.bots.filter((b) => !b.mac).map((b) => ({ channel: b.channel, title: b.name, mine: true }));
+  return [...assistantConversations(state), ...bots, ...own, ...shared, ...room, ...asked].filter((c) => !seen.has(c.channel) && Boolean(seen.add(c.channel)));
 }
 
 const itemsOf = (state: DomainState, channel: string): LogItem[] => state.log.filter((l) => l.channel === channel);
@@ -637,12 +667,15 @@ export function homeView(state: DomainState, ctx: ViewContext): HomeView {
   const first = review[0] ? taskTopic(review[0].id) : undefined;
   const assistant = summaryOf(state, openAssistant(state), waiting, ctx);
   const macChats = macChatSummaries(state, waiting, ctx);
+  const bots = botSummaries(state, waiting, ctx);
   return {
     mac: { name: clip(ctx.mac.name, 100), version: clip(ctx.mac.version, 40), keepAwake: state.prefs.keepAwake ?? 'off' },
     // 1.5: Your Mac, for Home's "Ask your Mac" (its last line, whether it works).
     ...(assistant ? { assistant } : {}),
     // 1.14: all of Your Mac's chats, for the phone's chat list.
     ...(macChats.length ? { macChats } : {}),
+    // 1.52: your bots, Your Mac first (docs/bots.md).
+    ...(bots.length > 1 || bots[0]?.line ? { bots } : {}),
     me: { name: clip(myName(state), 64), peerId: myId(state) },
     usage: usageViews(state.peers.find((p) => p.peerId === state.self?.peerId) ?? state.self, state.prefs.defaultAgent),
     needsYou: items,

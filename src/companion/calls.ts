@@ -35,6 +35,8 @@ export const CombosResult = z.object({
 });
 /** The combo and target a run used ("Economy · Codex"); none when it ran on no combo. */
 export const RunRouteResult = z.object({ requestId: z.string(), combo: z.string(), name: z.string(), runtime: z.string(), model: z.string().optional(), target: z.string(), words: z.string() }).optional();
+/** 1.52 (docs/bots.md): a bot as `bots.list` gives it (src/core/bots/schema.ts BotInfo; more fields pass through). */
+const BotResult = z.object({ id: z.string(), name: z.string(), icon: z.string(), channel: z.string(), mac: z.boolean(), orchestrates: z.boolean(), autonomy: z.string(), problems: z.array(z.string()), status: z.object({ planId: z.string(), planTitle: z.string(), done: z.number(), total: z.number(), waiting: z.string().optional(), draft: z.literal(true).optional() }).optional() }).passthrough();
 export const PutResult =z.union([z.object({ received: z.number().int().min(0) }), z.object({ ref: z.string() })]);
 
 export const PhoneCalls = {
@@ -217,6 +219,9 @@ export const PhoneCalls = {
   'routing.retry': entry('routing.retry', z.string()),
   // Runs through combos, by combo and target.
   'routing.usage': entry('routing.usage', z.array(z.object({ combo: z.string(), name: z.string(), runs: z.number(), limited: z.number(), ms: z.number(), tokens: z.number().optional(), cost: z.number().optional(), targets: z.array(z.object({ target: z.string(), runtime: z.string(), runs: z.number(), limited: z.number(), ms: z.number(), tokens: z.number().optional(), cost: z.number().optional() }).passthrough()) }).passthrough())),
+  // 1.52 (docs/bots.md): your bots and what each is doing; editing them is the Mac's.
+  'bots.list': entry('bots.list', z.array(BotResult)),
+  'bots.status': entry('bots.status', z.object({ status: BotResult.shape.status, line: z.string().optional() })),
 } as const;
 
 export type PhoneMethod = keyof typeof PhoneCalls;

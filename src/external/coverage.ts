@@ -25,6 +25,7 @@ const INBOX = 'The inbox marks what a person has read, and an agent\'s mark woul
 const NO_SCOPE = 'A file name does not say which chat the image is in, so a grant cannot check it.';
 const VIEW_SOURCE = 'It runs a view\'s source, which can be a command: sentinel_try_source tries one under its own class.';
 const AGENT_TERM = 'A terminal app for a person to type in: an agent works through beluga_chat_send.';
+const BOTS = 'A person sets up their bots in Bot Studio; their files name secrets.';
 const STATS = 'The Usage tab counts the person\'s work in every project, past any grant\'s scope.';
 const WEB_SESSION = 'A browser session can answer approvals and read secret values, which no agent does (BLG-244).';
 const WINDOW_LOAD = 'The window notes a part of itself that did not load: an agent has no window.';
@@ -220,6 +221,36 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'routing.resetCombos': { refused: NO_TOOL },
   'routing.retry': { refused: NO_TOOL },
   'routing.usage': { refused: STATS },
+  // Bots (docs/bots.md): the person's own orchestrators and their files (secrets among them), set up in Bot Studio.
+  'bots.list': { refused: BOTS },
+  'bots.status': { refused: BOTS },
+  'bots.get': { refused: BOTS },
+  'bots.create': { refused: BOTS },
+  'bots.delete': { refused: BOTS },
+  'bots.edit.bot': { refused: BOTS },
+  'bots.edit.persona': { refused: BOTS },
+  'bots.edit.mcp': { refused: BOTS },
+  'bots.edit.addMcp': { refused: BOTS },
+  'bots.edit.secret': { refused: BOTS },
+  'bots.edit.skill': { refused: BOTS },
+  'bots.edit.copySkill': { refused: BOTS },
+  'bots.edit.agent': { refused: BOTS },
+  'bots.edit.memory': { refused: BOTS },
+  'bots.installed': { refused: BOTS },
+  'bots.knowledge.addFile': { refused: BOTS },
+  'bots.knowledge.addText': { refused: BOTS },
+  'bots.knowledge.addUrl': { refused: BOTS },
+  'bots.knowledge.remove': { refused: BOTS },
+  'bots.knowledge.reindex': { refused: BOTS },
+  'bots.knowledge.search': { refused: BOTS },
+  'bots.validate': { refused: BOTS },
+  'bots.versions': { refused: BOTS },
+  'bots.undo': { refused: BOTS },
+  'bots.restore': { refused: BOTS },
+  'bots.export': { refused: BOTS },
+  'bots.import': { refused: BOTS },
+  'bots.draft': { refused: BOTS },
+  'bots.applyDraft': { refused: BOTS },
   'attachments.add': 'ui_only',
   'attachments.addFile': 'ui_only',
   'attachments.reattach': 'ui_only',

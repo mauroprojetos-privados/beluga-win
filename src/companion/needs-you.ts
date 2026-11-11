@@ -13,6 +13,8 @@ import { agentLabel } from '../shared/agent-label.js';
 import { type AgentRef, defaultAgentOf } from '../protocol.js';
 import { exhaustedCombos } from '../core/routing/model.js';
 import { hhmm } from '../shared/clock.js';
+import { botBehind } from '../core/bots/schema.js';
+import { isAssistant } from '../shared/assistant.js';
 
 /**
  * Everything waiting for you, each with the API calls its buttons make: the phone's Needs You
@@ -576,7 +578,17 @@ function dialogueItems(state: DomainState): NeedsYou[] {
 export function allNeeds(state: DomainState): NeedsYou[] {
   const dismissed = state.dismissedNeeds ?? [];
   const all = waitingNeeds(state);
-  return dismissed.length ? all.filter((n) => !dismissed.includes(n.id)) : all;
+  return withBots(state, dismissed.length ? all.filter((n) => !dismissed.includes(n.id)) : all);
+}
+
+/** 1.52 (docs/bots.md): what a bot's work asks names the bot (its own chat, a plan it dispatched, that plan's worktrees). */
+function withBots(state: DomainState, items: NeedsYou[]): NeedsYou[] {
+  if (!state.bots.bots.length) return items;
+  return items.map((n) => {
+    const channel = n.topic?.startsWith('conv:') ? n.topic.slice(5) : undefined;
+    const bot = channel && !isAssistant(channel) ? botBehind(state.bots.bots, channel) : undefined;
+    return bot ? { ...n, bot: clip(bot.name, 100) } : n;
+  });
 }
 
 /** Everything waiting for you, dismissed or not. */

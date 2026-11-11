@@ -43,6 +43,7 @@ import { AGENT_TERM_API } from './agent-term-api.js';
 import { HANDOFF_MODES } from '../shared/agent-handoff.js';
 import { Combo, DifficultyCombos, MAX_COMBOS, RoleCombos } from '../core/routing/model.js';
 import { ROUTING_API } from './routing-api.js';
+import { BOTS_API } from './bots-api.js';
 
 /**
  * Everything a client can ask Beluga to do, in one list. The daemon validates every call
@@ -573,6 +574,8 @@ export const API = {
   ...WEB_API,
   // ---- combos: which agents and models a conversation's runs go to, in order (routing-api.ts)
   ...ROUTING_API,
+  // ---- bots: Your Mac and the ones you make, each a folder of files; Bot Studio edits them (bots-api.ts)
+  ...BOTS_API,
 } as const;
 
 export type Api = typeof API;

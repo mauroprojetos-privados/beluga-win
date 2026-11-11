@@ -1014,4 +1014,7 @@ export const NOT_EXPOSED: Readonly<Record<string, 'chat_only' | 'checker_only'>>
   plan_gate: 'checker_only',
   // A draft's reviewer records what it found (BLG-772): a fresh agent, not the one that wrote it.
   plan_review: 'checker_only',
+  // A bot's own (docs/bots.md): its map of categories and its knowledge are its chat's, set up in Bot Studio.
+  plan_dispatch: 'chat_only',
+  knowledge_search: 'chat_only',
 };
