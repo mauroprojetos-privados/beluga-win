@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { inLanguage } from './side-language.js';
 import type { Complete } from './runtime/types.js';
 import { LOOK_TOOLS, lookVerdict } from './task-drafter.js';
 
@@ -110,7 +111,7 @@ export async function reviewPr(input: PrReviewInput, opts: { complete: Complete;
       vetTool: (tool, toolInput) => verdict(reviewVerdict(input.dir, tool, toolInput)),
       maxTurns: REVIEW_TURNS,
       signal: abortController.signal,
-      system: SYSTEM,
+      system: inLanguage(SYSTEM, 'the review (summary and findings; code, paths and identifiers stay as they are)'),
     });
     return parseReview(said);
   } catch {

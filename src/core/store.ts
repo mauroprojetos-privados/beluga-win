@@ -9,6 +9,7 @@ import { BRANCH_PREFIX_DEFAULT, NotifySettings as NotifySchema, SETTLE_IDLE_DAYS
 import type { Review } from '../workspaces/git.js';
 import type { CategoryCombos, Combo, DifficultyCombos, RoleCombos } from './routing/model.js';
 import type { SavingsBaseline } from './routing/outcomes.js';
+import type { LanguageChoice, Locale } from '../shared/i18n/locales.js';
 import type { Project, ProjectGroup } from '../workspaces/types.js';
 import type { EnvChange } from '../workspaces/env.js';
 import type { EnvSendAsk } from '../shared/env-send.js';
@@ -315,6 +316,10 @@ export type Overlay = 'help' | 'settings' | 'welcome' | 'clear' | 'model' | 'inb
 /** Preferences mirrored from ~/.beluga/settings.json (every key here is a settings key). */
 export interface Prefs {
   readonly theme: ThemeName;
+  /** The app's language (docs/i18n.md): `auto` is the system's. */
+  readonly language: LanguageChoice;
+  /** Per project (by name), what its commits and pull requests are written in; unset: English. */
+  readonly commitLanguages?: Readonly<Record<string, Locale>>;
   readonly mouse: boolean;
   readonly tunnel: Settings['tunnel'];
   /** Keep the Mac awake while a phone is paired (companion/awake.ts). */
@@ -783,6 +788,7 @@ const MAX_REMARKS = 40;
 
 export const DEFAULT_PREFS: Prefs = {
   theme: 'calm',
+  language: 'auto',
   mouse: true,
   tunnel: 'auto',
   keepAwake: 'off',
@@ -822,7 +828,7 @@ export const DEFAULT_PREFS: Prefs = {
 
 /** The preference fields out of saved settings. */
 export function prefsFrom(settings: Partial<Settings>): Prefs {
-  const picked = Object.fromEntries(Object.keys(DEFAULT_PREFS).concat(['model', 'effort', 'defaultAgent', 'projectAgents', 'combos', 'difficultyCombos', 'roleCombos', 'categoryCombos', 'savingsBaseline', 'shell', 'earningsCurrency']).filter((k) => settings[k as keyof Settings] !== undefined).map((k) => [k, settings[k as keyof Settings]]));
+  const picked = Object.fromEntries(Object.keys(DEFAULT_PREFS).concat(['model', 'effort', 'defaultAgent', 'projectAgents', 'combos', 'difficultyCombos', 'roleCombos', 'categoryCombos', 'savingsBaseline', 'shell', 'earningsCurrency', 'commitLanguages']).filter((k) => settings[k as keyof Settings] !== undefined).map((k) => [k, settings[k as keyof Settings]]));
   return { ...DEFAULT_PREFS, ...picked };
 }
 

@@ -324,6 +324,9 @@ export const PHONE: Record<Method, Side> = {
 
   // ---- supporting Beluga: the star and coffee asks are the Mac's (they open web pages there)
   'support.answer': 'mac',
+  // The language (docs/i18n.md): Settings stay the Mac's; the phone has its own picker, in the app.
+  'settings.language': 'mac',
+  'settings.commitLanguage': 'mac',
   // ---- your stats: the Usage tab's charts and what the composer saw (the phone keeps its plan meters)
   'stats.get': 'mac',
   'stats.note': 'mac',

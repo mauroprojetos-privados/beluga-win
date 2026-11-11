@@ -8,6 +8,7 @@ import { CHAT_LIMIT_DEFAULT, CHAT_LIMIT_MAX } from './chat-limit.js';
 import { AUTO_CONTINUE_OFF_MAX } from './auto-continue.js';
 import { MAX_AGENT_ARGS, MAX_AGENT_ARG_LENGTH } from './agent-args.js';
 import { THREAD_LIMITS_DEFAULT, THREAD_LIMITS_MAX } from './threads.js';
+import { LANGUAGE_CHOICES, LOCALES } from './i18n/locales.js';
 import { coercePerKind, coerceSound, DEFAULT_SOUND, DEFAULT_VOLUME, PerKindSounds, SoundChoice } from './notify-sound.js';
 
 // Settings as data (no file access), so the reducer and the clients can use them anywhere.
@@ -113,6 +114,10 @@ export const Settings = z.object({
   /** Run New Work On (BLG-780): `here`, `best`, or a computer's id. */
   runOn: z.string().regex(RUN_ON).default('here'),
   theme: z.enum(THEMES).default('calm'),
+  /** Settings › General › Language (docs/i18n.md): the system's (`auto`), or one of ours. Your agents answer in it too. */
+  language: z.enum(LANGUAGE_CHOICES).catch('auto').default('auto'),
+  /** A project's language for commit messages and pull requests (by project name); unset: English. It never follows `language`. */
+  commitLanguages: z.record(z.string().min(1).max(80), z.enum(LOCALES)).optional().catch(undefined),
   /** Default trust for people you haven't chosen a level for. Unset until you answer the welcome screen once. */
   policy: z.enum(['ask', 'auto', 'deny']).optional(),
   mouse: z.boolean().default(true),

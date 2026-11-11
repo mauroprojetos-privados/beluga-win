@@ -1,4 +1,5 @@
 import type { ChatAnswerRequest } from '../core/chat/claude-prompt.js';
+import type { Locale } from '../shared/i18n/locales.js';
 import type { ScriptFix, SetupFix, WorkedOutScripts } from './setup-fixer.js';
 import type { DraftContext, TaskDraft } from './task-drafter.js';
 import type { AgentRef, ClaudeAnswer, ClaudeQuestion, FsEntry, PeerInfo, Usage } from '../protocol.js';
@@ -117,6 +118,11 @@ export interface AgentRunInput {
   readonly board?: BoardTools;
   /** The task this run's worktree is doing (its brief), or a note that the board is there: added to the instructions. */
   readonly taskBrief?: string;
+  /**
+   * What the agent answers in (Settings › General › Language), and what it writes commit messages and
+   * pull requests in (the project's own choice, English by default; docs/i18n.md). Unset: English.
+   */
+  readonly language?: { readonly answerIn: Locale; readonly commitIn: Locale };
   /**
    * Plan mode with the board: whether the plan's task still has to be defined (task_define) before
    * the plan goes to you, and what to do when you approve it (its task goes on the board).

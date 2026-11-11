@@ -1,4 +1,5 @@
 import { isExternalRequester } from '../core/trust.js';
+import { type Key, type Params, t } from '../shared/i18n/index.js';
 import type { Approval, DomainState } from '../core/store.js';
 import { OFFER_DETAIL, knockWords, offerWords } from '../core/team/model.js';
 import type { PendingQuestion } from '../core/collab-store.js';
@@ -51,6 +52,16 @@ function threadPlace(state: DomainState, channel: string | undefined): Pick<Need
   return ws?.thread ? { thread: clip(ws.name, 300) } : {};
 }
 
+/**
+ * A title said by key (protocol.ts `key`/`params`, docs/i18n.md): in this side's language, and with
+ * its key for a phone that says it in its own. An older phone reads the title.
+ */
+const keyed = (key: Key, params?: Params): { title: string; key: Key; params?: Params } => ({ title: clip(t(key, params), 500), key, ...(params ? { params } : {}) });
+/** A button said by key, the same way. */
+const btn = (key: Key, tone: 'main' | 'danger' | 'plain', method: string, args: unknown[]) => ({ label: clip(t(key), 40), key, tone, method, args });
+/** What an answer's send button says, by key. */
+const sendLabel = (key: Key): { label: string; key: Key } => ({ label: clip(t(key), 40), key });
+
 function approvalItem(state: DomainState, a: Approval): NeedsYou {
   const from = a.asker ?? (a.peer ? `${nameOf(state, a.peer) ?? 'a friend'}` : agentOf(state, undefined, ''));
   // A friends' chat opens that chat (a request from there, your Claude working there: BLG-207).
@@ -67,10 +78,10 @@ function approvalItem(state: DomainState, a: Approval): NeedsYou {
     ...(a.askedAt !== undefined ? { askedAt: a.askedAt } : {}),
     ...(a.timeoutMs !== undefined ? { timeoutMs: a.timeoutMs } : {}),
     actions: [
-      { label: a.once ? 'Allow once' : 'Approve', tone: 'main', method: 'host.answerApproval', args: ['yes', a.id] },
-      { label: 'Decline', tone: 'danger', method: 'host.answerApproval', args: ['no', a.id] },
+      btn(a.once ? 'needs.allowOnce' : 'needs.approve', 'main', 'host.answerApproval', ['yes', a.id]),
+      btn('needs.decline', 'danger', 'host.answerApproval', ['no', a.id]),
       // A friend's request for a secret is asked each time: no Always.
-      ...(a.once ? [] : [{ label: 'Always', tone: 'plain' as const, method: 'host.answerApproval', args: ['always', a.id] }]),
+      ...(a.once ? [] : [btn('needs.always', 'plain', 'host.answerApproval', ['always', a.id])]),
     ],
   };
 }
@@ -84,15 +95,15 @@ function questionItem(state: DomainState, q: PendingQuestion): NeedsYou {
     return {
       ...base,
       kind: 'question',
-      title: `${owner.charAt(0).toUpperCase()}${owner.slice(1)} has a plan for you to approve`,
+      ...keyed('needs.planToApprove', { owner: `${owner.charAt(0).toUpperCase()}${owner.slice(1)}` }),
       detail: clip(stripCode(q.question.plan).text, 64_000),
       freeText: true,
       actions: [
-        { label: 'Approve', tone: 'main', method: 'questions.answer', args: [q.qid, { kind: 'plan', approve: true, feedback: '' }] },
-        { label: 'Keep planning', tone: 'danger', method: 'questions.answer', args: [q.qid, { kind: 'plan', approve: false, feedback: '' }] },
+        btn('needs.approve', 'main', 'questions.answer', [q.qid, { kind: 'plan', approve: true, feedback: '' }]),
+        btn('needs.keepPlanning', 'danger', 'questions.answer', [q.qid, { kind: 'plan', approve: false, feedback: '' }]),
       ],
       // Your words: what to change in the plan (it keeps planning with them).
-      answer: { method: 'questions.answer', args: [q.qid, { kind: 'plan', approve: false, feedback: '' }], slot: [1, 'feedback'], text: true, picks: false, label: 'Send changes' },
+      answer: { method: 'questions.answer', args: [q.qid, { kind: 'plan', approve: false, feedback: '' }], slot: [1, 'feedback'], text: true, picks: false, ...sendLabel('needs.sendChanges') },
     };
   }
   const [first, ...rest] = q.question.questions.filter((x) => !(x.question in q.picked));
@@ -107,8 +118,8 @@ function questionItem(state: DomainState, q: PendingQuestion): NeedsYou {
   // Several picks (joined with ", " as the Mac does) or your own words go where `slot` says: the
   // last question sends every answer (questions.answer); an earlier one is kept with questions.pick.
   const answer: NonNullable<NeedsYou['answer']> = last
-    ? { method: 'questions.answer', args: [q.qid, { kind: 'answers', answers: { ...picked, [head.question]: '' } }], slot: [1, 'answers', head.question], join: ', ', text: true, picks: head.options.length > 0, label: 'Send' }
-    : { method: 'questions.pick', args: [q.qid, head.question, ''], slot: [2], join: ', ', text: true, picks: head.options.length > 0, label: 'Next' };
+    ? { method: 'questions.answer', args: [q.qid, { kind: 'answers', answers: { ...picked, [head.question]: '' } }], slot: [1, 'answers', head.question], join: ', ', text: true, picks: head.options.length > 0, ...sendLabel('needs.send') }
+    : { method: 'questions.pick', args: [q.qid, head.question, ''], slot: [2], join: ', ', text: true, picks: head.options.length > 0, ...sendLabel('needs.next') };
   return {
     ...base,
     kind: decision ? 'decision' : 'question',
@@ -122,7 +133,7 @@ function questionItem(state: DomainState, q: PendingQuestion): NeedsYou {
     // One question with a few options: a button each (the phone sends the rest, multi-select or words, itself).
     actions: [
       ...(single ? head.options.map((o) => ({ label: clip(o.label, 40), tone: 'plain' as const, method: 'questions.answer', args: [q.qid, { kind: 'answers', answers: { ...picked, [head.question]: o.label } }] })) : []),
-      { label: 'Skip', tone: 'danger', method: 'questions.answer', args: [q.qid, { kind: 'skip' }] },
+      btn('needs.skip', 'danger', 'questions.answer', [q.qid, { kind: 'skip' }]),
     ],
     answer,
   };
@@ -136,16 +147,16 @@ function gatewayItems(state: DomainState, t: GwTask): NeedsYou[] {
       {
         id: `confirm:${t.id}`,
         kind: 'confirm',
-        title: `Ask ${agentOf(state, t.peerId, clip(t.peerName, 60))}?`,
+        ...keyed('needs.askAgent', { agent: agentOf(state, t.peerId, clip(t.peerName, 60)) }),
         detail: clip(plainLine(t.ask, 64_000), 64_000),
         from: agentOf(state, undefined, ''),
         ...at,
         askedAt: t.createdAt,
         actions: [
-          { label: 'Ask', tone: 'main', method: 'gateway.confirm', args: [t.id, true] },
+          btn('needs.ask', 'main', 'gateway.confirm', [t.id, true]),
           // Send it, and let your Claude ask them without checking from now on.
-          { label: 'Always', tone: 'plain', method: 'gateway.confirm', args: [t.id, true, '', true] },
-          { label: 'Not now', tone: 'danger', method: 'gateway.confirm', args: [t.id, false] },
+          btn('needs.always', 'plain', 'gateway.confirm', [t.id, true, '', true]),
+          btn('needs.notNow', 'danger', 'gateway.confirm', [t.id, false]),
         ],
       },
     ];
@@ -169,9 +180,9 @@ function gatewayItems(state: DomainState, t: GwTask): NeedsYou[] {
         freeText: t.question.questions.length === 1,
         actions: [
           ...(single ? head.options.map((o) => ({ label: clip(o.label, 40), tone: 'plain' as const, method: 'gateway.answer', args: [t.id, [o.label]] })) : []),
-          { label: 'Skip', tone: 'danger', method: 'gateway.answer', args: [t.id, 'skip'] },
+          btn('needs.skip', 'danger', 'gateway.answer', [t.id, 'skip']),
         ],
-        ...(t.question.questions.length === 1 ? { answer: { method: 'gateway.answer', args: [t.id, ['']], slot: [1, 0], join: ', ', text: true, picks: head.options.length > 0, label: 'Send' } } : {}),
+        ...(t.question.questions.length === 1 ? { answer: { method: 'gateway.answer', args: [t.id, ['']], slot: [1, 0], join: ', ', text: true, picks: head.options.length > 0, ...sendLabel('needs.send') } } : {}),
       },
     ];
   }
@@ -187,9 +198,9 @@ function gatewayItems(state: DomainState, t: GwTask): NeedsYou[] {
         ...(t.chat && chatTopic(t.chat) ? { topic: chatTopic(t.chat)! } : {}),
         askedAt: t.createdAt,
         actions: [
-          { label: t.secret ? 'Allow once' : 'Approve', tone: 'main', method: 'gateway.decide', args: [t.id, { answer: 'yes' }] },
-          { label: 'Decline', tone: 'danger', method: 'gateway.decide', args: [t.id, { answer: 'no' }] },
-          ...(t.secret ? [] : [{ label: 'Always', tone: 'plain' as const, method: 'gateway.decide', args: [t.id, { answer: 'always' }] }]),
+          btn(t.secret ? 'needs.allowOnce' : 'needs.approve', 'main', 'gateway.decide', [t.id, { answer: 'yes' }]),
+          btn('needs.decline', 'danger', 'gateway.decide', [t.id, { answer: 'no' }]),
+          ...(t.secret ? [] : [btn('needs.always', 'plain', 'gateway.decide', [t.id, { answer: 'always' }])]),
         ],
       },
     ];
@@ -209,11 +220,11 @@ function stuckItems(plan: Plan, progress: PlanProgress, at: Pick<NeedsYou, 'topi
     .map(([taskId, w]): NeedsYou => ({
       id: `plan:${plan.id}:stalled:${taskId}`,
       kind: 'decision',
-      title: clip(`“${titles.get(taskId) ?? 'A task'}” stopped twice: resume it?`, 500),
+      ...keyed('needs.taskStalled', { title: titles.get(taskId) ?? t('needs.aTask') }),
       detail: clip(w.reason, 64_000),
       ...at,
       askedAt: w.at,
-      actions: [{ label: 'Resume', tone: 'main', method: 'plans.resumeTask', args: [plan.id, taskId] }],
+      actions: [btn('needs.resume', 'main', 'plans.resumeTask', [plan.id, taskId])],
     }));
   const rescued = Object.entries(plan.rescue ?? {})
     .filter(([, r]) => r.yours)
@@ -235,11 +246,11 @@ function stuckItems(plan: Plan, progress: PlanProgress, at: Pick<NeedsYou, 'topi
     (c): NeedsYou => ({
       id: `plan:${plan.id}:conflict:${c.key}`,
       kind: 'stuck',
-      title: clip('A merge conflict Claude couldn’t fix', 500),
+      ...keyed('needs.conflictStuck'),
       detail: clip(`While ${c.what}: ${c.files.join(', ')}`, 64_000),
       ...at,
       askedAt: c.at,
-      actions: [{ label: 'Ask Claude again', tone: 'main', method: 'plans.retryConflicts', args: [plan.id] }],
+      actions: [btn('needs.askClaudeAgain', 'main', 'plans.retryConflicts', [plan.id])],
     }),
   );
   return [...stalled, ...rescued, ...conflicts];
@@ -266,14 +277,14 @@ function gateItems(plan: Plan, progress: PlanProgress, title: string, at: Pick<N
       {
         id: `plan:${plan.id}:review:${plan.draftRev}`,
         kind: 'decision',
-        title: `The reviewer found ${found.length === 1 ? 'one thing' : `${found.length} things`} to fix in “${title}”`,
+        ...keyed('needs.reviewFound', { count: found.length, title }),
         detail: clip(found.map((f, i) => `${i + 1}. ${plainLine(f.text, 1000)}`).join('\n'), 64_000),
         ...at,
         askedAt: plan.review.at,
         actions: [
-          { label: 'Fix', tone: 'main', method: 'plans.fixReview', args: [plan.id] },
-          { label: 'Approve anyway', tone: 'plain', method: 'plans.approve', args: [plan.id] },
-          { label: 'Discard', tone: 'danger', method: 'plans.discard', args: [plan.id] },
+          btn('needs.fix', 'main', 'plans.fixReview', [plan.id]),
+          btn('needs.approveAnyway', 'plain', 'plans.approve', [plan.id]),
+          btn('needs.discard', 'danger', 'plans.discard', [plan.id]),
         ],
       },
     ];
@@ -283,15 +294,15 @@ function gateItems(plan: Plan, progress: PlanProgress, title: string, at: Pick<N
       {
         id: `plan:${plan.id}:approve:${plan.draftRev}`,
         kind: 'decision',
-        title: next.kind === 'approve' ? `Approve the plan “${title}”?` : `Approve the changes to “${title}”?`,
+        ...keyed(next.kind === 'approve' ? 'needs.approvePlan' : 'needs.approveChanges', { title }),
         ...(plan.draft?.goal ? { detail: clip(plainLine(plan.draft.goal, 4000), 4000) } : {}),
         ...at,
         askedAt: plan.updatedAt,
         actions: [
-          { label: 'Approve', tone: 'main', method: 'plans.approve', args: [plan.id] },
+          btn('needs.approve', 'main', 'plans.approve', [plan.id]),
           // A first draft can be read by a fresh agent first, and approved once it reads well (BLG-772).
-          ...(next.kind === 'approve' ? [{ label: 'Verify, then approve', tone: 'plain' as const, method: 'plans.verify', args: [plan.id, { thenApprove: true }] }] : []),
-          { label: 'Discard', tone: 'danger', method: 'plans.discard', args: [plan.id] },
+          ...(next.kind === 'approve' ? [btn('needs.verifyThenApprove', 'plain', 'plans.verify', [plan.id, { thenApprove: true }])] : []),
+          btn('needs.discard', 'danger', 'plans.discard', [plan.id]),
         ],
       },
     ];
@@ -304,16 +315,16 @@ function gateItems(plan: Plan, progress: PlanProgress, title: string, at: Pick<N
       {
         id: `plan:${plan.id}:pass:${m.id}`,
         kind: 'decision',
-        title: failed ? `“${clip(m.title, 200)}” couldn’t merge: pass it again?` : `“${clip(m.title, 200)}” is ready: pass it?`,
+        ...keyed(failed ? 'needs.milestoneMergeFailed' : 'needs.milestoneReady', { title: clip(m.title, 200) }),
         detail: clip(failed ? failed.reason : m.criteria.join('\n'), 64_000),
         ...at,
         // Send it back takes your words (the answer template).
         freeText: true,
         actions: [
-          { label: 'Pass', tone: 'main', method: 'plans.pass', args: [plan.id, m.id] },
-          { label: 'Check again', tone: 'plain', method: 'plans.recheck', args: [plan.id, m.id] },
+          btn('needs.pass', 'main', 'plans.pass', [plan.id, m.id]),
+          btn('needs.checkAgain', 'plain', 'plans.recheck', [plan.id, m.id]),
         ],
-        answer: { method: 'plans.sendBack', args: [plan.id, m.id, ''], slot: [2], text: true, picks: false, label: 'Send back' },
+        answer: { method: 'plans.sendBack', args: [plan.id, m.id, ''], slot: [2], text: true, picks: false, ...sendLabel('needs.sendBack') },
       },
     ];
   }
@@ -330,13 +341,13 @@ function knockItems(state: DomainState): NeedsYou[] {
     return {
       id: `knock:${k.peerId}`,
       kind: 'request',
-      title: clip(`${name} wants to come in`, 500),
+      ...keyed('needs.wantsToComeIn', { name }),
       detail: clip(link ? `With your link to ${link.label}` : 'With one of your links', 64_000),
       from: clip(name, 100),
       ...(k.ts ? { askedAt: k.ts } : {}),
       actions: [
-        { label: 'Let in', tone: 'main', method: 'invites.letIn', args: [k.peerId] },
-        { label: 'Turn away', tone: 'danger', method: 'invites.decline', args: [k.peerId] },
+        btn('needs.letIn', 'main', 'invites.letIn', [k.peerId]),
+        btn('needs.turnAway', 'danger', 'invites.decline', [k.peerId]),
       ],
     };
   });
@@ -357,8 +368,8 @@ function joinItems(state: DomainState): NeedsYou[] {
           ...(topic ? { topic } : {}),
           askedAt: r.ts,
           actions: [
-            { label: 'Let in', tone: 'main' as const, method: 'network.groups.approve', args: [g.id, r.peerId] },
-            { label: 'Decline', tone: 'danger' as const, method: 'network.groups.decline', args: [g.id, r.peerId] },
+            btn('needs.letIn', 'main', 'network.groups.approve', [g.id, r.peerId]),
+            btn('needs.decline', 'danger', 'network.groups.decline', [g.id, r.peerId]),
           ],
         };
       }),
@@ -378,7 +389,7 @@ function offerItems(state: DomainState): NeedsYou[] {
       askedAt: o.at,
       actions: [
         { label: 'Accept', tone: 'main' as const, method: 'network.friends.answerOffer', args: [o.peerId, true] },
-        { label: 'Not now', tone: 'danger' as const, method: 'network.friends.answerOffer', args: [o.peerId, false] },
+        btn('needs.notNow', 'danger', 'network.friends.answerOffer', [o.peerId, false]),
       ],
     }));
 }
@@ -400,7 +411,7 @@ function callItems(state: DomainState): NeedsYou[] {
         ...(c.ringSince ? { askedAt: c.ringSince } : {}),
         actions: [
           { label: 'Answer on Mac', tone: 'main' as const, method: 'calls.join', args: [c.conversation] },
-          { label: 'Decline', tone: 'danger' as const, method: 'calls.decline', args: [c.conversation] },
+          btn('needs.decline', 'danger', 'calls.decline', [c.conversation]),
         ],
       };
     });
@@ -483,7 +494,7 @@ function sharedPlanItems(state: DomainState): NeedsYou[] {
       from: clip(p.ownerName, 100),
       askedAt: p.updatedAt,
       freeText: true,
-      actions: [{ label: 'Approve', tone: 'main' as const, method: 'team.reviewPlan', args: [p.owner, p.id, { kind: 'approve' }] }],
+      actions: [btn('needs.approve', 'main', 'team.reviewPlan', [p.owner, p.id, { kind: 'approve' }])],
       answer: { method: 'team.reviewPlan', args: [p.owner, p.id, { kind: 'comment', text: '' }], slot: [2, 'text'], text: true, picks: false, label: 'Comment' },
     }));
   const mine = Object.values(state.team.planShares).flatMap((share) => {

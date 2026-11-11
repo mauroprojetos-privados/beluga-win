@@ -356,6 +356,9 @@ export const MACHINE: Record<Method, MachineSide> = {
   'revenuecat.setApps': 'drive',
   // ---- support
   'support.answer': 'drive',
+  // ---- languages (docs/i18n.md): your settings, as the rest
+  'settings.language': 'drive',
+  'settings.commitLanguage': 'drive',
   // ---- stats
   'stats.get': 'drive',
   'stats.note': 'drive',

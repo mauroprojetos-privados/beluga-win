@@ -5,6 +5,7 @@ import { EntryRow, useEntryList } from './EntryRow.js';
 import { SignalMark } from './signal-marks.js';
 import { Section } from './sidebar-parts.js';
 import m from './signal.module.css';
+import { useT } from '../lib/i18n.js';
 
 /**
  * The top of the sidebar, like Slack's Unreads: every conversation that finished, got a
@@ -13,6 +14,7 @@ import m from './signal.module.css';
  */
 
 export function UnreadSection() {
+  const t = useT();
   const prefs = usePrefs();
   const list = useEntryList((state) => (prefs.unreadSection ? unreadEntries(state) : []));
   if (!prefs.unreadSection) return null;
@@ -20,8 +22,8 @@ export function UnreadSection() {
   const rows = list.kept ? [...list.entries.slice(0, list.kept.at), list.kept.entry, ...list.entries.slice(list.kept.at)] : list.entries;
   if (!rows.length) return null;
   return (
-    <div role="region" aria-label="Unread" className={m.section}>
-      <Section id="unread" title="Unread">
+    <div role="region" aria-label={t('sidebar.unread')} className={m.section}>
+      <Section id="unread" title={t('sidebar.unread')}>
         {rows.map((e, at) => (
           <EntryRow
             key={e.channel}

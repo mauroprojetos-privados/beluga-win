@@ -14,6 +14,8 @@ import { STRIPE_API } from './stripe-api.js';
 import { REVENUECAT_API } from './revenuecat-api.js';
 import { TRIAGE_API } from './triage-api.js';
 import { SUPPORT_API } from './support-api.js';
+import { I18N_API } from './i18n-api.js';
+import { LANGUAGE_CHOICES, LOCALES } from '../shared/i18n/locales.js';
 import { STATS_API } from './stats-api.js';
 import { WEB_API } from './web-api.js';
 import { DIAGNOSTICS_API } from './diagnostics-api.js';
@@ -89,6 +91,9 @@ const EXPERIMENTS_MAX = 20;
 export const PrefsPatch = z
   .object({
     theme: z.enum(THEMES),
+    language: z.enum(LANGUAGE_CHOICES),
+    // Per project (by name), its commits' and PRs' language; null: back to English.
+    commitLanguages: z.record(z.string().min(1).max(80), z.enum(LOCALES)).nullable(),
     mouse: bool,
     tunnel: z.enum(['auto', 'p2p', 'cloudflared', 'ngrok', 'none']),
     keepAwake: z.enum(KEEP_AWAKE),
@@ -531,6 +536,8 @@ export const API = {
   ...REVENUECAT_API,
   // ---- supporting Beluga: the star and coffee asks merges bring (support-api.ts)
   ...SUPPORT_API,
+  // ---- the app's language, and each project's for its commits and PRs (i18n-api.ts, docs/i18n.md)
+  ...I18N_API,
   // ---- your stats in the Usage tab: counted by the daemon, pastes and dictation from the Mac (stats-api.ts)
   ...STATS_API,
   // ---- problem reports: the daemon's black box in one redacted file (diagnostics-api.ts)

@@ -9,7 +9,7 @@ import { z } from 'zod';
  * ignores what it doesn't know. A breaking change bumps the major, and the Mac keeps answering the
  * previous major for a release.
  */
-export const COMPANION_PROTO = { major: 1, minor: 53 } as const;
+export const COMPANION_PROTO = { major: 1, minor: 54 } as const;
 
 /**
  * What came in which minor, for a phone talking to an older Mac: it subscribes to a topic (and
@@ -143,8 +143,10 @@ export const COMPANION_PROTO = { major: 1, minor: 53 } as const;
  * conversation `conv:bot:<id>`, which the phone opens and writes in like any other), and the bot behind
  * a Needs You (`NeedsYou.bot`). `bots.list` and `bots.status` read them; editing them stays on the Mac.
  * An older Mac sends neither: no Bots list, Needs You as before. An older phone leaves both out.
+ * 1.54 (docs/i18n.md): texts as catalog keys beside their words (`TextKey`: Needs You's title and buttons), and the
+ * Mac's language (`HomeView.mac.language`), which the phone follows unless it picked its own (SINCE.language).
  */
-export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, routing: 52, bots: 53 } as const;
+export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, routing: 52, bots: 53, language: 54 } as const;
 
 /** One frame's biggest payload, and a file piece. */
 export const MAX_COMPANION_FRAME = 1024 * 1024;
@@ -261,6 +263,14 @@ export const UsageView = z.object({
 });
 export type UsageView = z.infer<typeof UsageView>;
 
+/**
+ * 1.54 (docs/i18n.md): what a text says as a catalog key (src/shared/i18n) and what fills it, beside
+ * the text itself. A phone that knows the key says it in its own language; an older one, or one
+ * that doesn't know the key, shows the text (in the Mac's language).
+ */
+export const TextKey = z.string().max(80);
+export const TextParams = z.record(z.string().max(40), z.union([z.string().max(1000), z.number()]));
+
 export const Choice = z.object({ label: z.string().max(200), description: z.string().max(1000).optional() });
 
 /**
@@ -271,6 +281,9 @@ export const NeedsYou = z.object({
   id,
   kind: z.union([z.enum(['approval', 'question', 'request', 'decision', 'confirm']), z.string().max(40)]),
   title: z.string().max(500),
+  /** 1.54: the title as a key and its params (TextKey). */
+  key: TextKey.optional(),
+  params: TextParams.optional(),
   detail: text.optional(),
   /** Who is asking ("your Claude", "mia's Claude"). */
   from: z.string().max(100).optional(),
@@ -289,7 +302,7 @@ export const NeedsYou = z.object({
   freeText: z.boolean().optional(),
   /** Buttons: what they say and the call they make. `tone` main is the swipe-right one, danger the swipe-left. */
   actions: z
-    .array(z.object({ label: z.string().max(40), tone: z.enum(['main', 'danger', 'plain']), method: z.string().max(80), args: z.array(z.unknown()).max(8) }))
+    .array(z.object({ label: z.string().max(40), key: TextKey.optional(), tone: z.enum(['main', 'danger', 'plain']), method: z.string().max(80), args: z.array(z.unknown()).max(8) }))
     .max(4),
   /**
    * How to send an answer of your own (picked options, or words): call `method` with `args`, after
@@ -307,8 +320,9 @@ export const NeedsYou = z.object({
       list: z.boolean().optional(),
       text: z.boolean(),
       picks: z.boolean(),
-      /** What the send button says ("Send", "Send back"). */
+      /** What the send button says ("Send", "Send back"), and since 1.54 its key. */
       label: z.string().max(40).optional(),
+      key: TextKey.optional(),
     })
     .optional(),
 });
@@ -547,7 +561,8 @@ export type BotSummary = z.infer<typeof BotSummary>;
 
 export const HomeView = z.object({
   // 1.13: keepAwake, whether the Mac stays awake for the phone (companion.keepAwake).
-  mac: z.object({ name: z.string().max(100), version: z.string().max(40), keepAwake: z.enum(['off', 'power', 'always']).optional() }),
+  // 1.54: language, what the Mac speaks (its Settings › General › Language, `auto` resolved); the phone follows it unless it picked its own.
+  mac: z.object({ name: z.string().max(100), version: z.string().max(40), keepAwake: z.enum(['off', 'power', 'always']).optional(), language: z.string().max(16).optional() }),
   me: z.object({ name: z.string().max(64), peerId: id }),
   usage: z.array(UsageView).max(8),
   needsYou: z.array(NeedsYou).max(50),

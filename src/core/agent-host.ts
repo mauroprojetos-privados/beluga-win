@@ -1,4 +1,6 @@
 import { actingVia, asActingAgent } from './acting-agent.js';
+import { appLocale, commitLocale } from './language.js';
+import type { Locale } from '../shared/i18n/locales.js';
 import { randomUUID } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import path from 'node:path';
@@ -1507,6 +1509,7 @@ export class AgentHost {
       const runPlace = plans?.tools && place?.askOnly && !place.syncMain ? withoutAskOnly(place) : place;
       const final = await Promise.race([gone, exited, agent.run({
         ...(scratch ? { scratchDir: scratch } : {}),
+        ...(place ? { language: this.languagesFor(place) } : {}),
         ...(board?.tools ? { board: board.tools } : {}),
         ...(board?.brief ? { taskBrief: board.brief } : {}),
         ...(board?.needsDefinition && board.planApproved ? { planTask: { needsDefinition: board.needsDefinition, approved: board.planApproved } } : {}),
@@ -1659,6 +1662,7 @@ export class AgentHost {
         canUseSecret: (toolName, input) => this.authorizeSecret(toolName, input, channel, place.cwd),
         askUser: (question) => this.deps.questions.ask(this.selfId, requestId, channel, question),
         ...(scratch ? { scratchDir: scratch } : {}),
+        ...(place ? { language: this.languagesFor(place) } : {}),
         ...(board?.tools ? { board: board.tools } : {}),
         ...(board?.brief ? { taskBrief: board.brief } : {}),
         ...(phone ? { phoneTools: phone.tools, phoneBrief: phone.brief } : {}),
@@ -1883,6 +1887,13 @@ export class AgentHost {
    * and each pasted "worktree:wt-…" which worktree it is and where (BLG-878).
    * `sent`: what the message sends (images, files) is copied there, and the words say where.
    */
+  /** What a run answers in, and what its project's commits and PRs are written in (docs/i18n.md). */
+  private languagesFor(place: AgentPlace): { answerIn: Locale; commitIn: Locale } {
+    const { prefs, projects } = this.store.getState();
+    const project = place.askOnly?.project || projects.find((p) => p.root === place.cwd || p.workspaces.some((w) => w.path === place.cwd))?.name;
+    return { answerIn: appLocale(prefs), commitIn: commitLocale(prefs, project) };
+  }
+
   private promptOf(body: BodyOf<'agent_request'>, sent?: SentPlace): string {
     const { board, projects } = this.store.getState();
     const tasked = board.issues.length ? explainTaskMentions(body.prompt, (key) => findIssue(board, key)) : body.prompt;

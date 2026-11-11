@@ -23,3 +23,38 @@ process.env.CODEX_HOME = mkdtempSync(path.join(os.tmpdir(), 'beluga-test-codex-'
 
 // The tests are a Mac's wherever they run ("Your Mac"; shared/assistant.ts).
 process.env.BELUGA_COMPUTER ??= 'mac';
+
+// The daemon's language is English in tests, whatever this computer speaks (src/core/language.ts).
+process.env.BELUGA_LANGUAGE = 'en';
+
+// Dates, numbers and money format as US English in tests, whatever this computer speaks: what
+// formats with the system's language (no locale given) gets en-US, so a pt-BR or de-DE machine
+// reads "$84.50" and "11/11/2026" as CI does. A locale a test names is kept (docs/i18n.md).
+const TEST_LOCALE = 'en-US';
+const pinned = (locales: unknown): unknown => (locales === undefined || (Array.isArray(locales) && locales.length === 0) ? TEST_LOCALE : locales);
+for (const name of ['DateTimeFormat', 'NumberFormat', 'PluralRules', 'RelativeTimeFormat', 'ListFormat', 'Collator', 'DisplayNames', 'Segmenter'] as const) {
+  const Real = (Intl as unknown as Record<string, (new (l?: unknown, o?: unknown) => object) & { supportedLocalesOf: unknown }>)[name];
+  if (!Real) continue;
+  const Pinned = function (this: unknown, locales?: unknown, options?: unknown) {
+    return new Real(pinned(locales), options);
+  } as unknown as typeof Real;
+  Object.setPrototypeOf(Pinned, Real);
+  Pinned.prototype = Real.prototype;
+  (Intl as unknown as Record<string, unknown>)[name] = Pinned;
+}
+for (const [proto, methods] of [
+  [Date.prototype, ['toLocaleString', 'toLocaleDateString', 'toLocaleTimeString']],
+  [Number.prototype, ['toLocaleString']],
+  [BigInt.prototype, ['toLocaleString']],
+  [Array.prototype, ['toLocaleString']],
+  [String.prototype, ['localeCompare']],
+] as const) {
+  for (const m of methods) {
+    const real = (proto as unknown as Record<string, (...a: unknown[]) => unknown>)[m]!;
+    Object.defineProperty(proto, m, {
+      configurable: true,
+      writable: true,
+      value: m === 'localeCompare' ? function (this: string, that: string, locales?: unknown, options?: unknown) { return real.call(this, that, pinned(locales), options); } : function (this: unknown, locales?: unknown, options?: unknown) { return real.call(this, pinned(locales), options); },
+    });
+  }
+}

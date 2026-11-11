@@ -15,6 +15,7 @@ import { UpdatePill, UpdateSheet } from '../../components/Update';
 import { UsageCard, UsageSheet } from '../../components/Usage';
 import { Card, IconBadge, Pill, Press, Section, StatusDot, T } from '../../components/ui';
 import { useLink, useSupports, useView, useAllNeeds } from '../../lib/hooks';
+import { useT } from '../../lib/language';
 import type { BotSummary, ConvSummary, HomeView, PlansView } from '../../lib/link/protocol';
 import { displayName } from '../../lib/names';
 import { color, TAB_BAR_H } from '../../lib/theme';
@@ -24,6 +25,7 @@ import { color, TAB_BAR_H } from '../../lib/theme';
  * tasks waiting for your review, and your allowance (outputs live with their conversations).
  */
 export default function Home() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const { scrolled, onScroll } = useScrolled();
   const [usageOpen, setUsageOpen] = useState(false);
@@ -40,7 +42,7 @@ export default function Home() {
   const asleep = link.phase === 'asleep';
   const hour = new Date().getHours();
   const name = displayName(h?.me.name);
-  const greeting = hour < 5 ? 'Hi' : hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const greeting = t(hour < 5 ? 'phone.home.hi' : hour < 12 ? 'phone.home.goodMorning' : hour < 18 ? 'phone.home.goodAfternoon' : 'phone.home.goodEvening');
 
   return (
     <Screen>
@@ -51,27 +53,27 @@ export default function Home() {
             <Mark size={40} intro={false} />
             <View style={{ flex: 1 }}>
               <T v="heading" numberOfLines={1}>
-                {h?.mac.name ?? link.mac?.name ?? link.pairing?.macName ?? 'Your Mac'}
+                {h?.mac.name ?? link.mac?.name ?? link.pairing?.macName ?? t('phone.home.yourMac')}
               </T>
             </View>
             {/* The link's state as a dot and a word: green only while it's live. */}
-            <View accessibilityLabel={linked ? 'Linked' : asleep ? 'Asleep' : 'Away'} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View accessibilityLabel={t(linked ? 'phone.home.linked' : asleep ? 'phone.home.asleep' : 'phone.home.away')} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <StatusDot c={linked ? color.ok : asleep ? color.text3 : link.phase === 'dialing' ? color.warn : color.text3} size={7} />
               <T v="caption" c={color.text2}>
-                {linked ? 'Linked' : asleep ? 'Asleep' : link.phase === 'dialing' ? 'Linking' : 'Away'}
+                {t(linked ? 'phone.home.linked' : asleep ? 'phone.home.asleep' : link.phase === 'dialing' ? 'phone.home.linking' : 'phone.home.away')}
               </T>
             </View>
-            <Press onPress={() => router.push('/settings')} accessibilityLabel="Settings" hitSlop={8} style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: color.card }}>
+            <Press onPress={() => router.push('/settings')} accessibilityLabel={t('common.settings')} hitSlop={8} style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: color.card }}>
               <Settings color={color.text2} size={19} />
             </Press>
           </View>
           <Animated.View entering={FadeIn.duration(180)} style={{ marginTop: 24 }}>
             <T v="hero">
-              {name ? `${greeting}, ${name}` : 'Hi there'}
+              {name ? t('phone.home.greetName', { greeting, name }) : t('phone.home.hiThere')}
             </T>
             <T v="callout" style={{ marginTop: 4 }}>
-              {needs.length ? `${needs.length} ${needs.length === 1 ? 'thing needs' : 'things need'} you` : 'Nothing needs you'}
-              {h?.running.length ? ` · ${h.running.filter((r) => r.status === 'working').length} working` : ''}
+              {needs.length ? t('needsYou.count', { count: needs.length }) : t('phone.home.nothingNeedsYou')}
+              {h?.running.length ? ` · ${t('phone.home.working', { count: h.running.filter((r) => r.status === 'working').length })}` : ''}
             </T>
           </Animated.View>
           <UpdatePill onPress={() => setUpdateOpen(true)} />
@@ -80,9 +82,9 @@ export default function Home() {
 
         {!h ? (
           <Card style={{ margin: 16, marginTop: 28, padding: 20 }}>
-            <T v="heading">Reaching your Mac…</T>
+            <T v="heading">{t('phone.home.reaching')}</T>
             <T v="callout" style={{ marginTop: 4 }}>
-              What it shows will appear here.
+              {t('phone.home.reachingHint')}
             </T>
           </Card>
         ) : (
@@ -92,13 +94,13 @@ export default function Home() {
             {h.bots?.length ? <BotsHome bots={h.bots} /> : null}
 
             <Section
-              title="Needs you"
+              title={t('phone.home.needsYou')}
               right={
                 needs.length > 1 ? (
                   <Press onPress={() => router.push('/needs')} hitSlop={10}>
                     {/* One string, so Android measures the whole label again when the count changes width. */}
                     <T v="callout" c={color.info} numberOfLines={1} style={{ fontWeight: '600', flexShrink: 0 }}>
-                      {`All ${needs.length}`}
+                      {t('phone.needs.all', { count: needs.length })}
                     </T>
                   </Press>
                 ) : null
@@ -108,7 +110,7 @@ export default function Home() {
             </Section>
 
             {h.running.length || running.length ? (
-              <Section title="Running">
+              <Section title={t('phone.home.running')}>
                 <Animated.View layout={LinearTransition.duration(180)} style={{ gap: 10 }}>
                   {running.map((p) => (
                     <Press key={p.id} scaleTo={0.985} onPress={() => router.push(`/plan/${p.id}`)} style={{ marginHorizontal: 16 }}>
@@ -119,7 +121,7 @@ export default function Home() {
                             {p.title}
                           </T>
                           <T v="caption">
-                            Plan · {p.done} of {p.total} done
+                            {t('phone.home.planProgress', { done: p.done, total: p.total })}
                           </T>
                         </View>
                         <ChevronRight color={color.text3} size={18} />
@@ -134,16 +136,16 @@ export default function Home() {
             ) : null}
 
             {h.review?.count ? (
-              <Section title="For your review">
+              <Section title={t('phone.home.forReview')}>
                 <Press scaleTo={0.985} onPress={() => router.push(h.review!.count === 1 && h.review!.first ? `/task/${encodeURIComponent(h.review!.first.topic.slice(5))}` : '/tasks')} style={{ marginHorizontal: 16 }}>
                   <Card style={{ padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                     <IconBadge Icon={Eye} tone="sky" />
                     <View style={{ flex: 1 }}>
                       <T v="heading" numberOfLines={1}>
-                        {h.review.count === 1 && h.review.first ? h.review.first.title : `${h.review.count} tasks in review`}
+                        {h.review.count === 1 && h.review.first ? h.review.first.title : t('phone.home.tasksInReview', { count: h.review.count })}
                       </T>
                       <T v="caption" numberOfLines={1}>
-                        {h.review.count === 1 && h.review.first ? `${h.review.first.key} · in review` : h.review.first ? `${h.review.first.key} and ${h.review.count - 1} more` : 'Tasks'}
+                        {h.review.count === 1 && h.review.first ? t('phone.home.inReview', { key: h.review.first.key }) : h.review.first ? t('phone.home.andMore', { key: h.review.first.key, count: h.review.count - 1 }) : t('phone.home.tasks')}
                       </T>
                     </View>
                     <ChevronRight color={color.text3} size={18} />
@@ -156,7 +158,7 @@ export default function Home() {
             {sentinelOn ? <NumbersHome /> : null}
 
             {h.usage.length ? (
-              <Section title="Usage">
+              <Section title={t('phone.home.usage')}>
                 <UsageCard usage={h.usage} onOpen={() => setUsageOpen(true)} />
               </Section>
             ) : null}
@@ -178,25 +180,26 @@ export default function Home() {
 function AskYourMac({ c, chats, onChats }: { readonly c: ConvSummary; readonly chats: number; readonly onChats: () => void }) {
   const working = c.status === 'working' || c.status === 'waiting';
   const many = useSupports('macChats');
+  const t = useT();
   return (
-    <Press scaleTo={0.985} onPress={() => router.push(convHref(c.topic) as never)} onLongPress={many ? onChats : undefined} accessibilityLabel="Ask your Mac" style={{ marginHorizontal: 16, marginTop: 18 }}>
+    <Press scaleTo={0.985} onPress={() => router.push(convHref(c.topic) as never)} onLongPress={many ? onChats : undefined} accessibilityLabel={t('phone.home.askYourMac')} style={{ marginHorizontal: 16, marginTop: 18 }}>
       <Card style={{ paddingVertical: 12, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <IconBadge Icon={Laptop} tone="sky" size={34} />
         <View style={{ flex: 1 }}>
           <T v="heading" numberOfLines={1} style={{ fontSize: 16 }}>
-            Ask your Mac
+            {t('phone.home.askYourMac')}
           </T>
           {working ? (
-            <StepTicker step={c.last ?? 'Working'} size={12.5} />
+            <StepTicker step={c.last ?? t('phone.home.workingStep')} size={12.5} />
           ) : (
             <T v="caption" numberOfLines={1}>
-              {c.last ?? 'Screenshots, what’s running, start a worktree'}
+              {c.last ?? t('phone.home.askHint')}
             </T>
           )}
         </View>
         {c.unread ? <Pill label={String(c.unread)} tone="sky" /> : null}
         {many ? (
-          <Press onPress={onChats} accessibilityLabel={`Your Mac’s chats, ${chats}`} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height: 32, paddingHorizontal: 10, borderRadius: 16, backgroundColor: color.sunken }}>
+          <Press onPress={onChats} accessibilityLabel={t('phone.home.macChats', { count: chats })} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height: 32, paddingHorizontal: 10, borderRadius: 16, backgroundColor: color.sunken }}>
             <MessagesSquare color={color.text2} size={15} />
             {chats > 1 ? (
               <T v="caption" c={color.text2} style={{ fontWeight: '700' }}>
@@ -213,18 +216,19 @@ function AskYourMac({ c, chats, onChats }: { readonly c: ConvSummary; readonly c
 }
 
 /**
- * Your bots (1.52, docs/bots.md): Your Mac first, then the ones you made, each with what it's doing
+ * Your bots (1.53, docs/bots.md): Your Mac first, then the ones you made, each with what it's doing
  * ("2 of 6 done · waiting on Contrast check"). A tap opens its chat; its plan, when it has one, is a
  * chip. Making and editing bots is Bot Studio's, on the Mac.
  */
 function BotsHome({ bots }: { readonly bots: readonly BotSummary[] }) {
+  const t = useT();
   return (
-    <Section title="Bots">
+    <Section title={t('phone.home.bots')}>
       <View style={{ gap: 8 }}>
         {bots.map((b) => {
           const working = b.status === 'working' || b.status === 'waiting';
           return (
-            <Press key={b.id} scaleTo={0.985} onPress={() => router.push(convHref(b.topic) as never)} accessibilityLabel={`Open ${b.name}`} style={{ marginHorizontal: 16 }}>
+            <Press key={b.id} scaleTo={0.985} onPress={() => router.push(convHref(b.topic) as never)} accessibilityLabel={t('phone.home.openBot', { name: b.name })} style={{ marginHorizontal: 16 }}>
               <Card style={{ paddingVertical: 12, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 <IconBadge Icon={b.mac ? Laptop : Bot} tone={b.mac ? 'sky' : 'lavender'} size={34} />
                 <View style={{ flex: 1 }}>
@@ -232,11 +236,11 @@ function BotsHome({ bots }: { readonly bots: readonly BotSummary[] }) {
                     {b.name}
                   </T>
                   <T v="caption" numberOfLines={1} c={working ? color.text : undefined}>
-                    {b.line ?? b.description ?? (working ? 'Working' : 'Ready')}
+                    {b.line ?? b.description ?? (working ? t('phone.home.botWorking') : t('phone.home.botReady'))}
                   </T>
                 </View>
                 {b.plan ? (
-                  <Press onPress={() => router.push(`/plan/${b.plan!.slice(5)}` as never)} accessibilityLabel={`${b.name}’s plan`} hitSlop={8} style={{ height: 32, paddingHorizontal: 10, borderRadius: 16, backgroundColor: color.sunken, alignItems: 'center', justifyContent: 'center' }}>
+                  <Press onPress={() => router.push(`/plan/${b.plan!.slice(5)}` as never)} accessibilityLabel={t('phone.home.botPlan', { name: b.name })} hitSlop={8} style={{ height: 32, paddingHorizontal: 10, borderRadius: 16, backgroundColor: color.sunken, alignItems: 'center', justifyContent: 'center' }}>
                     <Workflow color={color.text2} size={15} />
                   </Press>
                 ) : (

@@ -337,12 +337,12 @@ describe('the views of a known Mac', () => {
       ['network.groups.decline', [GROUP, ZOE]],
     ]);
     // The second question of a prompt: several picks joined, sent with every answer so far.
-    expect(home.needsYou.find((n) => n.id === 'question:q2')!.answer).toEqual({ method: 'questions.answer', args: ['q2', { kind: 'answers', answers: { 'Which browsers?': 'Chrome', 'Which checks?': '' } }], slot: [1, 'answers', 'Which checks?'], join: ', ', text: true, picks: true, label: 'Send' });
+    expect(home.needsYou.find((n) => n.id === 'question:q2')!.answer).toEqual({ method: 'questions.answer', args: ['q2', { kind: 'answers', answers: { 'Which browsers?': 'Chrome', 'Which checks?': '' } }], slot: [1, 'answers', 'Which checks?'], join: ', ', text: true, picks: true, label: 'Send', key: 'needs.send' });
     const question = home.needsYou.find((n) => n.kind === 'question')!;
     expect(question.actions).toEqual([
       { label: 'Redis', tone: 'plain', method: 'questions.answer', args: ['q1', { kind: 'answers', answers: { 'Which session store?': 'Redis' } }] },
       { label: 'Postgres', tone: 'plain', method: 'questions.answer', args: ['q1', { kind: 'answers', answers: { 'Which session store?': 'Postgres' } }] },
-      { label: 'Skip', tone: 'danger', method: 'questions.answer', args: ['q1', { kind: 'skip' }] },
+      { label: 'Skip', key: 'needs.skip', tone: 'danger', method: 'questions.answer', args: ['q1', { kind: 'skip' }] },
     ]);
     // Both wait on you (an approval in w2, Claude's question in w1); w2's sub-agent is a dot.
     expect(home.running.filter((r) => !r.topic.startsWith('conv:task:')).map((r) => [r.topic, r.status, r.agents])).toEqual([

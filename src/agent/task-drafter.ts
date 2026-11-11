@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { inLanguage } from './side-language.js';
 import { CATEGORY_INFO, DIFFICULTIES, WORK_CATEGORIES, type Difficulty, type WorkCategory } from '../core/routing/model.js';
 import { decideTool } from './policy.js';
 import type { Complete } from './runtime/types.js';
@@ -232,7 +233,7 @@ export async function draftTask(text: string, ctx: DraftContext, opts: { cwd: st
       ...(look ? { tools: LOOK_TOOLS, vetTool: (tool: string, input: Record<string, unknown>) => verdict(lookVerdict(look, tool, input)) } : {}),
       maxTurns: look ? LOOK_TURNS : 1,
       signal: abortController.signal,
-      system: look ? LOOK_SYSTEM : ctx.several ? SEVERAL_SYSTEM : SYSTEM,
+      system: inLanguage(look ? LOOK_SYSTEM : ctx.several ? SEVERAL_SYSTEM : SYSTEM, "the tasks' titles and descriptions (the JSON keys stay as they are)"),
     });
     return parseTaskDraft(said, ctx.labels, ctx.several ? ctx.people : []);
   } catch {

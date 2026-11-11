@@ -1,4 +1,5 @@
 import type { SettingsSection } from '@beluga/ui/settings-menus.js';
+import { useLanguage } from './lib/i18n.js';
 import { useDictationSetup } from './lib/dictation.js';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { useEffect } from 'react';
@@ -201,6 +202,8 @@ export function App() {
   const [joining, setJoining] = useState<string>();
   const welcome = useOnboarding();
   useOverlays();
+  // Settings › General › Language (docs/i18n.md).
+  useLanguage();
   useShortcuts();
   // Back and Forward between pages (⌘[ ⌘], the toolbar's arrows, the mouse's buttons).
   useNavHistory(client, actions);

@@ -39,6 +39,8 @@ import { revealLabel } from '../lib/os-words.js';
 import { useActions } from '../lib/actions.js';
 import { onMachine } from '../machines/pane-model.js';
 import { useMoveTo } from './move-to.js';
+import { useT } from '../lib/i18n.js';
+import { t as say } from '@beluga/shared/i18n/index.js';
 
 const PlanCanvas = lazy(() => import('./PlanCanvas.js'));
 
@@ -56,6 +58,7 @@ function readPrefs(): PlanLayout {
  * talked through and changed. Everything else is a click away (⋯, a task, a gate).
  */
 export function PlanPage({ id, task }: { id: string; task?: string }) {
+  const t = useT();
   const plan = usePlans().plans.find((x) => x.id === id);
   const view = usePlanView(plan);
   const [prefs, setPrefsState] = useState(readPrefs);
@@ -80,12 +83,13 @@ export function PlanPage({ id, task }: { id: string; task?: string }) {
   useEffect(() => {
     if (picked && view && picked !== FEED && picked !== BRANCH && picked !== DECISIONS && !picked.startsWith('gate:') && !view.milestones.some((m) => m.tasks.some((t) => t.task.id === picked))) setPicked(undefined);
   }, [view, picked]);
-  if (!plan || !view) return <Empty icon="flag" title="This plan is gone" detail="It was deleted. Its tasks stay on the board." action={<Button onClick={() => openList()}>Back to Plans</Button>} />;
+  if (!plan || !view) return <Empty icon="flag" title={t('plans.gone')} detail={t('plans.goneDetail')} action={<Button onClick={() => openList()}>{t('plans.backToPlans')}</Button>} />;
   return <Page view={view} prefs={prefs} setPrefs={setPrefs} picked={picked} setPicked={setPicked} />;
 }
 
 /** It moved to another computer (BLG-806): this is its record here; it runs there. */
 function MovedAway({ plan }: { plan: Plan }) {
+  const t = useT();
   const actions = useActions();
   const to = plan.movedTo;
   if (!to) return null;
@@ -93,11 +97,11 @@ function MovedAway({ plan }: { plan: Plan }) {
   return (
     <div className={p.changes} role="status">
       <Icon name="send" size={13} />
-      <strong>Moved to {to.name}</strong>
-      <span>It runs there now, with its chat and tasks; this is its record.</span>
+      <strong>{t('plans.movedTo', { name: to.name })}</strong>
+      <span>{t('plans.movedDetail')}</span>
       <span className={p.grow} />
       <Button size="small" onClick={() => actions.run({ type: 'view', view: to.id ? onMachine(to.id, page) : page })}>
-        Open There
+        {t('plans.openThere')}
       </Button>
     </div>
   );
@@ -108,10 +112,11 @@ function MovedAway({ plan }: { plan: Plan }) {
  * head Claude and each paused task once the limit resets (see core/plans/watchdog.ts).
  */
 function LimitPause({ view }: { view: PlanView }) {
+  const t = useT();
   const { plan } = view;
   const { api, act } = usePlanActions();
   const { client } = useBeluga();
-  const paused = view.active.filter((t) => t.pulse?.kind === 'paused');
+  const paused = view.active.filter((x) => x.pulse?.kind === 'paused');
   // The head Claude's own last turn, when your limit stopped it.
   const home = useApp((st) => {
     const card = st.log.findLast((l) => l.type === 'agent' && l.channel === plan.home);
@@ -119,25 +124,26 @@ function LimitPause({ view }: { view: PlanView }) {
     return f?.kind === 'usage_limit' ? (f.resetsAt ?? 0) : undefined;
   });
   if (plan.status !== 'active' || (!paused.length && home === undefined)) return null;
-  const until = Math.max(home ?? 0, ...paused.map((t) => (t.pulse?.kind === 'paused' ? t.pulse.until : 0)));
+  const until = Math.max(home ?? 0, ...paused.map((x) => (x.pulse?.kind === 'paused' ? x.pulse.until : 0)));
   const resume = (): void => {
     if (home !== undefined) void act(() => client.api.session.submit(CONTINUE_PROMPT, { channel: plan.home, urgent: true }));
-    for (const t of paused) void act(() => api.resumeTask(plan.id, t.task.id));
+    for (const x of paused) void act(() => api.resumeTask(plan.id, x.task.id));
   };
   return (
     <div className={p.changes} role="status">
       <Icon name="clock" size={13} />
-      <strong>Paused: usage limit</strong>
-      <span>{until > Date.now() ? `resumes at ${resetWords(until)}` : 'resuming as usage comes back'}</span>
+      <strong>{t('plans.pausedLimit')}</strong>
+      <span>{until > Date.now() ? t('plans.resumesAt', { when: resetWords(until) }) : t('plans.resumingAsUsage')}</span>
       <span className={p.grow} />
       <Button size="small" variant="primary" icon="play" onClick={resume}>
-        Resume now
+        {t('plans.resumeNow')}
       </Button>
     </div>
   );
 }
 
 function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; prefs: PlanLayout; setPrefs: (change: (layout: PlanLayout) => PlanLayout) => void; picked?: string; setPicked: (id: string | undefined) => void }) {
+  const t = useT();
   const { plan } = view;
   const chat = chatOpen(prefs, plan.id);
   const showChat = useCallback((open: boolean) => setPrefs((l) => setChatOpen(l, plan.id, open)), [plan.id, setPrefs]);
@@ -157,14 +163,14 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
   useConversationLoaded(plan.home);
   const uiPrefs = usePrefs();
   const body = shownBody(plan);
-  const keys = useMemo(() => new Map(view.milestones.flatMap((m) => m.tasks.flatMap((t) => (t.issue ? [[t.task.id, t.issue.key] as const] : [])))), [view]);
+  const keys = useMemo(() => new Map(view.milestones.flatMap((m) => m.tasks.flatMap((x) => (x.issue ? [[x.task.id, x.issue.key] as const] : [])))), [view]);
   const startable = useMemo(() => {
     if (!plan.body || plan.draft || !view.open.length) return new Set<string>();
     // Yours never start in a worktree: their button is Decide…, which opens the plan's conversation (its card asks you).
-    const yours = view.ready.filter((t) => t.forYou).map((t) => t.task.id);
+    const yours = view.ready.filter((x) => x.forYou).map((x) => x.task.id);
     if (view.active.length >= plan.maxParallel) return new Set(yours);
     const step = new Set(view.open.filter((m) => m.autonomy === 'step').map((m) => m.milestone.id));
-    return new Set([...yours, ...view.ready.filter((t) => !t.forYou && (plan.paused || step.has(t.milestoneId))).map((t) => t.task.id)]);
+    return new Set([...yours, ...view.ready.filter((x) => !x.forYou && (plan.paused || step.has(x.milestoneId))).map((x) => x.task.id)]);
   }, [view, plan]);
   // The chat's width: dragged (live), else the one you left it at, never past half the plan's area.
   const split = useRef<HTMLDivElement>(null);
@@ -181,7 +187,7 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
   }, []);
   const chatWidth = drag ?? clampChatWidth(prefs.chatWidth, areaWidth || window.innerWidth);
   const start = useCallback(
-    (taskId: string, agent?: AgentRef) => (view.ready.some((t) => t.task.id === taskId && t.forYou) ? showChat(true) : void act(() => api.startTask(plan.id, taskId, agent))),
+    (taskId: string, agent?: AgentRef) => (view.ready.some((x) => x.task.id === taskId && x.forYou) ? showChat(true) : void act(() => api.startTask(plan.id, taskId, agent))),
     [plan.id, act, api, view, showChat],
   );
   // Decide… on a task of yours (the outline, its details): the conversation, where its card is.
@@ -205,103 +211,103 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
   const conflictHere = Boolean(plan.mainMerge?.conflict || Object.values(plan.merging ?? {}).some((m) => m.conflict) || Object.values(plan.combining ?? {}).some((c) => c.conflict));
   // Conflicts go to the plan's head agent: yours.
   const who = agentName(mine);
-  const askAgain = (): void => void step.run(`ask ${who} to fix the conflict again`, `Asking ${who}…`, () => api.retryConflicts(plan.id), `${who} is on the conflict again`);
+  const askAgain = (): void => void step.run(t('plans.askAgainWhat', { who }), t('plans.asking', { who }), () => api.retryConflicts(plan.id), t('plans.onConflictAgain', { who }));
   const mergeNow = (auto: boolean): void =>
-    void step.run(auto ? `turn on Merge When Checks Pass for #${pr?.number}` : `merge #${pr?.number} on GitHub`, auto ? 'Turning On…' : 'Merging…', () => api.mergePr(plan.id, auto ? { auto: true } : {}), auto ? `#${pr?.number} merges once its checks pass` : `Merged #${pr?.number}: the plan’s tasks are Done`);
-  const openPr = (): void => void step.run('open the plan’s pull request', 'Opening PR…', () => api.openPr(plan.id), 'Opened the plan’s pull request');
+    void step.run(auto ? t('plans.autoMergeWhat', { number: String(pr?.number) }) : t('plans.mergeWhat', { number: String(pr?.number) }), auto ? t('plans.turningOn') : t('plans.merging'), () => api.mergePr(plan.id, auto ? { auto: true } : {}), auto ? t('plans.mergesOnceChecks', { number: String(pr?.number) }) : t('plans.merged', { number: String(pr?.number) }));
+  const openPr = (): void => void step.run(t('plans.openPrWhat'), t('plans.openingPr'), () => api.openPr(plan.id), t('plans.openedPr'));
 
   // Start with ▸ (BLG-506): "Your agent" over a plan with its own agent is yours by name (none would mean the plan's again).
-  const startTasks = (tasks: readonly { readonly task: { readonly id: string } }[], agent?: AgentRef): void => tasks.forEach((t) => void act(() => api.startTask(plan.id, t.task.id, agent)));
-  const approvePlan = (): void => void act(() => api.approve(plan.id), 'Plan approved: its tasks are on the board');
+  const startTasks = (tasks: readonly { readonly task: { readonly id: string } }[], agent?: AgentRef): void => tasks.forEach((x) => void act(() => api.startTask(plan.id, x.task.id, agent)));
+  const approvePlan = (): void => void act(() => api.approve(plan.id), t('plans.approved'));
   // Verifying a first draft with a fresh agent, when you ask (BLG-772): Approve Plan waits for it, or Fix what it found.
   const review = reviewState(plan);
-  const fixReview = (): void => void act(() => api.fixReview(plan.id), 'Sent to your agent');
-  const verify = (thenApprove: boolean): void => void act(() => api.verify(plan.id, { thenApprove }), thenApprove ? 'A fresh agent is verifying the plan: it’s approved once nothing needs fixing' : 'A fresh agent is verifying the plan');
+  const fixReview = (): void => void act(() => api.fixReview(plan.id), t('plans.sentToAgent'));
+  const verify = (thenApprove: boolean): void => void act(() => api.verify(plan.id, { thenApprove }), thenApprove ? t('plans.verifyingThenApprove') : t('plans.verifyingToast'));
   // `with`: the same action by another agent, as the ▾ of a split button.
   const primary = ((): { label: string; run?: () => void; icon?: IconName; busy?: boolean; with?: { readonly label: string; readonly items: ActionItem[] } } | undefined => {
     if (step.busy) return { label: step.busy, busy: true };
     switch (next.kind) {
       case 'approve':
-        if (body?.milestones.length && review === 'reviewing') return { label: 'Verifying the Plan…', busy: true };
-        if (body?.milestones.length && review === 'findings' && !plan.review?.fixAsked) return { label: 'Fix', icon: 'wand', run: fixReview, with: { label: 'Approve anyway', items: [{ label: 'Approve Anyway', onSelect: approvePlan }] } };
+        if (body?.milestones.length && review === 'reviewing') return { label: t('plans.verifying'), busy: true };
+        if (body?.milestones.length && review === 'findings' && !plan.review?.fixAsked) return { label: t('plans.fix'), icon: 'wand', run: fixReview, with: { label: t('plans.approveAnywayMenu'), items: [{ label: t('plans.approveAnyway'), onSelect: approvePlan }] } };
         // Approve, worked by ▸: who works its milestones and tasks, set as it's approved.
         return body?.milestones.length
           ? {
-              label: 'Approve Plan',
+              label: t('plans.approvePlan'),
               icon: 'check',
               run: approvePlan,
               with: {
-                label: 'More ways to approve',
+                label: t('plans.moreWaysToApprove'),
                 items: [
                   // A fresh agent reads it first (contradictions, duplicates, stale decisions), and approves it once nothing needs fixing.
                   // Who: the same agents and models as Approve, worked by ▸; the one picked verifies it and then works it.
                   {
-                    label: 'Verify, Then Approve',
+                    label: t('plans.verifyThenApprove'),
                     icon: 'eye',
                     onSelect: () => undefined,
-                    submenu: startWith(plan.agent, (a) => void act(async () => (await api.setWorkAgent(plan.id, a ?? null), api.verify(plan.id, { thenApprove: true })), 'A fresh agent is verifying the plan: it’s approved once nothing needs fixing'), ''),
+                    submenu: startWith(plan.agent, (a) => void act(async () => (await api.setWorkAgent(plan.id, a ?? null), api.verify(plan.id, { thenApprove: true })), t('plans.verifyingThenApprove')), ''),
                   },
-                  ...startWith(plan.agent, (a) => void act(async () => (await api.setWorkAgent(plan.id, a ?? null), api.approve(plan.id)), 'Plan approved: its tasks are on the board'), 'Approve, worked by').map((item, i) => (i === 0 ? { ...item, separate: true } : item)),
+                  ...startWith(plan.agent, (a) => void act(async () => (await api.setWorkAgent(plan.id, a ?? null), api.approve(plan.id)), t('plans.approved')), t('plans.approveWorkedBy')).map((item, i) => (i === 0 ? { ...item, separate: true } : item)),
                 ],
               },
             }
           : undefined;
       case 'review_changes':
-        return { label: 'Apply Changes', icon: 'check', run: () => void act(() => api.approve(plan.id), 'Changes applied') };
+        return { label: t('plans.applyChanges'), icon: 'check', run: () => void act(() => api.approve(plan.id), t('plans.changesApplied')) };
       case 'resume':
-        return { label: 'Resume', icon: 'play', run: () => void act(() => api.setPaused(plan.id, false)) };
+        return { label: t('plans.resume'), icon: 'play', run: () => void act(() => api.setPaused(plan.id, false)) };
       case 'start':
         // Yours: the plan's conversation, where its card asks you; Claude's: started.
-        if (next.tasks.every((t) => t.forYou)) return { label: words.title, run: () => showChat(true) };
+        if (next.tasks.every((x) => x.forYou)) return { label: words.title, run: () => showChat(true) };
         return {
           label: words.title,
           icon: 'play',
-          run: () => startTasks(next.tasks.filter((t) => !t.forYou)),
-          with: { label: 'Start with another agent', items: startWith(plan.agent, (a) => startTasks(next.tasks.filter((t) => !t.forYou), a ?? (plan.agent ? mine : undefined))) },
+          run: () => startTasks(next.tasks.filter((x) => !x.forYou)),
+          with: { label: t('plans.startWithAnother'), items: startWith(plan.agent, (a) => startTasks(next.tasks.filter((x) => !x.forYou), a ?? (plan.agent ? mine : undefined))) },
         };
       case 'pass': {
         const again = Boolean(next.milestone.run.mergeFailed);
-        return { label: again ? 'Pass Again' : 'Pass Milestone', icon: 'check', run: () => void step.run(`pass “${next.milestone.milestone.title}”`, 'Passing…', () => api.pass(plan.id, next.milestone.milestone.id)) };
+        return { label: again ? t('plans.passAgain') : t('plans.passMilestone'), icon: 'check', run: () => void step.run(t('plans.passWhat', { title: next.milestone.milestone.title }), t('plans.passing'), () => api.pass(plan.id, next.milestone.milestone.id)) };
       }
       case 'merging': {
         // Merging runs by itself; a conflict goes to Claude, and only one it couldn't fix waits for you.
         const c = next.milestone.merging?.conflict;
-        if (c?.stuck) return { label: `Ask ${who} Again`, icon: agentMark(mine), run: askAgain };
-        return { label: c ? `${who} Is Fixing the Conflict` : 'Merging…', busy: true };
+        if (c?.stuck) return { label: t('plans.askAgain', { who }), icon: agentMark(mine), run: askAgain };
+        return { label: c ? t('plans.fixingConflict', { who }) : t('plans.merging'), busy: true };
       }
       case 'checking':
         // Its checker's conversation (off the sidebar, folded into the plan); the head Claude's own check: the plan's chat.
-        return { label: 'Watch the Check', icon: 'eye', run: checker ? () => openWorktree(checker) : () => showChat(true) };
+        return { label: t('plans.watchCheck'), icon: 'eye', run: checker ? () => openWorktree(checker) : () => showChat(true) };
       case 'failed':
-        return { label: 'Not Yet…', run: () => openSheet({ kind: 'plan_send_back', planId: plan.id, milestone: next.milestone.milestone.id }) };
+        return { label: t('plans.notYet'), run: () => openSheet({ kind: 'plan_send_back', planId: plan.id, milestone: next.milestone.milestone.id }) };
       case 'ship': {
         // One pull request for the whole plan (plan/<slug> → main): opened, brought up to date with main when it conflicts, merged.
         const a = shipAction(plan, next.pr);
         switch (a.kind) {
           case 'open':
-            return { label: a.again ? 'Open PR Again' : 'Open PR', icon: 'pr', run: openPr };
+            return { label: a.again ? t('plans.openPrAgain') : t('plans.openPr'), icon: 'pr', run: openPr };
           case 'catching_up':
-            return { label: 'Bringing Main In…', busy: true };
+            return { label: t('plans.bringingMainIn'), busy: true };
           case 'fixing':
-            return { label: `${who} Is Fixing the Conflict`, busy: true };
+            return { label: t('plans.fixingConflict', { who }), busy: true };
           case 'stuck':
-            return { label: `Ask ${who} Again`, icon: agentMark(mine), run: askAgain };
+            return { label: t('plans.askAgain', { who }), icon: agentMark(mine), run: askAgain };
           case 'resolve':
-            return { label: 'Resolve Conflicts', icon: 'merge', run: () => void step.run(`bring main into ${next.branch}`, 'Bringing Main In…', () => api.bringInMain(plan.id)) };
+            return { label: t('plans.resolveConflicts'), icon: 'merge', run: () => void step.run(t('plans.bringMainWhat', { branch: next.branch }), t('plans.bringingMainIn'), () => api.bringInMain(plan.id)) };
           case 'draft':
-            return { label: 'Mark Ready on GitHub', icon: 'external', run: () => void openExternal(next.pr!.url) };
+            return { label: t('plans.markReady'), icon: 'external', run: () => void openExternal(next.pr!.url) };
           case 'wait':
-            return { label: 'Merge When Checks Pass', icon: 'check', run: () => mergeNow(true) };
+            return { label: t('plans.mergeWhenChecksPass'), icon: 'check', run: () => mergeNow(true) };
           case 'merge':
-            return { label: 'Merge on GitHub', icon: 'check', run: () => mergeNow(false) };
+            return { label: t('plans.mergeOnGitHub'), icon: 'check', run: () => mergeNow(false) };
           default:
             return undefined;
         }
       }
       case 'answer':
-        return next.tasks[0]?.worktree ? { label: `Answer in ${next.tasks[0].issue?.key ?? 'Its Worktree'}`, run: () => openWorktree(next.tasks[0]!.worktree!) } : undefined;
+        return next.tasks[0]?.worktree ? { label: next.tasks[0].issue?.key ? t('plans.answerIn', { key: next.tasks[0].issue.key }) : t('plans.answerInWorktree'), run: () => openWorktree(next.tasks[0]!.worktree!) } : undefined;
       case 'stalled':
-        return { label: words.title, icon: 'play', run: () => next.tasks.forEach((t) => void act(() => api.resumeTask(plan.id, t.task.id))) };
+        return { label: words.title, icon: 'play', run: () => next.tasks.forEach((x) => void act(() => api.resumeTask(plan.id, x.task.id))) };
       default:
         return undefined;
     }
@@ -316,37 +322,37 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
       if (typeof said === 'string') toast(client, said, 'success');
     });
   const more: ActionItem[] = [
-    ...(plan.body && plan.status === 'active' ? [{ label: plan.paused ? 'Resume' : 'Pause', onSelect: () => void act(() => api.setPaused(plan.id, !plan.paused)) }] : []),
-    { label: 'Run at Once', submenu: [1, 2, 3, 4, 6, MAX_PARALLEL].map((n) => ({ label: `${n} ${n === 1 ? 'milestone' : 'milestones'}`, checked: plan.maxParallel === n, onSelect: () => void act(() => api.setParallel(plan.id, n)) })), onSelect: () => undefined },
-    ...(plan.status !== 'done' ? [{ label: 'Agent for Its Work', submenu: agentMenuItems(agents, plan.agent, workAgent), onSelect: () => undefined }] : []),
-    { label: 'When to Run Tests', submenu: TESTS_AT.map((t) => ({ label: TESTS_AT_INFO[t].label, hint: TESTS_AT_INFO[t].hint, checked: plan.testsAt === t, onSelect: () => void act(() => api.setTestsAt(plan.id, t), t === 'end' ? 'From now on, milestone checks skip the test suites; they all run once, in the final step' : 'From now on, each milestone’s check runs the full suites once, on its combined work') })), onSelect: () => undefined },
-    ...(review === 'reviewing' ? [{ label: 'Approve Without Waiting', onSelect: approvePlan }] : []),
-    ...(review !== 'off' && review !== 'reviewing' ? [{ label: review === 'none' ? 'Verify the Plan' : 'Verify the Plan Again', onSelect: () => verify(false) }] : []),
-    ...(next.kind === 'stalled' ? next.tasks.flatMap((t) => (t.worktree ? [{ label: `Open ${t.issue?.key ?? 'Its'} Chat`, onSelect: () => openWorktree(t.worktree!) }] : [])) : []),
-    ...(next.kind === 'pass' ? [{ label: 'Not Yet…', onSelect: () => openSheet({ kind: 'plan_send_back', planId: plan.id, milestone: next.milestone.milestone.id }) }] : []),
+    ...(plan.body && plan.status === 'active' ? [{ label: plan.paused ? t('plans.resume') : t('plans.pause'), onSelect: () => void act(() => api.setPaused(plan.id, !plan.paused)) }] : []),
+    { label: t('plans.runAtOnce'), submenu: [1, 2, 3, 4, 6, MAX_PARALLEL].map((n) => ({ label: t('plans.milestones', { count: n }), checked: plan.maxParallel === n, onSelect: () => void act(() => api.setParallel(plan.id, n)) })), onSelect: () => undefined },
+    ...(plan.status !== 'done' ? [{ label: t('plans.agentForWork'), submenu: agentMenuItems(agents, plan.agent, workAgent), onSelect: () => undefined }] : []),
+    { label: t('plans.whenToRunTests'), submenu: TESTS_AT.map((at) => ({ label: TESTS_AT_INFO[at].label, hint: TESTS_AT_INFO[at].hint, checked: plan.testsAt === at, onSelect: () => void act(() => api.setTestsAt(plan.id, at), at === 'end' ? t('plans.testsAtEnd') : t('plans.testsAtMilestone')) })), onSelect: () => undefined },
+    ...(review === 'reviewing' ? [{ label: t('plans.approveWithoutWaiting'), onSelect: approvePlan }] : []),
+    ...(review !== 'off' && review !== 'reviewing' ? [{ label: review === 'none' ? t('plans.verifyPlan') : t('plans.verifyPlanAgain'), onSelect: () => verify(false) }] : []),
+    ...(next.kind === 'stalled' ? next.tasks.flatMap((x) => (x.worktree ? [{ label: x.issue?.key ? t('plans.openChat', { key: x.issue.key }) : t('plans.openItsChat'), onSelect: () => openWorktree(x.worktree!) }] : [])) : []),
+    ...(next.kind === 'pass' ? [{ label: t('plans.notYet'), onSelect: () => openSheet({ kind: 'plan_send_back', planId: plan.id, milestone: next.milestone.milestone.id }) }] : []),
     ...(next.kind === 'failed' || next.kind === 'checking'
       ? [
-          { label: 'Check Again', onSelect: () => void act(() => api.recheck(plan.id, next.milestone.milestone.id)) },
-          { label: 'Pass Anyway', onSelect: () => void act(() => api.pass(plan.id, next.milestone.milestone.id)) },
+          { label: t('plans.checkAgain'), onSelect: () => void act(() => api.recheck(plan.id, next.milestone.milestone.id)) },
+          { label: t('plans.passAnyway'), onSelect: () => void act(() => api.pass(plan.id, next.milestone.milestone.id)) },
         ]
       : []),
-    ...(pr ? [{ label: `View PR #${pr.number} on GitHub`, onSelect: () => void openExternal(pr.url) }] : []),
+    ...(pr ? [{ label: t('plans.viewPr', { number: pr.number }), onSelect: () => void openExternal(pr.url) }] : []),
     ...(next.kind === 'ship'
       ? [
-          ...(shipAction(plan, next.pr).kind === 'wait' ? [{ label: 'Merge Now', onSelect: () => mergeNow(false) }] : []),
-          ...(next.pr?.state === 'OPEN' && !next.pr.conflicts && !plan.mainMerge ? [{ label: 'Bring Main In', hint: `Merge main into ${next.branch} now`, onSelect: () => void step.run(`bring main into ${next.branch}`, 'Bringing Main In…', () => api.bringInMain(plan.id), `Main is in ${next.branch}`) }] : []),
-          { label: 'Merge into Main Locally', onSelect: () => openSheet({ kind: 'confirm', title: `Merge ${next.branch} into main here?`, message: 'The main folder must be on main with no uncommitted changes. The plan’s tasks go to Done.', confirm: 'Merge', run: () => void step.run(`merge ${next.branch} into main here`, 'Merging…', () => api.mergeLocal(plan.id), 'Merged into main: the plan’s tasks are Done') }) },
+          ...(shipAction(plan, next.pr).kind === 'wait' ? [{ label: t('plans.mergeNow'), onSelect: () => mergeNow(false) }] : []),
+          ...(next.pr?.state === 'OPEN' && !next.pr.conflicts && !plan.mainMerge ? [{ label: t('plans.bringMainIn'), hint: t('plans.bringMainHint', { branch: next.branch }), onSelect: () => void step.run(t('plans.bringMainWhat', { branch: next.branch }), t('plans.bringingMainIn'), () => api.bringInMain(plan.id), t('plans.mainIsIn', { branch: next.branch })) }] : []),
+          { label: t('plans.mergeLocally'), onSelect: () => openSheet({ kind: 'confirm', title: t('plans.mergeLocallyTitle', { branch: next.branch }), message: t('plans.mergeLocallyMessage'), confirm: t('plans.merge'), run: () => void step.run(t('plans.mergeLocallyWhat', { branch: next.branch }), t('plans.merging'), () => api.mergeLocal(plan.id), t('plans.mergedLocally')) }) },
         ]
       : []),
-    ...(conflictWaits && primary?.run !== askAgain ? [{ label: `Ask ${who} Again`, onSelect: askAgain }] : []),
+    ...(conflictWaits && primary?.run !== askAgain ? [{ label: t('plans.askAgain', { who }), onSelect: askAgain }] : []),
     ...(conflictHere ? [{ label: revealLabel('Conflict'), onSelect: () => void act(() => api.showConflict(plan.id)) }] : []),
     ...(plan.status === 'active' ? [taskChatsItem(plan.id, uiPrefs)] : []),
     ...teamItems,
     ...(moveTo ? [moveTo] : []),
-    { label: 'Copy as Markdown', separate: true, onSelect: () => void copyText(markdownOf(view)) },
-    { label: 'Planning Style…', onSelect: () => openSheet({ kind: 'plan_style' }) },
-    ...(plan.draft ? [{ label: plan.body ? 'Discard Changes' : 'Discard Draft', danger: true, separate: true, onSelect: () => openSheet({ kind: 'confirm', title: plan.body ? 'Discard the proposed changes?' : 'Discard this draft?', message: plan.body ? 'The plan stays as you approved it.' : 'Nothing was put on the board, so nothing else changes.', confirm: 'Discard', destructive: true, run: () => void act(() => api.discard(plan.id)) }) }] : []),
-    ...(plan.body ? [{ label: 'Delete Plan…', danger: true, separate: !plan.draft, onSelect: () => openSheet({ kind: 'confirm', title: `Delete “${titleOf(plan)}”?`, message: 'Its tasks stay on the board; only the plan goes.', confirm: 'Delete', destructive: true, run: () => void act(() => api.remove(plan.id)).then(() => openList(plan.projectId)) }) }] : []),
+    { label: t('plans.copyMarkdown'), separate: true, onSelect: () => void copyText(markdownOf(view)) },
+    { label: t('plans.planningStyle'), onSelect: () => openSheet({ kind: 'plan_style' }) },
+    ...(plan.draft ? [{ label: plan.body ? t('plans.discardChanges') : t('plans.discardDraft'), danger: true, separate: true, onSelect: () => openSheet({ kind: 'confirm', title: plan.body ? t('plans.discardChangesTitle') : t('plans.discardDraftTitle'), message: plan.body ? t('plans.discardChangesMessage') : t('plans.discardDraftMessage'), confirm: t('plans.discard'), destructive: true, run: () => void act(() => api.discard(plan.id)) }) }] : []),
+    ...(plan.body ? [{ label: t('plans.deletePlan'), danger: true, separate: !plan.draft, onSelect: () => openSheet({ kind: 'confirm', title: t('plans.deleteTitle', { title: titleOf(plan) }), message: t('plans.deleteMessage'), confirm: t('common.delete'), destructive: true, run: () => void act(() => api.remove(plan.id)).then(() => openList(plan.projectId)) }) }] : []),
   ];
 
   return (
@@ -354,13 +360,13 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
       <header className={p.pageHead}>
         <div className={p.headMain}>
           <div className={p.titleRow}>
-            <IconButton icon="back" label="All Plans" className={p.back} onClick={() => openList(plan.projectId)} />
+            <IconButton icon="back" label={t('plans.allPlans')} className={p.back} onClick={() => openList(plan.projectId)} />
             <TitleField value={titleOf(plan)} onSave={(title) => void act(() => api.edit(plan.id, [{ op: 'retitle', title }]))} />
           </div>
           {drafting ? null : (
             <>
               {view.milestones.length && plan.body ? <PlanProgress columns={barColumns(view)} /> : null}
-              <button type="button" className={p.saidButton} onClick={() => setPicked(picked === FEED ? undefined : FEED)} aria-label={`${line.who === 'you' ? 'You: ' : ''}${line.text}. Show what happened`}>
+              <button type="button" className={p.saidButton} onClick={() => setPicked(picked === FEED ? undefined : FEED)} aria-label={t(line.who === 'you' ? 'plans.saidAriaYou' : 'plans.saidAria', { text: line.text })}>
                 <Said line={line} />
               </button>
             </>
@@ -368,24 +374,24 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
         </div>
         <div className={p.headActions}>
           {/* Where it runs (BLG-786): the computer it was made on. Only with a computer paired. */}
-          <RunsOnLabel tip="It runs on the computer it was made on until you move it." />
+          <RunsOnLabel tip={t('plans.runsOnTip')} />
           {/* The plan's pull request, always one click from GitHub, with what stands in its way. */}
           {pr ? <PlanPrChip pr={pr} /> : null}
           {/* How it runs: nothing to run while Claude writes it. A real decision: its sheet says what changes. */}
           {drafting ? null : (
             <Button size="small" variant="quiet" icon="gauge" title={AUTONOMY_INFO[plan.autonomy].hint} onClick={() => openSheet({ kind: 'plan_mode', planId: plan.id })}>
-              Runs on {AUTONOMY_INFO[plan.autonomy].label}
-              {view.milestones.some((m) => m.milestone.autonomy && m.milestone.autonomy !== plan.autonomy) ? ' (mixed)' : ''}
+              {t('plans.runsOn', { mode: AUTONOMY_INFO[plan.autonomy].label })}
+              {view.milestones.some((m) => m.milestone.autonomy && m.milestone.autonomy !== plan.autonomy) ? ` ${t('plans.mixed')}` : ''}
             </Button>
           )}
           {/* The orchestrator's chat beside the plan, in and out: always here, whichever way it is. */}
-          <Tip label={chat ? 'Hide the orchestrator’s chat' : 'Open the orchestrator’s chat'} keys={shortcutKeys('toggle-inspector')}>
+          <Tip label={chat ? t('plans.hideChatTip') : t('plans.openChatTip')} keys={shortcutKeys('toggle-inspector')}>
             <Button size="small" variant="quiet" icon="claude" aria-pressed={chat} onClick={() => showChat(!chat)}>
-              {chat ? 'Hide Orchestrator' : 'Open Orchestrator'}
+              {chat ? t('plans.hideOrchestrator') : t('plans.openOrchestrator')}
             </Button>
           </Tip>
           <ActionsDropdown items={more}>
-            <IconButton icon="more" label="Plan Options" />
+            <IconButton icon="more" label={t('plans.options')} />
           </ActionsDropdown>
           {primary?.with && !primary.busy ? (
             <SplitButton label={primary.with.label} items={primary.with.items}>
@@ -404,22 +410,22 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
       {step.trouble ? (
         <div className={cx(p.changes, p.trouble)} role="alert">
           <Icon name="alert" size={13} />
-          <strong>Couldn’t {step.trouble.what}</strong>
+          <strong>{t('plans.couldnt', { what: step.trouble.what })}</strong>
           <span className={p.troubleWhy}>{step.trouble.why}</span>
           <span className={p.grow} />
           <Button size="small" variant="quiet" onClick={step.dismiss}>
-            Dismiss
+            {t('plans.dismiss')}
           </Button>
           {step.trouble.retry ? (
             <Button size="small" onClick={step.trouble.retry}>
-              Try Again
+              {t('common.retry')}
             </Button>
           ) : null}
         </div>
       ) : null}
       <MovedAway plan={plan} />
       <ConflictLine view={view} onShow={setPicked} />
-      <MergeFailed view={view} onPass={(id, title) => void step.run(`pass “${title}”`, 'Passing…', () => api.pass(plan.id, id))} />
+      <MergeFailed view={view} onPass={(id, title) => void step.run(t('plans.passWhat', { title }), t('plans.passing'), () => api.pass(plan.id, id))} />
       <LimitPause view={view} />
       <TidyOffer view={view} />
       <TeamReviews planId={plan.id} />
@@ -427,14 +433,14 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
       {plan.body && plan.draft ? (
         <div className={p.changes} role="status">
           <Icon name="wand" size={13} />
-          <strong>Your agent proposes changes</strong>
+          <strong>{t('plans.proposesChanges')}</strong>
           <span>{changeWords(plan)}</span>
           <span className={p.grow} />
           <Button size="small" variant="quiet" onClick={() => void act(() => api.discard(plan.id))}>
-            Discard
+            {t('plans.discard')}
           </Button>
-          <Button size="small" variant="primary" onClick={() => void act(() => api.approve(plan.id), 'Changes applied')}>
-            Apply Changes
+          <Button size="small" variant="primary" onClick={() => void act(() => api.approve(plan.id), t('plans.changesApplied'))}>
+            {t('plans.applyChanges')}
           </Button>
         </div>
       ) : null}
@@ -443,37 +449,37 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
           <div className={p.stageTools}>
             {drafting ? null : (
               <Segmented<Display>
-                label="Show"
+                label={t('plans.show')}
                 value={prefs.display}
                 onChange={(display) => setPrefs((l) => ({ ...l, display }))}
                 options={[
-                  { value: 'graph', label: 'Canvas', hint: 'The plan as a graph' },
-                  { value: 'outline', label: 'List', hint: 'Milestone by milestone' },
+                  { value: 'graph', label: t('plans.canvas'), hint: t('plans.canvasHint') },
+                  { value: 'outline', label: t('plans.list'), hint: t('plans.listHint') },
                 ]}
               />
             )}
             {drafting ? null : (
               <Button size="small" variant="quiet" icon="clock" onClick={() => setPicked(picked === FEED ? undefined : FEED)} aria-pressed={picked === FEED}>
-                What Happened
+                {t('plans.whatHappened')}
               </Button>
             )}
             {/* What the plan has decided (BLG-772): there once it decided something. */}
             {body?.decisions?.length ? (
               <Button size="small" variant="quiet" icon="bulb" onClick={() => setPicked(picked === DECISIONS ? undefined : DECISIONS)} aria-pressed={picked === DECISIONS}>
-                Decisions
+                {t('plans.decisions')}
               </Button>
             ) : null}
             {/* Where the work goes: each milestone into the plan's branch, the branch into main as one PR. */}
             {plan.body && !plan.draft ? (
-              <Button size="small" variant="quiet" icon="branch" onClick={() => setPicked(picked === BRANCH ? undefined : BRANCH)} aria-pressed={picked === BRANCH} title={`Where the plan’s work goes, step by step${plan.branch ? ` (${plan.branch})` : ''}`} className={p.branchButton}>
-                {plan.branch ?? 'Branch'}
+              <Button size="small" variant="quiet" icon="branch" onClick={() => setPicked(picked === BRANCH ? undefined : BRANCH)} aria-pressed={picked === BRANCH} title={plan.branch ? t('plans.branchTipNamed', { branch: plan.branch }) : t('plans.branchTip')} className={p.branchButton}>
+                {plan.branch ?? t('plans.branch')}
               </Button>
             ) : null}
           </div>
           {!body?.milestones.length ? (
             <Drafting plan={plan} />
           ) : prefs.display === 'graph' ? (
-            <Suspense fallback={<div className={p.canvasNote}>Laying out…</div>}>
+            <Suspense fallback={<div className={p.canvasNote}>{t('plans.layingOut')}</div>}>
               <PlanCanvas view={view} keys={keys} selected={picked} onSelect={setPicked} onStart={start} startable={startable} />
             </Suspense>
           ) : (
@@ -486,7 +492,7 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
           <div className={p.chatSide} style={chat ? undefined : { display: 'none' }} aria-hidden={chat ? undefined : true}>
             <ResizeHandle
               axis="x"
-              label="Resize the chat"
+              label={t('plans.resizeChat')}
               className={p.chatEdge}
               onMove={(x) => setDrag(clampChatWidth((split.current?.getBoundingClientRect().right ?? window.innerWidth) - x, splitWidth()))}
               onEnd={() => {
@@ -506,6 +512,7 @@ function Page({ view, prefs, setPrefs, picked, setPicked }: { view: PlanView; pr
 
 /** The plan's name, changed in place: wraps instead of clipping (descenders and long names show whole); Enter saves. */
 function TitleField({ value, onSave }: { value: string; onSave: (title: string) => void }) {
+  const t = useT();
   const [text, setText] = useState(value);
   const box = useRef<HTMLTextAreaElement>(null);
   // What you typed and haven't saved: a name arriving meanwhile (your last rename coming back) never overwrites it.
@@ -540,7 +547,7 @@ function TitleField({ value, onSave }: { value: string; onSave: (title: string) 
     <textarea
       ref={box}
       className={cx(p.title, 'selectable')}
-      aria-label="Plan name"
+      aria-label={t('plans.planName')}
       rows={1}
       spellCheck={false}
       value={text}
@@ -566,16 +573,17 @@ function TitleField({ value, onSave }: { value: string; onSave: (title: string) 
  * the canvas, and the one line that says what's going on (how long it's been at it).
  */
 function Drafting({ plan }: { plan: Plan }) {
+  const t = useT();
   const project = useApp((s) => s.projects.find((x) => x.id === plan.projectId)?.name);
   const activity = useApp((s) => activityOf(s.log, plan.home));
   const now = useNow(true);
   const since = activity.startedAt ?? plan.createdAt;
   const fresh = now - plan.createdAt < 20_000;
   const line = activity.running
-    ? `Your agent is reading ${project ?? 'the code'} and writing the plan · ${formatDuration(Math.max(0, now - since))}`
+    ? t('plans.draftingReading', { project: project ?? t('plans.theCode'), time: formatDuration(Math.max(0, now - since)) })
     : fresh
-      ? 'Your agent is starting on the plan…'
-      : 'Your agent isn’t writing the plan right now. Tell it what to plan in the conversation.';
+      ? t('plans.draftingStarting')
+      : t('plans.draftingIdle');
   return (
     <div className={p.writing}>
       <div className={p.skeleton} data-live={activity.running || fresh ? 'true' : undefined} aria-hidden="true">
@@ -603,8 +611,8 @@ function markdownOf(view: PlanView): string {
   for (const m of view.milestones) {
     lines.push(`## ${m.index + 1}. ${m.milestone.title}`, '');
     if (m.milestone.goal) lines.push(m.milestone.goal, '');
-    for (const t of m.tasks) lines.push(`- [${t.state === 'done' ? 'x' : ' '}] ${t.issue ? `${t.issue.key} ` : ''}${t.task.title}${t.task.blockedBy.length ? ` (after ${t.task.blockedBy.join(', ')})` : ''}`);
-    if (m.milestone.criteria.length) lines.push('', '**Passes when:**', ...m.milestone.criteria.map((c) => `- ${c}`));
+    for (const x of m.tasks) lines.push(`- [${x.state === 'done' ? 'x' : ' '}] ${x.issue ? `${x.issue.key} ` : ''}${x.task.title}${x.task.blockedBy.length ? ` ${say('plans.mdAfter', { tasks: x.task.blockedBy.join(', ') })}` : ''}`);
+    if (m.milestone.criteria.length) lines.push('', `**${say('plans.mdPassesWhen')}**`, ...m.milestone.criteria.map((c) => `- ${c}`));
     lines.push('');
   }
   return lines.join('\n');
@@ -615,25 +623,26 @@ function markdownOf(view: PlanView): string {
  * into it and their worktrees cleared away, but only on your Yes (never by itself, nor on a restart).
  */
 function TidyOffer({ view }: { view: PlanView }) {
+  const t = useT();
   const { api, act } = usePlanActions();
   const tasks = tidyOffer(view);
   if (!tasks.length) return null;
   const plan = view.plan;
   return (
-    <div className={p.changes} role="status" aria-label="Tidy up">
+    <div className={p.changes} role="status" aria-label={t('plans.tidyUpAria')}>
       <Icon name="branch" size={13} />
       <strong>
-        Tidy up {tasks.length} merged task {tasks.length === 1 ? 'worktree' : 'worktrees'}?
+        {t('plans.tidyUpQuestion', { count: tasks.length })}
       </strong>
-      <span title={tasks.map((t) => `${t.issue!.key} ${t.task.title}`).join('\n')}>
-        {tasks.map((t) => t.issue!.key).join(', ')}: their milestones passed before {plan.branch} was the plan’s branch. Tidy Up merges each into it, then archives its worktree (the conversation stays) and deletes its branch only if merged.
+      <span title={tasks.map((x) => `${x.issue!.key} ${x.task.title}`).join('\n')}>
+        {t('plans.tidyUpBody', { keys: tasks.map((x) => x.issue!.key).join(', '), branch: plan.branch ?? '' })}
       </span>
       <span className={p.grow} />
-      <Button size="small" variant="quiet" onClick={() => void act(() => api.tidyUp(plan.id, false), 'Left as they are')}>
-        No
+      <Button size="small" variant="quiet" onClick={() => void act(() => api.tidyUp(plan.id, false), t('plans.leftAsTheyAre'))}>
+        {t('common.no')}
       </Button>
-      <Button size="small" variant="primary" onClick={() => void act(() => api.tidyUp(plan.id, true), `Tidying up ${tasks.length === 1 ? '1 worktree' : `${tasks.length} worktrees`}`)}>
-        Tidy Up
+      <Button size="small" variant="primary" onClick={() => void act(() => api.tidyUp(plan.id, true), t('plans.tidyingUp', { count: tasks.length }))}>
+        {t('plans.tidyUp')}
       </Button>
     </div>
   );
@@ -646,28 +655,29 @@ function TidyOffer({ view }: { view: PlanView }) {
  * and Show in Finder sit in ••• and the main button.
  */
 function ConflictLine({ view, onShow }: { view: PlanView; onShow: (id: string) => void }) {
+  const t = useT();
   const { plan } = view;
   const merging = Object.entries(plan.merging ?? {}).find(([, m]) => m.conflict);
   const main = plan.mainMerge?.conflict;
   const c = main ?? merging?.[1].conflict;
   if (!c) return null;
   const m = merging ? view.milestones.find((x) => x.milestone.id === merging[0]) : undefined;
-  const what = main ? `${plan.mainMerge!.main} into ${plan.branch}` : `${merging![1].conflict!.key ?? merging![1].conflict!.merging} (“${m?.milestone.title ?? 'a milestone'}”) into ${plan.branch}`;
+  const what = main ? t('plans.conflictMain', { main: plan.mainMerge!.main, branch: String(plan.branch) }) : t('plans.conflictMilestone', { merging: merging![1].conflict!.key ?? merging![1].conflict!.merging, title: m?.milestone.title ?? t('plans.aMilestone'), branch: String(plan.branch) });
   const shown = c.files.slice(0, 4);
   return (
-    <div className={cx(p.changes, c.stuck ? p.trouble : undefined)} role="status" aria-label="Merge conflict">
+    <div className={cx(p.changes, c.stuck ? p.trouble : undefined)} role="status" aria-label={t('plans.mergeConflict')}>
       <Icon name="merge" size={13} />
-      <strong>{c.stuck ? 'Conflict: needs you' : 'Your agent is fixing a conflict'}</strong>
+      <strong>{c.stuck ? t('plans.conflictNeedsYou') : t('plans.agentFixingConflict')}</strong>
       <span className={p.troubleWhy} title={c.files.join('\n')}>
-        Merging {what} · {shown.map((f) => (
+        {t('plans.mergingWhat', { what })} · {shown.map((f) => (
           <code key={f} className={p.conflictFile}>{f}</code>
         ))}
-        {c.files.length > shown.length ? ` and ${c.files.length - shown.length} more` : ''}
+        {c.files.length > shown.length ? ` ${t('plans.andMore', { count: c.files.length - shown.length })}` : ''}
       </span>
       <span className={p.grow} />
       {!c.stuck ? <Working /> : null}
       <Button size="small" variant="quiet" onClick={() => onShow(main ? BRANCH : `gate:${merging![0]}`)}>
-        Details
+        {t('plans.details')}
       </Button>
     </div>
   );
@@ -675,6 +685,7 @@ function ConflictLine({ view, onShow }: { view: PlanView; onShow: (id: string) =
 
 /** A milestone you passed whose work couldn't go into the plan's branch (not a conflict): why, kept, and Pass Again. */
 function MergeFailed({ view, onPass }: { view: PlanView; onPass: (milestoneId: string, title: string) => void }) {
+  const t = useT();
   const failed = view.milestones.filter((m) => m.run.mergeFailed && !m.run.passedAt && m.state !== 'merging');
   if (!failed.length) return null;
   return (
@@ -683,12 +694,13 @@ function MergeFailed({ view, onPass }: { view: PlanView; onPass: (milestoneId: s
         <div key={m.milestone.id} className={cx(p.changes, p.trouble)} role="alert">
           <Icon name="alert" size={13} />
           <strong>
-            “{m.milestone.title}” couldn’t merge into {view.plan.branch ?? 'the plan’s branch'}
+            {t('plans.couldntMerge', { title: m.milestone.title, branch: view.plan.branch ?? t('plans.thePlansBranch') })}
           </strong>
           <span className={p.troubleWhy}>{m.run.mergeFailed!.reason}</span>
           <span className={p.grow} />
           <Button size="small" onClick={() => onPass(m.milestone.id, m.milestone.title)}>
-            Pass Again
+            {t('plans.passAgain')}
+
           </Button>
         </div>
       ))}

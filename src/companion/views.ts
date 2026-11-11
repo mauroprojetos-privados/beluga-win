@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { appLocale } from '../core/language.js';
 import { STILLS_DIR, STILL_SCHEME } from '../shared/preview/ref.js';
 import { SCRATCH_DIR } from '../shared/scratch-dir.js';
 import { dialogueHeader } from '../core/dialogues/view.js';
@@ -670,7 +671,7 @@ export function homeView(state: DomainState, ctx: ViewContext): HomeView {
   const macChats = macChatSummaries(state, waiting, ctx);
   const bots = botSummaries(state, waiting, ctx);
   return {
-    mac: { name: clip(ctx.mac.name, 100), version: clip(ctx.mac.version, 40), keepAwake: state.prefs.keepAwake ?? 'off' },
+    mac: { name: clip(ctx.mac.name, 100), version: clip(ctx.mac.version, 40), keepAwake: state.prefs.keepAwake ?? 'off', language: appLocale(state.prefs) },
     // 1.5: Your Mac, for Home's "Ask your Mac" (its last line, whether it works).
     ...(assistant ? { assistant } : {}),
     // 1.14: all of Your Mac's chats, for the phone's chat list.

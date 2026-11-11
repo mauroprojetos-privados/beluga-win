@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import { sayNeed } from './language';
 import type { NeedsYou, OutputView, Topic } from './link/protocol';
 import { kv } from './kv';
 import type { ComputerLinkState } from './link/computers';
@@ -78,7 +79,8 @@ export function useVisibleNeeds(items: readonly NeedsYou[] | undefined): NeedsYo
     (fn) => store.subscribe('hidden', fn),
     () => store.snapshot('hidden', () => ({})),
   );
-  return (items ?? []).filter((n) => !store.isHidden(n.id));
+  // Said in this phone's language where the Mac sent keys (1.54, docs/i18n.md).
+  return (items ?? []).filter((n) => !store.isHidden(n.id)).map(sayNeed);
 }
 
 export function useFile(ref: string | undefined, variant: 'thumb' | 'full' | 'text'): FileState | undefined {
