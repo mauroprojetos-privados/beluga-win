@@ -5,6 +5,7 @@ import { copyText } from '../lib/copy.js';
 import { toast, useApi, useApp, useBeluga } from '../lib/beluga.js';
 import { Markdown } from './Markdown.js';
 import { useAgentNameIn } from '../lib/agent-words.js';
+import { useT } from '../lib/i18n.js';
 import s from './btw.module.css';
 
 const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
@@ -22,6 +23,7 @@ export function askBtw(client: ReturnType<typeof useBeluga>['client'], api: Retu
 export function BtwCard({ channel }: { channel: string }) {
   const { client } = useBeluga();
   const api = useApi();
+  const t = useT();
   const btw = useApp((st) => st.btw?.[channel]);
   const agent = useAgentNameIn(channel);
   const body = useRef<HTMLDivElement>(null);
@@ -39,25 +41,25 @@ export function BtwCard({ channel }: { channel: string }) {
   const thinking = btw.state === 'thinking';
   const writing = btw.state === 'answering';
   return (
-    <section key={btw.id} className={cx(s.card, thinking && s.thinking)} aria-label="Side question" aria-live="polite">
+    <section key={btw.id} className={cx(s.card, thinking && s.thinking)} aria-label={t('chat.btw.aria')} aria-live="polite">
       <header className={s.head}>
         <span className={s.tag}>
           <Icon name="sparkles" size={11} />
-          By the way
+          {t('chat.btw.tag')}
         </span>
         <span className={s.question} title={btw.question}>
           {btw.question}
         </span>
         <span className={s.acts}>
           {btw.state === 'done' && btw.text ? (
-            <Tip label="Copy the answer">
-              <button type="button" className={s.act} aria-label="Copy the answer" onClick={() => void copyText(btw.text).then(() => toast(client, 'Copied', 'success'))}>
+            <Tip label={t('chat.btw.copy')}>
+              <button type="button" className={s.act} aria-label={t('chat.btw.copy')} onClick={() => void copyText(btw.text).then(() => toast(client, t('chat.btw.copied'), 'success'))}>
                 <Icon name="copy" size={12} />
               </button>
             </Tip>
           ) : null}
-          <Tip label={thinking || writing ? 'Stop and close' : 'Close'} keys="esc">
-            <button type="button" className={s.act} aria-label="Close the side question" onClick={close}>
+          <Tip label={thinking || writing ? t('chat.btw.stopClose') : t('common.close')} keys="esc">
+            <button type="button" className={s.act} aria-label={t('chat.btw.closeAria')} onClick={close}>
               <Icon name="x" size={12} />
             </button>
           </Tip>
@@ -72,7 +74,7 @@ export function BtwCard({ channel }: { channel: string }) {
         }}
       >
         {thinking ? (
-          <span className={s.shimmer}>{agent} is thinking on the side…</span>
+          <span className={s.shimmer}>{t('chat.btw.thinking', { agent })}</span>
         ) : btw.text ? (
           <div className={cx(s.answer, writing && s.writing)}>
             <Markdown text={btw.text} live={writing} />
@@ -80,14 +82,14 @@ export function BtwCard({ channel }: { channel: string }) {
         ) : null}
         {btw.state === 'failed' ? (
           <p className={s.error}>
-            {btw.error ?? `${agent} couldn’t answer that`}
+            {btw.error ?? t('chat.btw.couldntAnswer', { agent })}
             <button type="button" className={s.retry} onClick={() => askBtw(client, api, channel, btw.question)}>
-              Ask Again
+              {t('chat.btw.askAgain')}
             </button>
           </p>
         ) : null}
       </div>
-      <footer className={s.foot}>Not part of the conversation: {agent} keeps working and won’t remember this</footer>
+      <footer className={s.foot}>{t('chat.btw.foot', { agent })}</footer>
     </section>
   );
 }

@@ -7,6 +7,7 @@ import { setPrefs, usePrefs } from '../lib/prefs.js';
 import { ChatView } from '../views/ChatView.js';
 import { AgentTermView } from './AgentTermView.js';
 import { TurnWaitBanner } from './TurnWaitBanner.js';
+import { useT } from '../lib/i18n.js';
 import s from './agent-term.module.css';
 
 /** Whether a workspace's conversation can show as a terminal (lib/convo-mode.ts: not Codex's). */
@@ -18,6 +19,7 @@ export const useTerminalCapable = (wsId: string | undefined): boolean => useApp(
  */
 export function ConvoCenter({ wsId }: { readonly wsId: string }) {
   const prefs = usePrefs();
+  const t = useT();
   const capable = useTerminalCapable(wsId);
   const turnRunning = useApp((st) => activityOf(st.log, `ws:${wsId}`).running);
   const driving = useApp((st) => Boolean(st.agentTerms[wsId]));
@@ -44,7 +46,7 @@ export function ConvoCenter({ wsId }: { readonly wsId: string }) {
       </div>
       <ResizeHandle
         axis="x"
-        label="Resize the chat beside the terminal"
+        label={t('chat.termView.resizeChat')}
         className={s.bothEdge}
         onMove={(x) => {
           const r = box.current?.getBoundingClientRect();

@@ -5,6 +5,8 @@
  * platform's page in Claude Code's docs.
  */
 
+import { t } from '../../../../src/shared/i18n/index.js';
+
 export type SignInHow = 'claudeai' | 'console';
 
 /** A row of the menu (an ActionItem of components/SpecMenu; kept apart so this file stays plain TypeScript). */
@@ -25,10 +27,11 @@ export const PLATFORM_DOCS: readonly { readonly label: string; readonly url: str
 
 export function signInChoices(signIn: (how: SignInHow) => void, open: (url: string) => void): Choice[] {
   return [
-    { label: 'Claude account with subscription', hint: 'Pro, Max, Team, Enterprise', onSelect: () => signIn('claudeai') },
-    { label: 'Anthropic Console account', hint: 'API usage billing', onSelect: () => signIn('console') },
+    // i18n-ignore: plan names
+    { label: t('chat.signIn.claudeAccount'), hint: 'Pro, Max, Team, Enterprise', onSelect: () => signIn('claudeai') },
+    { label: t('chat.signIn.console'), hint: t('chat.signIn.consoleHint'), onSelect: () => signIn('console') },
     {
-      label: '3rd-party platform',
+      label: t('chat.signIn.thirdParty'),
       separate: true,
       hint: 'Amazon Bedrock, Microsoft Foundry, Google Vertex AI',
       onSelect: () => undefined,

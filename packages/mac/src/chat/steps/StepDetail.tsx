@@ -17,6 +17,8 @@ import { isPdfFile } from '../../views/reader/reader-model.js';
 import { UnifiedDiff } from '../../views/DiffView.js';
 import { Markdown } from '../Markdown.js';
 import { AnsiText } from './AnsiText.js';
+import { type Key, t } from '@beluga/shared/i18n/index.js';
+import { useT } from '../../lib/i18n.js';
 import s from './steps.module.css';
 
 /**
@@ -31,13 +33,19 @@ const REMINDERS = /<system-reminder>[\s\S]*?<\/system-reminder>/g;
 const tidy = (out: string | undefined): string => (out ?? '').replace(REMINDERS, '').replace(/\s+$/, '');
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 
-function useCopy(): (text: string, what: string) => void {
+/** What a section's Copy copies: its toast, and its button's name. */
+type Copied = 'output' | 'command' | 'message' | 'input';
+const COPIED: Record<Copied, Key> = { output: 'chat.shell.copiedOutput', command: 'chat.shell.copiedCommand', message: 'chat.step.copiedMessage', input: 'chat.step.copiedInput' };
+const COPY: Record<Copied, Key> = { output: 'chat.step.copyOutput', command: 'chat.step.copyCommand', message: 'chat.step.copyMessage', input: 'chat.step.copyInput' };
+
+function useCopy(): (text: string, what: Copied) => void {
   const { client } = useBeluga();
-  return (text, what) => void copyText(text).then(() => toast(client, `Copied ${what}`, 'success'));
+  return (text, what) => void copyText(text).then(() => toast(client, t(COPIED[what]), 'success'));
 }
 
 /** A box that stops growing at its height, with "Show all" when there's more. */
-function Capped({ children, tall = false, fade = false, label = 'Show all' }: { children: ReactNode; tall?: boolean; fade?: boolean; label?: string }) {
+function Capped({ children, tall = false, fade = false, label }: { children: ReactNode; tall?: boolean; fade?: boolean; label?: string }) {
+  const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   const [all, setAll] = useState(false);
   const [over, setOver] = useState(false);
@@ -52,23 +60,24 @@ function Capped({ children, tall = false, fade = false, label = 'Show all' }: { 
       </div>
       {over || all ? (
         <button type="button" className={s.showAll} onClick={() => setAll(!all)}>
-          {all ? 'Show less' : label}
+          {all ? t('chat.items.showLess') : (label ?? t('chat.items.showAll'))}
         </button>
       ) : null}
     </div>
   );
 }
 
-function Section({ label, copy, children, tone }: { label: string; copy?: { text: string; what: string }; children: ReactNode; tone?: 'error' }) {
+function Section({ label, copy, children, tone }: { label: string; copy?: { text: string; what: Copied } | undefined; children: ReactNode; tone?: 'error' | undefined }) {
   const doCopy = useCopy();
+  const t = useT();
   return (
     <div className={cx(s.section, tone === 'error' && s.sectionError)}>
       <div className={s.sectionHead}>
         <span>{label}</span>
         {copy ? (
-          <button type="button" className={s.copy} onClick={() => doCopy(copy.text, copy.what)} aria-label={`Copy ${copy.what}`}>
+          <button type="button" className={s.copy} onClick={() => doCopy(copy.text, copy.what)} aria-label={t(COPY[copy.what])}>
             <Icon name="copy" size={11} />
-            Copy
+            {t('chat.items.copy')}
           </button>
         ) : null}
       </div>
@@ -80,42 +89,45 @@ function Section({ label, copy, children, tone }: { label: string; copy?: { text
 /** A file path you can click to open it in the Files panel. */
 function PathLink({ path, line }: { path: string; line?: number }) {
   const actions = useActions();
+  const t = useT();
   if (!path) return null;
   return (
-    <button type="button" className={s.path} title={`Open ${path}`} onClick={() => actions.openLink({ kind: 'local', path, dir: false, ...(line ? { line } : {}) })}>
+    <button type="button" className={s.path} title={t('chat.step.openPath', { path })} onClick={() => actions.openLink({ kind: 'local', path, dir: false, ...(line ? { line } : {}) })}>
       <Icon name="file" size={11} />
       <span>{path}</span>
     </button>
   );
 }
 
-function Output({ record, label = 'Output', ansi = true }: { record: StepRecord; label?: string; ansi?: boolean }) {
+function Output({ record, label, ansi = true }: { record: StepRecord; label?: string; ansi?: boolean }) {
+  const t = useT();
   const out = tidy(record.output);
-  if (record.status === 'running' && !out) return <div className={s.waiting}>Waiting for the result…</div>;
+  if (record.status === 'running' && !out) return <div className={s.waiting}>{t('chat.step.waitingResult')}</div>;
   return (
-    <Section label={record.isError ? 'Failed' : label} copy={out ? { text: stripAnsi(out), what: 'the output' } : undefined} tone={record.isError ? 'error' : undefined}>
+    <Section label={record.isError ? t('chat.step.failed') : (label ?? t('chat.step.output'))} copy={out ? { text: stripAnsi(out), what: 'output' } : undefined} tone={record.isError ? 'error' : undefined}>
       {out ? (
         <Capped>
           <pre className={cx(s.term, 'selectable')}>{ansi ? <AnsiText text={out} /> : out}</pre>
         </Capped>
       ) : (
-        <div className={s.quiet}>No output</div>
+        <div className={s.quiet}>{t('chat.step.noOutput')}</div>
       )}
     </Section>
   );
 }
 
 function BashDetail({ record }: { record: StepRecord }) {
+  const t = useT();
   const input = record.input ?? {};
   const command = str(input.command);
   return (
     <>
-      <Section label={str(input.description) || 'Command'} copy={command ? { text: command, what: 'the command' } : undefined}>
+      <Section label={str(input.description) || t('chat.step.command')} copy={command ? { text: command, what: 'command' } : undefined}>
         <pre className={cx(s.command, 'selectable')}>
           <span className={s.prompt}>$ </span>
           {command || record.title}
         </pre>
-        {input.run_in_background === true ? <div className={s.quiet}>Runs in the background</div> : null}
+        {input.run_in_background === true ? <div className={s.quiet}>{t('chat.step.background')}</div> : null}
       </Section>
       <Output record={record} />
     </>
@@ -142,10 +154,11 @@ function LocalPdf({ path }: { path: string }) {
 function Seen({ file }: { file: string }) {
   const src = imageSource(file);
   const name = baseName(file) || file;
+  const t = useT();
   if (src.kind === 'local') {
     const image = localImage(src.path, name);
     return (
-      <Section label="Image">
+      <Section label={t('chat.step.image')}>
         <div className={s.seen}>
           <Thumb image={image} all={[image]} index={0} tiled={false} />
         </div>
@@ -154,7 +167,7 @@ function Seen({ file }: { file: string }) {
   }
   if (isAbsolutePath(file) && isPdfFile(file)) {
     return (
-      <Section label="PDF">
+      <Section label="PDF">{/* i18n-ignore */}
         <LocalPdf path={file} />
       </Section>
     );
@@ -167,13 +180,14 @@ function ReadDetail({ record }: { record: StepRecord }) {
   const file = str(input.file_path) || str(input.notebook_path);
   const from = typeof input.offset === 'number' ? input.offset : undefined;
   const count = typeof input.limit === 'number' ? input.limit : undefined;
+  const t = useT();
   return (
     <>
       <div className={s.pathRow}>
         <PathLink path={file} {...(from ? { line: from } : {})} />
-        {from || count ? <span className={s.quiet}>{from ? `from line ${from}` : ''}{from && count ? ', ' : ''}{count ? `${count} lines` : ''}</span> : null}
+        {from || count ? <span className={s.quiet}>{from && count ? t('chat.step.fromLineCount', { line: from, count }) : from ? t('chat.step.fromLine', { line: from }) : t('chat.step.lines', { count: count ?? 0 })}</span> : null}
       </div>
-      {isAbsolutePath(file) && (imageSource(file).kind === 'local' || isPdfFile(file)) && !record.isError ? <Seen file={file} /> : <Output record={record} label="Lines read" ansi={false} />}
+      {isAbsolutePath(file) && (imageSource(file).kind === 'local' || isPdfFile(file)) && !record.isError ? <Seen file={file} /> : <Output record={record} label={t('chat.step.linesRead')} ansi={false} />}
     </>
   );
 }
@@ -183,7 +197,7 @@ function diffOf(record: StepRecord): DiffLine[] {
   if (record.tool === 'Write') return addedLines(str(input.content));
   if (record.tool === 'NotebookEdit') return addedLines(str(input.new_source));
   if (record.tool === 'MultiEdit' && Array.isArray(input.edits)) {
-    return (input.edits as Array<Record<string, unknown>>).flatMap((e, i) => [...(i ? [{ kind: 'hunk' as const, text: `Edit ${i + 1}` }] : []), ...editDiff(str(e.old_string), str(e.new_string))]);
+    return (input.edits as Array<Record<string, unknown>>).flatMap((e, i) => [...(i ? [{ kind: 'hunk' as const, text: t('chat.step.editN', { n: i + 1 }) }] : []), ...editDiff(str(e.old_string), str(e.new_string))]);
   }
   return editDiff(str(input.old_string), str(input.new_string));
 }
@@ -191,6 +205,7 @@ function diffOf(record: StepRecord): DiffLine[] {
 function EditDetail({ record }: { record: StepRecord }) {
   const input = record.input ?? {};
   const file = str(input.file_path) || str(input.notebook_path);
+  const t = useT();
   const lines = useMemo(() => diffOf(record), [record]);
   const added = lines.filter((l) => l.kind === 'add').length;
   const removed = lines.filter((l) => l.kind === 'del').length;
@@ -210,13 +225,14 @@ function EditDetail({ record }: { record: StepRecord }) {
           </div>
         </Capped>
       ) : null}
-      {record.isError ? <Output record={record} /> : record.status === 'running' ? <div className={s.waiting}>Applying…</div> : null}
+      {record.isError ? <Output record={record} /> : record.status === 'running' ? <div className={s.waiting}>{t('chat.step.applying')}</div> : null}
     </>
   );
 }
 
 /** A search's matches: lines that start with a path open that file. */
 function Matches({ text, base }: { text: string; base?: string }) {
+  const t = useT();
   const lines = text.split('\n').filter(Boolean);
   return (
     <div className={cx(s.matches, 'selectable')}>
@@ -233,7 +249,7 @@ function Matches({ text, base }: { text: string; base?: string }) {
           </div>
         );
       })}
-      {lines.length > 500 ? <div className={s.quiet}>…and {lines.length - 500} more</div> : null}
+      {lines.length > 500 ? <div className={s.quiet}>{t('chat.step.andMore', { count: lines.length - 500 })}</div> : null}
     </div>
   );
 }
@@ -242,25 +258,26 @@ function SearchDetail({ record }: { record: StepRecord }) {
   const input = record.input ?? {};
   const where = str(input.path);
   const out = tidy(record.output);
+  const t = useT();
   return (
     <>
-      <Section label={record.tool === 'Glob' ? 'Files matching' : record.tool === 'LS' ? 'Folder' : 'Pattern'}>
+      <Section label={record.tool === 'Glob' ? t('chat.step.filesMatching') : record.tool === 'LS' ? t('chat.step.folder') : t('chat.step.pattern')}>
         <pre className={cx(s.command, 'selectable')}>
           {str(input.pattern) || where}
-          {input.glob ? <span className={s.quiet}> in {str(input.glob)}</span> : null}
-          {where && input.pattern ? <span className={s.quiet}> in {where}</span> : null}
+          {input.glob ? <span className={s.quiet}>{t('chat.step.in', { where: str(input.glob) })}</span> : null}
+          {where && input.pattern ? <span className={s.quiet}>{t('chat.step.in', { where })}</span> : null}
         </pre>
       </Section>
       {record.status === 'running' && !out ? (
-        <div className={s.waiting}>Searching…</div>
+        <div className={s.waiting}>{t('chat.step.searching')}</div>
       ) : (
-        <Section label={record.isError ? 'Failed' : 'Matches'} tone={record.isError ? 'error' : undefined}>
+        <Section label={record.isError ? t('chat.step.failed') : t('chat.step.matches')} tone={record.isError ? 'error' : undefined}>
           {out ? (
             <Capped>
               <Matches text={out} {...(isAbsolutePath(where) ? { base: where } : {})} />
             </Capped>
           ) : (
-            <div className={s.quiet}>No matches</div>
+            <div className={s.quiet}>{t('chat.step.noMatches')}</div>
           )}
         </Section>
       )}
@@ -273,6 +290,7 @@ function WebDetail({ record }: { record: StepRecord }) {
   const actions = useActions();
   const url = str(input.url);
   const out = tidy(record.output);
+  const t = useT();
   return (
     <>
       <div className={s.pathRow}>
@@ -287,11 +305,11 @@ function WebDetail({ record }: { record: StepRecord }) {
       </div>
       {str(input.prompt) ? <div className={s.quiet}>{str(input.prompt)}</div> : null}
       {record.status === 'running' && !out ? (
-        <div className={s.waiting}>Fetching…</div>
+        <div className={s.waiting}>{t('chat.step.fetching')}</div>
       ) : (
-        <Section label={record.isError ? 'Failed' : 'Result'} tone={record.isError ? 'error' : undefined}>
+        <Section label={record.isError ? t('chat.step.failed') : t('chat.step.result')} tone={record.isError ? 'error' : undefined}>
           <Capped>
-            <div className={s.prose}>{out ? <Markdown text={out} /> : <span className={s.quiet}>Nothing came back</span>}</div>
+            <div className={s.prose}>{out ? <Markdown text={out} /> : <span className={s.quiet}>{t('chat.step.nothingBack')}</span>}</div>
           </Capped>
         </Section>
       )}
@@ -302,10 +320,11 @@ function WebDetail({ record }: { record: StepRecord }) {
 function AgentDetail({ record }: { record: StepRecord }) {
   const input = record.input ?? {};
   const out = tidy(record.output);
+  const t = useT();
   return (
     <>
       {str(input.prompt) ? (
-        <Section label={`Task${str(input.subagent_type) ? ` for ${str(input.subagent_type)}` : ''}`}>
+        <Section label={str(input.subagent_type) ? t('chat.step.taskFor', { agent: str(input.subagent_type) }) : t('chat.step.task')}>
           <Capped fade>
             <div className={s.prose}>
               <Markdown text={str(input.prompt)} />
@@ -314,7 +333,7 @@ function AgentDetail({ record }: { record: StepRecord }) {
         </Section>
       ) : null}
       {out ? (
-        <Section label={record.isError ? 'Failed' : 'Its answer'} tone={record.isError ? 'error' : undefined}>
+        <Section label={record.isError ? t('chat.step.failed') : t('chat.step.itsAnswer')} tone={record.isError ? 'error' : undefined}>
           <Capped fade>
             <div className={s.prose}>
               <Markdown text={out} />
@@ -322,7 +341,7 @@ function AgentDetail({ record }: { record: StepRecord }) {
           </Capped>
         </Section>
       ) : record.status === 'running' ? (
-        <div className={s.waiting}>Working…</div>
+        <div className={s.waiting}>{t('chat.step.working')}</div>
       ) : null}
     </>
   );
@@ -332,12 +351,13 @@ function AgentDetail({ record }: { record: StepRecord }) {
 function MessageDetail({ record }: { record: StepRecord }) {
   const input = record.input ?? {};
   const words = str(input.message) || str(input.content);
+  const t = useT();
   return (
     <>
       {str(input.summary) ? <div className={s.quiet}>{str(input.summary)}</div> : null}
-      <Section label="Message" copy={words ? { text: words, what: 'the message' } : undefined}>
+      <Section label={t('chat.step.message')} copy={words ? { text: words, what: 'message' } : undefined}>
         <Capped fade>
-          <div className={s.prose}>{words ? <Markdown text={words} /> : <span className={s.quiet}>Empty</span>}</div>
+          <div className={s.prose}>{words ? <Markdown text={words} /> : <span className={s.quiet}>{t('chat.step.empty')}</span>}</div>
         </Capped>
       </Section>
       {record.isError ? <Output record={record} /> : null}
@@ -375,26 +395,27 @@ function JsonDetail({ record }: { record: StepRecord }) {
   const input = record.input ?? {};
   const json = pretty(input);
   const out = tidy(record.output);
+  const t = useT();
   return (
     <>
       <div className={s.quiet}>{record.tool}</div>
       {Object.keys(input).length ? (
-        <Section label="Input" copy={{ text: json, what: 'the input' }}>
+        <Section label={t('chat.step.input')} copy={{ text: json, what: 'input' }}>
           <Capped>
             <pre className={cx(s.json, 'selectable')}>{json}</pre>
           </Capped>
         </Section>
       ) : null}
       {record.status === 'running' && !out ? (
-        <div className={s.waiting}>Waiting for the result…</div>
+        <div className={s.waiting}>{t('chat.step.waitingResult')}</div>
       ) : (
-        <Section label={record.isError ? 'Failed' : 'Output'} copy={out ? { text: out, what: 'the output' } : undefined} tone={record.isError ? 'error' : undefined}>
+        <Section label={record.isError ? t('chat.step.failed') : t('chat.step.output')} copy={out ? { text: out, what: 'output' } : undefined} tone={record.isError ? 'error' : undefined}>
           {out ? (
             <Capped>
               <pre className={cx(s.json, 'selectable')}>{prettyText(out)}</pre>
             </Capped>
           ) : (
-            <div className={s.quiet}>No output</div>
+            <div className={s.quiet}>{t('chat.step.noOutput')}</div>
           )}
         </Section>
       )}
@@ -403,9 +424,10 @@ function JsonDetail({ record }: { record: StepRecord }) {
 }
 
 export function ThinkingDetail({ record }: { record: StepRecord }) {
-  if (!record.text) return <div className={s.quiet}>The agent didn’t share what it thought here.</div>;
+  const t = useT();
+  if (!record.text) return <div className={s.quiet}>{t('chat.step.thoughtHidden')}</div>;
   return (
-    <Capped fade label="Show more">
+    <Capped fade label={t('chat.step.showMore')}>
       <div className={s.thought}>
         <Markdown text={record.text} />
       </div>
@@ -414,6 +436,7 @@ export function ThinkingDetail({ record }: { record: StepRecord }) {
 }
 
 export function StepDetail({ record }: { record: StepRecord }) {
+  const t = useT();
   const body = (() => {
     if (record.kind === 'thinking') return <ThinkingDetail record={record} />;
     switch (toolFamily(record.tool)) {
@@ -440,7 +463,7 @@ export function StepDetail({ record }: { record: StepRecord }) {
   return (
     <div className={s.detail} data-step-detail={record.kind === 'thinking' ? 'thinking' : toolFamily(record.tool)}>
       {body}
-      {record.truncated ? <div className={s.note}>Long, so Beluga kept its start and end.</div> : null}
+      {record.truncated ? <div className={s.note}>{t('chat.step.truncated')}</div> : null}
     </div>
   );
 }

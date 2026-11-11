@@ -2,6 +2,7 @@ import { SLOT_WAIT_TITLE, type SlotWait, slotWaitDetail } from '@beluga/shared/r
 import { Icon } from '../components/Icon.js';
 import { Button, Tip } from '../components/ui.js';
 import { toast, useBeluga } from '../lib/beluga.js';
+import { useT } from '../lib/i18n.js';
 import s from './slot-wait.module.css';
 
 /**
@@ -11,6 +12,7 @@ import s from './slot-wait.module.css';
  */
 export function SlotWaitNotice({ wait, requestId }: { wait: SlotWait; requestId?: string }) {
   const { client, ui } = useBeluga();
+  const t = useT();
   const busy = Math.max(wait.running, wait.limit);
   const startNow = (): void =>
     void client.api.host.promote(requestId ?? '').catch((err: unknown) => toast(client, err instanceof Error ? err.message : String(err), 'error'));
@@ -22,8 +24,8 @@ export function SlotWaitNotice({ wait, requestId }: { wait: SlotWait; requestId?
       <div className={s.body}>
         <div className={s.title}>{SLOT_WAIT_TITLE}</div>
         <div className={s.detail}>{slotWaitDetail(wait)}</div>
-        <Tip label={`${busy} of ${wait.limit} at once`}>
-          <span className={s.pills} aria-label={`${busy} of ${wait.limit} conversations working`}>
+        <Tip label={t('chat.slot.atOnce', { busy, limit: wait.limit })}>
+          <span className={s.pills} aria-label={t('chat.slot.working', { busy, limit: wait.limit })}>
             {Array.from({ length: Math.min(busy, 30) }, (_, i) => (
               <span key={i} className={s.pill} />
             ))}
@@ -31,11 +33,11 @@ export function SlotWaitNotice({ wait, requestId }: { wait: SlotWait; requestId?
         </Tip>
         {requestId ? (
           <div className={s.actions}>
-            <Button size="small" icon="play" onClick={startNow} title="Starts it now, past the limit">
-              Start now
+            <Button size="small" icon="play" onClick={startNow} title={t('chat.slot.startNowTip')}>
+              {t('chat.slot.startNow')}
             </Button>
-            <Button size="small" variant="quiet" icon="gear" onClick={() => ui.patch({ settings: 'claude' })} title="Settings › Agent › Working at once">
-              Change the limit
+            <Button size="small" variant="quiet" icon="gear" onClick={() => ui.patch({ settings: 'claude' })} title={t('chat.slot.changeTip')}>
+              {t('chat.slot.change')}
             </Button>
           </div>
         ) : null}

@@ -1,6 +1,7 @@
 import { Icon } from '../components/Icon.js';
 import { type DiffComment, commentWhere, removeComment } from '../views/diff-comments.js';
 import { useWaitingComments } from '../views/DiffComment.js';
+import { useT } from '../lib/i18n.js';
 import s from './composer.module.css';
 
 /** The first changed line a comment is on (else its first line), sign and all, for its card; blank lines skipped. */
@@ -15,20 +16,21 @@ function firstLine(c: DiffComment): string {
  */
 export function CommentCards({ box }: { box: string }) {
   const comments = useWaitingComments(box);
+  const t = useT();
   if (!comments.length) return null;
   return (
-    <div className={s.commentCards} role="list" aria-label="Comments on the changes">
+    <div className={s.commentCards} role="list" aria-label={t('chat.comments.aria')}>
       {comments.map((c) => {
         const where = commentWhere(c);
         const line = firstLine(c);
         return (
-          <div key={c.id} role="listitem" className={s.commentCard} aria-label={`Comment on ${where}`}>
+          <div key={c.id} role="listitem" className={s.commentCard} aria-label={t('chat.comments.on', { where })}>
             <div className={s.commentHead}>
               <Icon name="chat" size={11} />
               <span className={s.commentWhere} title={where}>
                 {where}
               </span>
-              <button type="button" aria-label={`Remove the comment on ${where}`} onClick={() => removeComment(box, c.id)}>
+              <button type="button" aria-label={t('chat.comments.remove', { where })} onClick={() => removeComment(box, c.id)}>
                 <Icon name="x" size={9} />
               </button>
             </div>

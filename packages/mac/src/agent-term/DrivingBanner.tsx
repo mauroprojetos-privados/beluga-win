@@ -3,6 +3,7 @@ import { Button } from '../components/ui.js';
 import { useApi, useApp, useBeluga, toast } from '../lib/beluga.js';
 import { convoModeOf, withConvoMode } from '../lib/convo-mode.js';
 import { getPrefs, setPrefs } from '../lib/prefs.js';
+import { useT } from '../lib/i18n.js';
 import s from './agent-term.module.css';
 
 /**
@@ -13,6 +14,7 @@ import s from './agent-term.module.css';
 export function DrivingBanner({ wsId }: { readonly wsId: string }) {
   const api = useApi();
   const { client } = useBeluga();
+  const t = useT();
   const driving = useApp((st) => st.agentTerms[wsId]);
   if (!driving) return null;
   const mode = getPrefs().termView ? convoModeOf(getPrefs().convoModes, getPrefs().convoDefault, wsId) : 'off';
@@ -28,14 +30,14 @@ export function DrivingBanner({ wsId }: { readonly wsId: string }) {
   return (
     <div className={s.driving} role="status">
       <Icon name="terminal" size={14} />
-      <span className={s.drivingText}>{driving.label}’s terminal is driving this conversation</span>
+      <span className={s.drivingText}>{t('chat.driving.text', { agent: driving.label })}</span>
       {mode === 'chat' ? (
         <Button size="small" variant="quiet" icon="terminal" onClick={() => setPrefs({ convoModes: withConvoMode(getPrefs().convoModes, wsId, 'terminal') })}>
-          Show Terminal
+          {t('chat.driving.showTerminal')}
         </Button>
       ) : null}
       <Button size="small" onClick={() => void takeOver()}>
-        Take Over
+        {t('chat.driving.takeOver')}
       </Button>
     </div>
   );

@@ -12,7 +12,8 @@ import { useActions } from '../lib/actions.js';
 import { toast, useApi, useApp, useBeluga, useUi } from '../lib/beluga.js';
 import { sameDeep } from '../lib/stable.js';
 import { DOT, FamilyEnd, FamilyMark, FamilyTitle } from './FamilyRow.js';
-import { type ThreadFamilyParent, type ThreadFamilyRow, THREAD_WORDS, isThreadWorking, threadFamilyView, panelRows } from './threads-model.js';
+import { type ThreadFamilyParent, type ThreadFamilyRow, isThreadWorking, threadFamilyView, threadWord, panelRows } from './threads-model.js';
+import { useT } from '../lib/i18n.js';
 import s from './threads.module.css';
 
 /** How many finished rows stay in view before the rest fold into Earlier. */
@@ -26,6 +27,7 @@ export function ThreadsSection({ id }: { id: string }) {
   const api = useApi();
   const actions = useActions();
   const { client } = useBeluga();
+  const t = useT();
   const sessions = useCcSessions();
   const origins = useAgentOrigins();
   const agents = useMemo(() => subAgentsUnder(sessions, id, origins), [sessions, id, origins]);
@@ -42,28 +44,28 @@ export function ThreadsSection({ id }: { id: string }) {
   if (!view) return null;
   const { shown, earlier } = panelRows(view.rows, FINISHED_SHOWN, showAll);
   const toggle = (): void => actions.run({ type: 'toggle_fold', key });
-  const stop = (thread: string): void => void api.threads.stop(thread).catch((err: unknown) => toast(client, err instanceof Error ? err.message : 'Cannot stop the thread', 'error'));
+  const stop = (thread: string): void => void api.threads.stop(thread).catch((err: unknown) => toast(client, err instanceof Error ? err.message : t('chat.threads.cannotStop'), 'error'));
   const open = (row: ThreadFamilyRow): void => {
     const sub = row.kind === 'agent' ? agents.find((a) => a.agent.id === row.id) : undefined;
     if (sub) openSubAgent(client, actions, sub);
     else actions.run({ type: 'open_ws', id: row.id });
   };
   const items: ActionItem[] = [
-    { label: 'Stop All Running', icon: 'stop', disabled: !view.stoppable.length, onSelect: () => void api.threads.stopAll(id).catch((err: unknown) => toast(client, err instanceof Error ? err.message : 'Cannot stop the threads', 'error')) },
-    { label: 'Show Finished', checked: showAll, separate: true, onSelect: toggle },
+    { label: t('chat.threads.stopAll'), icon: 'stop', disabled: !view.stoppable.length, onSelect: () => void api.threads.stopAll(id).catch((err: unknown) => toast(client, err instanceof Error ? err.message : t('chat.threads.cannotStopAll'), 'error')) },
+    { label: t('chat.threads.showFinished'), checked: showAll, separate: true, onSelect: toggle },
   ];
   return (
     <Panel
-      title={view.running ? `Threads · ${view.running} running` : 'Threads'}
+      title={view.running ? t('chat.threads.titleRunning', { count: view.running }) : t('chat.threads.title')}
       action={
         view.rows.length ? (
           <ActionsDropdown items={items}>
-            <Button size="small" variant="quiet" icon="more" aria-label="Thread actions" />
+            <Button size="small" variant="quiet" icon="more" aria-label={t('chat.threads.actions')} />
           </ActionsDropdown>
         ) : null
       }
     >
-      <div className={s.list} role="list" aria-label="Threads">
+      <div className={s.list} role="list" aria-label={t('chat.threads.title')}>
         {view.parent ? <ParentRow parent={view.parent} onOpen={(to) => actions.run({ type: 'open_ws', id: to })} /> : null}
         {shown.map((row) => (
           <ChildRow key={`${row.kind}:${row.id}`} row={row} now={now} onOpen={() => open(row)} onStop={() => stop(row.id)} />
@@ -71,7 +73,7 @@ export function ThreadsSection({ id }: { id: string }) {
         {earlier ? (
           <div role="listitem">
             <button type="button" className={s.earlier} onClick={toggle}>
-              Earlier · {earlier}
+              {t('chat.threads.earlier', { count: earlier })}
             </button>
           </div>
         ) : null}
@@ -83,7 +85,8 @@ export function ThreadsSection({ id }: { id: string }) {
 function ChildRow({ row, now, onOpen, onStop }: { row: ThreadFamilyRow; now: number; onOpen: () => void; onStop: () => void }) {
   const working = isThreadWorking(row.state);
   const stoppable = working && row.kind === 'thread';
-  const word = THREAD_WORDS[row.state];
+  const t = useT();
+  const word = threadWord(row.state);
   const duration = since((row.endedAt ?? now) - row.since);
   return (
     <div role="listitem" className={cx(s.row, stoppable && s.stoppable)} data-thread-row={row.kind} data-state={row.state}>
@@ -92,14 +95,14 @@ function ChildRow({ row, now, onOpen, onStop }: { row: ThreadFamilyRow; now: num
         label={
           <span className={s.card}>
             <strong>{row.title}</strong>
-            <span>{[row.kind === 'agent' ? 'Sub-agent' : '', row.agent, row.model].filter(Boolean).join(' · ')}</span>
+            <span>{[row.kind === 'agent' ? t('chat.threads.subAgent') : '', row.agent, row.model].filter(Boolean).join(' · ')}</span>
             <span>
               {word} · {duration}
             </span>
           </span>
         }
       >
-        <button type="button" className={s.open} aria-label={`Open ${row.title}${row.kind === 'agent' ? ', sub-agent' : ''}, ${word}`} onClick={onOpen}>
+        <button type="button" className={s.open} aria-label={row.kind === 'agent' ? t('chat.threads.openAgent', { title: row.title, state: word }) : t('chat.threads.open', { title: row.title, state: word })} onClick={onOpen}>
           <FamilyMark row={row} />
           <FamilyTitle row={row} />
         </button>
@@ -107,8 +110,8 @@ function ChildRow({ row, now, onOpen, onStop }: { row: ThreadFamilyRow; now: num
       <span className={s.end}>
         <FamilyEnd row={row} now={now} />
         {stoppable ? (
-          <button type="button" className={s.stop} aria-label={`Stop ${row.title}`} onClick={onStop}>
-            Stop
+          <button type="button" className={s.stop} aria-label={t('chat.items.stopAgent', { agent: row.title })} onClick={onStop}>
+            {t('common.stop')}
           </button>
         ) : null}
       </span>
@@ -119,7 +122,8 @@ function ChildRow({ row, now, onOpen, onStop }: { row: ThreadFamilyRow; now: num
 /** The chat that started this one. A removed parent keeps its title and opens nothing. */
 function ParentRow({ parent, onOpen }: { parent: ThreadFamilyParent; onOpen: (id: string) => void }) {
   // An open chat with no run says Idle; a Your Mac chat's state isn't known here.
-  const word = parent.gone ? 'Removed' : parent.state ? THREAD_WORDS[parent.state] : parent.openId ? 'Idle' : '';
+  const t = useT();
+  const word = parent.gone ? t('chat.threads.removed') : parent.state ? threadWord(parent.state) : parent.openId ? t('chat.threads.idle') : '';
   const inner = (
     <>
       <span className={s.mark}>
@@ -136,7 +140,7 @@ function ParentRow({ parent, onOpen }: { parent: ThreadFamilyParent; onOpen: (id
   return (
     <div role="listitem" className={s.row} data-thread-row="parent">
       {parent.openId ? (
-        <button type="button" className={s.open} aria-label={`Open the parent chat, ${parent.title}`} onClick={() => onOpen(parent.openId!)}>
+        <button type="button" className={s.open} aria-label={t('chat.threads.openParent', { title: parent.title })} onClick={() => onOpen(parent.openId!)}>
           {inner}
         </button>
       ) : (

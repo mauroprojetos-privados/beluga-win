@@ -13,6 +13,7 @@ import { attachTermLinks } from './term-links.js';
 import { type TermAction, type TermKey, termKeyFor, termKeysOf } from '../lib/term-keys.js';
 import { belugaHas, setTerminalChords } from '../lib/shortcuts.js';
 import { chordLabel } from '../lib/shortcuts-model.js';
+import { useT } from '../lib/i18n.js';
 
 /** The last visual token in a terminal, from the bottom up. */
 function newestOnScreen(t: Terminal): number | undefined {
@@ -64,6 +65,7 @@ const BUSY_RETRY_MS = 1500;
 
 /** Find in the terminal (⌘F): as you type, Return for the next, ⇧Return the one before. */
 function FindBar({ search, onClose }: { readonly search: SearchAddon; readonly onClose: () => void }) {
+  const t = useT();
   const [query, setQuery] = useState('');
   const [count, setCount] = useState<{ index: number; total: number } | undefined>(undefined);
   const input = useRef<HTMLInputElement>(null);
@@ -88,8 +90,8 @@ function FindBar({ search, onClose }: { readonly search: SearchAddon; readonly o
         ref={input}
         className={s.findInput}
         value={query}
-        placeholder="Find in terminal"
-        aria-label="Find in terminal"
+        placeholder={t('chat.term.find')}
+        aria-label={t('chat.term.find')}
         spellCheck={false}
         onChange={(e) => {
           setQuery(e.target.value);
@@ -109,10 +111,10 @@ function FindBar({ search, onClose }: { readonly search: SearchAddon; readonly o
           }
         }}
       />
-      <span className={s.findCount}>{count ? (count.total ? `${count.index + 1} of ${count.total}` : 'None') : ''}</span>
-      <IconButton icon="chevronUp" label="Previous" onClick={() => go(true)} />
-      <IconButton icon="chevronDown" label="Next" onClick={() => go(false)} />
-      <IconButton icon="x" label="Close" keys="Esc" onClick={onClose} />
+      <span className={s.findCount}>{count ? (count.total ? t('chat.find.count', { index: count.index + 1, total: count.total }) : t('chat.find.none')) : ''}</span>
+      <IconButton icon="chevronUp" label={t('chat.find.previous')} onClick={() => go(true)} />
+      <IconButton icon="chevronDown" label={t('chat.find.next')} onClick={() => go(false)} />
+      <IconButton icon="x" label={t('common.close')} keys="Esc" onClick={onClose} />
     </div>
   );
 }
@@ -126,6 +128,7 @@ function FindBar({ search, onClose }: { readonly search: SearchAddon; readonly o
 export function TermPane({ wsId, termKey, kind, cwd, split, focusOnMount, onSplit, onClose, onAction, onTitle, openVisual, openTask, openImage, openNewest }: TermPaneProps) {
   const api = useApi();
   const { client } = useBeluga();
+  const tr = useT();
   const [error, setError] = useState<string | undefined>(undefined);
   const [gen, setGen] = useState(0);
   const [starting, setStarting] = useState(false);
@@ -139,7 +142,7 @@ export function TermPane({ wsId, termKey, kind, cwd, split, focusOnMount, onSpli
   const exited = useApp((st) => (termKey in st.termExits ? st.termExits[termKey] : undefined));
   const ended = exited !== undefined;
   const driving = useApp((st) => st.agentTerms[wsId]);
-  const label = useApp((st) => st.agentTerms[wsId]?.label ?? (st.projects.flatMap((p) => p.workspaces).find((w) => w.id === wsId)?.agent?.label ?? 'Your agent'));
+  const label = useApp((st) => st.agentTerms[wsId]?.label ?? (st.projects.flatMap((p) => p.workspaces).find((w) => w.id === wsId)?.agent?.label ?? tr('chat.term.yourAgent')));
   const visuals = useApp((st) => st.termVisuals[wsId]);
   // Links take the terminal's own colours (a theme's blue, its background), else Beluga's pastel.
   const prefs = usePrefs();
@@ -286,23 +289,23 @@ export function TermPane({ wsId, termKey, kind, cwd, split, focusOnMount, onSpli
         />
       ) : null}
       <div className={s.paneTools}>
-        <IconButton icon="panelRight" label="Split Right" keys={keyFor(keys, 'split_right')} onClick={() => onSplit('right')} />
-        <IconButton icon="panelBottom" label="Split Down" keys={keyFor(keys, 'split_down')} onClick={() => onSplit('down')} />
-        {onClose ? <IconButton icon="x" label="Close This Shell" onClick={onClose} /> : null}
+        <IconButton icon="panelRight" label={tr('chat.term.splitRight')} keys={keyFor(keys, 'split_right')} onClick={() => onSplit('right')} />
+        <IconButton icon="panelBottom" label={tr('chat.term.splitDown')} keys={keyFor(keys, 'split_down')} onClick={() => onSplit('down')} />
+        {onClose ? <IconButton icon="x" label={tr('chat.term.closeShell')} onClick={onClose} /> : null}
       </div>
       {busy && !error ? (
         <div className={s.over} role="status" data-term-busy="">
           <Icon name="terminal" size={18} />
-          <p className={s.overTitle}>{label} is finishing a turn in the chat</p>
-          <p className={s.overDetail}>The terminal opens here as soon as it’s done.</p>
+          <p className={s.overTitle}>{tr('chat.term.finishingTurn', { agent: label })}</p>
+          <p className={s.overDetail}>{tr('chat.term.opensWhenDone')}</p>
         </div>
       ) : error || (ended && !driving && kind === 'agent') || (ended && kind === 'shell') ? (
         <div className={s.over} role="status">
           <Icon name={error ? 'alert' : 'terminal'} size={18} />
-          <p className={s.overTitle}>{error ? (kind === 'agent' ? `${label} couldn’t start here` : 'The shell couldn’t start') : kind === 'agent' ? `${label}’s terminal ended` : 'The shell ended'}</p>
-          {error ? <p className={s.overDetail}>{error}</p> : kind === 'agent' ? <p className={s.overDetail}>The conversation is the chat’s again. Start it here to go on in the terminal.</p> : null}
+          <p className={s.overTitle}>{error ? (kind === 'agent' ? tr('chat.term.couldntStart', { agent: label }) : tr('chat.term.shellCouldntStart')) : kind === 'agent' ? tr('chat.term.ended', { agent: label }) : tr('chat.term.shellEnded')}</p>
+          {error ? <p className={s.overDetail}>{error}</p> : kind === 'agent' ? <p className={s.overDetail}>{tr('chat.term.chatsAgain')}</p> : null}
           <Button variant="primary" icon="play" disabled={starting} onClick={() => void again()}>
-            {error ? 'Try Again' : 'Start Again'}
+            {error ? tr('common.retry') : tr('chat.term.startAgain')}
           </Button>
         </div>
       ) : null}

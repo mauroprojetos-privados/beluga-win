@@ -5,7 +5,8 @@ import { type AgentMark, agentMark } from '../../../../src/shared/agent-marks.js
 import { span } from '../../../../src/shared/clock.js';
 import { resetWords } from '../../../../src/shared/run-failure.js';
 import { agentName } from '../../../../src/shared/agent-label.js';
-import { THREAD_WORDS, type ThreadState, isThreadWorking } from '../../../../src/shared/threads.js';
+import { type ThreadState, isThreadWorking } from '../../../../src/shared/threads.js';
+import { type Key, t } from '../../../../src/shared/i18n/index.js';
 import { type ThreadFamilyParent, type ThreadNesting, mixedHarnesses, threadNesting, threadParent, threadRank, threadStateOf } from '../../../../src/ui/thread-tree.js';
 import { activityOf } from '../../../../src/ui/workspace-models.js';
 import { laterUntil } from '../../../../src/core/triage/facts.js';
@@ -18,6 +19,20 @@ import { type SubAgent, agentTitle, cappedAgents, subAgentsSummary } from '../cl
  */
 
 export { THREAD_WORDS, isThreadWorking } from '../../../../src/shared/threads.js';
+
+const WORD_KEYS: Readonly<Record<ThreadState, Key>> = {
+  queued: 'chat.threads.queued',
+  running: 'chat.threads.running',
+  needs_you: 'chat.threads.needsYou',
+  waiting_limit: 'chat.threads.waitingLimit',
+  done: 'chat.threads.done',
+  failed: 'chat.threads.failed',
+  stopped: 'chat.threads.stopped',
+  interrupted: 'chat.threads.interrupted',
+};
+
+/** A thread's state in a word, in the app's language (THREAD_WORDS says it in English). */
+export const threadWord = (state: ThreadState): string => t(WORD_KEYS[state]);
 export { type ThreadFamilyParent, type ThreadNesting, mixedHarnesses, parentIdOf, threadNesting, threadStateOf } from '../../../../src/ui/thread-tree.js';
 
 const WS = 'ws:';
@@ -173,7 +188,7 @@ export function foldSummary(rows: readonly FoldRow[]): string {
   const threads = rows.filter((r) => r.kind === 'thread');
   if (!threads.length) return subAgentsSummary(agents);
   const running = foldRunning(rows);
-  return [`${threads.length} thread${threads.length === 1 ? '' : 's'}`, agents.length ? `${agents.length} sub-agent${agents.length === 1 ? '' : 's'}` : '', running ? `${running} running` : ''].filter(Boolean).join(' · ');
+  return [t('chat.threads.nThreads', { count: threads.length }), agents.length ? t('chat.steps.subAgents', { count: agents.length }) : '', running ? t('chat.threads.nRunning', { count: running }) : ''].filter(Boolean).join(' · ');
 }
 
 /** A fold's row as the panel draws it: a thread, or a native sub-agent with its parent's harness. */
@@ -183,8 +198,8 @@ export function familyRowOf(state: ThreadFamilySource, parent: Workspace, row: F
 
 /** A row's last word: its timer while it works, else what it is now. */
 export function rowEnd(row: ThreadFamilyRow, now: number): string {
-  if (row.state === 'waiting_limit' && row.resumesAt !== undefined) return `Waiting · ${resetWords(row.resumesAt, now)}`;
-  return row.state === 'running' ? span(now - row.since) : THREAD_WORDS[row.state];
+  if (row.state === 'waiting_limit' && row.resumesAt !== undefined) return t('chat.threads.waitingUntil', { when: resetWords(row.resumesAt, now) });
+  return row.state === 'running' ? span(now - row.since) : threadWord(row.state);
 }
 
 export function foldRunning(rows: readonly FoldRow[]): number {
@@ -195,7 +210,7 @@ export function foldRunning(rows: readonly FoldRow[]): number {
 export function foldNoun(rows: readonly FoldRow[]): string {
   const threads = rows.some((r) => r.kind === 'thread');
   const agents = rows.some((r) => r.kind === 'agent');
-  return threads && agents ? 'threads and sub-agents' : threads ? 'threads' : 'sub-agents';
+  return threads && agents ? t('chat.threads.nounBoth') : threads ? t('chat.threads.nounThreads') : t('chat.threads.nounAgents');
 }
 
 /** The harness a row's mark shows, with threads on: the chat's own agent, else yours. A main folder has no mark. */

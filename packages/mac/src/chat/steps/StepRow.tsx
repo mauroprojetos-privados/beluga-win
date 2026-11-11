@@ -10,6 +10,7 @@ import { countRender } from '../../lib/render-count.js';
 import { type ImageRead, imageReadOf } from './image-read.js';
 import { StepDetail } from './StepDetail.js';
 import { useStepDetail } from './use-steps.js';
+import { useT } from '../../lib/i18n.js';
 import s from './steps.module.css';
 
 /**
@@ -110,6 +111,7 @@ export interface StepRowProps {
 
 export const StepRow = memo(function StepRow({ step: given, open, onToggle, load, live, now, openable = true, current = false, words, person }: StepRowProps) {
   countRender(`step:${given.id}`);
+  const t = useT();
   const step = person && !given.person ? { ...given, person } : given;
   const thinking = step.kind === 'thinking';
   const personId = usePersonId(step.person);
@@ -137,7 +139,7 @@ export const StepRow = memo(function StepRow({ step: given, open, onToggle, load
   return (
     <div className={cx(s.row, open && s.rowOpen, step.status === 'error' && s.rowError, current && s.rowCurrent)} data-step={step.id} data-current={current || undefined} data-step-kind={thinking ? 'thinking' : toolFamily(step.tool)}>
       {canOpen ? (
-        <button type="button" className={s.head} aria-expanded={open} onClick={() => onToggle(step.id)} title={open ? 'Hide details' : 'Show what ran and what came back'}>
+        <button type="button" className={s.head} aria-expanded={open} onClick={() => onToggle(step.id)} title={open ? t('chat.items.hideDetails') : t('chat.stepRow.showWhatRan')}>
           {head}
         </button>
       ) : (
@@ -147,7 +149,7 @@ export const StepRow = memo(function StepRow({ step: given, open, onToggle, load
         record ? (
           <StepDetail record={record} />
         ) : (
-          <div className={cx(s.detail, s.quiet)}>{loading ? 'Loading…' : gone ? 'Beluga no longer has the details of this step.' : null}</div>
+          <div className={cx(s.detail, s.quiet)}>{loading ? t('common.loading') : gone ? t('chat.stepRow.gone') : null}</div>
         )
       ) : null}
     </div>

@@ -26,6 +26,7 @@ import { StartedByLine, ThreadStartLine } from '../threads/ThreadLines.js';
 import { sameDeep } from '../lib/stable.js';
 import s from './chat.module.css';
 import f from './flight.module.css';
+import { useT } from '../lib/i18n.js';
 
 const GROUP_GAP_MS = 3 * 60_000;
 
@@ -128,6 +129,7 @@ export function ChatLog({ channel, empty }: { channel: string; empty?: React.Rea
   // Only this conversation's items and tasks: another one streaming doesn't draw this one again (KLD-48).
   const mine = useApp((st) => st.log.filter((l) => l.channel === channel), sameItems);
   const selfId = useApp((st) => st.selfId);
+  const tr = useT();
   // The agent this conversation runs on: a worktree's own pick, else yours.
   const myAgent = useMyAgent();
   const ownAgent = useApp(
@@ -259,7 +261,7 @@ export function ChatLog({ channel, empty }: { channel: string; empty?: React.Rea
       <div className={s.logWrap}>
         <FindBar items={items} logRef={parent} onGo={() => undefined} />
         <StartedByLine channel={channel} />
-        <div className={s.logEmpty}>{empty ?? <Empty icon="chat" title="Nothing here yet" detail="Say something below." />}</div>
+        <div className={s.logEmpty}>{empty ?? <Empty icon="chat" title={tr('chat.log.emptyTitle')} detail={tr('chat.log.emptyDetail')} />}</div>
       </div>
     );
   }
@@ -319,7 +321,7 @@ export function ChatLog({ channel, empty }: { channel: string; empty?: React.Rea
               <Avatar name={agent} id={selfId} agent={agentRef} size={22} />
             </span>
             <Working />
-            <span>{agent} is starting…</span>
+            <span>{tr('chat.log.starting', { agent })}</span>
           </div>
         ) : null}
       </div>
@@ -334,7 +336,7 @@ export function ChatLog({ channel, empty }: { channel: string; empty?: React.Rea
           }}
         >
           <Icon name="chevronDown" size={12} />
-          Latest
+          {tr('chat.log.latest')}
         </button>
       )}
     </div>
