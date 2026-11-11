@@ -70,6 +70,11 @@ export interface PilotDeps {
   readonly eventMs?: number;
   /** Who does a milestone's tasks: one Claude for the whole milestone (default), or a worktree per task. */
   readonly workers?: 'milestone' | 'task';
+  /**
+   * A plan a bot dispatched (core/bots): how each of its tasks is routed (by its id in the plan), so
+   * each runs in its own worktree on its category's agent. Undefined: not a bot's plan.
+   */
+  readonly route?: (planId: string) => ((taskId: string) => { readonly agent?: AgentRef; readonly why?: string } | undefined) | undefined;
   /** Beluga no longer needs a request of its own (a check you passed past): out of the queue, or its run stopped. */
   readonly cancel?: (requestId: string) => void;
   /**
@@ -418,14 +423,18 @@ export class PlanPilot {
       this.fixAsked.delete(t.issue.id);
       this.deps.plans.setCombining(plan.id, t.task.id, { ...t.combining, ...(t.combining.conflict ? { conflict: { ...t.combining.conflict, stuck: false } } : {}) });
     } else if (t.state !== 'ready') throw new Error(`“${t.task.title}” can’t start: ${t.why ?? t.state}`);
-    if (this.byMilestone) return this.startInMilestone(plan, view, t, by, agent);
+    if (this.byMilestone(plan)) return this.startInMilestone(plan, view, t, by, agent);
     if (view.active.length + this.startingIn(plan) >= plan.maxParallel) throw new Error(`${plan.maxParallel} tasks are already running (the plan’s limit)`);
     this.failed.delete(t.issue!.id);
     return this.start(plan, t, by, agent);
   }
 
-  /** One milestone, one Claude (see the top): unless the plan says a worktree per task. */
-  private get byMilestone(): boolean {
+  /**
+   * One milestone, one Claude (see the top): unless the plan says a worktree per task. A bot's plan
+   * (docs/bots.md) has a route per task (its category's combo or bot), so each gets its own.
+   */
+  private byMilestone(plan: Plan): boolean {
+    if (this.deps.route?.(plan.id)) return false;
     return (this.deps.workers ?? 'milestone') === 'milestone';
   }
 
@@ -537,7 +546,7 @@ export class PlanPilot {
     if (!view.open.length) return;
     // Every open milestone runs side by side; the limit on tasks (or milestones at work) at once is the whole plan's.
     for (const m of view.open) this.open(plan, m.milestone.id);
-    if (this.byMilestone) this.stepAgents(plan, view);
+    if (this.byMilestone(plan)) this.stepAgents(plan, view);
     else {
       for (const t of startable(view, this.failed, this.startingIn(plan))) void this.start(plan, t, { kind: 'beluga' }).catch(() => undefined);
       this.stepCombining(plan, view);
@@ -728,7 +737,7 @@ export class PlanPilot {
     this.sentOn.delete(key);
     const ready = todo.filter((t) => t.state === 'ready' || t.state === 'idle' || t.state === 'running');
     if (!ready.length) return undefined;
-    if (!m.agent || !this.byMilestone) {
+    if (!m.agent || !this.byMilestone(plan)) {
       this.schedule();
       return `started “${m.milestone.title}” again`;
     }
@@ -764,7 +773,7 @@ export class PlanPilot {
     const fresh = waitingOnYou(view).filter((t) => !this.toldYou.has(`${plan.id}:${t.task.id}`));
     if (!fresh.length) return;
     for (const t of fresh) this.toldYou.add(`${plan.id}:${t.task.id}`);
-    for (const t of fresh) this.deps.plans.note(plan.id, 'note', `${t.issue?.key ?? t.task.id} “${t.task.title}” waits for you: only you can do it${this.byMilestone ? ', so its milestone’s agent leaves it to you' : ''}`, { kind: 'beluga' });
+    for (const t of fresh) this.deps.plans.note(plan.id, 'note', `${t.issue?.key ?? t.task.id} “${t.task.title}” waits for you: only you can do it${this.byMilestone(plan) ? ', so its milestone’s agent leaves it to you' : ''}`, { kind: 'beluga' });
     this.deps.forYou?.(plan, fresh);
   }
 
@@ -1157,7 +1166,10 @@ export class PlanPilot {
       const base = t.bases?.length ? await this.combinedBase(plan, t, issue) : t.base;
       if (t.bases?.length && !base) return `${issue.key} builds on several tasks: combining their branches hit a conflict, and the agent is fixing it`;
       // The agent you started it with (BLG-506), else the task's own, else the plan's (BLG-497), else your default.
-      const agent = pick ?? issue.agent ?? plan.agent ?? comboForRole(this.deps.store.getState(), 'milestone');
+      // A bot's plan (docs/bots.md): the task's category or difficulty picks its combo, or the bot it goes to.
+      const routed = this.deps.route?.(plan.id)?.(t.task.id);
+      const agent = pick ?? issue.agent ?? routed?.agent ?? plan.agent ?? comboForRole(this.deps.store.getState(), 'milestone');
+      if (routed?.why && !pick && !issue.agent) this.deps.plans.note(plan.id, 'note', `${issue.key} “${t.task.title}”: ${routed.why}`, { kind: 'beluga' });
       await this.deps.work.start(issue.id, { claude: true, quiet: true, ...(base ? { base } : {}), ...(agent ? { agent } : {}) });
       if (t.bases?.length) this.deps.plans.setCombining(plan.id, t.task.id, undefined);
       this.deps.plans.note(plan.id, 'started', `started ${issue.key} “${t.task.title}”${base ? ` from ${base}` : ''}`, by);

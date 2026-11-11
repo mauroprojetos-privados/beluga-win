@@ -34,6 +34,7 @@ import { findIssue } from './board/model.js';
 import { explainTaskMentions } from '../shared/task-refs.js';
 import { explainWorktreeRefs } from '../shared/worktree-refs.js';
 import { ASSISTANT_TITLE, isAssistant } from '../shared/assistant.js';
+import { isBotChannel } from './bots/schema.js';
 import { type SlotWait, clampParallelRuns } from '../shared/run-slots.js';
 import { fallbackFor } from '../shared/runtime-fallbacks.js';
 import { agentForAsk } from './gateway/serve.js';
@@ -98,6 +99,8 @@ export interface AgentHostDeps {
   readonly threads?: (channel: string) => import('../agent/types.js').ThreadTools | undefined;
   /** "Your Mac" (core/assistant), your own runs in its conversation: where it runs, its tools, what Claude is told. */
   readonly assistant?: (channel: string, from: string) => { readonly place: AgentPlace; readonly tools: MacTools; readonly brief: string } | undefined;
+  /** A worktree doing a task a bot's plan handed to another bot (core/bots): that bot's MCPs, folder and persona, for your own runs. */
+  readonly botWork?: (channel: string) => { readonly mcp?: AgentPlace['mcp']; readonly dir: string; readonly brief: string } | undefined;
   /** Your phone (core/phone, BLG-150), your own runs: tools to act on it, saving screenshots in `scratchDir`. `env` lets Bash use adb/scrcpy (BLG-174). */
   /** The notes of calls you were in (core/calls, BLG-715), as tools for your own runs. */
   readonly callNotes?: () => import('../agent/types.js').CallNotesTools | undefined;
@@ -1390,7 +1393,10 @@ export class AgentHost {
     const sentinelChat = root || mac ? undefined : this.deps.sentinelChat?.(body.channel, from);
     const picked = root ? { cwd: root, additionalDirectories: [], autoEdit: false, onSession: () => undefined, askOnly: { project: body.project ?? '' } } : (mac?.place ?? sentinelChat ?? this.deps.workspaces?.place(body.channel));
     // A combo (core/routing): the run goes to its first target that can run now (a worktree's place is resolved already).
-    const place = picked && this.routePlace(picked);
+    const routedPlace = picked && this.routePlace(picked);
+    // A task handed to a bot (docs/bots.md): its worktree's run carries the bot's tools and folder.
+    const botWork = routedPlace && from === this.selfId && body.channel.startsWith('ws:') ? this.deps.botWork?.(body.channel) : undefined;
+    const place = routedPlace && botWork ? { ...routedPlace, additionalDirectories: [...routedPlace.additionalDirectories, botWork.dir], ...(botWork.mcp ? { mcp: botWork.mcp } : {}) } : routedPlace;
     let markFinished: () => void = () => undefined;
     /** Claude Code's process for this run (see gone), and whether the run is over. */
     let proc: RunProcess | undefined;
@@ -1401,6 +1407,8 @@ export class AgentHost {
     if (body.channel !== 'room' && !place) {
       const why = isAssistant(body.channel)
         ? `${ASSISTANT_TITLE}’s assistant needs the Beluga app.`
+        : isBotChannel(body.channel)
+          ? 'That bot was deleted (or bots need the Beluga app).'
         : /^(dm|group):/.test(body.channel)
           ? 'Your agent acts in chats only in the Beluga app, and only when you ask it.'
         : this.deps.workspaces?.inChannel(body.channel)?.kind === 'main'
@@ -1506,6 +1514,7 @@ export class AgentHost {
         ...(plans?.brief ? { planBrief: plans.brief } : {}),
         ...(threads ? { threadTools: threads } : {}),
         ...(mac ? { macTools: mac.tools, macBrief: mac.brief } : {}),
+        ...(botWork && !mac ? { macBrief: botWork.brief } : {}),
         ...(phone ? { phoneTools: phone.tools, phoneBrief: phone.brief } : {}),
         ...(callNotes ? { callNotesTools: callNotes } : {}),
         ...(previewBrief ? { previewBrief } : {}),

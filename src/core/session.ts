@@ -7,10 +7,12 @@ import { agentLabel } from '../shared/agent-label.js';
 import { KNOWN_RUNTIMES } from '../shared/agent-runtimes.js';
 import { ASSISTANT_TITLE, isAssistant } from '../shared/assistant.js';
 import { assistantOf } from './assistant/registry.js';
+import { botsOf } from './bots/registry.js';
+import { isBotChannel } from './bots/schema.js';
 import os from 'node:os';
 import path from 'node:path';
 import type { AgentBackend, RoomBridge } from '../agent/types.js';
-import type { AgentRuntime, RuntimeCapabilities, RuntimeId, RuntimeOptions } from '../agent/runtime/types.js';
+import type { AgentRuntime, CompletionRequest, RuntimeCapabilities, RuntimeId, RuntimeOptions } from '../agent/runtime/types.js';
 import { guardedBackend } from '../agent/runtime/guard.js';
 import { type SideRoute, routeSideCall, routedBackend } from '../agent/runtime/router.js';
 import { comboForRole, routeOf } from './routing/model.js';
@@ -869,6 +871,16 @@ export class Session {
     return this.claudeReadyAt.ready;
   }
 
+  /**
+   * A one-shot answer from Claude Code (Bot Studio's Create with Claude, core/bots): Claude's own
+   * runtime, signed in as you. Throws when it isn't here.
+   */
+  async completeWithClaude(req: CompletionRequest): Promise<string> {
+    const claude = this.opts.runtime?.runtimes(CLAUDE_AGENT.runtime);
+    if (!claude) throw new Error('Create with Claude needs Claude Code on this computer');
+    return claude.complete(req);
+  }
+
   /** A worktree name for a task: from a small model on your agent (Claude when it can't), else from its words. */
   async nameTask(prompt: string): Promise<string> {
     return routeSideCall(this.sideRoute(), (on) => on.nameTask?.(prompt), slugify(prompt));
@@ -1100,6 +1112,14 @@ export class Session {
       this.store.dispatch({ type: 'context_reset', channel });
       this.host.forgetContext(channel);
       this.toast(`Cleared. ${ASSISTANT_TITLE} starts a fresh conversation`, 'success');
+      return;
+    }
+    // A bot's chat or its Test chat (core/bots): a fresh conversation in its folder.
+    if (opts.fresh && isBotChannel(channel)) {
+      botsOf(this)?.forget(channel);
+      this.store.dispatch({ type: 'context_reset', channel });
+      this.host.forgetContext(channel);
+      this.toast('Cleared. The bot starts a fresh conversation', 'success');
       return;
     }
     this.toast(channel.startsWith('ws:') || isAssistant(channel) ? 'Messages cleared. Your agent still remembers the conversation' : 'Cleared on your screen', 'success');

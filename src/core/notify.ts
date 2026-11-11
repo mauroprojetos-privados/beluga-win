@@ -8,6 +8,7 @@ import { type Plan, checkerOf, planById, planForHome, planTitle } from './plans/
 import { type MilestoneView, planView } from './plans/progress.js';
 import { isDecisionQid } from './plans/decisions.js';
 import { ASSISTANT_TITLE, isAssistant } from '../shared/assistant.js';
+import { botOfChannel } from './bots/schema.js';
 import { allNeeds, needMatches } from '../companion/needs-you.js';
 import { type AgentRef, defaultAgentOf } from '../protocol.js';
 import { isExternalRequester } from './trust.js';
@@ -116,6 +117,9 @@ export function placeName(state: DomainState, channel: string): string {
   if (isExternalRequester(channel)) return 'an external agent';
   if (isAssistant(channel)) return ASSISTANT_TITLE;
   if (isSentinelChat(channel)) return 'the Sentinel chat';
+  // A bot's chat or Test chat (docs/bots.md): by its name.
+  const bot = botOfChannel(channel);
+  if (bot) return `${state.bots.bots.find((b) => b.id === bot.id)?.name ?? 'a bot'}${bot.test ? ' (Test chat)' : ''}`;
   // A friends' chat (your Claude acts there when you ask it, BLG-207).
   if (channel.startsWith('dm:')) return `your chat with ${state.network.friends.find((f) => f.peerId === channel.slice(3))?.name ?? 'a friend'}`;
   if (channel.startsWith('group:')) return state.network.groups.find((g) => g.id === channel.slice(6))?.name ?? 'a channel';

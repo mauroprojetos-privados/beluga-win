@@ -68,6 +68,8 @@ export class PlansWork {
   readonly pilot: PlanPilot;
   /** Moving a plan to another computer of yours (BLG-806): this daemon's part. */
   readonly mover: PlanMover;
+  /** How a bot's plan routes its tasks (core/bots sets it once it starts): see PilotDeps.route. */
+  router?: PilotDeps['route'];
   /** A fresh agent's read of each first draft, before Approve Plan (see draft-review.ts). */
   readonly reviewer: DraftReviewer;
 
@@ -133,6 +135,7 @@ export class PlansWork {
       ...(deps.forYou ? { forYou: deps.forYou } : {}),
       ...(deps.rescueMs !== undefined ? { rescueMs: deps.rescueMs } : {}),
       structure: (plan) => this.structure(plan.id),
+      route: (planId) => this.router?.(planId),
     });
     this.mover = new PlanMover({
       store: deps.store,
@@ -193,6 +196,25 @@ export class PlansWork {
       })
       .catch(() => undefined);
     return plan;
+  }
+
+  /**
+   * A plan a bot wrote whole (core/bots, plan_dispatch): its own conversation in the project (the
+   * head Claude that checks its milestones), the draft written as the bot's, and approved at once
+   * when `approve` (the bot's autonomy runs it). Nothing asks a head Claude to plan: the bot did.
+   */
+  async createWritten(input: { readonly projectId: string; readonly body: BodyInput; readonly autonomy: Autonomy; readonly approve: boolean; readonly by: string }): Promise<Plan> {
+    const controller = this.deps.controller;
+    if (!controller) throw new Error('Plans need a project folder');
+    const chat = await controller.newChat(input.projectId, input.body.title.slice(0, 40) || UNTITLED, undefined, { quiet: true });
+    if (!chat) throw new Error('Couldn’t start the plan’s conversation');
+    const head = comboForRole(this.deps.store.getState(), 'planHead');
+    if (head) controller.manager.setAgent(chat.id, head);
+    const home = `${WS}${chat.id}`;
+    const made = this.plans.create({ projectId: input.projectId, home, title: input.body.title, goal: input.body.goal, autonomy: input.autonomy }, this.me());
+    const plan = this.plans.writeDraft(made.id, { ...input.body, milestones: input.body.milestones.map((m) => ({ ...m, tasks: (m.tasks ?? []).map((t) => this.adopt(t, made.id)) })) }, this.claude());
+    this.deps.store.dispatch({ type: 'system', channel: home, text: `${input.by} planned this and dispatches its tasks${input.approve ? '' : ': it waits for your Approve'}.`, level: 'info' });
+    return input.approve ? this.approve(plan.id, this.claude()) : plan;
   }
 
   /**

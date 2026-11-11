@@ -18,6 +18,7 @@ import type { Workspace } from '../../workspaces/types.js';
 import { AgentRef, CLAUDE_AGENT } from '../../protocol.js';
 import { chosenAgent } from '../settings.js';
 import { chatFits, chatLimitMessage } from '../../shared/chat-limit.js';
+import type { MacExtras } from '../bots/bots.js';
 
 /**
  * "Your Mac" (BLG-47, docs/companion.md): one conversation with your own Claude that isn't tied to
@@ -62,6 +63,11 @@ export interface AssistantDeps {
   readonly trash?: (abs: string) => Promise<void>;
   /** How soon after starting, and how often after, old scratch files are tidied (false: never). */
   readonly tidy?: { readonly firstMs: number; readonly everyMs: number } | false;
+  /**
+   * What Your Mac's folder sets it up as, as a bot (core/bots, docs/bots.md): its persona, combo,
+   * plan_dispatch and MCPs. Undefined, or nothing set: Your Mac as it always was.
+   */
+  readonly bot?: () => MacExtras | undefined;
 }
 
 /** Your Mac's scratch is tidied a minute after Beluga starts, then once a day. */
@@ -324,7 +330,7 @@ export class MacAssistant {
 
   /** Your default agent now (BLG-503): Your Mac's chats run on it; an "On Your Mac" step's chat on the agent the step chose. */
   private agent(id?: string): AgentRef {
-    return this.list.chats.find((c) => c.id === id)?.agent ?? chosenAgent(this.deps.store.getState().prefs);
+    return this.list.chats.find((c) => c.id === id)?.agent ?? this.extras()?.agent ?? chosenAgent(this.deps.store.getState().prefs);
   }
 
   /**
@@ -374,7 +380,20 @@ export class MacAssistant {
       this.fresh(id);
       this.save({ ...this.list, chats: [{ id, createdAt: this.now }, ...this.list.chats] });
     }
-    return { place: this.place(channel), tools: this.tools(), brief: assistantBrief() };
+    const extras = this.extras();
+    const place = this.place(channel);
+    if (!extras) return { place, tools: this.tools(), brief: assistantBrief() };
+    // Set up as a bot: its folder's persona, tools and MCPs come too.
+    return { place: extras.mcp ? { ...place, mcp: extras.mcp } : place, tools: { ...this.tools(), ...extras.tools }, brief: assistantBrief() + extras.brief };
+  }
+
+  /** What Your Mac's folder adds as a bot (none: nothing set). A bad file never stops a run. */
+  private extras(): MacExtras | undefined {
+    try {
+      return this.deps.bot?.();
+    } catch {
+      return undefined;
+    }
   }
 
   /**

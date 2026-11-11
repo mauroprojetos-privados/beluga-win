@@ -205,3 +205,10 @@ tokens.
 by kind, then the suggestions. `routing.usage` returns the same (`comboReport`: each combo's usage
 with `judged`, `good`, `categories`, `baselineCost`, `spent`, `saved`, `baseline`, `suggestions`),
 and the phone draws it in Settings › Routing.
+
+## Bots (Phases 6, 6b and 6c)
+
+A bot plans and dispatches with all of the above: its own combo for its conversation, and a map of
+**categories** (`quick`, `deep`, `supabase`…) to a combo or to another bot for the tasks it hands
+out, else their difficulty. Your Mac is the first bot; the others are folders in `~/.beluga/bots`.
+See [bots.md](bots.md).

@@ -2,6 +2,7 @@ import type { AgentEventKind, AgentRef, FsEntry, MessageVia, PeerInfo } from '..
 import { agentName } from '../shared/agent-label.js';
 import { isExternalRequester } from './trust.js';
 import { type AssistantChats, NO_ASSISTANT_CHATS, activeAssistantChannel, assistantChannel } from '../shared/assistant.js';
+import { type BotsState, NO_BOTS, botChannel } from './bots/schema.js';
 import type { ConnectionStatus } from '../net/peer-client.js';
 import type { Effort, NotifySettings, Settings, ThemeName, TrustLevel } from './settings.js';
 import { BRANCH_PREFIX_DEFAULT, NotifySettings as NotifySchema, SETTLE_IDLE_DAYS_DEFAULT } from '../shared/settings-schema.js';
@@ -410,6 +411,8 @@ export type View =
   | { readonly kind: 'room' }
   /** "Your Mac" (core/assistant): your Claude for the whole Mac, the same as on the phone; one of its chats (tabs, BLG-102), the open one when unset. */
   | { readonly kind: 'assistant'; readonly chat?: string }
+  /** A bot of yours other than Your Mac (core/bots): its conversation, beside its plan. */
+  | { readonly kind: 'bot'; readonly id: string }
   /** "Your phone" (BLG-171): the live mirror of your paired Android phone and what Claude's done on it. Only when one is paired. */
   | { readonly kind: 'phone' }
   | { readonly kind: 'files' }
@@ -518,13 +521,15 @@ export const channelOf = (view: View): string =>
         : activeAssistantChannel(NO_ASSISTANT_CHATS)
       : view.kind === 'sentinel_chat'
         ? sentinelChatChannel(view.chat ?? FIRST_SENTINEL_CHAT)
-        : view.kind === 'draft' || view.kind === 'draft_worktree'
-          ? 'draft'
-          : 'room';
+        : view.kind === 'bot'
+          ? botChannel(view.id)
+          : view.kind === 'draft' || view.kind === 'draft_worktree'
+            ? 'draft'
+            : 'room';
 
 /** The conversation a view shows, if any (Overview, Search, Terminal… show none, so the chat's unread count stays). */
 export const shownChannel = (view: View): string | undefined =>
-  view.kind === 'conversation' ? view.id : view.kind === 'room' || view.kind === 'workspace' || view.kind === 'shared' || view.kind === 'assistant' || view.kind === 'sentinel_chat' ? channelOf(view) : undefined;
+  view.kind === 'conversation' ? view.id : view.kind === 'room' || view.kind === 'workspace' || view.kind === 'shared' || view.kind === 'assistant' || view.kind === 'sentinel_chat' || view.kind === 'bot' ? channelOf(view) : undefined;
 
 /** What the screens attached to this computer's Beluga are looking at (all of them together). */
 export interface Attention {
@@ -626,6 +631,8 @@ export interface DomainState extends CollabState, WorkState, NetworkSlice, Earni
   readonly powerSaving: boolean;
   /** Your Mac's chats, as tabs (BLG-102, core/assistant): which there are and the one open. */
   readonly assistant: AssistantChats;
+  /** Your bots (core/bots, docs/bots.md): Your Mac first, each with what it does now and what's wrong with its files. */
+  readonly bots: BotsState;
   /** Each chat's category record, by channel (core/triage), for you only: it never leaves this computer. */
   readonly triage: Readonly<Record<string, ChatTriage>>;
 }
@@ -737,6 +744,8 @@ export type Action =
   | { type: 'companion'; companion: CompanionSlice['companion'] }
   /** Your Mac's chats changed (one made, opened or deleted; core/assistant). */
   | { type: 'assistant_chats'; assistant: AssistantChats }
+  /** Your bots changed (a file saved here or outside, a plan of theirs moved on; core/bots). */
+  | { type: 'bots'; bots: BotsState['bots'] }
   /** The needs-you items you dismissed (all of them: on start, and after a Dismiss). */
   | { type: 'needs_dismissed'; ids: readonly string[] }
   /** One chat's category record changed (none: removed). `read`: the conversations whose unread count clears too (you settled it). */
@@ -872,6 +881,7 @@ export function initialState(room: string, policy: Policy = 'ask', prefs: Partia
     ...initialTeam,
     companion: { devices: [] },
     assistant: NO_ASSISTANT_CHATS,
+    bots: NO_BOTS,
     triage: {},
   };
 }
@@ -1392,6 +1402,8 @@ export function reduceDomain(state: DomainState, action: Action): DomainState {
       return { ...state, support: action.support };
     case 'assistant_chats':
       return { ...state, assistant: action.assistant };
+    case 'bots':
+      return { ...state, bots: { bots: action.bots } };
     case 'needs_dismissed':
       return { ...state, dismissedNeeds: action.ids };
     case 'triage_set':

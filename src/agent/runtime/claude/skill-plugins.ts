@@ -98,7 +98,10 @@ export async function skillPlugins(cwd: string, home: string, root: string): Pro
   const project = path.resolve(cwd, '.claude');
   // Your own folder as the project (a run in ~): it already loads as your user settings.
   if (path.resolve(home) === project) return [];
-  const dir = shadowPlugin(project, 'project', (entry) => FROM_CLAUDE_DIR.has(entry), root);
+  // A bot's folder (docs/bots.md, ~/.beluga only: nobody else writes there) brings its sub-agents too.
+  const beluga = path.dirname(path.resolve(root));
+  const bot = existsSync(path.resolve(cwd, 'bot.json')) && path.resolve(cwd).startsWith(beluga + path.sep);
+  const dir = shadowPlugin(project, bot ? 'bot' : 'project', (entry) => FROM_CLAUDE_DIR.has(entry) || (bot && entry === 'agents'), root);
   return dir ? [{ type: 'local' as const, path: dir, skipMcpDiscovery: true }] : [];
 }
 

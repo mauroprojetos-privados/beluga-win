@@ -31,6 +31,7 @@ import { RequestsNav } from '../gateway/RequestsNav.js';
 import { WorkNav } from '../work/WorkNav.js';
 import { SentinelNav } from '../sentinel/SentinelNav.js';
 import { AssistantNav } from './AssistantNav.js';
+import { BotsSection, useHasBots } from '../bots/BotsNav.js';
 import { LaterRows, laterOf, notLater, useLater } from './later-rows.js';
 import { footerStatus } from '../views/room/connection-model.js';
 import { WorktreesNav } from '../views/worktrees/WorktreesNav.js';
@@ -93,6 +94,7 @@ function useFolderDrop(): { ref: React.RefObject<HTMLElement | null>; over: bool
 
 export function Sidebar() {
   const actions = useActions();
+  const hasBots = useHasBots();
   const drop = useFolderDrop();
   // Only what the sidebar itself shows: drawn again when that changes, not on every streamed event (KLD-48).
   const { tabs, liveChats, view, badges, categories } = useApp((state) => {
@@ -133,7 +135,8 @@ export function Sidebar() {
       <SidebarSearch>
       <div className={s.scroll}>
         <section className={s.section}>
-          <AssistantNav />
+          {/* With bots of your own, Your Mac leads the Bots section instead (docs/bots.md). */}
+          {hasBots ? null : <AssistantNav />}
           <Row
             icon={<Icon name="grid" size={14} />}
             label={overview?.label ?? 'Overview'}
@@ -157,6 +160,9 @@ export function Sidebar() {
           <ActivityRow whenLive />
           <RequestsNav whenAny />
         </section>
+
+        {/* Your bots besides Your Mac (docs/bots.md): above the projects, each with what it's doing. */}
+        <BotsSection />
 
         {categories ? (
           <CategorySections />

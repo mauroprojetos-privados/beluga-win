@@ -9,7 +9,7 @@ import { z } from 'zod';
  * ignores what it doesn't know. A breaking change bumps the major, and the Mac keeps answering the
  * previous major for a release.
  */
-export const COMPANION_PROTO = { major: 1, minor: 52 } as const;
+export const COMPANION_PROTO = { major: 1, minor: 53 } as const;
 
 /**
  * What came in which minor, for a phone talking to an older Mac: it subscribes to a topic (and
@@ -139,8 +139,12 @@ export const COMPANION_PROTO = { major: 1, minor: 52 } as const;
  * 1.52 (docs/routing.md, Phases 3 and 5): a task's kind of work and where it starts (`TaskPageView.kind`),
  * and `routing.usage` with how tasks went, the savings and suggestions (`ComboReportView`, SINCE.routing).
  * An older Mac leaves them out; an older phone ignores them.
+ * 1.53 (docs/bots.md): your bots (`HomeView.bots`: Your Mac first, each with what it does now and its
+ * conversation `conv:bot:<id>`, which the phone opens and writes in like any other), and the bot behind
+ * a Needs You (`NeedsYou.bot`). `bots.list` and `bots.status` read them; editing them stays on the Mac.
+ * An older Mac sends neither: no Bots list, Needs You as before. An older phone leaves both out.
  */
-export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, routing: 52 } as const;
+export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, routing: 52, bots: 53 } as const;
 
 /** One frame's biggest payload, and a file piece. */
 export const MAX_COMPANION_FRAME = 1024 * 1024;
@@ -274,6 +278,8 @@ export const NeedsYou = z.object({
   topic: Topic.optional(),
   /** 1.47: that conversation's title when it is a child thread, so a need says which one asks. */
   thread: z.string().max(300).optional(),
+  /** 1.53 (docs/bots.md): the bot whose work asks ("Your Mac › Exportar CSV wants to run…"): its own chat, a plan it dispatched, a task of that plan. */
+  bot: z.string().max(100).optional(),
   askedAt: ts.optional(),
   timeoutMs: z.number().int().min(0).optional(),
   /** A question's options (pick one, or several). */
@@ -517,6 +523,28 @@ export type ConvSummary = z.infer<typeof ConvSummary>;
 
 // ---- views, one per topic
 
+/**
+ * 1.53 (docs/bots.md): one of your bots on the phone: Your Mac first, then the ones you made. Its
+ * conversation is `topic`; `line` says what it's doing ("2 of 6 done · waiting on Contrast check");
+ * `plan` is the plan it dispatched last, to open. Its files are edited on the Mac only.
+ */
+export const BotSummary = z.object({
+  id: z.string().max(40),
+  name: z.string().max(100),
+  /** One of the app's icon names (the phone draws a bot for one it doesn't know). */
+  icon: z.string().max(40).optional(),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  description: z.string().max(300).optional(),
+  topic: Topic,
+  mac: z.boolean(),
+  line: z.string().max(200).optional(),
+  plan: Topic.optional(),
+  status: z.enum(['working', 'waiting', 'idle', 'failed']).optional(),
+  /** How many problems its files have (Bot Studio on the Mac says which). */
+  problems: z.number().int().min(0).optional(),
+});
+export type BotSummary = z.infer<typeof BotSummary>;
+
 export const HomeView = z.object({
   // 1.13: keepAwake, whether the Mac stays awake for the phone (companion.keepAwake).
   mac: z.object({ name: z.string().max(100), version: z.string().max(40), keepAwake: z.enum(['off', 'power', 'always']).optional() }),
@@ -535,6 +563,8 @@ export const HomeView = z.object({
   assistant: ConvSummary.optional(),
   /** 1.14: every one of Your Mac's chats in the Mac's tab order, each titled by its tab ("New chat" until you write), for the phone's chat list. */
   macChats: z.array(ConvSummary).max(40).optional(),
+  /** 1.53: your bots, Your Mac first (docs/bots.md). */
+  bots: z.array(BotSummary).max(40).optional(),
   /** 1.3: tasks waiting for your review (Home links to them). */
   review: z.object({ count: z.number().int().min(0), first: z.object({ topic: Topic, key: z.string().max(40), title: z.string().max(300) }).optional() }).optional(),
 });

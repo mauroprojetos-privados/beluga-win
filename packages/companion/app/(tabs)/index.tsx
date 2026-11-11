@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ChevronRight, Eye, Laptop, MessagesSquare, Settings, Workflow } from 'lucide-react-native';
+import { Bot, ChevronRight, Eye, Laptop, MessagesSquare, Settings, Workflow } from 'lucide-react-native';
 import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import Animated, { LinearTransition, FadeIn } from 'react-native-reanimated';
@@ -15,7 +15,7 @@ import { UpdatePill, UpdateSheet } from '../../components/Update';
 import { UsageCard, UsageSheet } from '../../components/Usage';
 import { Card, IconBadge, Pill, Press, Section, StatusDot, T } from '../../components/ui';
 import { useLink, useSupports, useView, useAllNeeds } from '../../lib/hooks';
-import type { ConvSummary, HomeView, PlansView } from '../../lib/link/protocol';
+import type { BotSummary, ConvSummary, HomeView, PlansView } from '../../lib/link/protocol';
 import { displayName } from '../../lib/names';
 import { color, TAB_BAR_H } from '../../lib/theme';
 
@@ -88,6 +88,8 @@ export default function Home() {
         ) : (
           <>
             {h.assistant ? <AskYourMac c={h.assistant} chats={h.macChats?.length ?? 0} onChats={() => setChatsOpen(true)} /> : null}
+
+            {h.bots?.length ? <BotsHome bots={h.bots} /> : null}
 
             <Section
               title="Needs you"
@@ -207,5 +209,44 @@ function AskYourMac({ c, chats, onChats }: { readonly c: ConvSummary; readonly c
         )}
       </Card>
     </Press>
+  );
+}
+
+/**
+ * Your bots (1.52, docs/bots.md): Your Mac first, then the ones you made, each with what it's doing
+ * ("2 of 6 done · waiting on Contrast check"). A tap opens its chat; its plan, when it has one, is a
+ * chip. Making and editing bots is Bot Studio's, on the Mac.
+ */
+function BotsHome({ bots }: { readonly bots: readonly BotSummary[] }) {
+  return (
+    <Section title="Bots">
+      <View style={{ gap: 8 }}>
+        {bots.map((b) => {
+          const working = b.status === 'working' || b.status === 'waiting';
+          return (
+            <Press key={b.id} scaleTo={0.985} onPress={() => router.push(convHref(b.topic) as never)} accessibilityLabel={`Open ${b.name}`} style={{ marginHorizontal: 16 }}>
+              <Card style={{ paddingVertical: 12, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <IconBadge Icon={b.mac ? Laptop : Bot} tone={b.mac ? 'sky' : 'lavender'} size={34} />
+                <View style={{ flex: 1 }}>
+                  <T v="heading" numberOfLines={1} style={{ fontSize: 16 }}>
+                    {b.name}
+                  </T>
+                  <T v="caption" numberOfLines={1} c={working ? color.text : undefined}>
+                    {b.line ?? b.description ?? (working ? 'Working' : 'Ready')}
+                  </T>
+                </View>
+                {b.plan ? (
+                  <Press onPress={() => router.push(`/plan/${b.plan!.slice(5)}` as never)} accessibilityLabel={`${b.name}’s plan`} hitSlop={8} style={{ height: 32, paddingHorizontal: 10, borderRadius: 16, backgroundColor: color.sunken, alignItems: 'center', justifyContent: 'center' }}>
+                    <Workflow color={color.text2} size={15} />
+                  </Press>
+                ) : (
+                  <ChevronRight color={color.text3} size={18} />
+                )}
+              </Card>
+            </Press>
+          );
+        })}
+      </View>
+    </Section>
   );
 }

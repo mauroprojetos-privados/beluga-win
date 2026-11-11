@@ -7,6 +7,7 @@ import { type Signal, signalOf } from './attention-model.js';
 import { SignalMark } from './signal-marks.js';
 import { Row } from './sidebar-parts.js';
 import { yourComputer } from '../lib/os-words.js';
+import { BotLabel } from '../bots/BotsNav.js';
 
 const RANK: Record<Signal['level'], number> = { needs: 3, unread: 2, working: 1, idle: 0 };
 
@@ -25,10 +26,12 @@ export function AssistantNav() {
     const channels = own.length ? own.map((c) => c.channel) : [ASSISTANT_CHANNEL];
     return channels.map((c) => signalOf(s, c)).reduce((a, b) => (RANK[b.level] > RANK[a.level] ? b : a));
   }, sameDeep);
+  const bot = useApp((s) => s.bots.bots.find((x) => x.mac), sameDeep);
   return (
     <Row
       icon={<Icon name="laptop" size={14} />}
-      label={ASSISTANT_TITLE}
+      // Set up as a bot (docs/bots.md): what it's doing under its name ("2 of 6 done · waiting on …").
+      label={bot?.status || bot?.problems.length ? <BotLabel name={bot.name} bot={bot} /> : (bot?.name ?? ASSISTANT_TITLE)}
       detail={signal.tip || `Ask ${yourComputer()} anything: screenshots, what’s running, start a worktree or a task. Several chats as tabs; the open one is on your phone too`}
       selected={selected}
       onClick={() => actions.run({ type: 'view', view: { kind: 'assistant' } })}

@@ -115,7 +115,8 @@ export function NeedFace({ item, full = false, onAnswered, more }: { readonly it
             {k.label}
           </T>
           <T v="caption" numberOfLines={1}>
-            {[item.from, item.thread, ago(item.askedAt)].filter(Boolean).join(' · ')}
+            {/* 1.52: the bot whose work asks comes first ("Your Mac › …", docs/bots.md). */}
+            {[item.bot ? `${item.bot} ›` : undefined, item.from, item.thread, ago(item.askedAt)].filter(Boolean).join(' · ').replace('› · ', '› ')}
           </T>
         </View>
         {more ? (

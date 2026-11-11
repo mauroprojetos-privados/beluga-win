@@ -105,6 +105,7 @@ function Route() {
     case 'room':
       return <RoomChat />;
     case 'assistant':
+    case 'bot':
     case 'draft':
     case 'draft_worktree':
       return <ChatView />;
