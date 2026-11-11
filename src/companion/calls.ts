@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { API, type Method } from '../ipc/api.js';
-import { ChatMessageView, DataListView, DocumentView, FilePageView, FolderView, FoundView, MergeCheckView, MergeView, SignedLinkView, SubAgentDetailView, TerminalView, TerminalsView, TranscriptView, TurnView, VoiceMacView } from './protocol.js';
+import { ChatMessageView, ComboReportView, DataListView, DocumentView, FilePageView, FolderView, FoundView, MergeCheckView, MergeView, SignedLinkView, SubAgentDetailView, TerminalView, TerminalsView, TranscriptView, TurnView, VoiceMacView } from './protocol.js';
 
 /**
  * Every call the phone may make, typed: each `phone` method of coverage.ts with its arguments
@@ -215,8 +215,8 @@ export const PhoneCalls = {
   'routing.runRoute': entry('routing.runRoute', RunRouteResult),
   // Needs You's Try Again for a used-up combo: the target that goes on ("Economy · Codex").
   'routing.retry': entry('routing.retry', z.string()),
-  // Runs through combos, by combo and target.
-  'routing.usage': entry('routing.usage', z.array(z.object({ combo: z.string(), name: z.string(), runs: z.number(), limited: z.number(), ms: z.number(), tokens: z.number().optional(), cost: z.number().optional(), targets: z.array(z.object({ target: z.string(), runtime: z.string(), runs: z.number(), limited: z.number(), ms: z.number(), tokens: z.number().optional(), cost: z.number().optional() }).passthrough()) }).passthrough())),
+  // Runs through combos, by combo and target; 1.52: with how tasks went, savings and suggestions.
+  'routing.usage': entry('routing.usage', z.array(ComboReportView)),
 } as const;
 
 export type PhoneMethod = keyof typeof PhoneCalls;

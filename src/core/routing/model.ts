@@ -92,6 +92,75 @@ export function comboForDifficulty(st: Pick<RoutingState, 'runtimes' | 'prefs'> 
 }
 
 /**
+ * Kinds of work (Phase 3, docs/routing.md): what a task is, named the way a person routes it. The
+ * drafter (or, for a task made by hand, a quick Haiku look) picks one with a line of why, and
+ * Settings › Agent › Combos › By kind of work says which combo, and effort, each starts on.
+ * The one list: screens, the drafter's prompt and the API all read it from here.
+ */
+export const WORK_CATEGORIES = ['quick', 'deep', 'ultrabrain', 'visual', 'review', 'docs', 'explore'] as const;
+export type WorkCategory = (typeof WORK_CATEGORIES)[number];
+
+/** Each kind's name and what it's for (the drafter's prompt says the same). */
+export const CATEGORY_INFO: Readonly<Record<WorkCategory, { readonly label: string; readonly hint: string }>> = {
+  quick: { label: 'Quick', hint: 'a small, clear change: a typo, a rename, a one-file fix' },
+  deep: { label: 'Deep', hint: 'real implementation work across several files' },
+  ultrabrain: { label: 'Ultrabrain', hint: 'a hard problem: a design to work out, a bug whose cause is unknown, tricky logic' },
+  visual: { label: 'Visual', hint: 'how something looks: UI, layout, styles, screenshots' },
+  review: { label: 'Review', hint: 'reading and judging work: a review, an audit, checking a change' },
+  docs: { label: 'Docs', hint: 'writing: documentation, a README, comments, release notes' },
+  explore: { label: 'Explore', hint: 'finding out: research, reading the code to answer a question, a spike' },
+};
+
+/** Who set a task's kind: its drafter, the quick look a task made by hand gets, or you (a correction, Phase 5). */
+export const CATEGORY_SOURCES = ['drafter', 'classifier', 'you'] as const;
+export type CategorySource = (typeof CATEGORY_SOURCES)[number];
+
+/** One kind's combo, and the effort it runs at (unset: the combo's targets' own, else the conversation's). */
+export const CategoryRoute = z.object({ combo: z.string().regex(COMBO_ID), effort: z.enum(EFFORT_LEVELS).optional() });
+export type CategoryRoute = z.infer<typeof CategoryRoute>;
+
+/** Which combo a task of each kind starts on (unset: by its difficulty, else your agent). */
+export const CategoryCombos = z.object(Object.fromEntries(WORK_CATEGORIES.map((c) => [c, CategoryRoute.optional()])) as Record<WorkCategory, z.ZodOptional<typeof CategoryRoute>>);
+export type CategoryCombos = z.infer<typeof CategoryCombos>;
+
+/** What a task's routing reads of it. */
+export interface RoutedTask {
+  readonly agent?: AgentRef;
+  readonly category?: WorkCategory;
+  readonly difficulty?: Difficulty;
+}
+
+/** Where a task's agent came from, for its page ("Visual · Strong"). */
+export type TaskRouteSource = 'agent' | 'category' | 'difficulty' | 'default';
+
+/** The agent (and effort) a task starts on, and why. */
+export interface TaskRoute {
+  readonly agent?: AgentRef;
+  readonly effort?: Effort;
+  readonly from: TaskRouteSource;
+}
+
+/**
+ * The agent a task starts on: its own agent › its kind's combo › its difficulty's combo › your
+ * default (agent undefined). A combo since deleted is skipped, as if unset.
+ */
+export function taskRoute(st: Pick<RoutingState, 'runtimes' | 'prefs'> & { readonly prefs: { readonly difficultyCombos?: DifficultyCombos; readonly categoryCombos?: CategoryCombos } }, task: RoutedTask): TaskRoute {
+  if (task.agent) return { agent: task.agent, from: 'agent' };
+  const route = task.category ? st.prefs.categoryCombos?.[task.category] : undefined;
+  const combo = route ? combosIn(st).find((c) => c.id === route.combo) : undefined;
+  if (combo) return { agent: comboAgent(combo), ...(route?.effort ? { effort: route.effort } : {}), from: 'category' };
+  const byDifficulty = comboForDifficulty(st, task.difficulty);
+  if (byDifficulty) return { agent: byDifficulty, from: 'difficulty' };
+  return { from: 'default' };
+}
+
+/** "Visual · Strong", "Docs · your agent": a task's kind and the combo (or agent) it starts on. */
+export function taskRouteWords(category: WorkCategory | undefined, route: TaskRoute, yours = 'your agent'): string {
+  const on = route.agent ? (route.agent.comboName ?? route.agent.label) : yours;
+  return category ? `${CATEGORY_INFO[category].label} · ${on}` : on;
+}
+
+/**
  * Roles (Phase 4, docs/routing.md): the plan's head (its own conversation), the agent working a
  * milestone or a plan's task, the checker (a milestone's check, a draft's review: pick a combo of
  * another vendor for a cross-vendor check), and the pull-request reviewer. Each may run on a combo of

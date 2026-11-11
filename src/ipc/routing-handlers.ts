@@ -2,8 +2,9 @@ import type { Session } from '../core/session.js';
 import { type Combo, comboChoices, combosIn, runRouteOf, worldOf } from '../core/routing/model.js';
 import { hhmm } from '../shared/clock.js';
 import { CONTINUE_PROMPT } from '../shared/run-failure.js';
-import { comboStops, comboUsage, routeOf, routeWords } from '../core/routing/model.js';
+import { comboStops, routeOf, routeWords } from '../core/routing/model.js';
 import { sendAutomatic } from '../core/triage/launch.js';
+import { comboReport, strongerOf } from '../core/routing/outcomes.js';
 import type { Args, Method } from './api.js';
 
 /** What each `routing.*` method does (see routing-api.ts). */
@@ -45,7 +46,8 @@ export const ROUTING_HANDLERS = {
   },
   'routing.usage': (s, since) => {
     const st = s.store.getState();
-    return comboUsage(st.log, st.selfId, since ?? 0);
+    // With how its tasks went, what it saved against your baseline, and suggestions (Phase 5).
+    return comboReport(st.log, st.board.issues, st.selfId, { since: since ?? 0, ...(st.prefs.savingsBaseline ? { baseline: st.prefs.savingsBaseline } : {}), ...strongerOf(st) });
   },
   'routing.resetCombos': (s) => {
     s.setPrefs({ combos: null });

@@ -4,10 +4,10 @@ import { reviewPr } from './pr-reviewer.js';
 import { describeProject } from './project-describer.js';
 import type { Complete } from './runtime/types.js';
 import { fixRun, fixSetup, workOutScripts } from './setup-fixer.js';
-import { draftTask } from './task-drafter.js';
+import { classifyTask, draftTask } from './task-drafter.js';
 import type { AgentBackend } from './types.js';
 
-type SideCalls = Required<Pick<AgentBackend, 'nameTask' | 'titlePlan' | 'titleChat' | 'answerChat' | 'fixSetup' | 'fixRun' | 'workOutScripts' | 'draftTask' | 'describeProject' | 'reviewPr'>>;
+type SideCalls = Required<Pick<AgentBackend, 'nameTask' | 'titlePlan' | 'titleChat' | 'answerChat' | 'fixSetup' | 'fixRun' | 'workOutScripts' | 'draftTask' | 'classifyTask' | 'describeProject' | 'reviewPr'>>;
 
 /**
  * The one-shot calls a backend makes besides runs (BLG-441): naming worktrees and plans, drafting
@@ -25,6 +25,7 @@ export function sideCalls(complete: Complete, cwd: string, model?: string): Side
     fixRun: (dir, failed, output) => fixRun(dir, failed, output, { complete }),
     workOutScripts: (dir, want) => workOutScripts(dir, want, { complete }),
     draftTask: (text, ctx) => draftTask(text, ctx, { cwd, complete }),
+    classifyTask: (task) => classifyTask(task, { cwd, complete }),
     describeProject: (dir, project) => describeProject(dir, project, { complete }),
     reviewPr: (input) => reviewPr(input, { complete }),
   };

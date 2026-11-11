@@ -98,6 +98,8 @@ export const SETTINGS: readonly Entry[] = [
   ...rows('claude', 'Combos', [
     ['Agents in order', 'Each run goes to the first that can run then.', 'combo routing fallback order'],
     ['By how hard a task is', 'A task that names no agent starts on the combo for its difficulty.', 'difficulty simple normal hard classify task combo'],
+    ['By kind of work', 'A task of each kind (quick, deep, ultrabrain, visual, review, docs, explore) starts on this combo and effort.', 'category kind quick deep ultrabrain visual review docs explore classify task combo effort'],
+    ['Savings against', 'What Usage › Combos prices your runs against: everything on Opus, Sonnet or Codex.', 'savings baseline opus cost price saved'],
     ['By role', 'The combo a plan head, milestones, the checker and the PR reviewer run on.', 'role plan head milestone checker cross vendor reviewer pull request combo'],
   ]),
   group('claude', 'Launch flags', 'Your own flags for claude and codex.', 'args arguments cli flags dangerously skip permissions'),

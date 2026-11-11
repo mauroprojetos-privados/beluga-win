@@ -6,7 +6,8 @@ import type { ConnectionStatus } from '../net/peer-client.js';
 import type { Effort, NotifySettings, Settings, ThemeName, TrustLevel } from './settings.js';
 import { BRANCH_PREFIX_DEFAULT, NotifySettings as NotifySchema, SETTLE_IDLE_DAYS_DEFAULT } from '../shared/settings-schema.js';
 import type { Review } from '../workspaces/git.js';
-import type { Combo, DifficultyCombos, RoleCombos } from './routing/model.js';
+import type { CategoryCombos, Combo, DifficultyCombos, RoleCombos } from './routing/model.js';
+import type { SavingsBaseline } from './routing/outcomes.js';
 import type { Project, ProjectGroup } from '../workspaces/types.js';
 import type { EnvChange } from '../workspaces/env.js';
 import type { EnvSendAsk } from '../shared/env-send.js';
@@ -337,6 +338,10 @@ export interface Prefs {
   readonly difficultyCombos?: DifficultyCombos;
   /** Which combo each role runs on (core/routing/model.ts); unset: as before. */
   readonly roleCombos?: RoleCombos;
+  /** Which combo (and effort) a task of each kind starts on (core/routing/model.ts); unset: by difficulty, else your agent. */
+  readonly categoryCombos?: CategoryCombos;
+  /** What routing's savings are measured against (core/routing/outcomes.ts); unset: everything on Opus. */
+  readonly savingsBaseline?: SavingsBaseline;
   readonly autoSetup: boolean;
   /** What new worktrees' branches start with (`beluga/`; empty: none). */
   readonly branchPrefix: string;
@@ -808,7 +813,7 @@ export const DEFAULT_PREFS: Prefs = {
 
 /** The preference fields out of saved settings. */
 export function prefsFrom(settings: Partial<Settings>): Prefs {
-  const picked = Object.fromEntries(Object.keys(DEFAULT_PREFS).concat(['model', 'effort', 'defaultAgent', 'projectAgents', 'combos', 'difficultyCombos', 'roleCombos', 'shell', 'earningsCurrency']).filter((k) => settings[k as keyof Settings] !== undefined).map((k) => [k, settings[k as keyof Settings]]));
+  const picked = Object.fromEntries(Object.keys(DEFAULT_PREFS).concat(['model', 'effort', 'defaultAgent', 'projectAgents', 'combos', 'difficultyCombos', 'roleCombos', 'categoryCombos', 'savingsBaseline', 'shell', 'earningsCurrency']).filter((k) => settings[k as keyof Settings] !== undefined).map((k) => [k, settings[k as keyof Settings]]));
   return { ...DEFAULT_PREFS, ...picked };
 }
 

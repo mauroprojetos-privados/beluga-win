@@ -37,6 +37,9 @@ import { ProjectIcon } from '../components/ProjectIcon.js';
 import { RepoPicker, useSeveralRepos } from './boards.js';
 import { showWorktreeFolder } from '../lib/remote-open.js';
 import { revealThereLabel } from '@beluga/machines/open.js';
+import { CATEGORY_INFO, WORK_CATEGORIES, type WorkCategory, taskRoute } from '@beluga/core/routing/model.js';
+import { type TaskKindLine, taskKindLine } from '@beluga/core/routing/outcomes.js';
+import { PickMenu } from './PickMenu.js';
 
 /**
  * One task: its title (click to rename), what to do next (start a worktree with Claude on it, or
@@ -515,6 +518,7 @@ function Properties({ issue }: { issue: Issue }) {
           </button>
         </AssigneePicker>
       </Prop>}
+      <KindProp issue={issue} />
       <AgentProp issue={issue} />
       <Prop label="Labels">
         <div className={t.propLabels}>
@@ -597,6 +601,7 @@ function AgentProp({ issue }: { issue: Issue }) {
   const { openWorktree } = useTaskActions();
   const { who } = useTaskStart(issue);
   const mine = useMyAgentName();
+  const route = useApp((s) => taskRoute(s, issue), (a, b) => JSON.stringify(a) === JSON.stringify(b));
   const running = useApp((s) => (live ? pickedAgent(agentPicker(pickerState(s), `ws:${live.id}`, myRuntime(s.prefs))) : undefined), sameAgent);
   if (running && live) {
     return (
@@ -609,14 +614,50 @@ function AgentProp({ issue }: { issue: Issue }) {
     );
   }
   if (!isStartable(issue)) return null;
+  // Its own agent › its kind's combo › its difficulty's › yours (docs/routing.md).
+  const by = route.from === 'category' ? ' (by its kind)' : route.from === 'difficulty' ? ' (by how hard it is)' : '';
+  const routed = route.agent && route.from !== 'agent' ? `${route.agent.comboName ?? route.agent.label}${by}` : undefined;
   return (
     <Prop label="Agent" quiet>
       <span className={t.propStatic} title="Works it when it starts: Start › Start with another agent picks another">
-        {who === 'your agent' ? `Your agent (${mine})` : who}
+        {routed ?? (who === 'your agent' ? `Your agent (${mine})` : who)}
       </span>
     </Prop>
   );
 }
+
+/**
+ * Its kind of work (docs/routing.md): "Visual · Strong", the kind and the combo it starts on, with the
+ * why under it and how it went once judged. One click changes the kind (kept as a correction).
+ */
+function KindProp({ issue }: { issue: Issue }) {
+  const { api, act } = useTaskActions();
+  const line = useApp((s) => taskKindLine(s, issue), (a, b) => JSON.stringify(a) === JSON.stringify(b));
+  const pick = (value: WorkCategory | '') => void act(() => api.update(issue.id, { category: value || null }));
+  const sub = [line?.why, line?.outcome].filter(Boolean).join(' · ');
+  return (
+    <Prop label="Kind">
+      <div className={t.propRow} style={{ flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+        <PickMenu<WorkCategory | ''>
+          label="Kind of work"
+          align="end"
+          choices={[...WORK_CATEGORIES.map((c) => ({ value: c, label: CATEGORY_INFO[c].label, hint: CATEGORY_INFO[c].hint })), { value: '' as const, label: 'None', hint: 'By how hard it is, else your agent' }]}
+          chosen={[issue.category ?? '']}
+          onPick={pick}
+        >
+          <button type="button" className={cx(t.propValue, !issue.category && t.propAdd)} title={kindTitle(line)}>
+            {line?.ok !== undefined ? <Icon name={line.ok ? 'check' : 'x'} size={11} /> : null}
+            {issue.category ? line?.words : 'Set Kind'}
+          </button>
+        </PickMenu>
+        {sub ? <span className={cx(t.propStatic, t.ellipsis)} style={{ fontSize: 11, maxWidth: 220 }} title={sub}>{sub}</span> : null}
+      </div>
+    </Prop>
+  );
+}
+
+/** The kind's tooltip: who set it, and that you corrected it. */
+const kindTitle = (line: TaskKindLine | undefined): string => [line?.corrected ? 'You changed its kind (routing counts it as a correction)' : 'Its kind of work picks the combo it starts on (Settings › Agent › Combos)', line?.why ?? ''].filter(Boolean).join('\n');
 
 const sameAgent = (a: AgentRef | undefined, b: AgentRef | undefined): boolean => a?.runtime === b?.runtime && a?.label === b?.label && a?.model === b?.model;
 

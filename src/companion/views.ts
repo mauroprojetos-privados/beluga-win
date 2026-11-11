@@ -4,6 +4,7 @@ import { SCRATCH_DIR } from '../shared/scratch-dir.js';
 import { dialogueHeader } from '../core/dialogues/view.js';
 import { agentPicker, pickedAgent } from '../shared/agent-picker.js';
 import { runRouteOf } from '../core/routing/model.js';
+import { taskKindLine } from '../core/routing/outcomes.js';
 import { roomAgentTags } from '../shared/agent-tags.js';
 import { type Approval, type DomainState, type LogItem, type SubAgent, isRunning } from '../core/store.js';
 import { agentLabel, agentName } from '../shared/agent-label.js';
@@ -1117,6 +1118,25 @@ export function taskPageView(state: DomainState, id: string, ctx?: ViewContext):
     ...(live ? { agent: agentRefView(live) } : i.agent ? { agent: agentRefView(i.agent) } : {}),
     ...(isStartable(i) ? { agents: workPicker(state, i.agent) } : {}),
     ...(i.difficulty ? { difficulty: i.difficulty } : {}),
+    // 1.52 (docs/routing.md): its kind of work, what it starts on, and how it went.
+    ...kindView(state, i),
+  };
+}
+
+/** A task's kind line for the phone (1.52), clipped to the view's limits. */
+function kindView(state: DomainState, i: Issue): { kind?: NonNullable<TaskPageView['kind']> } {
+  const line = taskKindLine(state, i);
+  if (!line) return {};
+  return {
+    kind: {
+      ...(line.category ? { category: line.category } : {}),
+      ...(line.label ? { label: clip(line.label, 40) } : {}),
+      ...(line.why ? { why: clip(plainLine(line.why, 200), 200) } : {}),
+      words: clip(line.words, 140),
+      ...(line.corrected ? { corrected: true } : {}),
+      ...(line.ok !== undefined ? { ok: line.ok } : {}),
+      ...(line.outcome ? { outcome: clip(line.outcome, 200) } : {}),
+    },
   };
 }
 

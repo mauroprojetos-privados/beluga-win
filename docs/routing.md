@@ -101,7 +101,9 @@ A combo picked before it was deleted doesn't run: the run says to pick another a
 
 The phone (companion protocol 1.51) gets `comboName` on an agent: a run's answers say "Economy ·
 Codex", a task's page says which target its worktree's newest run went to and how hard the task is
-(`difficulty`), and a used-up combo is a Needs You card of kind `combo` with Try Again.
+(`difficulty`), and a used-up combo is a Needs You card of kind `combo` with Try Again. 1.52 adds a
+task's kind of work and record (`TaskPageView.kind`) and `routing.usage`'s success, savings and
+suggestions (`ComboReportView`, `SINCE.routing`), drawn in the phone's Settings › Routing.
 
 ## When a target hits its limit (Phase 2)
 
@@ -118,12 +120,38 @@ conversation waits in **Needs You** (`needs-you.ts`, kind `combo`) with the reas
 **Try Again** (`routing.retry`, on the phone too). The card goes away by itself when a target can run
 again; at the reset auto-continue sends the conversation on, as for any limit.
 
-## By how hard a task is (Phase 3)
+## By how hard a task is, and by kind of work (Phase 3)
 
 The task drafter (`agent/task-drafter.ts`) also says how hard a task looks: `simple`, `normal` or
 `hard`, kept on the task (`Issue.difficulty`). **Settings › Agent › Combos › By how hard a task is**
-maps each to a combo (`prefs.difficultyCombos`). A task that names no agent of its own starts on the
-combo for its difficulty; none mapped, your agent, as before.
+maps each to a combo (`prefs.difficultyCombos`).
+
+It also says what **kind of work** the task is, with one line of why (`Issue.category`,
+`categoryWhy`). The kinds are one list, `WORK_CATEGORIES` in `core/routing/model.ts`:
+
+| Kind | For |
+|---|---|
+| `quick` | a small, clear change: a typo, a rename, a one-file fix |
+| `deep` | real implementation work across several files |
+| `ultrabrain` | a hard problem: a design to work out, a bug whose cause is unknown |
+| `visual` | how something looks: UI, layout, styles |
+| `review` | reading and judging work: a review, an audit |
+| `docs` | writing: documentation, a README, release notes |
+| `explore` | finding out: research, reading the code to answer a question |
+
+A task made by hand (no drafter wrote it), or one whose drafter named no kind, gets a quick Haiku
+look in the background (`classifyTask`, a side call through `routeSideCall` like the others); one
+you set meanwhile stays. **Settings › Agent › Combos › By kind of work** maps each kind to a combo and,
+optionally, an effort (`prefs.categoryCombos`).
+
+A task starts on (`taskRoute`): **its own agent › its kind's combo › its difficulty's combo › your
+default**. A kind's effort is set on the worktree; a target's own effort still wins over it. A combo
+since deleted is skipped as unset.
+
+The task's page shows it under **Kind** as "Visual · Strong" (the kind, then the combo it starts on),
+with the why under it; one click picks another kind (`board.update` `category`). Your change is
+kept as a correction: `categoryBy: 'you'` and `categoryWas`, the kind it had first, which Phase 5's
+record counts. Its Agent line says which combo it starts on and why ("Strong (by its kind)").
 
 ## By role (Phase 4)
 
@@ -148,3 +176,32 @@ for its share of the combo's tokens), Settings › Agent › Combos says it unde
 1.2M tokens · $3.40: Codex 8 (850k), Claude · Sonnet 4 (350k, 1 at its limit)"), and
 `routing.usage` gives it to the phone. It counts the runs the log holds; runs from before this kept no
 tokens.
+
+### Did it go well, what did it save (Phase 5)
+
+`core/routing/outcomes.ts`, from what is already logged; nothing new is recorded.
+
+- **A task went well** (`taskOutcomes`) when all of these hold:
+  - it reached In Review (its history's status line; a task Done or In Review with no such line counts from its creation);
+  - no later task fixes it: one made after it reached review, related to it, blocked by it or under it, labelled `bug` or titled "Fix…";
+  - its checks passed the first time (no "checks are failing" in its history);
+  - you didn't switch: its runs all made the same pick (a combo handing on to its next target is the same pick), and you didn't correct its kind.
+
+  A task still before review isn't judged; one canceled before review is judged as not gone well.
+  The task's page says it (✓ or ✗ on its Kind, and why), on the phone too.
+- **Savings** against a baseline Settings › Agent › Combos › **Savings against** picks
+  (`prefs.savingsBaseline`: everything on Opus, the default, on Sonnet or on Codex). Each run's
+  tokens are priced at the baseline, and against what it cost: its reported cost, else its tokens at
+  its target's price. The prices are one table, `MODEL_PRICES` (USD per million tokens, input and
+  output; runs count tokens as one number, priced at a 90/10 blend). A Claude run with no model named
+  is priced as Opus and a runtime with no row (OpenCode, Copilot) at the baseline, so neither claims a
+  saving it may not have made. Your own endpoint is free.
+- **Suggestions**, read-only, never applied: for each combo and kind with at least `MIN_SAMPLE` (10)
+  judged tasks, one that went well 90% of the time or more on a target dearer than Haiku says "Docs
+  tasks on Economy went well 95% of the time (20 tasks); try Haiku directly?"; one at 60% or less
+  says to try the combo Ultrabrain work starts on (else Strong).
+
+**Usage › Combos** shows the total saved and how tasks went, then per combo its savings and its tasks
+by kind, then the suggestions. `routing.usage` returns the same (`comboReport`: each combo's usage
+with `judged`, `good`, `categories`, `baselineCost`, `spent`, `saved`, `baseline`, `suggestions`),
+and the phone draws it in Settings › Routing.

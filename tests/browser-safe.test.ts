@@ -37,6 +37,7 @@ const ENTRIES = [
   'src/core/triage/model.ts',
   // Combos (docs/routing.md): the pickers and Settings resolve them as the daemon does.
   'src/core/routing/model.ts',
+  'src/core/routing/outcomes.ts',
   'src/core/triage/facts.ts',
   // How a computer of yours is said and drawn, on the Mac and in the phone's bundle.
   'src/machines/words.ts',

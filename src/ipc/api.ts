@@ -41,7 +41,8 @@ import { CALLS_API } from './calls-api.js';
 import { TERMINAL_IMPORT_API } from './terminal-import-api.js';
 import { AGENT_TERM_API } from './agent-term-api.js';
 import { HANDOFF_MODES } from '../shared/agent-handoff.js';
-import { Combo, DifficultyCombos, MAX_COMBOS, RoleCombos } from '../core/routing/model.js';
+import { CategoryCombos, Combo, DifficultyCombos, MAX_COMBOS, RoleCombos } from '../core/routing/model.js';
+import { SAVINGS_BASELINES } from '../core/routing/outcomes.js';
 import { ROUTING_API } from './routing-api.js';
 
 /**
@@ -106,6 +107,10 @@ export const PrefsPatch = z
     difficultyCombos: DifficultyCombos.nullable(),
     // Which combo each role runs on; null: none (as before).
     roleCombos: RoleCombos.nullable(),
+    // Which combo (and effort) a task of each kind starts on; null: none (by difficulty, else your agent).
+    categoryCombos: CategoryCombos.nullable(),
+    // What Usage › Combos measures savings against ("everything on Opus"); null: the default.
+    savingsBaseline: z.enum(SAVINGS_BASELINES).nullable(),
     autoSetup: bool,
     branchPrefix: z.string().regex(BRANCH_PREFIX_RE, 'Use letters, digits and . _ - / only'),
     contextMeter: bool,

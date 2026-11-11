@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { AgentRef } from '../protocol.js';
-import { DifficultyCombos, RoleCombos, SavedCombos } from '../core/routing/model.js';
+import { CategoryCombos, DifficultyCombos, RoleCombos, SavedCombos } from '../core/routing/model.js';
+import { SAVINGS_BASELINES } from '../core/routing/outcomes.js';
 import { AUTO_COMPACT_DEFAULT, AUTO_COMPACT_MAX, AUTO_COMPACT_MIN } from './context-usage.js';
 import { PARALLEL_RUNS_DEFAULT, PARALLEL_RUNS_MAX, PARALLEL_RUNS_MIN } from './run-slots.js';
 import { CHAT_LIMIT_DEFAULT, CHAT_LIMIT_MAX } from './chat-limit.js';
@@ -136,6 +137,10 @@ export const Settings = z.object({
   difficultyCombos: DifficultyCombos.optional().catch(undefined),
   /** Which combo each role runs on: a plan's head, its milestones, the checker, the PR reviewer (docs/routing.md). */
   roleCombos: RoleCombos.optional().catch(undefined),
+  /** Which combo (and effort) a task of each kind of work starts on when it names no agent (docs/routing.md). */
+  categoryCombos: CategoryCombos.optional().catch(undefined),
+  /** What routing's savings are measured against (docs/routing.md); unset: everything on Opus. */
+  savingsBaseline: z.enum(SAVINGS_BASELINES).optional().catch(undefined),
   /** What new worktrees' branches start with (`beluga/<name>`); empty: no prefix. */
   branchPrefix: z.string().regex(BRANCH_PREFIX_RE).catch(BRANCH_PREFIX_DEFAULT),
   /** Run the project's setup script (e.g. npm install) in every new worktree. */

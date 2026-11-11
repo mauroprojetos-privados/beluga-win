@@ -568,6 +568,8 @@ export interface AgentBackend {
   workOutScripts?(dir: string, want: { setup: boolean; run: boolean; system?: string }): Promise<WorkedOutScripts | undefined>;
   /** A task written from a description: title, goal, criteria, labels from the board's own (Sonnet). */
   draftTask?(text: string, ctx: DraftContext): Promise<TaskDraft | undefined>;
+  /** What kind of work a task made by hand is (Phase 3, docs/routing.md): a quick Haiku look, no tools. */
+  classifyTask?(task: { readonly title: string; readonly goal?: string }): Promise<import('./task-drafter.js').TaskKind | undefined>;
   /** What a project is about, from a quick read-only look at its folder (About This Project, BLG-298). */
   describeProject?(dir: string, project: string): Promise<string | undefined>;
   /** A pull request reviewed before a sentinel merges it: ship or hold, in one sentence (a small model, read-only). */

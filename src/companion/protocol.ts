@@ -9,7 +9,7 @@ import { z } from 'zod';
  * ignores what it doesn't know. A breaking change bumps the major, and the Mac keeps answering the
  * previous major for a release.
  */
-export const COMPANION_PROTO = { major: 1, minor: 51 } as const;
+export const COMPANION_PROTO = { major: 1, minor: 52 } as const;
 
 /**
  * What came in which minor, for a phone talking to an older Mac: it subscribes to a topic (and
@@ -136,8 +136,11 @@ export const COMPANION_PROTO = { major: 1, minor: 51 } as const;
  * Runs on from its own links (BLG-810).
  * 1.50 (BLG-121, BLG-122): a message an external agent sent says so (`TurnView.via`). An older phone shows the message
  * without it. External agents from the phone: `external.agents`, `stopAgent`, `stopAll`, `revoke`, `activity` (SINCE.externalAgents).
+ * 1.52 (docs/routing.md, Phases 3 and 5): a task's kind of work and where it starts (`TaskPageView.kind`),
+ * and `routing.usage` with how tasks went, the savings and suggestions (`ComboReportView`, SINCE.routing).
+ * An older Mac leaves them out; an older phone ignores them.
  */
-export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50 } as const;
+export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, routing: 52 } as const;
 
 /** One frame's biggest payload, and a file piece. */
 export const MAX_COMPANION_FRAME = 1024 * 1024;
@@ -849,8 +852,51 @@ export const TaskPageView = TaskSummary.extend({
   agents: AgentPickerView.optional(),
   /** 1.51 (docs/routing.md): how hard its drafter judged it; with a combo mapped for that, the one it starts on. */
   difficulty: z.enum(['simple', 'normal', 'hard']).optional(),
+  /**
+   * 1.52 (docs/routing.md): its kind of work (core/routing WORK_CATEGORIES; one a phone doesn't know
+   * is shown by its label), why, and what it starts on ("Visual · Strong"); whether it went well
+   * (`ok` unset: not judged yet) and why, from what Beluga logged. Changing the kind is on the Mac.
+   */
+  kind: z
+    .object({
+      category: z.string().max(20).optional(),
+      label: z.string().max(40).optional(),
+      why: z.string().max(200).optional(),
+      words: z.string().max(140),
+      corrected: z.boolean().optional(),
+      ok: z.boolean().optional(),
+      outcome: z.string().max(200).optional(),
+    })
+    .optional(),
 });
 export type TaskPageView = z.infer<typeof TaskPageView>;
+
+/**
+ * 1.52 (docs/routing.md): `routing.usage`, one combo's record: runs, tokens and cost by target
+ * (1.51), then how its tasks went (by kind too), what it cost against the baseline you picked, and
+ * read-only suggestions. Fields after 1.51's are optional: an older Mac sends none.
+ */
+export const ComboReportView = z
+  .object({
+    combo: z.string(),
+    name: z.string(),
+    runs: z.number(),
+    limited: z.number(),
+    ms: z.number(),
+    tokens: z.number().optional(),
+    cost: z.number().optional(),
+    targets: z.array(z.object({ target: z.string(), runtime: z.string(), runs: z.number(), limited: z.number(), ms: z.number(), tokens: z.number().optional(), cost: z.number().optional() }).passthrough()),
+    judged: z.number().optional(),
+    good: z.number().optional(),
+    categories: z.array(z.object({ category: z.string(), judged: z.number(), good: z.number() }).passthrough()).optional(),
+    baselineCost: z.number().optional(),
+    spent: z.number().optional(),
+    saved: z.number().optional(),
+    baseline: z.string().optional(),
+    suggestions: z.array(z.string()).optional(),
+  })
+  .passthrough();
+export type ComboReportView = z.infer<typeof ComboReportView>;
 
 /** 1.21 (BLG-237): a sentinel run's state (src/core/sentinel/model.ts RUN_STATES); one a phone doesn't know is drawn plain. */
 export const SentinelRunState = z.union([z.enum(['queued', 'running', 'needs-you', 'done', 'skipped', 'failed', 'stopped']), z.string().max(20)]);
