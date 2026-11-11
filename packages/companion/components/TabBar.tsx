@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useView, useVisibleNeeds } from '../lib/hooks';
 import type { HomeView } from '../lib/link/protocol';
+import { t } from '../lib/language';
 import { color } from '../lib/theme';
 import { haptic, Press } from './ui';
 
@@ -14,7 +15,7 @@ import { haptic, Press } from './ui';
  * color. Ask sits in the middle, always there, in the primary ink.
  */
 const ICONS = { index: House, work: Layers, chats: MessageCircle, people: Users } as const;
-const LABELS = { index: 'Home', work: 'Work', chats: 'Chats', people: 'People' } as const;
+const LABELS = { get index() { return t('phone.tabs.home'); }, get work() { return t('phone.tabs.work'); }, get chats() { return t('phone.tabs.chats'); }, get people() { return t('phone.tabs.people'); } };
 
 export function TabBar({ state, navigateToTab, insets }: BottomTabBarProps) {
   const [width, setWidth] = useState(0);
@@ -57,7 +58,7 @@ export function TabBar({ state, navigateToTab, insets }: BottomTabBarProps) {
               haptic.commit();
               router.push('/ask');
             }}
-            accessibilityLabel="Ask your Mac"
+            accessibilityLabel={t('phone.home.askYourMac')}
             style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: color.primary }}
           >
             <Plus color={color.onPrimary} size={22} strokeWidth={2} />

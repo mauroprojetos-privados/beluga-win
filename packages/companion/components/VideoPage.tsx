@@ -8,6 +8,7 @@ import { ActivityIndicator, AppState, Platform, View } from 'react-native';
 import { useFile } from '../lib/hooks';
 import type { OutputView } from '../lib/link/protocol';
 import { cantPlay, videoFormat } from '../lib/media';
+import { t } from '../lib/language';
 import { store } from '../lib/store';
 import { color } from '../lib/theme';
 import { sizeOf } from './Outputs';
@@ -61,10 +62,10 @@ export function VideoPage({ o, active, onEngage, onRatio }: { readonly o: Output
     }
   }, [active]);
 
-  if (why) return <Fallback o={o} title="Can’t play this one here" detail={`${why} Open it on your Mac.`} />;
+  if (why) return <Fallback o={o} title={t('phoneParts.video.cantPlay')} detail={t('phoneParts.video.openOnMac', { why })} />;
   if (!engaged) {
     return (
-      <Press onPress={() => engage(true)} accessibilityLabel={`Play ${o.name}`} style={{ flex: 1, backgroundColor: color.onStageCard, borderRadius: 22, overflow: 'hidden' }}>
+      <Press onPress={() => engage(true)} accessibilityLabel={t('phoneParts.video.play', { name: o.name })} style={{ flex: 1, backgroundColor: color.onStageCard, borderRadius: 22, overflow: 'hidden' }}>
         {poster?.uri ? <Image
             source={{ uri: poster.uri }}
             style={{ flex: 1 }}
@@ -88,7 +89,7 @@ export function VideoPage({ o, active, onEngage, onRatio }: { readonly o: Output
       </Press>
     );
   }
-  if (error) return <Fallback o={o} title="Couldn’t play it" detail={error} retry={() => (setError(undefined), setUrl(undefined), setAttempt((a) => a + 1))} done={() => engage(false)} />;
+  if (error) return <Fallback o={o} title={t('phoneParts.video.couldntPlay')} detail={error} retry={() => (setError(undefined), setUrl(undefined), setAttempt((a) => a + 1))} done={() => engage(false)} />;
   if (!url) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: color.stage }}>
@@ -107,7 +108,11 @@ function Player({ url, name, onFail, onDone }: { readonly url: string; readonly 
   });
   const { status, error } = useEvent(player, 'statusChange', { status: player.status });
   useEffect(() => {
-    if (status === 'error') onFail(`${videoFormat(name)?.label ?? 'This'} video didn’t play on this phone${error?.message ? ` (${error.message.slice(0, 120)})` : ''}. Open it on your Mac.`);
+    if (status === 'error') {
+      const kind = videoFormat(name)?.label;
+      const why = error?.message?.slice(0, 120);
+      onFail(kind ? (why ? t('phoneParts.video.failedWhy', { kind, why }) : t('phoneParts.video.failed', { kind })) : why ? t('phoneParts.video.thisFailedWhy', { why }) : t('phoneParts.video.thisFailed'));
+    }
   }, [status]);
   // Put away, or another screen on top: paused.
   useEffect(() => {
@@ -123,10 +128,10 @@ function Player({ url, name, onFail, onDone }: { readonly url: string; readonly 
           <ActivityIndicator color={color.onStageDim} />
         </View>
       ) : null}
-      <Press onPress={onDone} accessibilityLabel="Done" style={{ position: 'absolute', top: 10, right: 10, height: 32, paddingHorizontal: 12, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: color.onStageChip }}>
+      <Press onPress={onDone} accessibilityLabel={t('common.done')} style={{ position: 'absolute', top: 10, right: 10, height: 32, paddingHorizontal: 12, borderRadius: 16, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: color.onStageChip }}>
         <X color={color.onStage} size={15} />
         <T v="caption" c={color.onStage} style={{ fontWeight: '600' }}>
-          Done
+          {t('common.done')}
         </T>
       </Press>
     </View>
@@ -149,17 +154,17 @@ function Fallback({ o, title, detail, retry, done }: { readonly o: OutputView; r
         {[o.name, sizeOf(o.size)].filter(Boolean).join(' · ')}
       </T>
       {retry ? (
-        <Press onPress={retry} accessibilityLabel="Retry" style={{ marginTop: 6, height: 42, paddingHorizontal: 20, borderRadius: 21, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: color.onStage }}>
+        <Press onPress={retry} accessibilityLabel={t('phoneParts.screen.retry')} style={{ marginTop: 6, height: 42, paddingHorizontal: 20, borderRadius: 21, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: color.onStage }}>
           <RotateCw color={color.stage} size={16} />
           <T v="callout" c={color.stage} style={{ fontWeight: '700' }}>
-            Retry
+            {t('phoneParts.screen.retry')}
           </T>
         </Press>
       ) : null}
       {done ? (
-        <Press onPress={done} accessibilityLabel="Back">
+        <Press onPress={done} accessibilityLabel={t('common.back')}>
           <T v="caption" c={color.onStageDim}>
-            Back
+            {t('common.back')}
           </T>
         </Press>
       ) : null}

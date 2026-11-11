@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { agentForChoice, agentPicks } from '../lib/agent-picks';
+import { t } from '../lib/language';
 import { color } from '../lib/theme';
 import { AgentMarkIcon, runtimeMark } from './AgentMark';
 import { haptic, Press, T } from './ui';
@@ -32,14 +33,14 @@ export function AgentChoice({ value, onChange }: { readonly value: PickedAgent |
     setOpen(false);
   };
   const chipMark = value ? runtimeMark(value.runtime) : picks.defaultRuntime ? runtimeMark(picks.defaultRuntime) : undefined;
-  const chipLabel = value ? (picks.options.find((o) => o.value === on)?.label ?? (value.model ? `${value.label} · ${value.model}` : value.label)) : 'Your agent';
+  const chipLabel = value ? (picks.options.find((o) => o.value === on)?.label ?? (value.model ? `${value.label} · ${value.model}` : value.label)) : t('phoneParts.onboarding.yourAgent');
   return (
     <>
       <Press
         onPress={() => (haptic.tap(), setOpen((o) => !o))}
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
-        accessibilityLabel={`Agent: ${chipLabel}`}
+        accessibilityLabel={t('phoneParts.agent.chipLabel', { name: chipLabel })}
         style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, paddingHorizontal: 10, borderRadius: 17, backgroundColor: color.sunken }}
       >
         {chipMark ? <AgentMarkIcon mark={chipMark} size={14} color={color.text2} /> : <Sparkles color={color.text2} size={15} strokeWidth={1.9} />}
@@ -51,13 +52,13 @@ export function AgentChoice({ value, onChange }: { readonly value: PickedAgent |
       {open ? (
         <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(120)} style={{ width: '100%' }}>
           <ScrollView style={{ maxHeight: 260 }} contentContainerStyle={{ paddingVertical: 4 }} nestedScrollEnabled>
-            <Row label="Your agent" sub="Your default, as on your Mac" mark={picks.defaultRuntime} on={!on} onPress={() => pick('')} />
+            <Row label={t('phoneParts.onboarding.yourAgent')} sub={t('phoneParts.agent.defaultSub')} mark={picks.defaultRuntime} on={!on} onPress={() => pick('')} />
             {picks.options.map((o) => (
               <Row key={o.value} label={o.label} mark={o.runtime} on={o.value === on} disabled={o.disabled} {...(o.why ? { sub: o.why } : {})} onPress={() => pick(o.value)} />
             ))}
             {!picks.options.length ? (
               <T v="caption" style={{ paddingHorizontal: 10, paddingTop: 4 }}>
-                Your Mac’s other agents show here once it has said which it runs.
+                {t('phoneParts.agent.othersLater')}
               </T>
             ) : null}
           </ScrollView>

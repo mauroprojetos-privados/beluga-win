@@ -4,22 +4,23 @@ import { View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useView } from '../lib/hooks';
 import type { PlansView } from '../lib/link/protocol';
+import { t } from '../lib/language';
 import { color } from '../lib/theme';
 import { Card, IconBadge, Press, T, toneInk, toneOf } from './ui';
 
-const STATE: Record<string, string> = { running: 'Running', done: 'Done', draft: 'Draft', waiting: 'Waiting', todo: 'To do' };
+const STATE: Record<string, () => string> = { running: () => t('phoneParts.sentinels.running'), done: () => t('phoneParts.sentinels.done'), draft: () => t('phoneParts.plans.draft'), waiting: () => t('phoneParts.plans.waiting'), todo: () => t('phoneParts.plans.todo') };
 
 /** The plans, as cards with their progress (Work › Plans, and /plans). */
 export function PlansList() {
   const plans = useView<PlansView>('plans');
   const list = plans?.data.plans ?? [];
-  if (!plans) return <T v="callout" style={{ paddingHorizontal: 20 }}>Loading plans…</T>;
+  if (!plans) return <T v="callout" style={{ paddingHorizontal: 20 }}>{t('phoneParts.plans.loading')}</T>;
   if (!list.length) {
     return (
       <Card style={{ marginHorizontal: 16, padding: 18 }}>
-        <T v="heading">No plans yet</T>
+        <T v="heading">{t('phoneParts.plans.none')}</T>
         <T v="callout" style={{ marginTop: 4 }}>
-          Plans are made on your Mac.
+          {t('phoneParts.plans.madeOnMac')}
         </T>
       </Card>
     );
@@ -40,7 +41,7 @@ export function PlansList() {
                       {p.title}
                     </T>
                     <T v="caption">
-                      {STATE[p.state] ?? p.state} · {p.done} of {p.total}
+                      {t('phoneParts.plans.progress', { state: STATE[p.state]?.() ?? p.state, done: p.done, total: p.total })}
                     </T>
                   </View>
                   <ChevronRight color={color.text3} size={18} />

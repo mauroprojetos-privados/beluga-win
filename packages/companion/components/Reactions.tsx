@@ -1,5 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 import type { ChatMessageView } from '../lib/link/protocol';
+import { t } from '../lib/language';
 import { color } from '../lib/theme';
 import { Press, T, haptic } from './ui';
 
@@ -16,15 +17,15 @@ const DEFAULT_QUICK = ['👍', '❤️', '😂', '🎉', '👀', '✅'];
 const whoLine = (who: readonly string[], count: number): string => {
   const names = who.slice(0, 3);
   const rest = count - names.length;
-  if (rest > 0) return `${names.join(', ')} and ${rest} other${rest === 1 ? '' : 's'}`;
-  return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+  if (rest > 0) return t('phoneParts.react.andOthers', { names: names.join(', '), count: rest });
+  return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} ${t('common.and')} ${names.at(-1)}`;
 };
 
 export function ReactionChips({ reactions, mine, onToggle, onWho }: { reactions: NonNullable<ChatMessageView['reactions']>; mine: boolean; onToggle: (emoji: string, on: boolean) => void; onWho: (line: string) => void }) {
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, justifyContent: mine ? 'flex-end' : 'flex-start', marginHorizontal: 2 }}>
       {reactions.map((r) => {
-        const line = `${whoLine(r.who, r.count)} reacted with ${r.emoji}`;
+        const line = t('phoneParts.react.reacted', { who: whoLine(r.who, r.count), emoji: r.emoji });
         return (
           <Press
             key={r.emoji}
@@ -63,11 +64,11 @@ export function ReactionChips({ reactions, mine, onToggle, onWho }: { reactions:
 export function QuickReactions({ quick, reactions, onPick }: { quick: readonly string[] | undefined; reactions: ChatMessageView['reactions']; onPick: (emoji: string, on: boolean) => void }) {
   const row = (quick?.length ? quick : DEFAULT_QUICK).slice(0, 6);
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 6, paddingBottom: 10 }} accessibilityLabel="React">
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 6, paddingBottom: 10 }} accessibilityLabel={t('phoneParts.react.react')}>
       {row.map((e) => {
         const yours = Boolean(reactions?.some((r) => r.emoji === e && r.mine));
         return (
-          <Press key={e} haptics={false} accessibilityLabel={yours ? `Take back ${e}` : `React with ${e}`} onPress={() => (haptic.commit(), onPick(e, !yours))} style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: yours ? `${color.info}1F` : color.sunken }}>
+          <Press key={e} haptics={false} accessibilityLabel={yours ? t('phoneParts.react.takeBack', { emoji: e }) : t('phoneParts.react.with', { emoji: e })} onPress={() => (haptic.commit(), onPick(e, !yours))} style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: yours ? `${color.info}1F` : color.sunken }}>
             <T v="body" style={{ fontSize: 24 }}>
               {e}
             </T>

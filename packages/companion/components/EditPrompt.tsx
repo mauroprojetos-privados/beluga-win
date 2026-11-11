@@ -4,6 +4,7 @@ import { Platform, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { calls } from '../lib/link/calls';
 import type { TurnView } from '../lib/link/protocol';
+import { t } from '../lib/language';
 import { store } from '../lib/store';
 import { useOn } from '../lib/scope';
 import { color } from '../lib/theme';
@@ -54,11 +55,11 @@ export function EditPromptSheet({ turn, onClose }: { readonly turn: TurnView | u
   const note =
     mode === 'here'
       ? worktree
-        ? 'What came after this goes, and the files go back to how they were then.'
-        : 'What came after this goes, and your agent forgets it.'
+        ? t('phoneParts.edit.hereWorktree')
+        : t('phoneParts.edit.hereChat')
       : worktree
-        ? 'Goes on in a new worktree from this point. This one stays as it is.'
-        : 'Goes on in a new chat from this point. This one stays as it is.';
+        ? t('phoneParts.edit.forkWorktree')
+        : t('phoneParts.edit.forkChat');
   return (
     <Sheet
       visible={Boolean(turn)}
@@ -66,7 +67,7 @@ export function EditPromptSheet({ turn, onClose }: { readonly turn: TurnView | u
       header={
         <View style={{ paddingHorizontal: 20, paddingBottom: 10 }}>
           <T v="title" style={{ fontSize: 20 }}>
-            Edit your message
+            {t('phoneParts.edit.title')}
           </T>
         </View>
       }
@@ -78,7 +79,7 @@ export function EditPromptSheet({ turn, onClose }: { readonly turn: TurnView | u
           onChangeText={setText}
           multiline
           editable={!busy}
-          accessibilityLabel="Edit your message"
+          accessibilityLabel={t('phoneParts.edit.title')}
           placeholderTextColor={color.text3}
           style={{ color: color.text, fontSize: 17, lineHeight: 24, minHeight: 72, maxHeight: 220, textAlignVertical: 'top', padding: 12, borderRadius: 14, backgroundColor: color.sunken, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : {}) }}
         />
@@ -86,12 +87,12 @@ export function EditPromptSheet({ turn, onClose }: { readonly turn: TurnView | u
           value={mode}
           onChange={(m) => (haptic.tap(), setMode(m))}
           options={[
-            { key: 'here', label: 'Rewind Here', Icon: Undo2 },
-            { key: 'fork', label: 'New Fork', Icon: GitBranch },
+            { key: 'here', label: t('phoneParts.edit.rewindHere'), Icon: Undo2 },
+            { key: 'fork', label: t('phoneParts.edit.newFork'), Icon: GitBranch },
           ]}
         />
         <T v="caption">{note}</T>
-        <Button label={busy ? (mode === 'here' ? 'Rewinding…' : 'Forking…') : mode === 'here' ? 'Rewind and Send' : 'Fork and Send'} Icon={mode === 'here' ? Undo2 : GitBranch} disabled={busy || !text.trim()} onPress={() => void send()} />
+        <Button label={busy ? (mode === 'here' ? t('phoneParts.edit.rewinding') : t('phoneParts.edit.forking')) : mode === 'here' ? t('phoneParts.edit.rewindSend') : t('phoneParts.edit.forkSend')} Icon={mode === 'here' ? Undo2 : GitBranch} disabled={busy || !text.trim()} onPress={() => void send()} />
       </View>
     </Sheet>
   );

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Platform, Pressable, TextInput, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withSpring, withTiming } from 'react-native-reanimated';
+import { t } from '../lib/language';
 import { color, spring, tint, type } from '../lib/theme';
 import { haptic } from './ui';
 
@@ -20,7 +21,7 @@ export function CodeBoxes({ value, onChange, onDone, autoFocus = true, error }: 
   }, [error]);
   const row = useAnimatedStyle(() => ({ transform: [{ translateX: shake.value }] }));
   return (
-    <Pressable onPress={() => input.current?.focus()} accessibilityLabel="Pairing code">
+    <Pressable onPress={() => input.current?.focus()} accessibilityLabel={t('phoneParts.pairingCode')}>
       <Animated.View style={[{ flexDirection: 'row', justifyContent: 'center', gap: 10 }, row]}>
         {[0, 1, 2].map((g) => (
           <View key={g} style={{ flexDirection: 'row', gap: 4 }}>

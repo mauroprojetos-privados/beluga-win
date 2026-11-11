@@ -5,6 +5,7 @@ import { ScrollView, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { calls } from '../lib/link/calls';
 import type { Topic } from '../lib/link/protocol';
+import { t } from '../lib/language';
 import { store } from '../lib/store';
 import { color, radius } from '../lib/theme';
 import { convHref } from './Conv';
@@ -49,23 +50,23 @@ const Step = ({ Icon, tone, title }: { Icon: LucideIcon; tone: Tone; title: stri
   </View>
 );
 
-const IDEAS: readonly Idea[] = [
+const ideas = (): readonly Idea[] => [
   {
     id: 'sleep',
     Icon: Activity,
     tone: 'rose',
-    line: 'Your site goes down at 3 a.m.; by morning a fix waits for your merge',
-    prompt: 'Watch my website every 5 minutes. When it stops answering, have my agent find out why on its own, open a task for it, fix it in a new worktree and open a pull request for me to merge, and tell me when it’s back.',
+    line: t('phoneParts.ideas.sleepLine'),
+    prompt: t('phoneParts.ideas.sleepPrompt'),
     scene: () => (
       <View style={{ gap: 8 }}>
         <T v="caption" style={{ textAlign: 'center' }}>
-          3:12 at night · example.com stopped answering
+          {t('phoneParts.ideas.sleepScene')}
         </T>
         <View style={{ flexDirection: 'row', gap: 6 }}>
-          <Step Icon={Activity} tone="rose" title="Spotted it" />
-          <Step Icon={Bot} tone="peach" title="The agent looked" />
-          <Step Icon={ListTodo} tone="sky" title="Opened a task" />
-          <Step Icon={GitMerge} tone="mint" title="Ready to merge" />
+          <Step Icon={Activity} tone="rose" title={t('phoneParts.ideas.spotted')} />
+          <Step Icon={Bot} tone="peach" title={t('phoneParts.ideas.looked')} />
+          <Step Icon={ListTodo} tone="sky" title={t('phoneParts.ideas.openedTask')} />
+          <Step Icon={GitMerge} tone="mint" title={t('phoneParts.ideas.readyToMerge')} />
         </View>
       </View>
     ),
@@ -74,12 +75,12 @@ const IDEAS: readonly Idea[] = [
     id: 'board',
     Icon: Gauge,
     tone: 'sky',
-    line: 'Your numbers on one board, and on your Mac’s desktop as widgets',
-    prompt: 'Look at my projects and put the numbers that matter on a board: sales, sign-ups, how fast the site answers, open pull requests. Set up what keeps them fresh every morning.',
+    line: t('phoneParts.ideas.boardLine'),
+    prompt: t('phoneParts.ideas.boardPrompt'),
     scene: () => (
       <View style={{ flexDirection: 'row', gap: 8 }}>
-        <Mini label="Revenue" value="$3,412" change="+7.3%" />
-        <Mini label="Sign-ups" value="35" change="+21%" />
+        <Mini label={t('phoneParts.ideas.revenue')} value="$3,412" change="+7.3%" />
+        <Mini label={t('phoneParts.ideas.signUps')} value="35" change="+21%" />
       </View>
     ),
   },
@@ -87,13 +88,13 @@ const IDEAS: readonly Idea[] = [
     id: 'fix',
     Icon: Wrench,
     tone: 'peach',
-    line: 'When the tests break, your agent fixes them and asks you to merge',
-    prompt: 'When the tests fail on GitHub for one of my projects, have my agent find out why, fix it in a new worktree and open a pull request for me to merge.',
+    line: t('phoneParts.ideas.fixLine'),
+    prompt: t('phoneParts.ideas.fixPrompt'),
     scene: () => (
       <View style={{ flexDirection: 'row', gap: 6 }}>
-        <Step Icon={TriangleAlert} tone="rose" title="Tests failed" />
-        <Step Icon={Wrench} tone="peach" title="The agent fixed it" />
-        <Step Icon={GitMerge} tone="mint" title="Ready to merge" />
+        <Step Icon={TriangleAlert} tone="rose" title={t('phoneParts.ideas.testsFailed')} />
+        <Step Icon={Wrench} tone="peach" title={t('phoneParts.ideas.fixed')} />
+        <Step Icon={GitMerge} tone="mint" title={t('phoneParts.ideas.readyToMerge')} />
       </View>
     ),
   },
@@ -101,24 +102,25 @@ const IDEAS: readonly Idea[] = [
     id: 'review',
     Icon: GitPullRequest,
     tone: 'mint',
-    line: 'Every pull request read before you get to it',
-    prompt: 'When a pull request opens in one of my projects, have my agent read the change and tell me what to look at, in a few lines.',
+    line: t('phoneParts.ideas.reviewLine'),
+    prompt: t('phoneParts.ideas.reviewPrompt'),
     scene: () => (
       <View style={{ padding: 10, borderRadius: radius.m, borderTopLeftRadius: 4, backgroundColor: toneBg('peach') }}>
         <T v="caption" c={color.text}>
-          Looks good. One thing: a retried webhook can refund twice. Check line 48.
+          {t('phoneParts.ideas.reviewScene')}
         </T>
       </View>
     ),
   },
 ];
 
-const SUGGEST = 'I’m new to Sentinel. Look at my projects and what they use, and suggest three watchers that would help me, each in one plain line. Set them up, with a board for their numbers, when I say yes.';
+const suggest = (): string => t('phoneParts.ideas.suggestPrompt');
 
 export function SentinelIdeas({ chat }: { chat?: Topic | undefined }) {
   const { width } = useWindowDimensions();
   const page = width - 32;
   const [at, setAt] = useState(0);
+  const IDEAS = ideas();
   const ask = (text: string): void => {
     if (!chat) return;
     void store.call(calls.send(chat, text)).then(() => router.push(convHref(chat) as never));
@@ -126,8 +128,8 @@ export function SentinelIdeas({ chat }: { chat?: Topic | undefined }) {
   return (
     <View style={{ gap: 12 }}>
       <View style={{ paddingHorizontal: 20, gap: 4 }}>
-        <T v="title">Let your agent keep an eye on things</T>
-        <T v="callout">Say what you want; nothing runs until you turn it on.</T>
+        <T v="title">{t('phoneParts.ideas.title')}</T>
+        <T v="callout">{t('phoneParts.ideas.sub')}</T>
       </View>
       <ScrollView
         horizontal
@@ -138,7 +140,7 @@ export function SentinelIdeas({ chat }: { chat?: Topic | undefined }) {
         contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}
         onScroll={(e) => setAt(Math.round(e.nativeEvent.contentOffset.x / (page + 10)))}
         scrollEventThrottle={32}
-        accessibilityLabel="What Sentinel can do"
+        accessibilityLabel={t('phoneParts.ideas.whatItDoes')}
       >
         {IDEAS.map((x) => (
           <Card key={x.id} style={{ width: page, padding: 16, gap: 14 }}>
@@ -149,7 +151,7 @@ export function SentinelIdeas({ chat }: { chat?: Topic | undefined }) {
                 {x.line}
               </T>
             </View>
-            {chat ? <Button label="Set This Up" onPress={() => ask(x.prompt)} /> : null}
+            {chat ? <Button label={t('phoneParts.ideas.setUp')} onPress={() => ask(x.prompt)} /> : null}
           </Card>
         ))}
       </ScrollView>
@@ -160,7 +162,7 @@ export function SentinelIdeas({ chat }: { chat?: Topic | undefined }) {
       </View>
       {chat ? (
         <View style={{ paddingHorizontal: 16 }}>
-          <Button quiet Icon={Sparkles} label="Suggest Some for Me" onPress={() => ask(SUGGEST)} />
+          <Button quiet Icon={Sparkles} label={t('phoneParts.ideas.suggest')} onPress={() => ask(suggest())} />
         </View>
       ) : null}
     </View>

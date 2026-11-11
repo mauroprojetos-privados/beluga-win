@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import Animated, { cancelAnimation, Easing, FadeIn, FadeOut, interpolate, interpolateColor, LinearTransition, type SharedValue, useAnimatedStyle, useDerivedValue, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { VOICE_MODELS, voiceSize } from '../../../src/shared/voice-models';
 import type { Phrase, VoiceSession, VoiceView } from '../lib/voice-session';
+import { t as tx } from '../lib/language';
 import { alpha, color, ink, scheme, spring, tint } from '../lib/theme';
 import { Metaballs } from './Metaballs';
 import { haptic, Press, T } from './ui';
@@ -38,8 +39,8 @@ export function VoiceButton({ voice, size = 44, onPress }: { readonly voice: Voi
     <Press
       onPress={onPress}
       disabled={phase === 'writing'}
-      accessibilityLabel={phase === 'listening' ? 'Put it in the box' : 'Speak instead of typing'}
-      accessibilityHint={phase === 'listening' ? 'Then edit it; the send button sends it as you said it' : 'Written down on this phone or your Mac (Settings › Voice)'}
+      accessibilityLabel={phase === 'listening' ? tx('phoneParts.voice.putInBox') : tx('phoneParts.voice.speak')}
+      accessibilityHint={phase === 'listening' ? tx('phoneParts.voice.putInBoxHint') : tx('phoneParts.voice.speakHint')}
       hitSlop={4}
       style={{ width: size, height: size }}
     >
@@ -166,7 +167,7 @@ function Line({ view, compact }: { readonly view: Extract<VoiceView, { phase: 'l
         </T>
       ) : null}
       <T v="caption" numberOfLines={1} style={{ flex: 1 }}>
-        {view.phase === 'listening' ? (compact ? '■ edit · ↑ send' : '■ edit it first · ↑ send it as you said it') : view.send ? 'Sending as soon as it’s written down…' : 'Writing down the last of it…'}
+        {view.phase === 'listening' ? (compact ? tx('phoneParts.voice.lineShort') : tx('phoneParts.voice.lineLong')) : view.send ? tx('phoneParts.voice.sendingSoon') : tx('phoneParts.voice.writingLast')}
       </T>
       {view.note ? (
         <T v="caption" c={color.text3} numberOfLines={1} style={{ maxWidth: '45%' }}>
@@ -217,7 +218,7 @@ export function VoiceStage({ voice, before = '', box, minHeight }: { readonly vo
       <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(140)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minHeight, paddingVertical: box ? 4 : 8 }}>
         <Dots />
         <View style={{ flex: 1, gap: 6 }}>
-          <T v="caption">{`Getting ${VOICE_MODELS[v.model].label}${f ? ` · ${voiceSize(f.bytes)}, once` : ''}`}</T>
+          <T v="caption">{f ? tx('phoneParts.voice.gettingSized', { model: VOICE_MODELS[v.model].label, size: voiceSize(f.bytes) }) : tx('phoneParts.voice.getting', { model: VOICE_MODELS[v.model].label })}</T>
           <View style={{ height: 4, borderRadius: 2, backgroundColor: color.sunken, overflow: 'hidden' }}>
             <Animated.View layout={LinearTransition} style={{ width: `${Math.round(v.progress * 100)}%`, height: 4, borderRadius: 2, backgroundColor: ink.lavender }} />
           </View>
@@ -237,7 +238,7 @@ export function VoiceStage({ voice, before = '', box, minHeight }: { readonly vo
           ) : (
             <Animated.View entering={FadeIn.delay(200).duration(400)}>
               <T v="callout" c={color.text3} style={type}>
-                {listening ? (box ? 'Listening…' : 'Listening… say it the way you’d tell a colleague.') : 'Writing it down…'}
+                {listening ? (box ? tx('phoneParts.voice.listening') : tx('phoneParts.voice.listeningLong')) : tx('phoneParts.voice.writing')}
               </T>
             </Animated.View>
           )}

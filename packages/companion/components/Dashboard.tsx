@@ -8,7 +8,9 @@ import type { DashboardTileView, SentinelsView, Topic } from '../lib/link/protoc
 import { type Column, parseView, readJson } from '../lib/render';
 import { convHref, Prose } from './Conv';
 import { JsonTree } from './render/JsonTree';
+import { t as tx } from '../lib/language';
 import { store } from '../lib/store';
+import { formatNumber } from '../../../src/shared/i18n/format';
 import { color, radius, tint, type } from '../lib/theme';
 import { ChartView } from './render/Chart';
 import { Spark } from './render/Inline';
@@ -29,10 +31,10 @@ const sentinelPath = (topic: Topic): string => `/sentinel/${encodeURIComponent(t
 
 /** The compares, in the chips' order, and how a pinned one says itself. */
 export const COMPARES = [
-  { key: 'previous', label: 'Previous', vs: 'vs the run before' },
-  { key: 'day', label: 'Yesterday', vs: 'vs yesterday' },
-  { key: 'week', label: 'Last week', vs: 'vs last week' },
-  { key: 'month', label: 'Last month', vs: 'vs last month' },
+  { key: 'previous', get label() { return tx('phoneParts.dash.previous'); }, get vs() { return tx('phoneParts.dash.vsPrevious'); } },
+  { key: 'day', get label() { return tx('phoneParts.dash.yesterday'); }, get vs() { return tx('phoneParts.dash.vsYesterday'); } },
+  { key: 'week', get label() { return tx('phoneParts.dash.lastWeek'); }, get vs() { return tx('phoneParts.dash.vsLastWeek'); } },
+  { key: 'month', get label() { return tx('phoneParts.dash.lastMonth'); }, get vs() { return tx('phoneParts.dash.vsLastMonth'); } },
 ] as const;
 export type CompareKey = (typeof COMPARES)[number]['key'];
 /** A compare the phone doesn't know reads as the run before. */
@@ -42,8 +44,8 @@ export const compareOf = (k: string | undefined): CompareKey => (COMPARES.find((
 export const toneInkOf = (tone: string | undefined): string => (tone === 'good' ? color.ok : tone === 'bad' ? color.error : color.text3);
 
 /** What a tile that can't draw says, quietly. */
-const STATE_WORDS: Record<string, string> = { paused: 'paused', draft: 'a draft: turn it on', gone: 'gone', waiting: 'waiting for its first run' };
-const stateWords = (state: string): string | undefined => (state === 'ok' ? undefined : (STATE_WORDS[state] ?? state));
+const STATE_WORDS: Record<string, () => string> = { paused: () => tx('phoneParts.dash.paused'), draft: () => tx('phoneParts.dash.draft'), gone: () => tx('phoneParts.dash.gone'), waiting: () => tx('phoneParts.dash.waiting') };
+const stateWords = (state: string): string | undefined => (state === 'ok' ? undefined : (STATE_WORDS[state]?.() ?? state));
 
 function TileHead({ t, right }: { readonly t: DashboardTileView; readonly right?: React.ReactNode }) {
   const quiet = stateWords(t.state);
@@ -81,7 +83,7 @@ export function NumberTile({ t, compare, width }: { readonly t: DashboardTileVie
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
           <Text numberOfLines={2} style={{ ...type.caption, flex: 1, fontWeight: '700', color: toneInkOf(d?.tone), fontVariant: ['tabular-nums'] }}>
-            {d?.change ?? (t.value ? 'no earlier run' : '')}
+            {d?.change ?? (t.value ? tx('phoneParts.dash.noEarlier') : '')}
           </Text>
           {t.trend && t.trend.length > 1 ? <Spark values={t.trend.slice(-30)} w={44} h={18} c={d?.tone === 'bad' ? color.error : color.info} /> : null}
         </View>
@@ -146,7 +148,7 @@ function ChartTile({ t }: { readonly t: DashboardTileView }) {
   return (
     <View style={[box(), { opacity: t.state === 'ok' ? 1 : 0.8 }]}>
       <TileHead t={t} />
-      {view ? <ChartView view={view} columns={view.columns} rows={view.rows} fit /> : <T v="caption">{t.state === 'ok' ? 'No numbers yet' : ''}</T>}
+      {view ? <ChartView view={view} columns={view.columns} rows={view.rows} fit /> : <T v="caption">{t.state === 'ok' ? tx('phoneParts.dash.noNumbers') : ''}</T>}
     </View>
   );
 }
@@ -154,7 +156,7 @@ function ChartTile({ t }: { readonly t: DashboardTileView }) {
 // ---- a table: its first rows, all of them a tap away
 
 const FIRST_ROWS = 5;
-const cellText = (c: string | number | boolean | null): string => (c === null ? '' : typeof c === 'boolean' ? (c ? 'yes' : 'no') : typeof c === 'number' ? c.toLocaleString() : c);
+const cellText = (c: string | number | boolean | null): string => (c === null ? '' : typeof c === 'boolean' ? (c ? tx('phoneParts.dash.yes') : tx('phoneParts.dash.no')) : typeof c === 'number' ? formatNumber(c) : c);
 
 function TableTile({ t, rows: given }: { readonly t: DashboardTileView; readonly rows?: DashboardTileView['table'] }) {
   const [all, setAll] = useState(false);
@@ -163,7 +165,7 @@ function TableTile({ t, rows: given }: { readonly t: DashboardTileView; readonly
     return (
       <View style={box()}>
         <TileHead t={t} />
-        <T v="caption">{t.state === 'ok' ? 'No rows yet' : ''}</T>
+        <T v="caption">{t.state === 'ok' ? tx('phoneParts.dash.noRows') : ''}</T>
       </View>
     );
   }
@@ -174,7 +176,7 @@ function TableTile({ t, rows: given }: { readonly t: DashboardTileView; readonly
     const ty = typedAt.get(i);
     const chip = ty?.docs ? Math.max(c.length, ...ty.docs.map((d) => (ty.button ?? d?.name ?? '').length)) + 4 : 0;
     const base = Math.max(56, Math.min(190, 14 + 7.2 * Math.max(c.length, chip, ...tb.rows.map((r) => cellText(r[i] ?? null).length))));
-    return ty?.kind === 'progress' ? Math.max(base, 120) : ty?.kind === 'person' ? base + 26 : ty?.kind === 'action' ? Math.max(base, 14 + 7.2 * (ty.button ?? 'Run').length + 30) : base;
+    return ty?.kind === 'progress' ? Math.max(base, 120) : ty?.kind === 'person' ? base + 26 : ty?.kind === 'action' ? Math.max(base, 14 + 7.2 * (ty.button ?? tx('phoneParts.typed.run')).length + 30) : base;
   });
   return (
     <View style={[box(), { paddingHorizontal: 0, opacity: t.state === 'ok' ? 1 : 0.85 }]}>
@@ -212,12 +214,12 @@ function TableTile({ t, rows: given }: { readonly t: DashboardTileView; readonly
       </ScrollView>
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8 }}>
         <T v="caption" style={{ flex: 1 }}>
-          {tb.total === 1 ? '1 row' : `${tb.total.toLocaleString()} rows`}
+          {tx('phoneParts.dash.rows', { count: tb.total, n: formatNumber(tb.total) })}
         </T>
         {tb.rows.length > FIRST_ROWS ? (
-          <Press haptics={false} onPress={() => (haptic.tap(), setAll((a) => !a))} accessibilityLabel={all ? 'Fewer rows' : 'All rows'} style={{ height: 28, paddingHorizontal: 12, borderRadius: 14, justifyContent: 'center', backgroundColor: color.sunken }}>
+          <Press haptics={false} onPress={() => (haptic.tap(), setAll((a) => !a))} accessibilityLabel={all ? tx('phoneParts.dash.fewerRows') : tx('phoneParts.dash.allRows')} style={{ height: 28, paddingHorizontal: 12, borderRadius: 14, justifyContent: 'center', backgroundColor: color.sunken }}>
             <T v="caption" c={color.text2} style={{ fontWeight: '600' }}>
-              {all ? 'Fewer' : `All ${tb.rows.length}`}
+              {all ? tx('phoneParts.dash.fewer') : tx('phoneParts.dash.allCount', { count: tb.rows.length })}
             </T>
           </Press>
         ) : null}
@@ -228,7 +230,7 @@ function TableTile({ t, rows: given }: { readonly t: DashboardTileView; readonly
 
 // ---- a sentinel's last headline: a tap unfolds its report (sentinel.runGet)
 
-const words = (md: string): string => md.replace(/```[\s\S]*?(```|$)/g, '(code)').trim();
+const words = (md: string): string => md.replace(/```[\s\S]*?(```|$)/g, tx('phoneParts.dash.codeLeftOut')).trim();
 
 function TextTile({ t }: { readonly t: DashboardTileView }) {
   const [open, setOpen] = useState(false);
@@ -249,7 +251,7 @@ function TextTile({ t }: { readonly t: DashboardTileView }) {
       <Press scaleTo={0.985} disabled={!t.runId && !sentinel} onPress={toggle} accessibilityLabel={`${t.title}: ${t.text ?? ''}`} style={{ padding: 12, gap: 6 }}>
         <TileHead t={t} right={t.runId ? open ? <ChevronDown color={color.text3} size={16} /> : <ChevronRight color={color.text3} size={16} /> : null} />
         <T v="body" numberOfLines={open ? undefined : 3} c={t.text ? color.text : color.text3}>
-          {t.text ?? (t.state === 'ok' ? 'It hasn’t said anything yet.' : '')}
+          {t.text ?? (t.state === 'ok' ? tx('phoneParts.dash.saidNothing') : '')}
         </T>
       </Press>
       {open ? (
@@ -259,13 +261,13 @@ function TextTile({ t }: { readonly t: DashboardTileView }) {
             <ActivityIndicator color={color.text3} style={{ alignSelf: 'flex-start' }} />
           ) : (
             <T v="callout" c={report ? color.text : color.text2} selectable>
-              {report || 'This run left no report.'}
+              {report || tx('phoneParts.dash.noReport')}
             </T>
           )}
           {sentinel ? (
-            <Press haptics={false} onPress={() => (haptic.tap(), router.push(sentinelPath(sentinel) as never))} accessibilityLabel={`Open ${t.sentinel ?? 'the sentinel'}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}>
+            <Press haptics={false} onPress={() => (haptic.tap(), router.push(sentinelPath(sentinel) as never))} accessibilityLabel={t.sentinel ? tx('phoneParts.dash.openName', { name: t.sentinel }) : tx('phoneParts.dash.openSentinel')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}>
               <T v="caption" c={color.info} style={{ fontWeight: '600' }}>
-                Open {t.sentinel ?? 'the sentinel'}
+                {t.sentinel ? tx('phoneParts.dash.openName', { name: t.sentinel }) : tx('phoneParts.dash.openSentinel')}
               </T>
               <ChevronRight color={color.info} size={14} />
             </Press>
@@ -304,7 +306,7 @@ function OutputTile({ t }: { readonly t: DashboardTileView }) {
     <View style={[box(), { opacity: t.state === 'ok' ? 1 : 0.8 }]}>
       <TileHead t={t} />
       {!o ? (
-        <T v="caption">{t.state === 'ok' ? 'No output yet: it shows after its step runs' : ''}</T>
+        <T v="caption">{t.state === 'ok' ? tx('phoneParts.dash.noOutput') : ''}</T>
       ) : doc ? (
         <JsonTree doc={doc} text={o.text} />
       ) : o.look === 'markdown' ? (
@@ -314,11 +316,11 @@ function OutputTile({ t }: { readonly t: DashboardTileView }) {
           {o.text}
         </T>
       )}
-      {o?.cut ? <T v="caption">Shortened: the run on your Mac has all of it.</T> : null}
+      {o?.cut ? <T v="caption">{tx('phoneParts.dash.shortened')}</T> : null}
       {sentinel ? (
-        <Press haptics={false} onPress={() => (haptic.tap(), router.push(sentinelPath(sentinel) as never))} accessibilityLabel={`Open ${t.sentinel ?? 'the sentinel'}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}>
+        <Press haptics={false} onPress={() => (haptic.tap(), router.push(sentinelPath(sentinel) as never))} accessibilityLabel={t.sentinel ? tx('phoneParts.dash.openName', { name: t.sentinel }) : tx('phoneParts.dash.openSentinel')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}>
           <T v="caption" c={color.info} style={{ fontWeight: '600' }}>
-            {t.sentinel ?? 'Its sentinel'}
+            {t.sentinel ?? tx('phoneParts.dash.itsSentinel')}
           </T>
           <ChevronRight color={color.info} size={14} />
         </Press>
@@ -350,7 +352,7 @@ export function Tiles({ tiles, compare }: { readonly tiles: readonly DashboardTi
                 {t.kind === 'chart' || t.kind === 'series' ? <ChartTile t={t} /> : t.kind === 'table' ? <TableTile t={t} /> : t.kind === 'output' ? <OutputTile t={t} /> : t.kind === 'text' ? <TextTile t={t} /> : (
                   <View style={box()}>
                     <TileHead t={t} />
-                    <T v="caption">Update Beluga on this phone to see this tile.</T>
+                    <T v="caption">{tx('phoneParts.dash.updatePhone')}</T>
                   </View>
                 )}
               </View>
@@ -429,7 +431,7 @@ export function DashboardRows() {
   return (
     <View style={{ gap: 10 }}>
       <T v="eyebrow" style={{ paddingHorizontal: 20 }}>
-        Dashboards
+        {tx('phoneParts.dash.dashboards')}
       </T>
       <Card style={{ marginHorizontal: 16 }}>
         {list.map((d, i) => (
@@ -450,10 +452,10 @@ export function SentinelChatRow() {
   return (
     <View style={{ gap: 10 }}>
       <T v="eyebrow" style={{ paddingHorizontal: 20 }}>
-        Chat
+        {tx('phoneParts.dash.chat')}
       </T>
       <Card style={{ marginHorizontal: 16 }}>
-        <Row first Icon={MessagesSquare} tone="lavender" label={chat.title} sub={chat.working ? 'Your agent is working…' : (chat.last ?? 'Ask about your sentinels, or tell your agent what to watch')} onPress={() => router.push(convHref(chat.topic) as never)} />
+        <Row first Icon={MessagesSquare} tone="lavender" label={chat.title} sub={chat.working ? tx('phoneParts.dash.agentWorking') : (chat.last ?? tx('phoneParts.dash.chatHint'))} onPress={() => router.push(convHref(chat.topic) as never)} />
       </Card>
     </View>
   );

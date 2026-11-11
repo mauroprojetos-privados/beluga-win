@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import Animated, { Easing, FadeIn, FadeOut, LinearTransition, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { elapsed, useSince } from '../lib/hooks';
 import type { LiveView, StepView, SubAgentView, TurnView } from '../lib/link/protocol';
+import { t as tx } from '../lib/language';
 import { color, spring } from '../lib/theme';
 import { Press, T, type Tone, toneBg, toneInk } from './ui';
 
@@ -93,11 +94,11 @@ function Bar({ value, tone = 'mint' }: { readonly value: number; readonly tone?:
 }
 
 const PHASE: Record<string, { label: string; Icon: LucideIcon; tone: Tone }> = {
-  thinking: { label: 'Thinking', Icon: Sparkles, tone: 'peach' },
-  writing: { label: 'Writing', Icon: PenLine, tone: 'peach' },
-  starting: { label: 'Starting', Icon: Sparkles, tone: 'peach' },
-  approval: { label: 'Waiting for your approval', Icon: ShieldQuestion, tone: 'butter' },
-  queued: { label: 'Waiting its turn', Icon: Hourglass, tone: 'plain' },
+  thinking: { get label() { return tx('phoneParts.live.thinking'); }, Icon: Sparkles, tone: 'peach' },
+  writing: { get label() { return tx('phoneParts.live.writing'); }, Icon: PenLine, tone: 'peach' },
+  starting: { get label() { return tx('phoneParts.live.starting'); }, Icon: Sparkles, tone: 'peach' },
+  approval: { get label() { return tx('phoneParts.live.approval'); }, Icon: ShieldQuestion, tone: 'butter' },
+  queued: { get label() { return tx('phoneParts.live.queued'); }, Icon: Hourglass, tone: 'plain' },
 };
 
 /** What it does right now: the phase (with the typing shimmer) or the step, its time and its count. */
@@ -107,7 +108,7 @@ function NowRow({ live }: { readonly live: LiveView }) {
   const frac = fraction(live.progress);
   const step = live.phase === 'step' || !p;
   const tool = step ? toolOf(live.tool) : undefined;
-  const words = step ? (live.words ?? 'Working') : p!.label;
+  const words = step ? (live.words ?? tx('phoneParts.working')) : p!.label;
   return (
     <View style={{ gap: 8 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -187,7 +188,7 @@ export function StepList({ steps, shown = 5, live }: { readonly steps: readonly 
  * `live` (before 1.3) still has the step in words: it's shown as it was.
  */
 export function LivePanel({ t }: { readonly t: TurnView }) {
-  const live: LiveView = t.live ?? { phase: 'step', words: t.step ?? 'Working' };
+  const live: LiveView = t.live ?? { phase: 'step', words: t.step ?? tx('phoneParts.working') };
   // While a step runs, its own row is the "now" row: the list holds the steps before it.
   const trail = t.trail ?? [];
   const done = live.phase === 'step' && trail.length ? trail.slice(0, -1) : trail;
@@ -206,7 +207,7 @@ export function StepsFold({ t }: { readonly t: TurnView }) {
   if (!trail.length) return null;
   return (
     <View>
-      <Press onPress={() => setOpen((o) => !o)} accessibilityLabel={open ? 'Hide the steps' : 'Show the steps'} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', height: 30, paddingHorizontal: 10, borderRadius: 15, backgroundColor: color.sunken }}>
+      <Press onPress={() => setOpen((o) => !o)} accessibilityLabel={open ? tx('phoneParts.live.hideSteps') : tx('phoneParts.live.showSteps')} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', height: 30, paddingHorizontal: 10, borderRadius: 15, backgroundColor: color.sunken }}>
         <View style={{ flexDirection: 'row' }}>
           {[...new Set(trail.map((s) => s.tool))].slice(0, 4).map((k, i) => (
             <View key={k} style={{ marginLeft: i ? -6 : 0, borderRadius: 11, borderWidth: 1.5, borderColor: color.card }}>
@@ -215,7 +216,7 @@ export function StepsFold({ t }: { readonly t: TurnView }) {
           ))}
         </View>
         <T v="caption" style={{ fontWeight: '600' }}>
-          {(t.steps ?? trail.length) === 1 ? '1 step' : `${t.steps ?? trail.length} steps`}
+          {tx('phoneParts.live.steps', { count: t.steps ?? trail.length })}
         </T>
         <Animated.View style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }}>
           <ChevronDown color={color.text3} size={14} />
@@ -254,8 +255,8 @@ export function AgentList({ agents, onOpen }: { readonly agents: readonly SubAge
   return (
     <View style={{ gap: 6 }}>
       <T v="caption" style={{ fontWeight: '600' }}>
-        {agents.length} {agents.length === 1 ? 'sub-agent' : 'sub-agents'}
-        {running ? ` · ${running} working` : ''}
+        {tx('phoneParts.live.subAgents', { count: agents.length })}
+        {running ? ` · ${tx('phoneParts.live.working', { count: running })}` : ''}
       </T>
       {agents.map((a) => {
         const tone = AGENT_TONE(a.status);

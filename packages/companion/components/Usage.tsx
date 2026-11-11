@@ -5,6 +5,7 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from '
 import { until, useSupports } from '../lib/hooks';
 import { calls } from '../lib/link/calls';
 import type { UsageView } from '../lib/link/protocol';
+import { t as tx } from '../lib/language';
 import { store } from '../lib/store';
 import { color, ink } from '../lib/theme';
 import { AgentMarkIcon, runtimeMark } from './AgentMark';
@@ -50,14 +51,14 @@ function TokenFigures({ usage }: { readonly usage: UsageView }) {
   const t = usage.tokens;
   return (
     <View style={{ flexDirection: 'row', gap: 16 }}>
-      {figure('Tokens', t ? shortTokens(t.input + t.output) : '–', t ? `${shortTokens(t.input)} in · ${shortTokens(t.output)} out` : 'since your Mac started')}
-      {figure('Speed', usage.tokensPerSec !== undefined ? `${Math.round(usage.tokensPerSec)} tok/s` : '–', 'over its last run')}
+      {figure(tx('phoneParts.usage.tokens'), t ? shortTokens(t.input + t.output) : '–', t ? tx('phoneParts.usage.inOut', { input: shortTokens(t.input), output: shortTokens(t.output) }) : tx('phoneParts.usage.sinceMac'))}
+      {figure(tx('phoneParts.usage.speed'), usage.tokensPerSec !== undefined ? tx('phoneParts.usage.tokPerSec', { n: Math.round(usage.tokensPerSec) }) : '–', tx('phoneParts.usage.lastRun'))}
     </View>
   );
 }
 
 export function UsageBars({ usage }: { readonly usage: UsageView }) {
-  if (usage.signedIn === false) return <T v="caption">Not signed in on your Mac.</T>;
+  if (usage.signedIn === false) return <T v="caption">{tx('phoneParts.usage.notSignedIn')}</T>;
   if (!usage.windows.length) return <TokenFigures usage={usage} />;
   return (
     <View style={{ gap: 12 }}>
@@ -68,7 +69,7 @@ export function UsageBars({ usage }: { readonly usage: UsageView }) {
               {w.label}
             </T>
             <T v="caption" style={{ flex: 1 }}>
-              {w.resetsAt ? `resets in ${until(w.resetsAt)}` : ''}
+              {w.resetsAt ? tx('phoneParts.usage.resetsIn', { when: until(w.resetsAt) }) : ''}
             </T>
             <T v="callout" c={color.text} style={{ fontWeight: '700', fontVariant: ['tabular-nums'] }}>
               {Math.round(w.pct)}%
@@ -82,12 +83,12 @@ export function UsageBars({ usage }: { readonly usage: UsageView }) {
 }
 
 /** The allowance at a glance; tapping it opens every provider (`onOpen`: the screen shows the `UsageSheet`, at its own level). */
-export function UsageCard({ usage, title = 'Allowance', onOpen }: { readonly usage: readonly UsageView[]; readonly title?: string; readonly onOpen: () => void }) {
+export function UsageCard({ usage, title = tx('phoneParts.usage.allowance'), onOpen }: { readonly usage: readonly UsageView[]; readonly title?: string; readonly onOpen: () => void }) {
   const main = usage[0];
   if (!main) return null;
   return (
     <>
-      <Press scaleTo={0.985} onPress={onOpen} accessibilityLabel={`${title}: all providers`} style={{ marginHorizontal: 16 }}>
+      <Press scaleTo={0.985} onPress={onOpen} accessibilityLabel={tx('phoneParts.usage.allProviders', { title })} style={{ marginHorizontal: 16 }}>
         <Card style={{ padding: 16, gap: 14 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <IconBadge Icon={Gauge} tone="mint" size={30} />
@@ -113,18 +114,18 @@ export function UsageCard({ usage, title = 'Allowance', onOpen }: { readonly usa
 function DefaultChip({ usage }: { readonly usage: UsageView }) {
   const can = useSupports('providers');
   const [busy, setBusy] = useState(false);
-  if (usage.isDefault) return <Pill label="Default" Icon={Check} />;
+  if (usage.isDefault) return <Pill label={tx('phoneParts.usage.default')} Icon={Check} />;
   if (!can || !usage.runtime || usage.isDefault === undefined) return null;
   const make = () => {
     setBusy(true);
     void store
       .call(calls.defaultAgent(usage.runtime!), { queue: false })
-      .catch(() => store.toast({ text: 'Your Mac is away: change this when it’s linked.', tone: 'warn' }))
+      .catch(() => store.toast({ text: tx('phoneParts.usage.macAway'), tone: 'warn' }))
       .finally(() => setBusy(false));
   };
   return (
-    <Press onPress={make} disabled={busy} accessibilityLabel={`Make ${usage.provider} your default agent`} hitSlop={6}>
-      <Pill label={busy ? 'Making default…' : 'Make default'} />
+    <Press onPress={make} disabled={busy} accessibilityLabel={tx('phoneParts.usage.makeDefaultLabel', { name: usage.provider })} hitSlop={6}>
+      <Pill label={busy ? tx('phoneParts.usage.making') : tx('phoneParts.usage.makeDefault')} />
     </Press>
   );
 }

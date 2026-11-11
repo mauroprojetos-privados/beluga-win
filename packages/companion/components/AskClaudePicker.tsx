@@ -1,6 +1,7 @@
 import { Check, Sparkles, Users } from 'lucide-react-native';
 import { View } from 'react-native';
 import type { ChatMemberView } from '../lib/link/protocol';
+import { t as tx } from '../lib/language';
 import { color, ink, tint } from '../lib/theme';
 import { Sheet } from './Sheet';
 import { Avatar, haptic, IconBadge, Press, T } from './ui';
@@ -19,13 +20,13 @@ export interface AskTarget {
 export function askTargets(members: readonly ChatMemberView[] | undefined, kind: 'dm' | 'group', chatName: string): AskTarget[] {
   const me = members?.find((m) => m.me);
   const others = (members ?? []).filter((m) => !m.me);
-  const mine: AskTarget[] = me ? [{ ask: [me.peerId], label: 'My agent' }] : [];
+  const mine: AskTarget[] = me ? [{ ask: [me.peerId], label: tx('phoneParts.ask.mine') }] : [];
   if (kind === 'dm') {
     const them = others[0];
-    if (!them) return [...mine, { ask: 'all', label: `${chatName}'s agent` }];
-    return [...mine, { ask: [them.peerId], label: `${them.name}'s agent` }, ...(me ? [{ ask: [me.peerId, them.peerId], label: 'Both agents' }] : [])];
+    if (!them) return [...mine, { ask: 'all', label: tx('phoneParts.ask.theirs', { name: chatName }) }];
+    return [...mine, { ask: [them.peerId], label: tx('phoneParts.ask.theirs', { name: them.name }) }, ...(me ? [{ ask: [me.peerId, them.peerId], label: tx('phoneParts.ask.both') }] : [])];
   }
-  return [...mine, { ask: 'all', label: "Everyone's agent" }, ...others.map((m) => ({ ask: [m.peerId], label: `${m.name}'s agent` }))];
+  return [...mine, { ask: 'all', label: tx('phoneParts.ask.everyone') }, ...others.map((m) => ({ ask: [m.peerId], label: tx('phoneParts.ask.theirs', { name: m.name }) }))];
 }
 
 export function AskClaudePicker({ visible, onClose, targets, chosen, onPick, members }: { readonly visible: boolean; readonly onClose: () => void; readonly targets: readonly AskTarget[]; readonly chosen?: AskTarget; readonly onPick: (t: AskTarget) => void; readonly members?: readonly ChatMemberView[] }) {
@@ -34,7 +35,7 @@ export function AskClaudePicker({ visible, onClose, targets, chosen, onPick, mem
     <Sheet visible={visible} onDismiss={onClose}>
       <View style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
         <T v="eyebrow" style={{ paddingHorizontal: 10, paddingBottom: 8 }}>
-          Ask an agent
+          {tx('phoneParts.ask.title')}
         </T>
         {targets.map((t) => {
           const on = chosen?.label === t.label;

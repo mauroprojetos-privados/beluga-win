@@ -1,7 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
 import { ScrollView, type ScrollViewInstance, Text, View } from 'react-native';
 import { type CalendarDay, type Column, type GanttBar, type Row, type View as ViewSpec, along, barTone, formatCell, formatNumber, inkOn, parseColor, planCalendar, planGantt, planHeatmap, scaleColor, scaleOf } from '../../lib/render';
+import { t as tx } from '../../lib/language';
 import { alpha, color, ink, scheme, tint, type } from '../../lib/theme';
+import { formatDateWith } from '../../../../src/shared/i18n/format';
 import { haptic, Press, T } from '../ui';
 
 /**
@@ -50,7 +52,7 @@ export function GanttView({ view, rows, columns }: Props) {
   if (!plan) return <Empty what="No dates to draw." />;
   const W = Math.max(space - LABEL_W, plan.ticks.length * 56, 160);
   const X = (t: number): number => 10 + along(plan, t) * (W - 20);
-  const fmt = (t: number): string => new Date(t).toLocaleDateString(undefined, plan.hours ? { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' } : { month: 'short', day: 'numeric', year: 'numeric' });
+  const fmt = (t: number): string => formatDateWith(new Date(t), plan.hours ? { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' } : { month: 'short', day: 'numeric', year: 'numeric' });
   // A date alone ends at the end of its day: show the day it ends on.
   const endOf = (b: GanttBar): number => (!plan.hours && b.end > b.start ? b.end - 1 : b.end);
   type Item = { kind: 'lane'; name: string } | { kind: 'bar'; bar: GanttBar };
@@ -100,7 +102,7 @@ export function GanttView({ view, rows, columns }: Props) {
                 const pick = () => (haptic.tap(), setPicked(on ? undefined : b));
                 if (b.milestone) {
                   return (
-                    <Press key={i} haptics={false} onPress={pick} hitSlop={8} accessibilityLabel={`${b.label}, milestone`} style={{ position: 'absolute', left: X(b.start) - 9, top: top + ROW_H / 2 - 9, width: 18, height: 18, alignItems: 'center', justifyContent: 'center' }}>
+                    <Press key={i} haptics={false} onPress={pick} hitSlop={8} accessibilityLabel={tx('phoneParts.grids.milestone', { name: b.label })} style={{ position: 'absolute', left: X(b.start) - 9, top: top + ROW_H / 2 - 9, width: 18, height: 18, alignItems: 'center', justifyContent: 'center' }}>
                       <View style={{ width: 12, height: 12, borderRadius: 2, transform: [{ rotate: '45deg' }], backgroundColor: c.ink, borderWidth: on ? 2 : 0, borderColor: color.card }} />
                     </Press>
                   );
@@ -123,7 +125,7 @@ export function GanttView({ view, rows, columns }: Props) {
       {picked ? (
         <Details>
           <T v="callout" c={color.text} style={{ fontWeight: '700' }} numberOfLines={2}>
-            {picked.label || 'Untitled'}
+            {picked.label || tx('phoneParts.grids.untitled')}
           </T>
           <T v="caption">
             {[picked.milestone ? fmt(picked.start) : `${fmt(picked.start)} – ${fmt(endOf(picked))}`, picked.status, picked.progress !== undefined ? `${Math.round(picked.progress * 100)}% done` : undefined, !picked.milestone && !plan.hours ? `${Math.max(1, Math.round((picked.end - picked.start) / DAY))} d` : undefined].filter(Boolean).join(' · ')}
@@ -221,7 +223,8 @@ function Legend({ scale, lo, hi }: { readonly scale: readonly string[]; readonly
 
 const SQ = 12;
 const GAP = 3;
-const DOW = ['Mon', '', 'Wed', '', 'Fri', '', ''];
+/** Mon, Wed and Fri in the language in use (1 January 2024 was a Monday). */
+const dow = (): string[] => [0, 1, 2, 3, 4, 5, 6].map((i) => (i % 2 || i > 4 ? '' : formatDateWith(new Date(2024, 0, 1 + i), { weekday: 'short' })));
 
 const dayDate = (k: string): Date => {
   const [y, m, d] = k.split('-').map(Number);
@@ -240,7 +243,7 @@ export function CalendarView({ view, rows, columns }: Props) {
     <View>
       <View style={{ flexDirection: 'row', paddingLeft: 14 }}>
         <View style={{ width: 28, paddingTop: 16 }}>
-          {DOW.map((d, i) => (
+          {dow().map((d, i) => (
             <Text key={i} style={{ height: step, ...type.caption, fontSize: 9.5, lineHeight: step, color: color.text3 }}>
               {d}
             </Text>
@@ -279,12 +282,12 @@ export function CalendarView({ view, rows, columns }: Props) {
             {valueText(picked.value, plan.valueColumn)}
             {unit ? <Text style={{ fontWeight: '400', color: color.text2 }}> {unit}</Text> : null}
           </T>
-          <T v="caption">{[dayDate(picked.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }), picked.note].filter(Boolean).join(' · ')}</T>
+          <T v="caption">{[formatDateWith(dayDate(picked.date), { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }), picked.note].filter(Boolean).join(' · ')}</T>
         </Details>
       ) : null}
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 8, gap: 8 }}>
         <T v="caption" style={{ flex: 1 }}>
-          {plan.days} {plan.days === 1 ? 'day' : 'days'} active · {valueText(plan.total, plan.valueColumn)} total
+          {tx('phoneParts.grids.active', { count: plan.days, total: valueText(plan.total, plan.valueColumn) })}
         </T>
         <View style={{ flexDirection: 'row', gap: 2, alignItems: 'center' }}>
           {scale.map((c, i) => (

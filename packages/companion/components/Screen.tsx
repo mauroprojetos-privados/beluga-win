@@ -5,6 +5,7 @@ import { type NativeScrollEvent, type NativeSyntheticEvent, StyleSheet, View, ty
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { asOf, useLink, useOutbox, useToasts } from '../lib/hooks';
+import { t as tx } from '../lib/language';
 import { store } from '../lib/store';
 import { color, spring } from '../lib/theme';
 import { Card, IconBadge, Press, T, type Tone } from './ui';
@@ -44,7 +45,7 @@ export function Header({ title, subtitle, back, right, eyebrow, at, scrolled, le
     <View style={{ paddingTop: insets.top + 8, paddingHorizontal: 20, paddingBottom: 8, backgroundColor: color.bg, zIndex: 2 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 40, gap: 10 }}>
         {back ? (
-          <Press onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} accessibilityLabel="Back" hitSlop={12} style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: color.card, marginLeft: -4, borderWidth: StyleSheet.hairlineWidth, borderColor: color.hairline }}>
+          <Press onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} accessibilityLabel={tx('common.back')} hitSlop={12} style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: color.card, marginLeft: -4, borderWidth: StyleSheet.hairlineWidth, borderColor: color.hairline }}>
             <ChevronLeft color={color.text} size={21} strokeWidth={1.9} />
           </Press>
         ) : null}
@@ -87,7 +88,7 @@ export function AwayBand({ at }: { readonly at?: number }) {
         <Card tone="butter" r={18} style={{ padding: 12, flexDirection: 'row', gap: 10, alignItems: 'center' }}>
           <TriangleAlert color={color.warn} size={18} />
           <T v="callout" c={color.warn} style={{ flex: 1, fontWeight: '500' }}>
-            {link.outdated === 'mac' ? 'Update Beluga on your Mac' : 'Update the app'}
+            {link.outdated === 'mac' ? tx('phoneParts.screen.updateMac') : tx('phoneParts.screen.updateApp')}
           </T>
         </Card>
       </Animated.View>
@@ -105,16 +106,16 @@ export function AwayBand({ at }: { readonly at?: number }) {
           <MoonStar color={color.info} size={18} />
           <View style={{ flex: 1 }}>
             <T v="callout" c={color.info} style={{ fontWeight: '600' }}>
-              {d?.title ?? 'Mac asleep'}
+              {d?.title ?? tx('phoneParts.screen.macAsleep')}
             </T>
             <T v="caption" c={color.info} style={{ opacity: 0.8 }}>
-              {[d?.auto ? (retrying ? 'Connecting…' : 'Trying again by itself') : undefined, at ? asOf(at) : undefined, outbox.length ? `${outbox.length} waiting` : undefined].filter(Boolean).join(' · ') || 'Last views'}
+              {[d?.auto ? (retrying ? tx('phoneParts.screen.connecting') : tx('phoneParts.screen.tryingItself')) : undefined, at ? asOf(at) : undefined, outbox.length ? tx('phoneParts.screen.waiting', { count: outbox.length }) : undefined].filter(Boolean).join(' · ') || tx('phoneParts.screen.lastViews')}
             </T>
           </View>
           {d ? (
-            <Press onPress={() => setWhy(true)} accessibilityLabel="Why?" hitSlop={8} style={{ height: 32, paddingHorizontal: 10, justifyContent: 'center' }}>
+            <Press onPress={() => setWhy(true)} accessibilityLabel={tx('phoneParts.screen.why')} hitSlop={8} style={{ height: 32, paddingHorizontal: 10, justifyContent: 'center' }}>
               <T v="caption" c={color.info} style={{ fontWeight: '600' }}>
-                Why?
+                {tx('phoneParts.screen.why')}
               </T>
             </Press>
           ) : null}
@@ -124,20 +125,20 @@ export function AwayBand({ at }: { readonly at?: number }) {
                 await store.signOut();
                 router.replace('/pair');
               }}
-              accessibilityLabel="Pair again"
+              accessibilityLabel={tx('phoneParts.screen.pairAgain')}
               hitSlop={8}
               style={{ height: 32, paddingHorizontal: 12, borderRadius: 16, backgroundColor: color.card, flexDirection: 'row', alignItems: 'center', gap: 6 }}
             >
               <Smartphone color={color.info} size={14} />
               <T v="caption" c={color.info} style={{ fontWeight: '600' }}>
-                Pair again
+                {tx('phoneParts.screen.pairAgain')}
               </T>
             </Press>
           ) : (
-          <Press onPress={() => store.retry()} accessibilityLabel="Try again" hitSlop={8} style={{ height: 32, paddingHorizontal: 12, borderRadius: 16, backgroundColor: color.card, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Press onPress={() => store.retry()} accessibilityLabel={tx('phoneParts.screen.tryAgain')} hitSlop={8} style={{ height: 32, paddingHorizontal: 12, borderRadius: 16, backgroundColor: color.card, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <RefreshCw color={color.info} size={14} />
             <T v="caption" c={color.info} style={{ fontWeight: '600' }}>
-              Retry
+              {tx('phoneParts.screen.retry')}
             </T>
           </Press>
           )}
@@ -149,7 +150,7 @@ export function AwayBand({ at }: { readonly at?: number }) {
                 <T v="caption" c={color.info} style={{ flex: 1 }} numberOfLines={1}>
                   {o.call.label}
                 </T>
-                <Press onPress={() => store.discard(o.id)} accessibilityLabel="Discard" hitSlop={8}>
+                <Press onPress={() => store.discard(o.id)} accessibilityLabel={tx('phoneParts.screen.discard')} hitSlop={8}>
                   <Trash2 color={color.info} size={15} />
                 </Press>
               </View>

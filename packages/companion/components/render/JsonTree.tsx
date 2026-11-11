@@ -2,6 +2,7 @@ import { Braces, ChevronDown, ChevronRight, Copy, FileJson, ListTree } from 'luc
 import { useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { type Json, type JsonDoc, jsonPreview, jsonSize, openDepth } from '../../lib/render';
+import { t as tx } from '../../lib/language';
 import { color, ink, radius, type } from '../../lib/theme';
 import { haptic, Press, T } from '../ui';
 import { copy, SmallChip } from './parts';
@@ -66,7 +67,7 @@ export function JsonTree({ doc, text }: { readonly doc: JsonDoc; readonly text: 
   };
   const mono = [type.mono, { fontSize: 12.5, lineHeight: 20 }];
   return (
-    <Press haptics={false} scaleTo={1} onLongPress={() => copy(doc.pretty, 'Copied, beautified')} delayLongPress={380} style={{ gap: 8 }}>
+    <Press haptics={false} scaleTo={1} onLongPress={() => copy(doc.pretty, tx('phoneParts.json.copiedPretty'))} delayLongPress={380} style={{ gap: 8 }}>
       <View style={{ borderRadius: radius.m - 2, backgroundColor: color.code, overflow: 'hidden' }}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ padding: raw ? 12 : 8, minWidth: '100%' }}>
           {raw ? (
@@ -106,7 +107,7 @@ export function JsonTree({ doc, text }: { readonly doc: JsonDoc; readonly text: 
                   </View>
                 );
                 return l.container ? (
-                  <Press key={l.id} haptics={false} scaleTo={0.99} onPress={() => flip(l.id)} onLongPress={() => copy(doc.pretty, 'Copied, beautified')} delayLongPress={380} accessibilityLabel={`${l.key ?? 'root'}, ${l.open ? 'open' : 'folded'}`}>
+                  <Press key={l.id} haptics={false} scaleTo={0.99} onPress={() => flip(l.id)} onLongPress={() => copy(doc.pretty, tx('phoneParts.json.copiedPretty'))} delayLongPress={380} accessibilityLabel={tx(l.open ? 'phoneParts.json.open' : 'phoneParts.json.folded', { key: l.key ?? tx('phoneParts.json.root') })}>
                     {row}
                   </Press>
                 ) : (
@@ -115,7 +116,7 @@ export function JsonTree({ doc, text }: { readonly doc: JsonDoc; readonly text: 
               })}
               {lines.length > shown.length ? (
                 <View style={{ paddingLeft: 16, paddingTop: 4, alignSelf: 'flex-start' }}>
-                  <SmallChip label={`Show ${lines.length - shown.length} more rows`} onPress={() => setAll(true)} />
+                  <SmallChip label={tx('phoneParts.json.moreRows', { count: lines.length - shown.length })} onPress={() => setAll(true)} />
                 </View>
               ) : null}
             </View>
@@ -124,17 +125,18 @@ export function JsonTree({ doc, text }: { readonly doc: JsonDoc; readonly text: 
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <View style={{ flexDirection: 'row', padding: 2, gap: 2, borderRadius: 15, backgroundColor: color.sunken }}>
-          {([['Tree', ListTree, false], ['Raw', Braces, true]] as const).map(([label, Icon, on]) => (
+          {([[tx('phoneParts.json.tree'), ListTree, false], [tx('phoneParts.json.raw'), Braces, true]] as const).map(([label, Icon, on]) => (
             <Press key={label} haptics={false} onPress={() => (haptic.tap(), setRaw(on))} accessibilityLabel={label} accessibilityState={{ selected: raw === on }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 26, paddingHorizontal: 10, borderRadius: 13, backgroundColor: raw === on ? color.card : 'transparent' }}>
               <Icon color={raw === on ? color.text : color.text3} size={13} />
               <Text style={{ ...type.caption, color: raw === on ? color.text : color.text3, fontWeight: '700' }}>{label}</Text>
             </Press>
           ))}
         </View>
-        <SmallChip label="Copy" Icon={Copy} onPress={() => copy(text)} />
+        <SmallChip label={tx('phoneParts.copy')} Icon={Copy} onPress={() => copy(text)} />
         <View style={{ flex: 1 }} />
         <FileJson color={color.text3} size={13} />
-        <T v="caption">{isContainer(doc.value) ? jsonSize(doc.value) : 'JSON'}</T>
+        <T v="caption">{/* i18n-ignore */}
+        {isContainer(doc.value) ? jsonSize(doc.value) : 'JSON'}</T>
       </View>
     </Press>
   );

@@ -4,6 +4,7 @@ import { Alert, Linking, Text, View } from 'react-native';
 import { calls } from '../lib/link/calls';
 import type { DashboardTileView, DocRefView } from '../lib/link/protocol';
 import { store } from '../lib/store';
+import { t } from '../lib/language';
 import { color, tint, type } from '../lib/theme';
 import { deltaCellOf, documentLook, personOf, progressOf, ratingOf, sparkOf } from '../../../src/shared/typed-cells';
 import { openOutput } from './Outputs';
@@ -34,7 +35,7 @@ export function TypedCell({ typed, cell, ri, tb, width }: { readonly typed: Type
       ) : null;
     case 'path':
       return (
-        <Text numberOfLines={1} onPress={() => store.toast({ text: `On your Mac: ${whole}`, tone: 'info' })} style={{ ...type.mono, width, color: color.text2 }}>
+        <Text numberOfLines={1} onPress={() => store.toast({ text: t('phoneParts.typed.onMac', { what: whole }), tone: 'info' })} style={{ ...type.mono, width, color: color.text2 }}>
           {whole.replace(/^\/Users\/[^/]+/, '~')}
         </Text>
       );
@@ -46,7 +47,7 @@ export function TypedCell({ typed, cell, ri, tb, width }: { readonly typed: Type
       if (!doc || !metric) return null;
       return (
         <View style={{ width }}>
-          <Press onPress={() => openDocument(doc, { sentinelId: metric.sentinelId, metric: metric.name, column: typed.key, value: whole, storage: typed.kind === 'storage' })} accessibilityLabel={`Open ${doc.name}`} style={{ alignSelf: 'flex-start', maxWidth: width - 6, flexDirection: 'row', alignItems: 'center', gap: 5, height: 26, paddingHorizontal: 9, borderRadius: 13, backgroundColor: tint.info }}>
+          <Press onPress={() => openDocument(doc, { sentinelId: metric.sentinelId, metric: metric.name, column: typed.key, value: whole, storage: typed.kind === 'storage' })} accessibilityLabel={t('phoneParts.dash.openName', { name: doc.name })} style={{ alignSelf: 'flex-start', maxWidth: width - 6, flexDirection: 'row', alignItems: 'center', gap: 5, height: 26, paddingHorizontal: 9, borderRadius: 13, backgroundColor: tint.info }}>
             <FileText size={12} color={color.info} />
             <Text numberOfLines={1} style={{ ...type.caption, color: color.info, fontWeight: '600', flexShrink: 1 }}>
               {typed.button ?? doc.name}
@@ -121,7 +122,7 @@ export function TypedCell({ typed, cell, ri, tb, width }: { readonly typed: Type
 
 /** An action column's button: asks first, then runs its sentinel with the row (the columns the phone has). */
 export function ActionCell({ typed, row, tb, width }: { readonly typed: Typed; readonly row: readonly Cell[]; readonly tb: Table; readonly width: number }) {
-  const words = typed.button ?? 'Run';
+  const words = typed.button ?? t('phoneParts.typed.run');
   const metric = tb.metric;
   const keys = tb.keys;
   if (!metric || !keys) return null;
@@ -132,9 +133,9 @@ export function ActionCell({ typed, row, tb, width }: { readonly typed: Typed; r
       const v = row[i] ?? null;
       if (k !== typed.key && !(typeof v === 'string' && v.length >= 300)) sent[k] = v;
     });
-    Alert.alert(words, 'Runs its sentinel on your Mac with this row.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: words, onPress: () => void store.call(calls.sentinelRunRow(metric.sentinelId, metric.name, typed.key, sent, words)).then(() => store.toast({ text: `${words}: running on your Mac`, tone: 'ok' }), (e: Error) => store.toast({ text: e.message, tone: 'error' })) },
+    Alert.alert(words, t('phoneParts.typed.runsRow'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: words, onPress: () => void store.call(calls.sentinelRunRow(metric.sentinelId, metric.name, typed.key, sent, words)).then(() => store.toast({ text: t('phoneParts.typed.running', { what: words }), tone: 'ok' }), (e: Error) => store.toast({ text: e.message, tone: 'error' })) },
     ]);
   };
   return (

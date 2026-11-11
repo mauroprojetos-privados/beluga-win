@@ -5,6 +5,7 @@ import { useView } from '../../lib/hooks';
 import type { TasksView } from '../../lib/link/protocol';
 import { splitTaskKeys } from '../../lib/render';
 import { store } from '../../lib/store';
+import { t as tx } from '../../lib/language';
 import { color, type } from '../../lib/theme';
 import { statusOf, taskHref } from '../Tasks';
 import { Press, toneBg, toneInk } from '../ui';
@@ -48,8 +49,8 @@ export function TaskChip({ k, task }: { readonly k: string; readonly task?: Task
   return (
     <Press
       haptics={false}
-      accessibilityLabel={t ? `${t.key} ${t.title}, ${st.label}` : `${k}, not on the board here`}
-      onPress={() => (t ? router.push(taskHref(t)) : store.toast({ text: `${k}: not on the board here`, tone: 'info' }))}
+      accessibilityLabel={t ? `${t.key} ${t.title}, ${st.label}` : tx('phoneParts.taskChip.notOnBoardA11y', { key: k })}
+      onPress={() => (t ? router.push(taskHref(t)) : store.toast({ text: tx('phoneParts.taskChip.notOnBoard', { key: k }), tone: 'info' }))}
       style={[pill, { backgroundColor: bg }]}
     >
       {t ? <st.Icon color={fg} size={11} strokeWidth={2} /> : null}

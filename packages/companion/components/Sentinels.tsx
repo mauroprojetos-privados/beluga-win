@@ -6,6 +6,8 @@ import Animated, { LinearTransition, FadeIn } from 'react-native-reanimated';
 import { ago, useSupports, useView } from '../lib/hooks';
 import type { SentinelSummary, SentinelsView } from '../lib/link/protocol';
 import { kv } from '../lib/kv';
+import { t } from '../lib/language';
+import { formatDateWith } from '../../../src/shared/i18n/format';
 import { color } from '../lib/theme';
 import { ProjectMark } from './ProjectMark';
 import { SentinelIdeas } from './SentinelIdeas';
@@ -23,13 +25,13 @@ export const sentinelIcon = (name: string): LucideIcon => ICONS[name] ?? Shield;
 
 /** A run's state as a pill: the Mac's words (RUN_STATE_INFO) in the phone's pastels. */
 const RUN: Record<string, { label: string; tone: Tone; Icon: LucideIcon }> = {
-  queued: { label: 'Queued', tone: 'plain', Icon: Clock },
-  running: { label: 'Running', tone: 'peach', Icon: Loader },
-  'needs-you': { label: 'Needs you', tone: 'butter', Icon: Hand },
-  done: { label: 'Done', tone: 'mint', Icon: Check },
-  skipped: { label: 'Skipped', tone: 'plain', Icon: Minus },
-  failed: { label: 'Failed', tone: 'rose', Icon: X },
-  stopped: { label: 'Stopped', tone: 'plain', Icon: CircleDot },
+  queued: { get label() { return t('phoneParts.sentinels.queued'); }, tone: 'plain', Icon: Clock },
+  running: { get label() { return t('phoneParts.sentinels.running'); }, tone: 'peach', Icon: Loader },
+  'needs-you': { get label() { return t('phoneParts.sentinels.needsYou'); }, tone: 'butter', Icon: Hand },
+  done: { get label() { return t('phoneParts.sentinels.done'); }, tone: 'mint', Icon: Check },
+  skipped: { get label() { return t('phoneParts.sentinels.skipped'); }, tone: 'plain', Icon: Minus },
+  failed: { get label() { return t('phoneParts.sentinels.failed'); }, tone: 'rose', Icon: X },
+  stopped: { get label() { return t('phoneParts.sentinels.stopped'); }, tone: 'plain', Icon: CircleDot },
 };
 export const runStateOf = (state: string) => RUN[state] ?? { label: state, tone: 'plain' as Tone, Icon: CircleDot };
 
@@ -47,12 +49,12 @@ export function nextText(at: number | undefined, now = Date.now()): string | und
   if (!at) return undefined;
   const d = new Date(at);
   const time = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
-  return new Date(now).toDateString() === d.toDateString() ? time : `${d.toLocaleDateString([], { weekday: 'short' })} ${time}`;
+  return new Date(now).toDateString() === d.toDateString() ? time : `${formatDateWith(d, { weekday: 'short' })} ${time}`;
 }
 
 /** The row's caption: "Every day at 7:00 · 3 commits landed", or that it's paused. */
 export function sentinelCaption(s: SentinelSummary): string {
-  if (s.paused) return s.pausedWhy ?? `Paused · ${s.sentence}`;
+  if (s.paused) return s.pausedWhy ?? t('phoneParts.sentinels.pausedWhat', { what: s.sentence });
   return [s.sentence, s.last?.headline].filter(Boolean).join(' · ');
 }
 
@@ -77,7 +79,7 @@ export function SentinelRow({ s, first }: { readonly s: SentinelSummary; readonl
             {when && !s.paused ? ` · ${when}` : ''}
           </T>
         </View>
-        {s.paused ? <Pill label="Paused" /> : st ? <Pill label={st.label} tone={st.tone} /> : null}
+        {s.paused ? <Pill label={t('phoneParts.sentinels.paused')} /> : st ? <Pill label={st.label} tone={st.tone} /> : null}
       </Press>
     </View>
   );
@@ -90,22 +92,22 @@ export function SentinelsList() {
   if (!on) {
     return (
       <Card style={{ marginHorizontal: 16, padding: 18 }}>
-        <T v="heading">Sentinel needs a newer Beluga</T>
+        <T v="heading">{t('phoneParts.sentinels.needsNewer')}</T>
         <T v="callout" style={{ marginTop: 4 }}>
-          Update Beluga on your Mac to see your sentinels here.
+          {t('phoneParts.sentinels.needsNewerHint')}
         </T>
       </Card>
     );
   }
-  if (!view) return <T v="callout" style={{ paddingHorizontal: 20 }}>Loading your sentinels…</T>;
+  if (!view) return <T v="callout" style={{ paddingHorizontal: 20 }}>{t('phoneParts.sentinels.loading')}</T>;
   const list = view.data.sentinels;
   if (!list.length && view.data.enabled) return <SentinelIdeas chat={view.data.chat?.topic} />;
   if (!list.length) {
     return (
       <Card style={{ marginHorizontal: 16, padding: 18 }}>
-        <T v="heading">Nothing watching yet</T>
+        <T v="heading">{t('phoneParts.sentinels.none')}</T>
         <T v="callout" style={{ marginTop: 4 }}>
-          {view.data.enabled ? 'A sentinel runs your agent, a script or a service on a schedule or when something happens, and leaves a report. Make one in Sentinel on your Mac.' : 'Sentinel runs in the Beluga app on your Mac.'}
+          {view.data.enabled ? t('phoneParts.sentinels.noneHint') : t('phoneParts.sentinels.runsInApp')}
         </T>
       </Card>
     );
@@ -113,7 +115,7 @@ export function SentinelsList() {
   const groups = new Map<string, { name: string; icon?: string; items: SentinelSummary[] }>();
   for (const s of list) {
     const key = s.projectId ?? '';
-    const g = groups.get(key) ?? { name: s.project ?? (s.projectId ? 'A project' : 'Your Mac'), items: [] };
+    const g = groups.get(key) ?? { name: s.project ?? (s.projectId ? t('phoneParts.sentinels.aProject') : t('phoneParts.yourMac')), items: [] };
     g.items.push(s);
     groups.set(key, g);
   }
@@ -137,7 +139,7 @@ export function SentinelsList() {
         </Animated.View>
       ))}
       <T v="caption" c={color.text3} style={{ textAlign: 'center', paddingHorizontal: 24 }}>
-        New sentinels and their steps are made on your Mac.
+        {t('phoneParts.sentinels.madeOnMac')}
       </T>
     </View>
   );
@@ -163,14 +165,15 @@ export function SentinelHome() {
   const next = v.sentinels.flatMap((s) => (s.nextAt ? [s.nextAt] : [])).sort((a, b) => a - b)[0];
   const live = v.sentinels.some((s) => s.live);
   const caption = fresh.length
-    ? `${fresh.length} ran since you looked${failed ? ` · ${failed} failed` : ''}`
-    : [watching ? `${watching} watching` : 'All paused', live ? 'one running now' : next ? `next at ${nextText(next)}` : undefined].filter(Boolean).join(' · ');
+    ? [t('phoneParts.sentinels.ranSince', { count: fresh.length }), failed ? t('phoneParts.sentinels.failedCount', { count: failed }) : undefined].filter(Boolean).join(' · ')
+    : [watching ? t('phoneParts.sentinels.watching', { count: watching }) : t('phoneParts.sentinels.allPaused'), live ? t('phoneParts.sentinels.oneRunning') : next ? t('phoneParts.sentinels.nextAt', { when: nextText(next) ?? '' }) : undefined].filter(Boolean).join(' · ');
   return (
-    <Press scaleTo={0.985} onPress={() => router.push('/sentinels' as never)} accessibilityLabel={`Sentinel, ${caption}`} style={{ marginHorizontal: 16, marginTop: 28 }}>
+    <Press scaleTo={0.985} onPress={() => router.push('/sentinels' as never)} accessibilityLabel={t('phoneParts.sentinels.homeLabel', { caption })} style={{ marginHorizontal: 16, marginTop: 28 }}>
       <Card style={{ padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <IconBadge Icon={Shield} tone={failed ? 'rose' : 'sky'} />
         <View style={{ flex: 1 }}>
           <T v="heading" numberOfLines={1}>
+            {/* i18n-ignore */}
             Sentinel
           </T>
           <T v="caption" numberOfLines={1}>

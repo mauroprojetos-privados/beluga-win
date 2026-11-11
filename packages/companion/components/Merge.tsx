@@ -6,6 +6,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { calls } from '../lib/link/calls';
 import type { ThreadChildren } from '../../../src/shared/threads';
 import type { BranchStepView, BranchView, MergeCheckView, MergeView, PhoneBranchStep, ThreadCountView, Topic } from '../lib/link/protocol';
+import { t as tx } from '../lib/language';
 import { openOnMac } from '../lib/mac';
 import { store } from '../lib/store';
 import { color } from '../lib/theme';
@@ -61,7 +62,7 @@ export function MergeSheet({ topic, visible, onClose }: { readonly topic: Topic;
         <View style={{ paddingHorizontal: 20, paddingBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <IconBadge Icon={GitMerge} tone="lavender" size={34} />
           <T v="title" style={{ flex: 1, fontSize: 21 }}>
-            Merge into {check?.into ?? 'main'}
+            {tx('phoneParts.merge.into', { branch: check?.into ?? 'main' })}
           </T>
         </View>
       }
@@ -69,12 +70,12 @@ export function MergeSheet({ topic, visible, onClose }: { readonly topic: Topic;
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 12, gap: 14 }}>
         {error ? (
           <T v="callout" c={color.error}>
-            Couldn’t look at this branch: {error}
+            {tx('phoneParts.merge.couldntLook', { error })}
           </T>
         ) : !check ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 18 }}>
             <ActivityIndicator color={color.text3} />
-            <T v="callout">Checking what would merge…</T>
+            <T v="callout">{tx('phoneParts.merge.checking')}</T>
           </View>
         ) : (
           <Animated.View entering={FadeIn.duration(200)} style={{ gap: 14 }}>
@@ -86,7 +87,7 @@ export function MergeSheet({ topic, visible, onClose }: { readonly topic: Topic;
             {check.commits ? (
               <View style={{ gap: 4 }}>
                 <T v="callout" c={color.text} style={{ fontWeight: '600' }}>
-                  {check.commits} {check.commits === 1 ? 'commit' : 'commits'} · {check.files} {check.files === 1 ? 'file' : 'files'}
+                  {tx('phoneParts.merge.commits', { count: check.commits })} · {tx('phoneParts.merge.files', { count: check.files })}
                 </T>
                 {check.subjects.map((s, i) => (
                   <T key={i} v="callout" numberOfLines={1}>
@@ -111,13 +112,13 @@ export function MergeSheet({ topic, visible, onClose }: { readonly topic: Topic;
               })}
             </View>
             {check.conflicts?.length ? <Files files={check.conflicts} /> : null}
-            <T v="caption">A merge commit is made in your Mac’s main folder, so its files change. Nothing is pushed.</T>
+            <T v="caption">{tx('phoneParts.merge.whatHappens')}</T>
           </Animated.View>
         )}
       </ScrollView>
       <View style={{ paddingHorizontal: 20, paddingTop: 6, gap: 10 }}>
-        {claudeFix ? <Button label="Ask your agent to resolve" Icon={Sparkles} onPress={() => void resolve()} /> : null}
-        <Button label={busy ? 'Merging…' : (check?.confirm ?? 'Merge')} Icon={GitMerge} quiet={claudeFix} disabled={!check?.canMerge || busy} onPress={() => void merge()} />
+        {claudeFix ? <Button label={tx('phoneParts.merge.askResolve')} Icon={Sparkles} onPress={() => void resolve()} /> : null}
+        <Button label={busy ? tx('phoneParts.merge.merging') : (check?.confirm ?? tx('phoneParts.merge.merge'))} Icon={GitMerge} quiet={claudeFix} disabled={!check?.canMerge || busy} onPress={() => void merge()} />
       </View>
     </Sheet>
   );
@@ -135,18 +136,18 @@ function Files({ files }: { readonly files: readonly string[] }) {
           </T>
         </View>
       ))}
-      {files.length > 12 ? <T v="caption">and {files.length - 12} more</T> : null}
+      {files.length > 12 ? <T v="caption">{tx('phoneParts.merge.andMore', { count: files.length - 12 })}</T> : null}
     </View>
   );
 }
 
 const BAND: Record<string, { tone: Tone; Icon: typeof Check; title: (m: MergeView) => string }> = {
-  merging: { tone: 'lavender', Icon: GitMerge, title: () => 'Merging…' },
-  conflicts: { tone: 'rose', Icon: CircleAlert, title: (m) => `${m.conflicts?.length ?? 'Some'} ${m.conflicts?.length === 1 ? 'file conflicts' : 'files conflict'}` },
-  resolving: { tone: 'lavender', Icon: Sparkles, title: () => 'Your agent is resolving the conflicts' },
-  resolved: { tone: 'sky', Icon: Check, title: () => 'Your agent is done: check it and merge' },
-  merged: { tone: 'mint', Icon: Check, title: () => 'Merged' },
-  blocked: { tone: 'butter', Icon: TriangleAlert, title: () => 'Not merged yet' },
+  merging: { tone: 'lavender', Icon: GitMerge, title: () => tx('phoneParts.merge.merging') },
+  conflicts: { tone: 'rose', Icon: CircleAlert, title: (m) => (m.conflicts?.length !== undefined ? tx('phoneParts.merge.conflicts', { count: m.conflicts.length }) : tx('phoneParts.merge.someConflict')) },
+  resolving: { tone: 'lavender', Icon: Sparkles, title: () => tx('phoneParts.merge.resolving') },
+  resolved: { tone: 'sky', Icon: Check, title: () => tx('phoneParts.merge.resolved') },
+  merged: { tone: 'mint', Icon: Check, title: () => tx('phoneParts.merge.merged') },
+  blocked: { tone: 'butter', Icon: TriangleAlert, title: () => tx('phoneParts.merge.blocked') },
 };
 
 /** Where the merge stands, in the conversation, live; each step's next action is on it. */
@@ -177,12 +178,12 @@ export function MergeBand({ topic, merge, onCheck }: { readonly topic: Topic; re
           </T>
         ) : null}
         {merge.conflicts?.length && merge.phase !== 'merged' ? <Files files={merge.conflicts} /> : null}
-        {merge.phase === 'conflicts' ? <Button label="Ask your agent to resolve" Icon={Sparkles} onPress={resolve} /> : null}
+        {merge.phase === 'conflicts' ? <Button label={tx('phoneParts.merge.askResolve')} Icon={Sparkles} onPress={resolve} /> : null}
         {merge.phase === 'resolved' || merge.phase === 'blocked' ? (
           <Press onPress={onCheck} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', height: 34, paddingHorizontal: 14, borderRadius: 17, backgroundColor: color.card }}>
             <RefreshCw color={color.text} size={14} />
             <T v="callout" c={color.text} style={{ fontWeight: '600' }}>
-              Check again
+              {tx('phoneParts.merge.checkAgain')}
             </T>
           </Press>
         ) : null}
@@ -252,20 +253,20 @@ export function BranchBand({ topic, branch, canMerge, onMerge }: { readonly topi
     return step.claude || step.danger || familyOf(step)?.count ? setAsking(step) : run(step);
   };
   const [main, ...rest] = steps;
-  const openPr: BranchStepView | undefined = branch.pr?.url && !steps.some((s) => s.id === 'open_pr') ? { id: 'open_pr', label: `Open PR #${branch.pr.number}`, hint: 'On GitHub' } : undefined;
+  const openPr: BranchStepView | undefined = branch.pr?.url && !steps.some((s) => s.id === 'open_pr') ? { id: 'open_pr', label: tx('phoneParts.merge.openPr', { number: branch.pr.number }), hint: tx('phoneParts.merge.onGitHub') } : undefined;
   const others = [...rest, ...(openPr ? [openPr] : [])];
   // An older Mac: its next step in words, and merging or resolving here.
   const next = branch.next;
   const here = steps.length ? undefined : next?.id === 'merge' && canMerge ? 'merge' : next?.id === 'merge_claude' ? 'resolve' : undefined;
   // The one step it needs next, as a small pastel chip; an older Mac's merge or resolve the same way.
   const chip: { label: string; Icon: LucideIcon; tone: Tone; onPress: () => void } | undefined = main
-    ? { label: busy ? 'Working…' : bare(main.label), Icon: iconOf(main), tone: toneOf(main), onPress: () => tap(main) }
+    ? { label: busy ? tx('phoneParts.merge.working') : bare(main.label), Icon: iconOf(main), tone: toneOf(main), onPress: () => tap(main) }
     : here === 'merge'
       ? { label: bare(next!.label), Icon: GitMerge, tone: 'lavender', onPress: onMerge }
       : here === 'resolve'
-        ? { label: 'Resolve', Icon: Sparkles, tone: 'peach', onPress: resolve }
+        ? { label: tx('phoneParts.merge.resolve'), Icon: Sparkles, tone: 'peach', onPress: resolve }
         : undefined;
-  const line = next && !here && !steps.length ? `Next, on your Mac: ${bare(next.label)}${next.claude ? ' (your agent does it)' : ''}` : branch.detail;
+  const line = next && !here && !steps.length ? tx(next.claude ? 'phoneParts.merge.nextOnMacAgent' : 'phoneParts.merge.nextOnMac', { step: bare(next.label) }) : branch.detail;
   // The row itself opens every step (the next one too), under the branch's state.
   const all = [...(main ? [main] : []), ...others];
   // Deleting asks with Archive first: it keeps the branch's commits and the conversation (BLG-617; the hint says what Delete loses).
@@ -305,7 +306,7 @@ export function BranchBand({ topic, branch, canMerge, onMerge }: { readonly topi
         {/* ••• always fits: the chip and the line give way to it. */}
         {others.length ? (
           <View style={{ flexShrink: 0 }}>
-            <More onPress={() => setMore(true)} label="Other steps" size={32} />
+            <More onPress={() => setMore(true)} label={tx('phoneParts.merge.otherSteps')} size={32} />
           </View>
         ) : null}
       </View>
@@ -322,13 +323,13 @@ export function BranchBand({ topic, branch, canMerge, onMerge }: { readonly topi
             </T>
           ) : undefined
         }
-        options={all.map((s) => ({ Icon: iconOf(s), label: bare(s.label), sub: s.claude ? `Your agent · ${s.hint}` : s.hint, tone: toneOf(s), onPress: () => tap(s) }))}
+        options={all.map((s) => ({ Icon: iconOf(s), label: bare(s.label), sub: s.claude ? tx('phoneParts.merge.agentHint', { hint: s.hint ?? '' }) : s.hint, tone: toneOf(s), onPress: () => tap(s) }))}
       />
       <Options
         window
         visible={Boolean(asking)}
         onClose={() => setAsking(undefined)}
-        title={asking?.danger ? 'This can’t be undone' : asking?.id === 'archive' ? 'Archive this chat' : 'Your agent does this in the conversation'}
+        title={asking?.danger ? tx('phoneParts.cantUndo') : asking?.id === 'archive' ? tx('phoneParts.merge.archiveChat') : tx('phoneParts.merge.agentDoesIt')}
         head={question ? <ThreadsBox question={question} on={too} onToggle={() => setToo(!too)} /> : undefined}
         options={confirm.map((s) => ({ Icon: iconOf(s), label: bare(s.label), sub: s.hint, tone: toneOf(s), onPress: () => run(s, children) }))}
       />
