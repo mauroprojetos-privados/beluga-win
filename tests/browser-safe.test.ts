@@ -42,6 +42,9 @@ const ENTRIES = [
   'src/machines/words.ts',
   'src/machines/look.ts',
   'src/shared/machine-kinds.ts',
+  // Beluga's words and formats in your language (docs/i18n.md): every screen says them.
+  'src/shared/i18n/index.ts',
+  'src/shared/i18n/format.ts',
 ];
 // Pure packages that run anywhere (string-width measures text the same way in both clients).
 const ALLOWED_PACKAGES = new Set(['zod', 'string-width']);
