@@ -9,6 +9,7 @@ import { remindLabel } from '../../../../src/shared/remind.js';
 import { threadNesting } from '../../../../src/ui/thread-tree.js';
 import { activityOf } from '../../../../src/ui/workspace-models.js';
 import type { Project, Workspace } from '../../../../src/workspaces/types.js';
+import { wordRecord } from '@beluga/shared/i18n/words.js';
 
 /**
  * What each conversation in the sidebar is waiting on, Slack-style: it needs you (an approval,
@@ -363,7 +364,7 @@ export function unreadEntries(state: ListSource): UnreadEntry[] {
  * Later (Remind Me Later, BLG-770), the owner's choices; the code says `active` and `snoozed`.
  */
 export const CATEGORY_ORDER: readonly ChatCategory[] = ['active', 'working', 'snoozed', 'settled'];
-export const CATEGORY_TITLES: Readonly<Record<ChatCategory, string>> = { active: 'Inbox', working: 'Working', snoozed: 'Later', settled: 'Settled' };
+export const CATEGORY_TITLES: Readonly<Record<ChatCategory, string>> = wordRecord({ active: 'helpers.chats.active', working: 'helpers.chats.working', snoozed: 'helpers.chats.snoozed', settled: 'helpers.chats.settled' });
 /** How many Settled rows show before "Show more". */
 export const SETTLED_PAGE = 50;
 
