@@ -1,4 +1,6 @@
 import { actingVia, asActingAgent } from './acting-agent.js';
+import { setSideLanguage } from '../agent/side-language.js';
+import { appLocale } from './language.js';
 import { closePreviews } from '../preview/off.js';
 import { experimentOn } from '../shared/experiments.js';
 import { createHash, randomUUID } from 'node:crypto';
@@ -251,6 +253,8 @@ export class Session {
 
   constructor(private readonly opts: SessionOptions) {
     if (opts.workspaces) opts.workspaces.branchPrefix = () => opts.store.getState().prefs.branchPrefix;
+    // Worktree names, task drafts, titles and reviews in your language (docs/i18n.md).
+    setSideLanguage(() => appLocale(opts.store.getState().prefs));
     this.bridge = createRoomBridge(this, () => opts.agentCwd);
     const parts = createSessionParts(this, opts);
     this.workspaces = parts.workspaces;
