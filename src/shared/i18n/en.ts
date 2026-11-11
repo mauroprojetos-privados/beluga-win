@@ -60,6 +60,23 @@ export const en = {
   'time.month': { one: 'month', other: 'months' },
   'time.year': { one: 'year', other: 'years' },
 
+  // ---- the daemon's notifications (src/core/notify.ts)
+  'notify.finished': '{who} finished in {where}',
+  'notify.done': 'Done',
+  'notify.planFor': '{who} has a plan for {where}',
+  'notify.planForBody': 'Approve it, or say what to change',
+  'notify.yourCall': 'Your call in {where}',
+  'notify.conflict': 'Merge conflict in {where}',
+  'notify.conflictFiles': '{count} file(s): {files}',
+  'notify.joined': '{name} joined',
+  'notify.joinedAgent': 'They brought their {agent}',
+  'notify.joinedHi': 'Say hi in the group chat',
+  'notify.left': '{name} left',
+  'notify.leftAgent': 'Their {agent} left with them',
+  'notify.leftRoom': 'They left the room',
+  'notify.testTitle': 'Notifications work',
+  'notify.testBody': 'This is how Beluga tells you your agent finished or needs you',
+
   // ---- Needs You
   'needs.allowOnce': 'Allow once',
   'needs.approve': 'Approve',

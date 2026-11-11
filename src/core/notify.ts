@@ -1,4 +1,5 @@
 import type { NotifySettings } from './settings.js';
+import { t } from '../shared/i18n/index.js';
 import { type DomainState, type LogItem, type Store, isRunning } from './store.js';
 import { dndActive } from '../shared/quiet.js';
 import { isSentinelChat } from './sentinel/model.js';
@@ -259,7 +260,7 @@ function finishedRuns(prev: DomainState, next: DomainState): NoticeEvent[] {
     if (!mine && item.requesterName !== selfName) continue;
     const who = mine ? agentName(item.agent ?? defaultAgentOf(next.self)) : agentLabel(item.agent, item.ownerName, false);
     const where = placeName(next, item.channel);
-    if (item.status === 'done') out.push({ kind: 'done', title: `${who} finished in ${where}`, body: firstLine(item.text) || 'Done', channel: item.channel, ...(mine && allDone(next, item) ? { watched: true } : {}) });
+    if (item.status === 'done') out.push({ kind: 'done', title: t('notify.finished', { who, where }), body: firstLine(item.text) || t('notify.done'), channel: item.channel, ...(mine && allDone(next, item) ? { watched: true } : {}) });
     else if (!QUIET_ERRORS.test(item.text)) out.push({ kind: 'problems', title: `${who} stopped in ${where}`, body: firstLine(item.text) || item.status, channel: item.channel });
   }
   return [...out, ...finishedTasks(next, before)];
@@ -431,9 +432,9 @@ export function detectNotices(prev: DomainState, next: DomainState, now = Date.n
       const who = agentName(speakerIn(next, q.channel));
       out.push(
         q.question.kind === 'plan'
-          ? { kind: 'needsYou', tag: 'plan', ref: q.qid, title: `${who} has a plan for ${where}`, body: 'Approve it, or say what to change', channel: q.channel }
+          ? { kind: 'needsYou', tag: 'plan', ref: q.qid, title: t('notify.planFor', { who, where }), body: t('notify.planForBody'), channel: q.channel }
           : isDecisionQid(q.qid)
-            ? { kind: 'needsYou', tag: 'question', ref: q.qid, title: `Your call in ${where}`, body: firstLine(q.question.questions[0]?.question ?? ''), channel: q.channel }
+            ? { kind: 'needsYou', tag: 'question', ref: q.qid, title: t('notify.yourCall', { where }), body: firstLine(q.question.questions[0]?.question ?? ''), channel: q.channel }
             : { kind: 'needsYou', tag: 'question', ref: q.qid, title: `${who} asks in ${where}`, body: firstLine(q.question.questions[0]?.question ?? ''), channel: q.channel },
       );
     }
@@ -441,7 +442,7 @@ export function detectNotices(prev: DomainState, next: DomainState, now = Date.n
   if (prev.conflicts !== next.conflicts) {
     for (const [id, files] of Object.entries(next.conflicts)) {
       if (!files.length || prev.conflicts[id]?.length) continue;
-      out.push({ kind: 'problems', tag: 'conflict', title: `Merge conflict in ${placeName(next, `ws:${id}`)}`, body: `${files.length} file(s): ${files.slice(0, 3).join(', ')}`, channel: `ws:${id}` });
+      out.push({ kind: 'problems', tag: 'conflict', title: t('notify.conflict', { where: placeName(next, `ws:${id}`) }), body: t('notify.conflictFiles', { count: files.length, files: files.slice(0, 3).join(', ') }), channel: `ws:${id}` });
     }
   }
   // People: only after you're in (the first peer list is everyone already there).
@@ -449,10 +450,10 @@ export function detectNotices(prev: DomainState, next: DomainState, now = Date.n
     const seen = new Set(prev.peers.map((p) => p.peerId));
     const still = new Set(next.peers.map((p) => p.peerId));
     const selfId = next.self?.peerId;
-    for (const p of next.peers) if (!seen.has(p.peerId) && p.peerId !== selfId) out.push({ kind: 'people', tag: 'joined', title: `${p.name} joined`, body: p.agent ? `They brought their ${agentName(defaultAgentOf(p))}` : 'Say hi in the group chat', channel: 'room' });
+    for (const p of next.peers) if (!seen.has(p.peerId) && p.peerId !== selfId) out.push({ kind: 'people', tag: 'joined', title: t('notify.joined', { name: p.name }), body: p.agent ? t('notify.joinedAgent', { agent: agentName(defaultAgentOf(p)) }) : t('notify.joinedHi'), channel: 'room' });
     // Only while you're still in the room: losing the room isn't news about each person.
     if (next.status === 'connected' && next.peers.some((p) => p.peerId === selfId)) {
-      for (const p of prev.peers) if (!still.has(p.peerId) && p.peerId !== selfId) out.push({ kind: 'people', tag: 'left', title: `${p.name} left`, body: p.agent ? `Their ${agentName(defaultAgentOf(p))} left with them` : 'They left the room', channel: 'room' });
+      for (const p of prev.peers) if (!still.has(p.peerId) && p.peerId !== selfId) out.push({ kind: 'people', tag: 'left', title: t('notify.left', { name: p.name }), body: p.agent ? t('notify.leftAgent', { agent: agentName(defaultAgentOf(p)) }) : t('notify.leftRoom'), channel: 'room' });
     }
   }
   if (prev.shared !== next.shared) {
@@ -522,7 +523,7 @@ export class Notifier {
 
   /** Show a test notification whatever the settings say (you asked for it). */
   test(): void {
-    const e: NoticeEvent = { kind: 'done', tag: 'test', title: 'Notifications work', body: 'This is how Beluga tells you your agent finished or needs you' };
+    const e: NoticeEvent = { kind: 'done', tag: 'test', title: t('notify.testTitle'), body: t('notify.testBody') };
     this.deps.store.dispatch({ type: 'notice_add', notice: { kind: e.kind, tag: e.tag, title: e.title, body: e.body } });
     this.queue.push(e);
     this.flush();
