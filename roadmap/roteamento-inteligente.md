@@ -392,6 +392,67 @@ schema zod (`src/core/bots/schema.ts`), com `version` para migrações.
 
 **Depende de:** fases 6 e 6b.
 
+### Fase 7: Vários idiomas, começando por português do Brasil
+
+Hoje o Beluga só fala inglês: não há biblioteca de tradução. Os textos estão escritos direto nos
+~440 componentes do Mac (`packages/mac/src`), nas ~35 telas do celular (`packages/companion/app`) e
+em textos montados pelo daemon (avisos, Needs You, notificações, `src/companion/views.ts`). Datas e
+números já usam o `Intl` do sistema, sem regra única: na suíte do Windows em pt-BR, alguns testes
+falham por isso.
+
+**O que muda para quem usa:**
+- **Settings › General › Idioma:** *Automático (o do sistema)*, *English* ou *Português (Brasil)*.
+  O celular segue o idioma do Mac, ou o próprio, se você escolher.
+- **Toda a interface traduzida:** menus, botões, Settings, Needs You, notificações, a interface web
+  e o celular.
+- **Datas, horas, números e moeda no formato do idioma** (`11/11/2026 14:30`, `R$ 1.234,56`), num só
+  lugar.
+- **Os agentes falam o seu idioma:**
+  - o prompt do agente ganha "responda em português do Brasil";
+  - as chamadas laterais também: o nome da worktree, o rascunho da tarefa, a descrição do projeto, o
+    resumo do plano e a revisão de PR;
+  - os bots (fase 6) têm o idioma como campo do `bot.json`.
+- **Os commits e os PRs** seguem uma regra **por projeto**, e não o idioma da interface: um
+  repositório em inglês continua recebendo commits em inglês. Isso fica em Settings do projeto
+  (*Idioma dos commits e PRs*).
+
+**Como construir:**
+1. **A base:** uma camada de tradução tipada e leve, que funcione no daemon, no Mac, no web e no
+   celular. Por exemplo: `src/shared/i18n/` com `t('chat.send')`, catálogos
+   `en.ts`/`pt-BR.ts`, plural com `Intl.PluralRules` e formatação com `Intl` num único
+   `format.ts`. Precisa ser compatível com navegador (`tests/browser-safe.test.ts`) e sem
+   dependências pesadas. A chave que falta no pt-BR cai para o inglês, nunca aparece vazia.
+2. **Extrair os textos:** feito por partes, tela por tela, com um script que encontra texto solto nos
+   `.tsx`. Um teste falha quando uma tela já migrada ganha texto sem `t()`.
+3. **O daemon manda chave e parâmetros**, não frase pronta, para o que vai às telas (Needs You,
+   avisos), e cada tela traduz. Quando isso não é possível (uma notificação do sistema, por
+   exemplo), o daemon usa o idioma escolhido. No `src/companion/protocol.ts`, isso só pode ser
+   aditivo: campos novos `key` e `params` ao lado do `text` atual, que continua para os celulares
+   antigos.
+4. **O pt-BR completo:** tradução revisada por uma pessoa, com glossário (worktree, plan, sentinel,
+   Needs You: o que traduzir e o que manter).
+5. **Os agentes:** o idioma entra no prompt (`src/agent/prompt.ts`) e nas chamadas laterais
+   (`side-calls.ts`). O idioma dos commits e PRs vem da configuração do projeto.
+6. **Os testes:**
+   - as suítes passam a fixar o idioma (`LANG=en-US`), resolvendo de vez as falhas de formatação em
+     máquinas pt-BR;
+   - um teste confere que todas as chaves existem nos dois catálogos;
+   - uma rodada de testes de interface em pt-BR verifica textos que estouram o espaço.
+7. **A documentação:** `docs/` continua em inglês. Um guia de uso em pt-BR (`docs/guide`) vem
+   depois, separado.
+
+**Ordem:** a base e a formatação primeiro (resolvem os testes); depois as telas mais usadas
+(barra lateral, chat, Needs You, Settings, celular); depois o resto; e o idioma dos agentes pode
+vir logo no começo, porque é pequeno e já ajuda muito.
+
+**Regras do `CLAUDE.md` que se aplicam:** os textos do celular e do Mac mudam juntos; o
+`protocol.ts` só muda de forma aditiva; o `docs/parity.md` ganha a linha do idioma em Settings; e a
+chave de idioma passa pelo `coverage.ts` (`settings.language` → `mac`; o celular tem o próprio
+seletor).
+
+**Depende de:** nada. Pode correr em paralelo com qualquer outra fase. Só o idioma dos bots depende
+da fase 6.
+
 ## 4. Regras do repositório (CLAUDE.md)
 
 - Todo método novo em `src/ipc/*-api.ts` precisa ser classificado em `src/companion/coverage.ts`:
@@ -425,6 +486,8 @@ schema zod (`src/core/bots/schema.ts`), com `version` para migrações.
    `CLAUDE.md`, `.mcp.json` e skills, aberta como projeto no Beluga.
 8. Fase 6c (Bot Studio): a interface que edita essas pastas. As abas de Identidade, Modelo e
    Ferramentas podem vir junto com a fase 6.
+9. Fase 7 (idiomas, pt-BR): independente, pode correr em paralelo desde já. O idioma dos agentes e a
+   formatação primeiro.
 
 ## 7. Exemplo prático (tudo pronto, fases 1 a 6)
 
@@ -524,6 +587,8 @@ Beluga de hoje.
 | Fase 0: Magpie ou 9router como endpoint | o Magpie está rodando no WSL; faltam os provedores, a chave e o Add Endpoint |
 | Fase 1: combos | em andamento, sessão "Fase 1: combos de agentes e modelos", worktree a partir da `main` |
 | Fases 2 a 6c | não iniciadas |
+| Fase 7: idiomas (pt-BR) | não iniciada; hoje não há biblioteca de tradução, e os textos estão escritos direto no código |
+| Navegador para os agentes | Playwright MCP registrado no Claude do WSL (escopo de usuário), com o Chromium já baixado, sem tela; vale para todas as conversas do Beluga do WSL |
 | OpenViking (base do conhecimento da 6b) | instalado no WSL; falta `openviking-server init` |
 | Modo WSL do app do Windows (pré-requisito para usar o app nativo) | commit `cd0a8c4c` na branch `feat/wsl-engine`; ainda não testado no app compilado |
 | Uso atual | o Beluga do WSL pelo navegador, em `127.0.0.1:7777` |
