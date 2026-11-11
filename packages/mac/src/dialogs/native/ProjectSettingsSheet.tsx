@@ -9,18 +9,19 @@ import { useApi, useApp } from '../../lib/beluga.js';
 import { LOCALES, LOCALE_NAMES, type Locale } from '@beluga/shared/i18n/locales.js';
 import { useT } from '../../lib/i18n.js';
 import type { NativeMenuProps } from './index.js';
+import { t as say } from '@beluga/shared/i18n/index.js';
 
 type Kind = 'setup' | 'run';
 type Source = NonNullable<ResolvedScripts['setup']>['source'];
 
-const SOURCE: Record<Source, { label: string; tone: 'team' | 'mine' | 'guess'; detail: string }> = {
-  yours: { label: 'Your settings', tone: 'mine', detail: 'Only you have it' },
-  claude: { label: 'By your agent', tone: 'guess', detail: 'Your agent worked it out from the project (only you have it). Change it if it’s wrong' },
-  'beluga.json': { label: 'beluga.json', tone: 'team', detail: 'Shared with everyone on the project' },
-  'klaud.json': { label: 'klaud.json', tone: 'team', detail: 'Shared with everyone on the project' },
-  'conductor.json': { label: 'conductor.json', tone: 'team', detail: 'A setup file in the project, shared with everyone on it' },
-  detected: { label: 'Guessed', tone: 'guess', detail: 'Beluga guessed it from the project. Change it if it’s wrong' },
-};
+const SOURCE = (): Record<Source, { label: string; tone: 'team' | 'mine' | 'guess'; detail: string }> => ({
+  yours: { label: say('native.project.sourceYours'), tone: 'mine', detail: say('native.project.sourceYoursDetail') },
+  claude: { label: say('native.project.sourceAgent'), tone: 'guess', detail: say('native.project.sourceAgentDetail') },
+  'beluga.json': { label: 'beluga.json', tone: 'team', detail: say('native.project.sourceShared') }, // i18n-ignore
+  'klaud.json': { label: 'klaud.json', tone: 'team', detail: say('native.project.sourceShared') }, // i18n-ignore
+  'conductor.json': { label: 'conductor.json', tone: 'team', detail: say('native.project.sourceConductor') }, // i18n-ignore
+  detected: { label: say('native.project.sourceGuessed'), tone: 'guess', detail: say('native.project.sourceGuessedDetail') },
+});
 
 /**
  * A project's Setup and Run commands, as a form: where each one comes from now, and whether to
@@ -59,17 +60,18 @@ export function ProjectSettingsSheet({ menu, close }: NativeMenuProps<'scripts'>
   const edited = (kind: Kind): boolean => values[kind].trim() !== saved(kind);
   const tag = (kind: Kind) => {
     const s = scripts[kind];
-    if (edited(kind)) return <SourceTag tone={team ? 'team' : 'mine'}>{team ? 'Will go in beluga.json' : 'Will be yours'}</SourceTag>;
-    return s ? (
-      <span title={SOURCE[s.source].detail}>
-        <SourceTag tone={SOURCE[s.source].tone}>{SOURCE[s.source].label}</SourceTag>
+    if (edited(kind)) return <SourceTag tone={team ? 'team' : 'mine'}>{team ? t('native.project.willGoInBeluga') : t('native.project.willBeYours')}</SourceTag>;
+    const source = s ? SOURCE()[s.source] : undefined;
+    return source ? (
+      <span title={source.detail}>
+        <SourceTag tone={source.tone}>{source.label}</SourceTag>
       </span>
     ) : (
-      <SourceTag tone="guess">None</SourceTag>
+      <SourceTag tone="guess">{t('native.project.none')}</SourceTag>
     );
   };
   // Guessed values say so (once), so you check them.
-  const hint = (kind: Kind, what: string) => (!edited(kind) && scripts[kind]?.source === 'detected' ? `${what} Guessed from the project: check it.` : !edited(kind) && scripts[kind]?.source === 'claude' ? `${what} Your agent worked it out from the project: check it.` : what);
+  const hint = (kind: Kind, what: string) => (!edited(kind) && scripts[kind]?.source === 'detected' ? t('native.project.guessedHint', { what }) : !edited(kind) && scripts[kind]?.source === 'claude' ? t('native.project.agentHint', { what }) : what);
   const changed = edited('setup') || edited('run') || team || auto !== autoSetup || agent !== agentNow || commits !== commitsNow;
 
   const save = (): void => {
@@ -90,30 +92,32 @@ export function ProjectSettingsSheet({ menu, close }: NativeMenuProps<'scripts'>
 
   return (
     <FormSheet
-      title={`${project.name} Settings`}
+      title={t('native.project.title', { name: project.name })}
       icon="terminal"
-      intro="The commands every workspace of this project uses. Leave one empty for none."
-      submitLabel="Save"
+      intro={t('native.project.intro')}
+      submitLabel={t('common.save')}
       canSubmit={changed}
       onSubmit={save}
       onCancel={close}
       width={560}
-      footer={<Checkbox checked={team} onChange={setTeam} label="Save to beluga.json" detail="Everyone on the project gets them (commit the file)" />}
+      footer={<Checkbox checked={team} onChange={setTeam} label={t('native.project.saveToBeluga')} detail={t('native.project.saveToBelugaDetail')} />}
     >
-      <Field label="Setup" htmlFor="script-setup" hint={hint('setup', 'Runs in each new worktree, e.g. to install dependencies.')} aside={tag('setup')}>
+      <Field label={t('native.project.setup')} htmlFor="script-setup" hint={hint('setup', t('native.project.setupHint'))} aside={tag('setup')}>
+        {/* i18n-ignore: a command */}
         <TextInput id="script-setup" value={values.setup} onChange={(v) => (setTouched(true), setValues({ ...values, setup: v }))} mono placeholder="npm install" />
       </Field>
-      <Field label="Run" htmlFor="script-run" hint={hint('run', 'Starts the project when you click Run.')} aside={tag('run')}>
+      <Field label={t('native.project.run')} htmlFor="script-run" hint={hint('run', t('native.project.runHint'))} aside={tag('run')}>
+        {/* i18n-ignore: a command */}
         <TextInput id="script-run" value={values.run} onChange={(v) => (setTouched(true), setValues({ ...values, run: v }))} mono placeholder="npm run dev" />
       </Field>
-      <Field label="Agent" htmlFor="project-agent" hint="Runs this project's new conversations and answers when friends write @you about it.">
-        <Popup id="project-agent" value={agent} onChange={setAgent} options={[{ value: '~', label: `Same as yours (${agentName(mine)})`, icon: agentMark(mine) }, ...agentEntries(agentChoices(runtimes, models))]} />
+      <Field label={t('native.project.agent')} htmlFor="project-agent" hint={t('native.project.agentFieldHint')}>
+        <Popup id="project-agent" value={agent} onChange={setAgent} options={[{ value: '~', label: t('native.project.sameAsYours', { agent: agentName(mine) }), icon: agentMark(mine) }, ...agentEntries(agentChoices(runtimes, models))]} />
       </Field>
       <Field label={t('language.commits')} htmlFor="project-commit-language" hint={t('language.commitsHint')}>
         <Popup id="project-commit-language" value={commits} onChange={(v) => setCommits(v as Locale)} options={LOCALES.map((l) => ({ value: l, label: LOCALE_NAMES[l] }))} />
       </Field>
       <Field label="">
-        <Checkbox checked={auto} onChange={setAuto} label="Run setup in new worktrees" detail="For every project; in its Terminal tab" />
+        <Checkbox checked={auto} onChange={setAuto} label={t('native.project.autoSetup')} detail={t('native.project.autoSetupDetail')} />
       </Field>
     </FormSheet>
   );

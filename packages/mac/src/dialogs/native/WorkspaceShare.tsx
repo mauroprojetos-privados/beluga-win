@@ -15,6 +15,7 @@ import { Choice, Section, Sheet, Tag } from './parts.js';
 import { ACCESS, type Access, SharePicker } from './SharePicker.js';
 import s from './sharing.module.css';
 import { thisComputer } from '../../lib/os-words.js';
+import { useT } from '../../lib/i18n.js';
 
 /**
  * Share a workspace with just this one worktree's people (BLG-340): pick a friend and what they can
@@ -23,6 +24,7 @@ import { thisComputer } from '../../lib/os-words.js';
  */
 export function WorkspaceShareSheet({ menu, close }: NativeMenuProps<'ws_share'>) {
   const api = useApi();
+  const t = useT();
   const { ui, client } = useBeluga();
   const ws = useApp((st) => findWorkspace(st.projects, menu.id));
   const project = useApp((st) => st.projects.find((p) => p.workspaces.some((w) => w.id === menu.id)));
@@ -53,48 +55,48 @@ export function WorkspaceShareSheet({ menu, close }: NativeMenuProps<'ws_share'>
     if (row) set(row, role);
   };
   const none = !network.enabled
-    ? 'Turn on the Beluga network in Settings to share with your friends.'
+    ? t('native.wsShare.networkOff')
     : network.friends.length
-      ? 'All your friends have it.'
-      : 'No friends yet. Add a friend, then share this worktree with them here.';
+      ? t('native.wsShare.allHaveIt')
+      : t('native.wsShare.noFriends');
   const byLink = (): void => ui.openMenu({ kind: 'invite_link', ...inviteChoice(project?.root ? project.id : undefined) });
   const addFriend = (): void => (close(), openNet({ kind: 'add_friend' }));
   return (
     <Sheet
-      title={`Share “${ws.name}”`}
-      subtitle="Only this worktree: people you add see its conversation, files and Scratch, and can ask your agent here. Friends get it over the Beluga network, so nobody needs to be in your room."
+      title={t('native.wsShare.title', { name: ws.name })}
+      subtitle={t('native.wsShare.subtitle')}
       icon="share"
       close={close}
       footer={
         <>
           {self?.host ? (
             <Button variant="quiet" icon="link" onClick={byLink}>
-              Invite by Link…
+              {t('native.wsShare.inviteByLink')}
             </Button>
           ) : (
             <Button variant="quiet" icon="people" onClick={addFriend}>
-              Add a Friend…
+              {t('native.wsShare.addFriend')}
             </Button>
           )}
           <Button variant="primary" onClick={close}>
-            Done
+            {t('common.done')}
           </Button>
         </>
       }
     >
-      <Section title="Share with">
+      <Section title={t('native.wsShare.shareWith')}>
         <SharePicker candidates={candidates} onShare={(peerId, role) => add(peerId, role)} none={none} />
       </Section>
-      <Section title="People with access">
-        <div className={s.list} role="list" aria-label="People with access">
+      <Section title={t('native.wsShare.peopleWithAccess')}>
+        <div className={s.list} role="list" aria-label={t('native.wsShare.peopleWithAccess')}>
           {self ? (
             <div role="listitem" className={s.item}>
               <Avatar name={self.name} id={self.peerId} size={24} />
               <div className={s.itemText}>
-                <span className={s.itemTitle}>{self.name} (you)</span>
-                <span className={s.itemDetail}>Your agent does the work here, on {thisComputer()}</span>
+                <span className={s.itemTitle}>{t('native.wsShare.you', { name: self.name })}</span>
+                <span className={s.itemDetail}>{t('native.wsShare.agentWorksHere', { computer: thisComputer() })}</span>
               </div>
-              <Tag>Owner</Tag>
+              <Tag>{t('native.wsShare.owner')}</Tag>
             </div>
           ) : null}
           {shared.map((row) => {
@@ -110,14 +112,14 @@ export function WorkspaceShareSheet({ menu, close }: NativeMenuProps<'ws_share'>
                   </span>
                   <span className={s.itemDetail}>{shareRowDetail(row, inRoom)}</span>
                 </div>
-                <Select<Access> label={`Access for ${row.name}`} value={row.access} options={ACCESS} onChange={(a) => set(row, a)} />
+                <Select<Access> label={t('native.wsShare.accessFor', { name: row.name })} value={row.access} options={ACCESS()} onChange={(a) => set(row, a)} />
               </div>
             );
           })}
-          {shared.length ? null : <div className={s.empty}>Only you so far.</div>}
+          {shared.length ? null : <div className={s.empty}>{t('native.wsShare.onlyYou')}</div>}
         </div>
       </Section>
-      <p className={s.hint}>Your agent runs on your computer. Risky steps still ask you, unless you fully trust the person asking.</p>
+      <p className={s.hint}>{t('native.wsShare.runsOnYours')}</p>
     </Sheet>
   );
 }
@@ -125,6 +127,7 @@ export function WorkspaceShareSheet({ menu, close }: NativeMenuProps<'ws_share'>
 /** From a person: put them into one of your workspaces, one click each. */
 export function InvitePersonSheet({ menu, close }: NativeMenuProps<'invite_person'>) {
   const api = useApi();
+  const t = useT();
   const peer = useApp((st) => st.peers.find((p) => p.peerId === menu.peerId));
   const projects = useApp((st) => st.projects);
   const members = useApp((st) => st.members);
@@ -136,32 +139,32 @@ export function InvitePersonSheet({ menu, close }: NativeMenuProps<'invite_perso
     .filter((x) => x.label.toLowerCase().includes(filter.trim().toLowerCase()));
   return (
     <Sheet
-      title={`Invite ${peer.name} to a Workspace`}
-      subtitle={`${peer.name} sees its conversation and files${role === 'contribute' ? ', and can ask your agent there' : ''}.`}
+      title={t('native.wsShare.invitePersonTitle', { name: peer.name })}
+      subtitle={role === 'contribute' ? t('native.wsShare.seesAndAsks', { name: peer.name }) : t('native.wsShare.sees', { name: peer.name })}
       badge={<Avatar name={peer.name} id={peer.peerId} size={36} />}
       close={close}
       footer={
         <>
           <span />
           <Button variant="primary" onClick={close}>
-            Done
+            {t('common.done')}
           </Button>
         </>
       }
     >
       <div className={s.field} style={{ gridTemplateColumns: '1fr auto' }}>
-        <input className={s.input} placeholder="Filter workspaces" aria-label="Filter workspaces" value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <input className={s.input} placeholder={t('native.wsShare.filter')} aria-label={t('native.wsShare.filter')} value={filter} onChange={(e) => setFilter(e.target.value)} />
         <Choice<WsRole>
-          label="They can"
+          label={t('native.invite.theyCan')}
           value={role}
           options={[
-            { value: 'contribute', label: 'Work here' },
-            { value: 'view', label: 'Follow' },
+            { value: 'contribute', label: t('native.wsShare.workHere') },
+            { value: 'view', label: t('native.person.follow') },
           ]}
           onChange={setRole}
         />
       </div>
-      <div className={s.list} role="list" aria-label="Workspaces">
+      <div className={s.list} role="list" aria-label={t('native.wsShare.workspaces')}>
         {list.slice(0, 60).map(({ w, label }) => {
           const now = members[w.id]?.[peer.peerId];
           const icon: IconName = w.kind === 'chat' ? 'chat' : w.kind === 'main' ? 'folder' : 'branch';
@@ -170,21 +173,21 @@ export function InvitePersonSheet({ menu, close }: NativeMenuProps<'invite_perso
               <Icon name={icon} size={14} className={s.itemIcon} />
               <div className={s.itemText}>
                 <span className={s.itemTitle}>{label}</span>
-                <span className={s.itemDetail}>{w.kind === 'chat' ? 'Chat' : w.kind === 'main' ? 'Main folder' : (w.branch ?? 'Worktree')}</span>
+                <span className={s.itemDetail}>{w.kind === 'chat' ? t('native.wsShare.chat') : w.kind === 'main' ? t('native.wsShare.mainFolder') : (w.branch ?? t('native.wsShare.worktree'))}</span>
               </div>
               {now === role ? (
                 <Tag tone="accent">
-                  <Icon name="check" size={10} /> {now === 'contribute' ? 'Works here' : 'Follows'}
+                  <Icon name="check" size={10} /> {now === 'contribute' ? t('native.wsShare.worksHere') : t('native.wsShare.follows')}
                 </Tag>
               ) : (
                 <Button size="small" onClick={() => void api.sharing.invite(w.id, peer.peerId, role)}>
-                  {now ? (role === 'contribute' ? 'Let Work' : 'Make Follower') : 'Invite'}
+                  {now ? (role === 'contribute' ? t('native.wsShare.letWork') : t('native.wsShare.makeFollower')) : t('native.wsShare.invite')}
                 </Button>
               )}
             </div>
           );
         })}
-        {list.length ? null : <div className={s.empty}>No workspaces match.</div>}
+        {list.length ? null : <div className={s.empty}>{t('native.wsShare.noMatch')}</div>}
       </div>
     </Sheet>
   );

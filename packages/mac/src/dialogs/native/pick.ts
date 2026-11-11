@@ -20,6 +20,3 @@ export function usePick(menu: MenuKind): (id: string, confirmed?: boolean) => bo
     [actions, client, menu],
   );
 }
-
-/** "3 files", "1 file". */
-export const count = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;

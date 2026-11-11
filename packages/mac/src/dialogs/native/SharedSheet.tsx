@@ -8,31 +8,34 @@ import type { NativeMenuProps } from './index.js';
 import { Alert, Section, Sheet, Tag } from './parts.js';
 import s from './sharing.module.css';
 import v from './shared.module.css';
+import { t } from '@beluga/shared/i18n/index.js';
+import { useT } from '../../lib/i18n.js';
 
-const OPEN: ReadonlyArray<{ tab: SharedTab; label: string; icon: IconName; detail: string }> = [
-  { tab: 'chat', label: 'Chat', icon: 'chat', detail: 'The conversation' },
-  { tab: 'files', label: 'Files', icon: 'folder', detail: 'Browse and search' },
-  { tab: 'diff', label: 'Changes', icon: 'diff', detail: 'What changed' },
+const OPEN = (): ReadonlyArray<{ tab: SharedTab; label: string; icon: IconName; detail: string }> => [
+  { tab: 'chat', label: t('native.wsShare.chat'), icon: 'chat', detail: t('native.shared.chatDetail') },
+  { tab: 'files', label: t('native.person.files'), icon: 'folder', detail: t('native.shared.filesDetail') },
+  { tab: 'diff', label: t('native.shared.changes'), icon: 'diff', detail: t('native.shared.changesDetail') },
 ];
 
 /** A workspace someone shared with you: what you can do there, who's in it, and leaving. */
 export function SharedSheet({ menu, close }: NativeMenuProps<'shared'>) {
   const api = useApi();
   const actions = useActions();
+  const t = useT();
   const w = useApp((st) => st.shared.find((x) => x.owner === menu.owner && x.id === menu.id));
   const peers = useApp((st) => st.peers);
   const roster = useApp((st) => st.roster[menu.id]) ?? [];
   const selfId = useApp((st) => st.selfId);
   const [leaving, setLeaving] = useState(false);
   if (!w) return null;
-  const owner = peers.find((p) => p.peerId === w.owner)?.name ?? 'Someone';
-  const nameOf = (id: string): string => (id === selfId ? 'You' : (peers.find((p) => p.peerId === id)?.name ?? 'someone'));
+  const owner = peers.find((p) => p.peerId === w.owner)?.name ?? t('native.someone');
+  const nameOf = (id: string): string => (id === selfId ? t('native.shared.you') : (peers.find((p) => p.peerId === id)?.name ?? t('native.shared.someone')));
   if (leaving) {
     return (
       <Alert
-        title={`Leave ${w.name}?`}
-        message={`It disappears from your sidebar. ${owner} can invite you again.`}
-        confirm="Leave"
+        title={t('native.shared.leaveTitle', { name: w.name })}
+        message={t('native.shared.leaveMessage', { owner })}
+        confirm={t('native.person.leave')}
         onCancel={() => setLeaving(false)}
         onConfirm={() => {
           void api.sharing.leave(w.owner, w.id);
@@ -47,27 +50,27 @@ export function SharedSheet({ menu, close }: NativeMenuProps<'shared'>) {
   };
   return (
     <Sheet
-      title={`${owner}’s ${w.name}`}
+      title={t('native.shared.title', { owner, name: w.name })}
       subtitle={`${w.project}${w.branch ? ` · ${w.branch}` : ''}`}
       badge={<Avatar name={owner} id={w.owner} size={36} />}
       close={close}
       footer={
         <>
           <Button variant="danger" onClick={() => setLeaving(true)}>
-            Leave…
+            {t('native.shared.leave')}
           </Button>
           <Button variant="primary" onClick={close}>
-            Done
+            {t('common.done')}
           </Button>
         </>
       }
     >
       <div className={v.role}>
-        <Tag tone={w.role === 'contribute' ? 'claude' : 'muted'}>{w.role === 'contribute' ? 'You can work here' : 'Following along'}</Tag>
-        <span>{w.role === 'contribute' ? `Talk to ${owner}’s agent here. It runs on ${owner}’s computer.` : 'Read-only: you see the conversation and the files.'}</span>
+        <Tag tone={w.role === 'contribute' ? 'claude' : 'muted'}>{w.role === 'contribute' ? t('native.shared.canWork') : t('native.shared.following')}</Tag>
+        <span>{w.role === 'contribute' ? t('native.shared.talkTo', { owner }) : t('native.shared.readOnly')}</span>
       </div>
       <div className={v.tiles}>
-        {OPEN.map((o) => (
+        {OPEN().map((o) => (
           <button key={o.tab} type="button" className={v.tile} onClick={() => open(o.tab)}>
             <Icon name={o.icon} size={18} />
             <span className={v.tileLabel}>{o.label}</span>
@@ -75,14 +78,14 @@ export function SharedSheet({ menu, close }: NativeMenuProps<'shared'>) {
           </button>
         ))}
       </div>
-      <Section title="In this workspace">
-        <div className={s.list} role="list" aria-label="In this workspace">
+      <Section title={t('native.shared.inWorkspace')}>
+        <div className={s.list} role="list" aria-label={t('native.shared.inWorkspace')}>
           <div role="listitem" className={s.item}>
             <Avatar name={owner} id={w.owner} size={22} />
             <span className={s.itemText}>
               <span className={s.itemTitle}>{owner}</span>
             </span>
-            <Tag>Owner</Tag>
+            <Tag>{t('native.wsShare.owner')}</Tag>
           </div>
           {roster
             .filter((r) => r.peerId !== w.owner)
@@ -92,7 +95,7 @@ export function SharedSheet({ menu, close }: NativeMenuProps<'shared'>) {
                 <span className={s.itemText}>
                   <span className={s.itemTitle}>{nameOf(r.peerId)}</span>
                 </span>
-                <Tag tone="muted">{r.role === 'contribute' ? 'Works here' : 'Follows'}</Tag>
+                <Tag tone="muted">{r.role === 'contribute' ? t('native.wsShare.worksHere') : t('native.wsShare.follows')}</Tag>
               </div>
             ))}
         </div>

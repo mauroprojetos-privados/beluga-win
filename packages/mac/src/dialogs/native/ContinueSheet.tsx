@@ -8,6 +8,7 @@ import { useMyAgent } from '../../lib/agent-words.js';
 import { agentForChoice, choiceForAgent } from '@beluga/ui/agent-choice.js';
 import { agentName } from '@beluga/shared/agent-label.js';
 import { cmdReturn } from '../../lib/os-words.js';
+import { useT } from '../../lib/i18n.js';
 
 /**
  * Continue a questions-only chat (a project's main folder) in a new worktree: what Claude should
@@ -17,6 +18,7 @@ import { cmdReturn } from '../../lib/os-words.js';
  */
 export function ContinueSheet({ wsId, close }: { wsId: string; close: () => void }) {
   const api = useApi();
+  const t = useT();
   const ws = useApp((st) => findWorkspace(st.projects, wsId));
   const project = useApp((st) => st.projects.find((p) => p.workspaces.some((w) => w.id === wsId)));
   const asked = useApp((st) => {
@@ -46,16 +48,16 @@ export function ContinueSheet({ wsId, close }: { wsId: string; close: () => void
   }, [project?.id]);
   if (!ws || !project) return null;
   const chosen = base || project.base;
-  const options = (branches?.branches.length ? branches.branches : [chosen]).map((b) => ({ value: b, label: b === branches?.base ? `${b} (default)` : b }));
+  const options = (branches?.branches.length ? branches.branches : [chosen]).map((b) => ({ value: b, label: b === branches?.base ? t('native.continue.defaultBranch', { branch: b }) : b }));
   // Picked another agent: sent only when it changed. Another runtime than the session's starts fresh (resumeFor).
   const picked = agent === YOUR_AGENT ? mine : agentForChoice(agent, runtimes);
   const fresh = agent !== own && Boolean(ws.sessionId) && picked.runtime !== (ws.sessionRuntime ?? 'claude');
   return (
     <FormSheet
-      title="Continue in a New Worktree"
+      title={t('native.continue.title')}
       icon="branch"
-      intro="This chat becomes a worktree: your agent gets its own branch and folder, keeps the conversation and starts on the task."
-      submitLabel="Continue"
+      intro={t('native.continue.intro')}
+      submitLabel={t('native.work.continue')}
       onSubmit={() => {
         // Git fetches and makes the worktree behind the chat ("Making this chat a worktree…"); a failure comes back as a toast.
         void api.workspaces.continueInWorktree(ws.id, { ...(task.trim() ? { task: task.trim() } : {}), ...(chosen !== project.base ? { base: chosen } : {}), ...(name.trim() ? { name: name.trim() } : {}), ...(agent !== own ? { agent: picked } : {}) }).catch(() => undefined);
@@ -64,17 +66,17 @@ export function ContinueSheet({ wsId, close }: { wsId: string; close: () => void
       onCancel={close}
       width={540}
     >
-      <Field label="Task" htmlFor="continue-task" hint={`Empty: your agent goes ahead with what you discussed. ${cmdReturn()} continues.`}>
-        <TextArea id="continue-task" value={task} onChange={setTask} rows={4} placeholder="What should your agent change?" data-autofocus />
+      <Field label={t('native.continue.task')} htmlFor="continue-task" hint={t('native.continue.taskHint', { keys: cmdReturn() })}>
+        <TextArea id="continue-task" value={task} onChange={setTask} rows={4} placeholder={t('native.continue.taskPlaceholder')} data-autofocus />
       </Field>
-      <Field label="Based on" htmlFor="continue-base" hint="Origin branches are fetched first, so it starts from the latest.">
-        <Popup id="continue-base" label="Based on" value={chosen} options={options} onChange={setBase} />
+      <Field label={t('native.continue.basedOn')} htmlFor="continue-base" hint={t('native.continue.basedOnHint')}>
+        <Popup id="continue-base" label={t('native.continue.basedOn')} value={chosen} options={options} onChange={setBase} />
       </Field>
-      <Field label="Agent" htmlFor="continue-agent" hint={fresh ? `${agentName(picked)} can’t pick up this conversation, so it starts fresh there, handed the conversation so far.` : 'Who goes on there. It keeps the conversation.'}>
-        <Select id="continue-agent" label="Agent that goes on there" value={agent} options={agents} onChange={setAgent} />
+      <Field label={t('native.project.agent')} htmlFor="continue-agent" hint={fresh ? t('native.continue.agentFresh', { agent: agentName(picked) }) : t('native.continue.agentHint')}>
+        <Select id="continue-agent" label={t('native.continue.agentLabel')} value={agent} options={agents} onChange={setAgent} />
       </Field>
-      <Field label="Name" htmlFor="continue-name" hint="Empty: named after the task.">
-        <TextInput id="continue-name" value={name} onChange={setName} maxLength={60} placeholder="from the task" spellCheck={false} />
+      <Field label={t('native.fork.name')} htmlFor="continue-name" hint={t('native.continue.nameHint')}>
+        <TextInput id="continue-name" value={name} onChange={setName} maxLength={60} placeholder={t('native.continue.namePlaceholder')} spellCheck={false} />
       </Field>
     </FormSheet>
   );

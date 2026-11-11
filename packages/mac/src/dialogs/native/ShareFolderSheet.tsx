@@ -10,6 +10,7 @@ import type { MenuKind } from '@beluga/ui/menus.js';
 import { Check, Choice, Field, Section, Sheet, Tag, tilde } from './parts.js';
 import s from './sharing.module.css';
 import f from './share.module.css';
+import { useT } from '../../lib/i18n.js';
 
 type Who = 'all' | 'some';
 
@@ -32,6 +33,7 @@ const shortPath = (p: string): string => (p.length > 56 ? `${p.slice(0, 18)}…$
  */
 export function ShareFolderSheet({ menu, close }: { readonly menu: Extract<MenuKind, { kind: 'share_folder' | 'share_who' }>; readonly close: () => void }) {
   const api = useApi();
+  const t = useT();
   const { client } = useBeluga();
   const home = useApp((st) => st.home);
   const selfId = useApp((st) => st.selfId);
@@ -60,10 +62,10 @@ export function ShareFolderSheet({ menu, close }: { readonly menu: Extract<MenuK
   const existing = mine.find((x) => norm(x.root) === norm(dir));
   const ready = isAbsolutePath(dir) && (who === 'all' || only.size > 0);
   const suggestions = projects.filter((p) => p.root && !mine.some((x) => norm(x.root) === norm(p.root))).slice(0, 8);
-  const nameOf = (id: string): string => people.find((p) => p.peerId === id)?.name ?? 'someone who left';
+  const nameOf = (id: string): string => people.find((p) => p.peerId === id)?.name ?? t('native.shareFolder.someoneWhoLeft');
 
   const choose = async (): Promise<void> => {
-    const picked = await pickFolders('Choose a folder to share');
+    const picked = await pickFolders(t('native.shareFolder.choosePrompt'));
     if (picked?.[0]) pickPath(picked[0]);
   };
   const edit = (x: MyShare): void => {
@@ -88,8 +90,8 @@ export function ShareFolderSheet({ menu, close }: { readonly menu: Extract<MenuK
 
   return (
     <Sheet
-      title="Share a Folder"
-      subtitle="Friends can browse, open and download its files. Secrets like .env files and keys are never shared."
+      title={t('native.shareFolder.title')}
+      subtitle={t('native.shareFolder.subtitle')}
       icon="share"
       wide
       close={close}
@@ -97,24 +99,24 @@ export function ShareFolderSheet({ menu, close }: { readonly menu: Extract<MenuK
       footer={
         <>
           <span />
-          <Button onClick={close}>Done</Button>
+          <Button onClick={close}>{t('common.done')}</Button>
           <Button variant="primary" icon="share" disabled={!ready} onClick={share}>
-            {existing ? 'Update Sharing' : 'Share'}
+            {existing ? t('native.shareFolder.update') : t('native.shareFolder.share')}
           </Button>
         </>
       }
     >
-      <Field label="Folder" htmlFor="share-path">
+      <Field label={t('native.shareFolder.folder')} htmlFor="share-path">
         {typing || !dir ? (
           <div className={f.pathRow}>
             <span className={f.pathIcon}>
               <Icon name="folder" size={14} />
             </span>
-            <input id="share-path" className={cx(s.input, f.path)} value={path} placeholder={canPickFolders() ? 'Choose a folder, or type its path' : '~/path/to/folder'} spellCheck={false} aria-label="Folder path" autoFocus={!inApp()} onChange={(e) => setPath(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), share())} />
-            {canPickFolders() ? <Button onClick={() => void choose()}>Choose…</Button> : null}
+            <input id="share-path" className={cx(s.input, f.path)} value={path} placeholder={canPickFolders() ? t('native.shareFolder.pathPlaceholder') : t('native.shareFolder.pathExample')} spellCheck={false} aria-label={t('native.shareFolder.folderPath')} autoFocus={!inApp()} onChange={(e) => setPath(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), share())} />
+            {canPickFolders() ? <Button onClick={() => void choose()}>{t('native.shareFolder.choose')}</Button> : null}
           </div>
         ) : (
-          <div className={f.folder} aria-label={`Folder: ${path}`}>
+          <div className={f.folder} aria-label={t('native.shareFolder.folderAria', { path })}>
             <span className={f.folderTile}>
               <Icon name="folder" size={17} />
             </span>
@@ -124,16 +126,16 @@ export function ShareFolderSheet({ menu, close }: { readonly menu: Extract<MenuK
             </span>
             {canPickFolders() ? (
               <Button size="small" onClick={() => void choose()}>
-                Choose…
+                {t('native.shareFolder.choose')}
               </Button>
             ) : null}
             <Button size="small" variant="quiet" onClick={() => setTyping(true)}>
-              Edit Path
+              {t('native.shareFolder.editPath')}
             </Button>
           </div>
         )}
         {suggestions.length ? (
-          <div className={f.chips} aria-label="Your projects">
+          <div className={f.chips} aria-label={t('native.shareFolder.yourProjects')}>
             {suggestions.map((p) => (
               <button key={p.id} type="button" className={cx(f.chip, norm(dir) === norm(p.root) && f.chipOn)} onClick={() => pickPath(p.root)} title={tilde(home, p.root)}>
                 {p.name}
@@ -141,15 +143,15 @@ export function ShareFolderSheet({ menu, close }: { readonly menu: Extract<MenuK
             ))}
           </div>
         ) : null}
-        {existing ? <span className={s.hint}>Shared now as “{existing.name}”. Sharing it again changes who sees it.</span> : null}
+        {existing ? <span className={s.hint}>{t('native.shareFolder.sharedAs', { name: existing.name })}</span> : null}
       </Field>
-      <Field label="Who sees it">
+      <Field label={t('native.shareFolder.whoSees')}>
         <Choice<Who>
-          label="Who sees it"
+          label={t('native.shareFolder.whoSees')}
           value={who}
           options={[
-            { value: 'all', label: 'Everyone in the room', icon: 'people' },
-            { value: 'some', label: 'Only…', icon: 'person' },
+            { value: 'all', label: t('native.shareFolder.everyoneInRoom'), icon: 'people' },
+            { value: 'some', label: t('native.shareFolder.only'), icon: 'person' },
           ]}
           onChange={setWho}
         />
@@ -161,52 +163,52 @@ export function ShareFolderSheet({ menu, close }: { readonly menu: Extract<MenuK
                   <input type="checkbox" checked={only.has(p.peerId)} onChange={(e) => toggle(p.peerId, e.target.checked)} />
                   <Avatar name={p.name} id={p.peerId} size={18} />
                   <span>{p.name}</span>
-                  {p.friend ? <Tag tone="muted">friend</Tag> : null}
+                  {p.friend ? <Tag tone="muted">{t('native.shareFolder.friend')}</Tag> : null}
                 </label>
               ))}
             </div>
           ) : (
-            <span className={s.hint}>No friends or room yet. Add a friend first.</span>
+            <span className={s.hint}>{t('native.shareFolder.noPeople')}</span>
           )
         ) : (
-          <span className={s.hint}>{inRoom.length ? `${inRoom.map((p) => p.name).join(', ')} and anyone who joins later.` : 'Everyone who joins the room.'}</span>
+          <span className={s.hint}>{inRoom.length ? t('native.shareFolder.namesAndLater', { names: inRoom.map((p) => p.name).join(', ') }) : t('native.shareFolder.everyoneWhoJoins')}</span>
         )}
-        {who === 'some' && people.some((p) => p.friend && only.has(p.peerId)) ? <span className={s.hint}>Friends find it in their Files, even when no room is open. Secrets never go.</span> : null}
+        {who === 'some' && people.some((p) => p.friend && only.has(p.peerId)) ? <span className={s.hint}>{t('native.shareFolder.friendsFind')}</span> : null}
       </Field>
-      <Field label="Your agent">
-        <Check checked={writable} onChange={setWritable} label="Your agent may edit files here" detail={writable ? 'When friends ask your agent, it can change files in this folder.' : 'Read-only: nothing in it changes.'} />
+      <Field label={t('native.shareFolder.yourAgent')}>
+        <Check checked={writable} onChange={setWritable} label={t('native.shareFolder.mayEdit')} detail={writable ? t('native.shareFolder.mayEditOn') : t('native.shareFolder.readOnly')} />
       </Field>
-      <Section title="Shared now">
-        <div className={s.list} role="list" aria-label="Shared folders">
+      <Section title={t('native.shareFolder.sharedNow')}>
+        <div className={s.list} role="list" aria-label={t('native.shareFolder.sharedFolders')}>
           {mine.length ? (
             mine.map((x) => (
-              <div key={x.name} role="listitem" className={cx(s.item, s.clickable)} aria-label={x.name} onClick={() => edit(x)} title="Click to change who sees it">
+              <div key={x.name} role="listitem" className={cx(s.item, s.clickable)} aria-label={x.name} onClick={() => edit(x)} title={t('native.shareFolder.clickToChange')}>
                 <Icon name="folder" size={15} className={f.folderIcon} />
                 <div className={s.itemText}>
                   <span className={s.itemTitle}>
-                    {x.name} {x.writable ? <Tag tone="claude">Agent may edit</Tag> : null}
+                    {x.name} {x.writable ? <Tag tone="claude">{t('native.shareFolder.agentMayEdit')}</Tag> : null}
                   </span>
                   <span className={s.itemDetail}>
-                    {shortPath(tilde(home, x.root))} · {x.private ? `only ${(x.allowed ?? []).map(nameOf).join(', ') || 'nobody'}` : 'everyone'}
+                    {shortPath(tilde(home, x.root))} · {x.private ? t('native.shareFolder.onlyNames', { names: (x.allowed ?? []).map(nameOf).join(', ') || t('native.shareFolder.nobody') }) : t('native.shareFolder.everyone')}
                   </span>
                 </div>
                 <div className={s.itemButtons}>
                   <Button
                     size="small"
                     variant="danger"
-                    aria-label={`Stop sharing ${x.name}`}
+                    aria-label={t('native.shareFolder.stopSharingName', { name: x.name })}
                     onClick={(e) => {
                       e.stopPropagation();
                       void api.session.unshareFolder(x.name);
                     }}
                   >
-                    Stop Sharing
+                    {t('native.shareFolder.stopSharing')}
                   </Button>
                 </div>
               </div>
             ))
           ) : (
-            <div className={s.empty}>Nothing yet. {dir ? `Share ${baseName(dir)} and it shows up here.` : 'Folders you share show up here.'}</div>
+            <div className={s.empty}>{dir ? t('native.shareFolder.emptyWithDir', { name: baseName(dir) }) : t('native.shareFolder.empty')}</div>
           )}
         </div>
       </Section>

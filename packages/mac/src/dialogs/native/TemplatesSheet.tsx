@@ -8,6 +8,7 @@ import { openSheet } from '../../lib/sheets.js';
 import type { NativeMenuProps } from './index.js';
 import { usePick } from './pick.js';
 import s from './menus.module.css';
+import { useT } from '../../lib/i18n.js';
 
 /** A template's prompt with its blanks (two spaces, ": .", "# ", a trailing space) shown as "…". */
 export const withBlanks = (prompt: string): string =>
@@ -27,6 +28,7 @@ const PICKER = { kind: 'templates' } as const;
  */
 export function TemplatesSheet({ menu, close }: NativeMenuProps<'templates'>) {
   const { ui } = useBeluga();
+  const tr = useT();
   const pick = usePick(menu);
   const use = usePick(PICKER);
   const templates = useApp((st) => st.templates);
@@ -37,9 +39,9 @@ export function TemplatesSheet({ menu, close }: NativeMenuProps<'templates'>) {
       <Alert
         icon="wand"
         tone="caution"
-        title={`Remove the template “${removing.name}”?`}
-        message="It’s gone from the list for good. Workspaces you started with it are not affected."
-        confirm={{ label: 'Remove', destructive: true, onClick: () => (setRemoving(undefined), pick(`tpl-del:${removing.id}`)) }}
+        title={tr('native.templates.removeTitle', { name: removing.name })}
+        message={tr('native.templates.removeMessage')}
+        confirm={{ label: tr('native.person.remove'), destructive: true, onClick: () => (setRemoving(undefined), pick(`tpl-del:${removing.id}`)) }}
         onCancel={() => setRemoving(undefined)}
       />
     );
@@ -47,29 +49,29 @@ export function TemplatesSheet({ menu, close }: NativeMenuProps<'templates'>) {
   const footer = (
     <>
       <button type="button" className={f.linkButton} onClick={() => (close(), openSheet({ kind: 'template' }))}>
-        New Template…
+        {tr('native.templates.newTemplate')}
       </button>
       {manage ? null : (
         <button type="button" className={f.linkButton} onClick={() => ui.openMenu({ kind: 'templates', manage: true })}>
-          Manage
+          {tr('native.templates.manage')}
         </button>
       )}
     </>
   );
   return (
     <FormSheet
-      title={manage ? 'Templates' : 'Start from a Template'}
+      title={manage ? tr('native.templates.templates') : tr('native.templates.startFrom')}
       icon="wand"
-      intro={manage ? 'Ways to start a task. Click one to use it; your own ones can be removed.' : 'It fills the message box, ready to finish and send.'}
+      intro={manage ? tr('native.templates.manageIntro') : tr('native.templates.pickIntro')}
       submitLabel=""
       hideSubmit
-      cancelLabel={manage ? 'Done' : 'Cancel'}
+      cancelLabel={manage ? tr('common.done') : tr('common.cancel')}
       onSubmit={() => undefined}
       onCancel={close}
       footer={footer}
       width={560}
     >
-      <div className={s.templates} role="list" aria-label="Templates">
+      <div className={s.templates} role="list" aria-label={tr('native.templates.templates')}>
         {templates.map((t) => (
           <div key={t.id} role="listitem" style={{ display: 'flex', alignItems: 'flex-start' }}>
             <button type="button" className={s.template} onClick={() => use(`tpl:${t.id}`)} data-autofocus={t === templates[0] ? true : undefined}>
@@ -79,14 +81,14 @@ export function TemplatesSheet({ menu, close }: NativeMenuProps<'templates'>) {
               <span className={s.templateText}>
                 <span className={s.templateName}>
                   {t.name}
-                  {t.plan ? <span className={s.badge}>Plans first</span> : null}
-                  {t.builtIn ? null : <span className={`${s.badge} ${s.badgeMuted}`}>Yours</span>}
+                  {t.plan ? <span className={s.badge}>{tr('native.templates.plansFirst')}</span> : null}
+                  {t.builtIn ? null : <span className={`${s.badge} ${s.badgeMuted}`}>{tr('native.templates.yours')}</span>}
                 </span>
                 <span className={s.templatePrompt}>{withBlanks(t.prompt)}</span>
               </span>
             </button>
             {manage && !t.builtIn ? (
-              <button type="button" className={s.remove} aria-label={`Remove ${t.name}`} title="Remove" onClick={() => setRemoving(t)}>
+              <button type="button" className={s.remove} aria-label={tr('native.templates.removeName', { name: t.name })} title={tr('native.person.remove')} onClick={() => setRemoving(t)}>
                 <Icon name="x" size={11} />
               </button>
             ) : null}
@@ -100,6 +102,7 @@ export function TemplatesSheet({ menu, close }: NativeMenuProps<'templates'>) {
 /** Save a new template: its name, what Claude should do, and whether it plans first. */
 export function TemplateEditorSheet({ close }: { close: () => void }) {
   const api = useApi();
+  const tr = useT();
   const names = useApp((st) => st.templates);
   const [name, setName] = useState('');
   const [prompt, setPrompt] = useState('');
@@ -108,10 +111,10 @@ export function TemplateEditorSheet({ close }: { close: () => void }) {
   const builtIn = taken?.builtIn === true;
   return (
     <FormSheet
-      title="New Template"
+      title={tr('native.templates.newTitle')}
       icon="wand"
-      intro="A way to start a task you do often. It shows up when you start a worktree or a chat."
-      submitLabel={taken && !builtIn ? 'Replace' : 'Save Template'}
+      intro={tr('native.templates.newIntro')}
+      submitLabel={taken && !builtIn ? tr('native.templates.replace') : tr('native.templates.save')}
       canSubmit={Boolean(name.trim() && prompt.trim()) && !builtIn}
       onSubmit={() => {
         // The core reads "name: prompt"; a colon in the name would end it early.
@@ -121,14 +124,14 @@ export function TemplateEditorSheet({ close }: { close: () => void }) {
       onCancel={close}
       width={560}
     >
-      <Field label="Name" htmlFor="tpl-name" error={builtIn ? 'A built-in template has this name. Pick another one.' : undefined} hint={taken ? 'You have a template with this name: saving replaces it.' : undefined}>
-        <TextInput id="tpl-name" value={name} onChange={setName} placeholder="Fix a flaky test" maxLength={60} invalid={builtIn} />
+      <Field label={tr('native.fork.name')} htmlFor="tpl-name" error={builtIn ? tr('native.templates.builtInTaken') : undefined} hint={taken ? tr('native.templates.replaceHint') : undefined}>
+        <TextInput id="tpl-name" value={name} onChange={setName} placeholder={tr('native.templates.namePlaceholder')} maxLength={60} invalid={builtIn} />
       </Field>
-      <Field label="Prompt" htmlFor="tpl-prompt" hint="What your agent should do. Leave two spaces where the details go: the cursor starts there.">
-        <TextArea id="tpl-prompt" value={prompt} onChange={setPrompt} rows={5} placeholder="Find out why this test fails now and then, make it reliable, and run it 20 times to be sure." />
+      <Field label={tr('native.templates.prompt')} htmlFor="tpl-prompt" hint={tr('native.templates.promptHint')}>
+        <TextArea id="tpl-prompt" value={prompt} onChange={setPrompt} rows={5} placeholder={tr('native.templates.promptPlaceholder')} />
       </Field>
       <Field label="">
-        <Checkbox checked={plan} onChange={setPlan} label="Plan first" detail="Your agent shows you a plan and waits for your OK before changing anything" />
+        <Checkbox checked={plan} onChange={setPlan} label={tr('native.templates.planFirst')} detail={tr('native.templates.planFirstDetail')} />
       </Field>
     </FormSheet>
   );
