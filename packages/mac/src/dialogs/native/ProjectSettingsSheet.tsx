@@ -19,7 +19,7 @@ const SOURCE = (): Record<Source, { label: string; tone: 'team' | 'mine' | 'gues
   claude: { label: say('native.project.sourceAgent'), tone: 'guess', detail: say('native.project.sourceAgentDetail') },
   'beluga.json': { label: 'beluga.json', tone: 'team', detail: say('native.project.sourceShared') }, // i18n-ignore
   'klaud.json': { label: 'klaud.json', tone: 'team', detail: say('native.project.sourceShared') }, // i18n-ignore
-  'conductor.json': { label: 'conductor.json', tone: 'team', detail: say('native.project.sourceConductor') }, // i18n-ignore
+  'conductor.json': { label: 'conductor.json', tone: 'team', detail: say('native.project.sourceSetupFile') }, // i18n-ignore
   detected: { label: say('native.project.sourceGuessed'), tone: 'guess', detail: say('native.project.sourceGuessedDetail') },
 });
 
