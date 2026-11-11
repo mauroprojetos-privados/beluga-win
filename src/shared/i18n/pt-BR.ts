@@ -6,6 +6,24 @@ import * as settings from './areas/settings.js';
 import * as tasks from './areas/tasks.js';
 import * as plans from './areas/plans.js';
 import * as phone from './areas/phone.js';
+import * as layout from './areas/layout.js';
+import * as bots from './areas/bots.js';
+import * as routing from './areas/routing.js';
+import * as chat from './areas/chat.js';
+import * as prefs from './areas/prefs.js';
+import * as sheets from './areas/sheets.js';
+import * as usage from './areas/usage.js';
+import * as native from './areas/native.js';
+import * as views from './areas/views.js';
+import * as project from './areas/project.js';
+import * as sentinel from './areas/sentinel.js';
+import * as network from './areas/network.js';
+import * as components from './areas/components.js';
+import * as github from './areas/github.js';
+import * as phoneApp from './areas/phoneApp.js';
+import * as phoneParts from './areas/phoneParts.js';
+import * as helpers from './areas/helpers.js';
+import * as daemon from './areas/daemon.js';
 
 /**
  * Brazilian Portuguese. A key missing here is said in English (never blank); tests/i18n.test.ts
@@ -116,4 +134,22 @@ export const ptBR: Partial<Record<Key, Message>> = {
   ...tasks.ptBR,
   ...plans.ptBR,
   ...phone.ptBR,
+  ...layout.ptBR,
+  ...bots.ptBR,
+  ...routing.ptBR,
+  ...chat.ptBR,
+  ...prefs.ptBR,
+  ...sheets.ptBR,
+  ...usage.ptBR,
+  ...native.ptBR,
+  ...views.ptBR,
+  ...project.ptBR,
+  ...sentinel.ptBR,
+  ...network.ptBR,
+  ...components.ptBR,
+  ...github.ptBR,
+  ...phoneApp.ptBR,
+  ...phoneParts.ptBR,
+  ...helpers.ptBR,
+  ...daemon.ptBR,
 };

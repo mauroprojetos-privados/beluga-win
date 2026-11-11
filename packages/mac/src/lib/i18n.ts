@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react';
-import { type Key, type Locale, type Params, getLocale, onLocaleChange, resolveLocale, setLocale, t } from '@beluga/shared/i18n/index.js';
+import { type Key, type Locale, type Params, en, getLocale, onLocaleChange, resolveLocale, setLocale, t } from '@beluga/shared/i18n/index.js';
 import { useApp } from './beluga.js';
 
 // The Mac app's language (docs/i18n.md): Settings › General › Language, kept by the daemon
@@ -26,4 +26,24 @@ export const useLocale = (): Locale => useSyncExternalStore(onLocaleChange, getL
 export function useT(): (key: Key, params?: Params) => string {
   useLocale();
   return t;
+}
+
+/** One of the catalog's plain sentences, by its English words. */
+export type Said = Extract<(typeof en)[Key], string>;
+
+let keys: Map<string, Key> | undefined;
+/** The key whose English is `english`, if the catalog has one (the first such key). */
+export function keyOfEnglish(english: string): Key | undefined {
+  keys ??= new Map(Object.entries(en).flatMap(([key, words]) => (typeof words === 'string' ? [[words, key as Key] as const] : [])).reverse());
+  return keys.get(english);
+}
+
+/**
+ * A sentence written in English in the source and said in the app's language: for Settings' row
+ * labels and group titles, whose English must stay in the file because the Settings search indexes
+ * it (dialogs/settings-index.ts, tests/mac-settings-search.test.ts). Typed against the catalog.
+ */
+export function say(english: Said): string {
+  const key = keyOfEnglish(english);
+  return key ? t(key) : english;
 }

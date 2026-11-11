@@ -5,6 +5,24 @@ import * as settings from './areas/settings.js';
 import * as tasks from './areas/tasks.js';
 import * as plans from './areas/plans.js';
 import * as phone from './areas/phone.js';
+import * as layout from './areas/layout.js';
+import * as bots from './areas/bots.js';
+import * as routing from './areas/routing.js';
+import * as chat from './areas/chat.js';
+import * as prefs from './areas/prefs.js';
+import * as sheets from './areas/sheets.js';
+import * as usage from './areas/usage.js';
+import * as native from './areas/native.js';
+import * as views from './areas/views.js';
+import * as project from './areas/project.js';
+import * as sentinel from './areas/sentinel.js';
+import * as network from './areas/network.js';
+import * as components from './areas/components.js';
+import * as github from './areas/github.js';
+import * as phoneApp from './areas/phoneApp.js';
+import * as phoneParts from './areas/phoneParts.js';
+import * as helpers from './areas/helpers.js';
+import * as daemon from './areas/daemon.js';
 
 /**
  * English, the source catalog: every key is here first (docs/i18n.md). Keys are `area.thing`;
@@ -122,6 +140,24 @@ export const en = {
   ...tasks.en,
   ...plans.en,
   ...phone.en,
+  ...layout.en,
+  ...bots.en,
+  ...routing.en,
+  ...chat.en,
+  ...prefs.en,
+  ...sheets.en,
+  ...usage.en,
+  ...native.en,
+  ...views.en,
+  ...project.en,
+  ...sentinel.en,
+  ...network.en,
+  ...components.en,
+  ...github.en,
+  ...phoneApp.en,
+  ...phoneParts.en,
+  ...helpers.en,
+  ...daemon.en,
 } as const satisfies Record<string, Message>;
 
 /** Every key the app may say. */
