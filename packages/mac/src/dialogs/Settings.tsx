@@ -58,6 +58,8 @@ import { openExternal } from '../lib/system.js';
 import { shortcutKeys } from '../lib/shortcuts.js';
 import { keyPlatform } from '../lib/shortcuts-model.js';
 import { cmdReturn, returnName, revealLabel, yourComputer } from '../lib/os-words.js';
+import { LANGUAGE_CHOICES, LOCALE_NAMES, type LanguageChoice, resolveLocale } from '@beluga/shared/i18n/locales.js';
+import { systemLanguages, useT } from '../lib/i18n.js';
 
 /** Your profile picture: friends and people in your groups get it once and keep it (net/mesh/avatars.ts). */
 function PictureRow() {
@@ -133,6 +135,24 @@ async function squarePicture(file: File): Promise<string> {
   throw new Error('That picture is too big to send, even shrunk');
 }
 
+/** Settings › General › Language (docs/i18n.md): the system's, or one of ours, each named in itself. */
+function LanguageRow() {
+  const api = useApi();
+  const t = useT();
+  const choice = useApp((st) => st.prefs.language ?? 'auto');
+  const system = LOCALE_NAMES[resolveLocale('auto', systemLanguages())];
+  return (
+    <Row label={t('language.title')} detail={t('language.hint')}>
+      <Select<LanguageChoice>
+        label={t('language.title')}
+        value={choice}
+        onChange={(v) => void api.settings.language(v)}
+        options={LANGUAGE_CHOICES.map((c) => ({ value: c, label: c === 'auto' ? t('language.auto', { language: system }) : LOCALE_NAMES[c] }))}
+      />
+    </Row>
+  );
+}
+
 function General() {
   const api = useApi();
   const state = useApp((st) => st);
@@ -152,6 +172,7 @@ function General() {
           </form>
         </Row>
         <PictureRow />
+        <LanguageRow />
         <Row label="Friends' requests for your agent" detail="For people you haven't picked a trust level for.">
           <Select
             label="Default policy"

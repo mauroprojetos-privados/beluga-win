@@ -35,6 +35,7 @@ export const en = {
   'language.auto': 'Automatic ({language})',
   'language.autoPlain': 'Automatic (the system’s)',
   'language.hint': 'Menus, buttons and notifications, and the language your agents answer in.',
+  'language.macShort': 'Your Mac',
   'language.followMac': 'Same as the Mac ({language})',
   'language.phoneHint': 'This phone’s language. By default it follows your Mac.',
   'language.commits': 'Language for commits and PRs',

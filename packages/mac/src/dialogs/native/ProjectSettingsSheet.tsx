@@ -6,6 +6,8 @@ import { agentEntries } from '../../chat/ModelPicker.js';
 import { Checkbox, Field, FormSheet, Popup, SourceTag, TextInput } from '../../components/FormSheet.js';
 import { agentName, useMyAgent } from '../../lib/agent-words.js';
 import { useApi, useApp } from '../../lib/beluga.js';
+import { LOCALES, LOCALE_NAMES, type Locale } from '@beluga/shared/i18n/locales.js';
+import { useT } from '../../lib/i18n.js';
 import type { NativeMenuProps } from './index.js';
 
 type Kind = 'setup' | 'run';
@@ -32,6 +34,8 @@ export function ProjectSettingsSheet({ menu, close }: NativeMenuProps<'scripts'>
   const models = useApp((st) => st.models);
   const runtimes = useApp((st) => st.runtimes);
   const mine = useMyAgent();
+  const t = useT();
+  const commitLanguages = useApp((st) => st.prefs.commitLanguages);
   const scripts = project?.scripts ?? {};
   const [values, setValues] = useState<Record<Kind, string>>({ setup: scripts.setup?.command ?? '', run: scripts.run?.command ?? '' });
   const [team, setTeam] = useState(false);
@@ -40,6 +44,9 @@ export function ProjectSettingsSheet({ menu, close }: NativeMenuProps<'scripts'>
   // '~': the same agent as yours (Settings); anything else is this project's own.
   const agentNow = project && projectAgents?.[project.name] ? choiceForAgent(projectAgents[project.name]) : '~';
   const [agent, setAgent] = useState(agentNow);
+  // What its commits and PRs are written in (docs/i18n.md): English unless you pick another.
+  const commitsNow: Locale = (project && commitLanguages?.[project.name]) || 'en';
+  const [commits, setCommits] = useState<Locale>(commitsNow);
   // Until you type, the fields follow what's saved (it can arrive just after the sheet opens).
   const setupNow = scripts.setup?.command ?? '';
   const runNow = scripts.run?.command ?? '';
@@ -63,7 +70,7 @@ export function ProjectSettingsSheet({ menu, close }: NativeMenuProps<'scripts'>
   };
   // Guessed values say so (once), so you check them.
   const hint = (kind: Kind, what: string) => (!edited(kind) && scripts[kind]?.source === 'detected' ? `${what} Guessed from the project: check it.` : !edited(kind) && scripts[kind]?.source === 'claude' ? `${what} Your agent worked it out from the project: check it.` : what);
-  const changed = edited('setup') || edited('run') || team || auto !== autoSetup || agent !== agentNow;
+  const changed = edited('setup') || edited('run') || team || auto !== autoSetup || agent !== agentNow || commits !== commitsNow;
 
   const save = (): void => {
     for (const kind of ['setup', 'run'] as const) {
@@ -77,6 +84,7 @@ export function ProjectSettingsSheet({ menu, close }: NativeMenuProps<'scripts'>
       const { [project.name]: _, ...others } = projectAgents ?? {};
       void api.session.setPrefs({ projectAgents: agent === '~' ? others : { ...others, [project.name]: agentForChoice(agent, runtimes) } });
     }
+    if (commits !== commitsNow) void api.settings.commitLanguage(project.name, commits);
     close();
   };
 
@@ -100,6 +108,9 @@ export function ProjectSettingsSheet({ menu, close }: NativeMenuProps<'scripts'>
       </Field>
       <Field label="Agent" htmlFor="project-agent" hint="Runs this project's new conversations and answers when friends write @you about it.">
         <Popup id="project-agent" value={agent} onChange={setAgent} options={[{ value: '~', label: `Same as yours (${agentName(mine)})`, icon: agentMark(mine) }, ...agentEntries(agentChoices(runtimes, models))]} />
+      </Field>
+      <Field label={t('language.commits')} htmlFor="project-commit-language" hint={t('language.commitsHint')}>
+        <Popup id="project-commit-language" value={commits} onChange={(v) => setCommits(v as Locale)} options={LOCALES.map((l) => ({ value: l, label: LOCALE_NAMES[l] }))} />
       </Field>
       <Field label="">
         <Checkbox checked={auto} onChange={setAuto} label="Run setup in new worktrees" detail="For every project; in its Terminal tab" />

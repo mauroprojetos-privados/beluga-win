@@ -909,6 +909,7 @@ Then protect \`/api/payments\`.",
     },
     "mac": {
       "keepAwake": "off",
+      "language": "en",
       "name": "Kayra’s Mac",
       "version": "0.6.2",
     },

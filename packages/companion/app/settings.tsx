@@ -9,6 +9,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Header, Screen, useScrolled } from '../components/Screen';
 import { Card, haptic, Pill, Row, T } from '../components/ui';
 import { appearance, type Choice } from '../lib/appearance';
+import { language, macLanguage, type PhoneLanguage, useT } from '../lib/language';
+import { LOCALE_NAMES } from '../../../src/shared/i18n/locales';
 import { useLink, useSupports, useView } from '../lib/hooks';
 import { calls } from '../lib/link/calls';
 import type { HomeView } from '../lib/link/protocol';
@@ -46,6 +48,9 @@ export default function Settings() {
   const [confirm, setConfirm] = useState(false);
   const [advanced, setAdvanced] = useState(false);
   const [look, setLook] = useState<Choice>(appearance.get());
+  const t = useT();
+  const [lang, setLang] = useState<PhoneLanguage>(language.get());
+  const macSays = macLanguage();
   const saved = useSaved();
   const home = useView<HomeView>('home');
   const [stay, setStayOn] = useState(stayOn());
@@ -247,6 +252,27 @@ export default function Settings() {
                   { key: 'dark', label: 'Dark', Icon: Moon },
                 ]}
               />
+            </View>
+
+            <View style={{ gap: 8 }}>
+              <T v="eyebrow" style={{ paddingHorizontal: 6 }}>
+                {t('language.title')}
+              </T>
+              <Segments
+                value={lang}
+                onChange={(c: PhoneLanguage) => {
+                  setLang(c);
+                  language.set(c);
+                }}
+                options={[
+                  { key: 'mac', label: t('language.macShort'), Icon: Monitor },
+                  { key: 'en', label: LOCALE_NAMES.en },
+                  { key: 'pt-BR', label: 'Português' },
+                ]}
+              />
+              <T v="caption" style={{ paddingHorizontal: 6 }}>
+                {lang === 'mac' && macSays ? t('language.followMac', { language: LOCALE_NAMES[macSays] }) : t('language.phoneHint')}
+              </T>
             </View>
 
         <Card>

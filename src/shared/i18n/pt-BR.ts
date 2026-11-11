@@ -33,6 +33,7 @@ export const ptBR: Partial<Record<Key, Message>> = {
   'language.auto': 'Automático ({language})',
   'language.autoPlain': 'Automático (o do sistema)',
   'language.hint': 'Menus, botões e notificações, e o idioma em que seus agentes respondem.',
+  'language.macShort': 'Seu Mac',
   'language.followMac': 'O mesmo do Mac ({language})',
   'language.phoneHint': 'O idioma deste celular. Por padrão, ele segue o seu Mac.',
   'language.commits': 'Idioma dos commits e PRs',

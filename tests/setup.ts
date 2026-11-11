@@ -23,3 +23,6 @@ process.env.CODEX_HOME = mkdtempSync(path.join(os.tmpdir(), 'beluga-test-codex-'
 
 // The tests are a Mac's wherever they run ("Your Mac"; shared/assistant.ts).
 process.env.BELUGA_COMPUTER ??= 'mac';
+
+// The daemon's language is English in tests, whatever this computer speaks (src/core/language.ts).
+process.env.BELUGA_LANGUAGE = 'en';

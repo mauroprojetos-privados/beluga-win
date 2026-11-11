@@ -285,6 +285,8 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'stripe.disconnect': 'gated',
   'stripe.refresh': 'gated',
   'support.answer': 'gated',
+  'settings.language': 'gated',
+  'settings.commitLanguage': 'gated',
   'claudeCode.steps': 'gated',
   'claudeCode.step': 'gated',
   'claudeCode.findAgent': 'gated',
