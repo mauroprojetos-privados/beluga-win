@@ -12,8 +12,10 @@ import { sessionBefore } from '../agent/runtime/claude/session-rewind.js';
 import { promptRef, restoreSnapshot, snapshot, snapshotAt } from '../workspaces/snapshots.js';
 import type { AgentPlace, OpenPr } from '../agent/types.js';
 import type { AgentRef } from '../protocol.js';
+import { type Resolved, routeOf } from './routing/model.js';
 import { placeAgent } from '../shared/agent-picker.js';
 import { agentName } from '../shared/agent-label.js';
+import { hhmm } from '../shared/clock.js';
 import { carriedPrompt, transcriptOf } from './agent-switch.js';
 import { type ArrangeTarget, type WorkspaceManager, real } from '../workspaces/manager.js';
 import type { ThreadChildren, ThreadRecord } from '../shared/threads.js';
@@ -673,8 +675,10 @@ export class WorkspaceController {
     const syncMain = ws.askOnly ? this.syncRuns.get(ws.id) : undefined;
     if (syncMain) this.syncRuns.delete(ws.id);
     // A conversation that picked no agent runs on yours (the project's own, else Settings' default).
-    const agent = ws.agent ?? this.followedAgent(ws.id);
+    // One that picked a combo runs on its first target that can run now (core/routing), resumed in that runtime's session.
+    const { agent, routed } = this.routedAgent(ws);
     const runtime = agent?.runtime ?? this.deps.defaultRuntime?.() ?? SESSION_RUNTIME_DEFAULT;
+    const ready = routed?.ok ? routed.ready : undefined;
     // An epic's worktree: its sub-tasks' worktrees in other repos too (BLG-561), still there.
     const also = ws.kind === 'worktree' && !ws.askOnly ? this.alsoIn(ws.id).filter((dir) => existsSync(dir)) : [];
     return {
@@ -688,9 +692,11 @@ export class WorkspaceController {
       // Only a session its own runtime made: another runtime's id is never fed to this one.
       ...resumeFor(ws, runtime, this.pendingResume.get(ws.id)),
       onSession: (sessionId) => this.deps.manager.rememberSession(ws.id, sessionId, runtime),
-      ...(agent ? { agent: ws.model ? { ...agent, model: ws.model } : agent } : {}),
-      ...(ws.model ? { model: ws.model } : {}),
-      ...(ws.effort ? { effort: ws.effort } : {}),
+      ...(agent ? { agent: ws.model && !routed ? { ...agent, model: ws.model } : agent } : {}),
+      // A combo's target brings its own model and effort; the conversation's own effort when it names none.
+      ...(routed ? (ready?.model ? { model: ready.model } : {}) : ws.model ? { model: ws.model } : {}),
+      ...((ready?.effort ?? ws.effort) ? { effort: ready?.effort ?? ws.effort } : {}),
+      ...(routed ? { route: routed.ok ? { combo: routed.combo.id, index: routed.index } : { combo: routed.combo.id, index: -1, problem: routed.why } } : {}),
       ...(ws.prShipped && ws.kind === 'worktree' ? { shipped: ws.prShipped } : {}),
       ...this.openPrOf(ws),
       ...(syncMain ? { syncMain } : {}),
@@ -732,7 +738,14 @@ export class WorkspaceController {
   /** The runtime a workspace's conversation runs on (its pick, else yours, else the daemon's own). */
   private runtimeIn(wsId: string): string {
     const ws = this.deps.manager.find(wsId);
-    return (ws?.agent ?? this.followedAgent(wsId))?.runtime ?? this.deps.defaultRuntime?.() ?? SESSION_RUNTIME_DEFAULT;
+    return (ws ? this.routedAgent(ws).agent : this.followedAgent(wsId))?.runtime ?? this.deps.defaultRuntime?.() ?? SESSION_RUNTIME_DEFAULT;
+  }
+
+  /** The agent a workspace runs on now: its pick (a combo resolved to its target that can run now), else yours. */
+  private routedAgent(ws: Workspace): { readonly agent?: AgentRef; readonly routed?: Resolved } {
+    const picked = ws.agent ?? this.followedAgent(ws.id);
+    const routed = routeOf(this.deps.store.getState(), picked, Date.now(), hhmm);
+    return { ...(routed?.ok ? { agent: routed.ready.agent } : picked ? { agent: picked } : {}), ...(routed ? { routed } : {}) };
   }
 
   /** The name of the agent a workspace's conversation runs on ("Codex"), for what the chat says. */

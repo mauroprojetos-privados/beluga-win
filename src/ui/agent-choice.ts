@@ -1,6 +1,7 @@
 import type { AgentRef } from '../protocol.js';
 import type { RuntimeChoice, RuntimeModel } from '../shared/agent-runtimes.js';
 import { type AgentMark, runtimeMark } from '../shared/agent-marks.js';
+import { type Combo, comboAgent, comboOfValue, comboValue } from '../core/routing/model.js';
 
 /** protocol.ts's CLAUDE_AGENT, repeated so the phone bundles this file without the daemon's protocol (types only from there). */
 // agent-wording: claude (the Claude runtime's own name)
@@ -40,8 +41,17 @@ export function agentChoices(runtimes: readonly RuntimeChoice[], claudeModels: r
   });
 }
 
-/** The AgentRef a pop-up value stands for (an older value, a bare model, is Claude's). */
-export function agentForChoice(value: string, runtimes: readonly RuntimeChoice[] = []): AgentRef {
+/**
+ * The AgentRef a pop-up value stands for (an older value, a bare model, is Claude's). A combo's
+ * (`combo:<id>`, docs/routing.md) is the combo, from `combos`; one not there any more still names it,
+ * and its run says it's gone.
+ */
+export function agentForChoice(value: string, runtimes: readonly RuntimeChoice[] = [], combos: readonly Pick<Combo, 'id' | 'name' | 'targets'>[] = []): AgentRef {
+  const combo = comboOfValue(value);
+  if (combo) {
+    const found = combos.find((c) => c.id === combo);
+    return found ? comboAgent(found) : { runtime: CLAUDE_AGENT.runtime, label: combo, combo };
+  }
   const at = value.indexOf(SEP);
   const runtime = at > 0 ? value.slice(0, at) : CLAUDE_AGENT.runtime;
   const model = at > 0 ? value.slice(at + 1) : value;
@@ -51,5 +61,6 @@ export function agentForChoice(value: string, runtimes: readonly RuntimeChoice[]
 
 /** The pop-up value for an agent you chose (undefined: Claude with its default model). */
 export function choiceForAgent(ref: AgentRef | undefined): string {
+  if (ref?.combo) return comboValue(ref.combo);
   return `${ref?.runtime ?? CLAUDE_AGENT.runtime}${SEP}${ref?.model ?? ''}`;
 }

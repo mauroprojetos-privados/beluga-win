@@ -489,6 +489,11 @@ export interface AgentPlace {
   readonly shipped?: { readonly number: number; readonly url?: string; readonly into: string };
   /** Its pull request is open (BLG-840): the run pushes its commits there (see prompt.ts buildCommitAppend). */
   readonly openPr?: OpenPr;
+  /**
+   * The conversation picked a combo (core/routing): `agent`, `model` and `effort` are already its
+   * target that can run now (`index`). None can: `problem` says why, and the run doesn't start.
+   */
+  readonly route?: { readonly combo: string; readonly index: number; readonly problem?: string };
 }
 
 /** A worktree's open pull request, for its run's commit rules (BLG-840). */

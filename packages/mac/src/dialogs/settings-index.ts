@@ -94,6 +94,8 @@ export const SETTINGS: readonly Entry[] = [
   ]),
   group('claude', 'Your agents', 'Each agent Beluga can run, and how to set it up.', 'sign in install login claude code codex'),
   ...rows('claude', 'Your agents', [['Signed in or installed one just now?', 'Check Again looks for your agents now.', 'check again refresh']]),
+  group('claude', 'Combos', 'Agents and models in order: each run goes to the first that can run.', 'combo routing fallback chain economy strong local first cheap tokens failover'),
+  ...rows('claude', 'Combos', [['Agents in order', 'Each run goes to the first that can run then.', 'combo routing fallback order']]),
   group('claude', 'Launch flags', 'Your own flags for claude and codex.', 'args arguments cli flags dangerously skip permissions'),
   ...rows('claude', 'Launch flags', [
     ['Claude Code', 'Your own flags for claude.', 'flags arguments cli'],

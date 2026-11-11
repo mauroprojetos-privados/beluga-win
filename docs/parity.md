@@ -319,6 +319,10 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `external.stopAll` | Settings › External agents › Stop All, and the phone's External agents |
 | `external.setPaused` | Settings › External agents › Pause All |
 | `external.activity` | Settings › External agents › Activity, and the phone's External agents |
+| `routing.combos` | Settings › Agent › Combos (each with its chain, and what it would run on now or why nothing can); the composer's agent picker › Combos, New Task › Agent and Start with ▸ list them above the models (docs/routing.md) |
+| `routing.runRoute` | – read by the phone; a run's card on the Mac says it in its badge ("Economy · Codex") from the run's own agent |
+| `routing.setCombos` | Settings › Agent › Combos: New Combo, Edit… (rename, add, reorder and remove targets, privacy), Delete |
+| `routing.resetCombos` | Settings › Agent › Combos › Use the Defaults |
 | `voice.models` | Settings › Voice: the models on this Mac, here or coming |
 | `voice.prepare` | Settings › Voice › Get now |
 | `voice.load` | – asked by a call's window now and then: how busy this Mac is, to decide who writes down whose words (BLG-718) |

@@ -716,6 +716,12 @@ export const PHONE: Record<Method, Side> = {
   'external.stopAll': 'phone',
   'external.setPaused': 'mac',
   'external.activity': 'phone',
+
+  // ---- combos (docs/routing.md): reading them and which one a run used is the phone's; changing them is Settings on the Mac
+  'routing.combos': 'phone',
+  'routing.runRoute': 'phone',
+  'routing.setCombos': 'mac',
+  'routing.resetCombos': 'mac',
 };
 
 /** A method the phone may call (unknown names are not). */

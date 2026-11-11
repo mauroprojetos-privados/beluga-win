@@ -213,6 +213,11 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'env.saveEndpoint': { refused: SECRET_VALUES },
   'env.removeEndpoint': 'gated',
   'env.checkEndpoints': 'gated',
+  // Combos (docs/routing.md): which agents a conversation's runs go to is the person's Settings.
+  'routing.combos': { refused: NO_TOOL },
+  'routing.runRoute': { refused: NO_TOOL },
+  'routing.setCombos': { refused: NO_TOOL },
+  'routing.resetCombos': { refused: NO_TOOL },
   'attachments.add': 'ui_only',
   'attachments.addFile': 'ui_only',
   'attachments.reattach': 'ui_only',

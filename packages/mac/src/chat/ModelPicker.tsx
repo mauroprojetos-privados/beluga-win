@@ -5,7 +5,9 @@ import type { AppState } from '@beluga/core/store.js';
 import { type AgentRef, CLAUDE_AGENT } from '@beluga/protocol.js';
 import { type HandoffMode, limitHit, needsHandoff } from '@beluga/shared/agent-handoff.js';
 import { type AgentMark, modelMark, runtimeMark } from '@beluga/shared/agent-marks.js';
-import { type AgentPicker, type PickerGroup, type PickerState, agentPicker, pickAction } from '@beluga/shared/agent-picker.js';
+import { type AgentPicker, type PickerCombo, type PickerGroup, type PickerState, agentPicker, pickAction, pickCombo } from '@beluga/shared/agent-picker.js';
+import { comboAgent, comboChoices, combosOf, worldOf } from '@beluga/core/routing/model.js';
+import { hhmm } from '@beluga/shared/clock.js';
 import type { RuntimeModel } from '@beluga/shared/agent-runtimes.js';
 import type { AgentOption } from '@beluga/ui/agent-choice.js';
 import { Icon } from '../components/Icon.js';
@@ -40,7 +42,7 @@ export function setMyAgent(api: Api, runtime: string, label: string, model: stri
 }
 
 /** The picker's view of the state: "your default model" is your agent's, whichever runtime it is. */
-export const pickerState = (st: AppState): PickerState => ({ ...st, prefs: { model: myModel(st.prefs) || undefined } });
+export const pickerState = (st: AppState): PickerState => ({ ...st, prefs: { model: myModel(st.prefs) || undefined }, combos: comboChoices(combosOf(st.prefs.combos, st.runtimes), worldOf(st, Date.now(), hhmm)) });
 
 /** A model's details (its effort levels) by runtime and value; Claude's come from Claude Code itself. */
 export function modelInfo(st: Pick<AppState, 'runtimes' | 'models'>, runtime: string, model: string): RuntimeModel | undefined {
@@ -96,6 +98,9 @@ function flavor(value: string, label: string, runtime: string): string {
 }
 
 export const samePicker = (a: AgentPicker, b: AgentPicker): boolean => JSON.stringify(a) === JSON.stringify(b);
+
+/** The rail's tab for your combos (no runtime is called this). */
+const COMBOS = '~combos';
 
 /** What a move to another runtime needs to know of a conversation: whose session it holds, and whether its agent is at its plan limit. */
 interface Carried {
@@ -163,12 +168,38 @@ export function ModelPicker({ channel, draft, onDraft }: { channel: string; draf
       else void api.workbench.setAgent(conversation, action.agent);
     }
   };
+  // A combo (docs/routing.md): this conversation's runs go to its first target that can run then.
+  const pickOne = (c: PickerCombo): void => {
+    if (onDraft && !conversation) return onDraft(comboAgent({ id: c.id, name: c.name, targets: c.targets.map((t) => t.target) }));
+    const action = pickCombo(picker, c);
+    if (action?.kind !== 'agent' || !conversation || !action.agent) return;
+    const live = { sessionId: 'live', ...(carried.sessionRuntime ? { sessionRuntime: carried.sessionRuntime } : {}) };
+    if (carried.live && needsHandoff(live, action.agent.runtime)) setMove({ agent: action.agent, to: c.name, from: picker.combo?.name ?? groups.find((x) => x.current)?.label ?? 'Your agent' });
+    else void api.workbench.setAgent(conversation, action.agent);
+  };
   const moveWith = (mode: HandoffMode): void => {
     if (move && conversation) void api.workbench.setAgent(conversation, move.agent, mode);
     setMove(undefined);
   };
+  // Combos show for a conversation, or a new worktree's own pick (new conversations take your agent's model).
+  const combos = conversation || onDraft ? picker.combos : [];
+  const showCombos = combos.length > 0 && (seen === COMBOS || (seen === undefined && Boolean(picker.combo)));
   // The agent whose models show: the one at work here, until you look at another.
-  const shown = groups.find((g) => g.runtime === seen) ?? groups.find((g) => g.current) ?? home ?? groups[0];
+  const shown = showCombos ? undefined : (groups.find((g) => g.runtime === seen) ?? groups.find((g) => g.current) ?? home ?? groups[0]);
+  const comboRows = (
+    <div className={s.models} role="radiogroup" aria-label="Combos">
+      {combos.map((c) => {
+        const desc = c.why ?? `${c.summary}${c.now ? ` · now ${c.now}` : ''}`;
+        return (
+          <button key={c.id} type="button" role="radio" aria-checked={c.on} disabled={Boolean(c.why) && !c.on} title={desc} className={cx(s.model, c.on && s.modelOn, c.why && s.modelOff)} onClick={() => pickOne(c)}>
+            <span className={s.radio}>{c.on ? <Icon name="check" size={9} /> : null}</span>
+            <span className={s.modelName}>{c.name}</span>
+            <span className={s.modelDesc}>{desc}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
   const rows = (g: PickerGroup) => (
     <div className={s.models} role="radiogroup" aria-label={`${g.label} models`}>
       {g.models.map((m) => {
@@ -216,6 +247,13 @@ export function ModelPicker({ channel, draft, onDraft }: { channel: string; draf
               </div>
               <div className={s.body}>
                 <div className={s.rail} role="tablist" aria-label="Agents" aria-orientation="vertical">
+                  {combos.length ? (
+                    <button type="button" role="tab" aria-selected={showCombos} aria-label="Combos" title={picker.combo ? `${picker.combo.name}, at work here` : 'Agents and models in order: each run goes to the first that can run'} className={cx(s.agent, showCombos && s.agentOn)} onClick={() => setSeen(COMBOS)}>
+                      <Icon name="branch" size={13} className={s.agentMark} />
+                      <span className={s.agentName}>Combos</span>
+                      {picker.combo ? <span className={s.inUse} aria-hidden /> : null}
+                    </button>
+                  ) : null}
                   {groups.map((g) => (
                     <button
                       key={g.runtime}
@@ -233,8 +271,8 @@ export function ModelPicker({ channel, draft, onDraft }: { channel: string; draf
                     </button>
                   ))}
                 </div>
-                <div className={s.pane} role="tabpanel" aria-label={shown?.label ?? 'Models'}>
-                  {shown ? (shown.available ? rows(shown) : <div className={s.why}>{shown.why}</div>) : null}
+                <div className={s.pane} role="tabpanel" aria-label={showCombos ? 'Combos' : (shown?.label ?? 'Models')}>
+                  {showCombos ? comboRows : shown ? (shown.available ? rows(shown) : <div className={s.why}>{shown.why}</div>) : null}
                 </div>
               </div>
               <div className={s.thinking}>

@@ -9,7 +9,7 @@ import { z } from 'zod';
  * ignores what it doesn't know. A breaking change bumps the major, and the Mac keeps answering the
  * previous major for a release.
  */
-export const COMPANION_PROTO = { major: 1, minor: 50 } as const;
+export const COMPANION_PROTO = { major: 1, minor: 51 } as const;
 
 /**
  * What came in which minor, for a phone talking to an older Mac: it subscribes to a topic (and
@@ -404,7 +404,8 @@ export const SubAgentDetailView = z.object({
 export type SubAgentDetailView = z.infer<typeof SubAgentDetailView>;
 
 /** Which agent it is (src/protocol.ts AgentRef, repeated here: this file is the phone's whole contract). */
-export const AgentRefView = z.object({ runtime: z.string().max(32), model: z.string().max(64).optional(), label: z.string().max(64) });
+/** 1.51 (docs/routing.md): `comboName`, the combo it went through (a run's) or that was picked (a task's): "Economy · Codex". */
+export const AgentRefView = z.object({ runtime: z.string().max(32), model: z.string().max(64).optional(), label: z.string().max(64), comboName: z.string().max(64).optional() });
 export type AgentRefView = z.infer<typeof AgentRefView>;
 
 /** 1.41 (BLG-702): one emoji under a message: how many put it there, whether you did, and who (their names, you as "You"). */

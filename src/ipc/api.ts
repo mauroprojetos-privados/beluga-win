@@ -41,6 +41,8 @@ import { CALLS_API } from './calls-api.js';
 import { TERMINAL_IMPORT_API } from './terminal-import-api.js';
 import { AGENT_TERM_API } from './agent-term-api.js';
 import { HANDOFF_MODES } from '../shared/agent-handoff.js';
+import { Combo, MAX_COMBOS } from '../core/routing/model.js';
+import { ROUTING_API } from './routing-api.js';
 
 /**
  * Everything a client can ask Beluga to do, in one list. The daemon validates every call
@@ -98,6 +100,8 @@ export const PrefsPatch = z
     // Who answers "@you" (null: back to Claude), and per-project ones by project name (BLG-444).
     defaultAgent: AgentRef.nullable().optional(),
     projectAgents: z.record(z.string().min(1).max(80), AgentRef),
+    // Your combos, the whole list each time (routing.setCombos checks them first); null: back to the defaults.
+    combos: z.array(Combo).max(MAX_COMBOS).nullable(),
     autoSetup: bool,
     branchPrefix: z.string().regex(BRANCH_PREFIX_RE, 'Use letters, digits and . _ - / only'),
     contextMeter: bool,
@@ -563,6 +567,8 @@ export const API = {
   ...AGENT_TERM_API,
   // ---- browsers on the web port: join links, the ones let in, revoking (web-api.ts)
   ...WEB_API,
+  // ---- combos: which agents and models a conversation's runs go to, in order (routing-api.ts)
+  ...ROUTING_API,
 } as const;
 
 export type Api = typeof API;

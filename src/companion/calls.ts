@@ -28,6 +28,13 @@ export type TaskDraftResult = z.infer<typeof TaskDraftResult>;
 /** What `put` answers: a piece taken, then the file's ref. */
 /** A sentinel's run as the phone reads it (src/core/sentinel/model.ts RunSummary; more fields pass through). */
 export const SentinelRunResult = z.object({ id: z.string(), sentinelId: z.string(), state: z.string(), startedAt: z.number(), headline: z.string() }).passthrough();
+/** 1.51 (docs/routing.md): your combos, each with its chain and what it would run on now (or why nothing can). */
+export const CombosResult = z.object({
+  combos: z.array(z.object({ id: z.string(), name: z.string(), summary: z.string(), privacy: z.string(), now: z.string().optional(), why: z.string().optional(), targets: z.array(z.object({ label: z.string(), why: z.string().optional() }).passthrough()) }).passthrough()),
+  custom: z.boolean(),
+});
+/** The combo and target a run used ("Economy · Codex"); none when it ran on no combo. */
+export const RunRouteResult = z.object({ requestId: z.string(), combo: z.string(), name: z.string(), runtime: z.string(), model: z.string().optional(), target: z.string(), words: z.string() }).optional();
 export const PutResult =z.union([z.object({ received: z.number().int().min(0) }), z.object({ ref: z.string() })]);
 
 export const PhoneCalls = {
@@ -203,6 +210,9 @@ export const PhoneCalls = {
   // 1.29 (BLG-392): what a sentinel keeps, its files and histories as refs; a run's file opened on the Mac.
   'sentinel.dataList': entry('sentinel.dataList', DataListView),
   'sentinel.runFileOpen': entry('sentinel.runFileOpen', done),
+  // 1.51 (docs/routing.md): combos, read-only on the phone.
+  'routing.combos': entry('routing.combos', CombosResult),
+  'routing.runRoute': entry('routing.runRoute', RunRouteResult),
 } as const;
 
 export type PhoneMethod = keyof typeof PhoneCalls;

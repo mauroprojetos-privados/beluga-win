@@ -19,7 +19,7 @@ import { type AgentRef, defaultAgentOf } from '../protocol.js';
  */
 
 export const clip = (s: string, max: number): string => (s.length > max ? `${s.slice(0, max - 1)}…` : s);
-export const agentRefView = (a: AgentRef): AgentRef => ({ runtime: clip(a.runtime, 32), label: clip(a.label, 64), ...(a.model ? { model: clip(a.model, 64) } : {}) });
+export const agentRefView = (a: AgentRef): AgentRef => ({ runtime: clip(a.runtime, 32), label: clip(a.label, 64), ...(a.model ? { model: clip(a.model, 64) } : {}), ...(a.comboName ? { comboName: clip(a.comboName, 64) } : {}) });
 const valid = (t: string): Topic | undefined => (Topic.safeParse(t).success ? (t as Topic) : undefined);
 
 /** A conversation's topic (`room` → `conv:room`, `ws:<id>` → `conv:ws:<id>`). */

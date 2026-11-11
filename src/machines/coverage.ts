@@ -18,6 +18,11 @@ export type MachineSide = 'drive' | 'refuse';
 export const MACHINE: Record<Method, MachineSide> = {
   // ---- session
   'session.submit': 'drive',
+  // ---- combos (docs/routing.md): your combos are your settings, synced to each computer
+  'routing.combos': 'drive',
+  'routing.runRoute': 'drive',
+  'routing.setCombos': 'drive',
+  'routing.resetCombos': 'drive',
   'session.copyInvite': 'drive',
   'session.copyLastAnswer': 'drive',
   'session.copyText': 'drive',

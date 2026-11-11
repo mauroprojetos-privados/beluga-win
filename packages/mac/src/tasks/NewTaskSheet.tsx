@@ -1,7 +1,6 @@
 import { type KeyboardEvent, useMemo, useRef, useState } from 'react';
 import { type IssueStatus, PRIORITY_INFO, type Priority, STATUS_INFO, asksPrivate, boardOf, issueById, reposOf } from '@beluga/core/board/model.js';
-import { agentForChoice } from '@beluga/ui/agent-choice.js';
-import { YOUR_AGENT, useAgentEntries } from '../components/agent-options.js';
+import { YOUR_AGENT, useAgentEntries, useAgentForChoice } from '../components/agent-options.js';
 import { Checkbox, Field, FormSheet, Popup, TextArea, TextInput } from '../components/FormSheet.js';
 import { useBoxSuggestions } from '../chat/BoxSuggestions.js';
 import { MentionHighlighter } from '../chat/MentionHighlighter.js';
@@ -64,7 +63,9 @@ export function NewTaskSheet({ boardId, projectId, status, parent, close }: { bo
   const choices = assigneeChoices(self, people);
   const [assignee, setAssignee] = useState('');
   const [start, setStart] = useState(false);
-  const agents = useAgentEntries();
+  // Combos first (docs/routing.md), then every agent and model.
+  const agents = useAgentEntries({ combos: true });
+  const toAgent = useAgentForChoice();
   const runtimes = useApp((s) => s.runtimes);
   const [agent, setAgent] = useState(YOUR_AGENT);
   // Only you see it (BLG-501): words asking for it pick it, until you pick yourself.
@@ -109,7 +110,7 @@ export function NewTaskSheet({ boardId, projectId, status, parent, close }: { bo
           priority,
           ...(who ? { assignee: who } : {}),
           ...(parentIssue ? { parent: parentIssue.id } : {}),
-          ...(agent !== YOUR_AGENT ? { agent: agentForChoice(agent, runtimes) } : {}),
+          ...(agent !== YOUR_AGENT ? { agent: toAgent(agent) } : {}),
           private: isPrivate,
         });
         close();
