@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { inApp } from '../lib/boot.js';
 import { type EngineStatus, choiceOf, engineDetail, engineOptions, movingText, valueOf } from './engine-location-model.js';
 import { Group, Row, Select } from './settings-controls.js';
+import { say, useT } from '../lib/i18n.js';
 import s from './settings.module.css';
 
 const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
@@ -13,6 +14,7 @@ const errorText = (err: unknown): string => (err instanceof Error ? err.message 
  * says how to install it.
  */
 export function EngineLocationSettings() {
+  useT();
   const [status, setStatus] = useState<EngineStatus>();
   const [distros, setDistros] = useState<string[]>([]);
   const [error, setError] = useState<string>();
@@ -52,9 +54,9 @@ export function EngineLocationSettings() {
     }
   };
   return (
-    <Group title="Engine">
-      <Row label="Where Beluga runs" detail={engineDetail(status)}>
-        <Select label="Where Beluga runs" value={valueOf(status)} options={engineOptions(distros, status)} disabled={!!busy} onChange={(v) => void choose(v)} />
+    <Group title={say('Engine')}>
+      <Row label={say('Where Beluga runs')} detail={engineDetail(status)}>
+        <Select label={say('Where Beluga runs')} value={valueOf(status)} options={engineOptions(distros, status)} disabled={!!busy} onChange={(v) => void choose(v)} />
       </Row>
       {busy ? <div className={s.webBusy}>{busy}</div> : null}
       {error ? <div className={s.engineError}>{error}</div> : null}

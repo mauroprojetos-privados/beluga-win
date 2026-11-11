@@ -5,11 +5,16 @@ import { cx } from '../components/ui.js';
 import { useApi, useApp } from '../lib/beluga.js';
 import { Group, Row } from './settings-controls.js';
 import s from './settings.module.css';
-import t from './terminal-settings.module.css';
+import ts from './terminal-settings.module.css';
+import { say, useT } from '../lib/i18n.js';
+import { t } from '@beluga/shared/i18n/index.js';
 
-const FLAGS: ReadonlyArray<{ readonly runtime: ArgsRuntime; readonly field: 'claudeArgs' | 'codexArgs'; readonly label: string; readonly example: string; readonly detail: string }> = [
-  { runtime: 'claude', field: 'claudeArgs', label: 'Claude Code', example: '--dangerously-skip-permissions', detail: 'In the chat and in its terminal.' },
-  { runtime: 'codex', field: 'codexArgs', label: 'Codex', example: '-c key=value', detail: 'Before app-server. Beluga still sets each turn’s sandbox.' },
+type Flags = { readonly runtime: ArgsRuntime; readonly field: 'claudeArgs' | 'codexArgs'; readonly label: string; readonly example: string; readonly detail: string };
+const FLAGS = (): readonly Flags[] => [
+  // i18n-ignore
+  { runtime: 'claude', field: 'claudeArgs', label: 'Claude Code', example: '--dangerously-skip-permissions', detail: t('prefs.launchFlags.claudeDetail') },
+  // i18n-ignore
+  { runtime: 'codex', field: 'codexArgs', label: 'Codex', example: '-c key=value', detail: t('prefs.launchFlags.codexDetail') },
 ];
 
 /**
@@ -18,16 +23,18 @@ const FLAGS: ReadonlyArray<{ readonly runtime: ArgsRuntime; readonly field: 'cla
  * trust) still come first.
  */
 export function LaunchFlagsSettings() {
+  useT();
   return (
-    <Group title="Launch flags">
-      {FLAGS.map((f) => (
+    <Group title={say('Launch flags')}>
+      {FLAGS().map((f) => (
         <FlagsRow key={f.runtime} {...f} />
       ))}
     </Group>
   );
 }
 
-function FlagsRow({ runtime, field, label, example, detail }: (typeof FLAGS)[number]) {
+function FlagsRow({ runtime, field, label, example, detail }: Flags) {
+  const t = useT();
   const api = useApi();
   const saved = useApp((st) => st.prefs[field]);
   const [text, setText] = useState(joinArgs(saved));
@@ -38,14 +45,14 @@ function FlagsRow({ runtime, field, label, example, detail }: (typeof FLAGS)[num
     if (!problem && joinArgs(args) !== joinArgs(saved)) void api.session.setPrefs({ [field]: args });
   };
   return (
-    <Row label={label} detail={problem ?? `${detail} Your own runs only.`}>
+    <Row label={label} detail={problem ?? t('prefs.launchFlags.ownRuns', { detail })}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
           save();
         }}
       >
-        <input className={cx(s.text, t.mono)} aria-label={`${label} launch flags`} aria-invalid={Boolean(problem)} value={text} placeholder={example} spellCheck={false} onChange={(e) => setText(e.target.value)} onBlur={save} />
+        <input className={cx(s.text, ts.mono)} aria-label={t('prefs.launchFlags.aria', { label })} aria-invalid={Boolean(problem)} value={text} placeholder={example} spellCheck={false} onChange={(e) => setText(e.target.value)} onBlur={save} />
       </form>
     </Row>
   );

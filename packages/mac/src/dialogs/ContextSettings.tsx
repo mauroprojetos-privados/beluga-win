@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AUTO_COMPACT_MAX, AUTO_COMPACT_MIN, clampThreshold } from '@beluga/shared/context-usage.js';
 import { useApi, useApp } from '../lib/beluga.js';
+import { say, useT } from '../lib/i18n.js';
 import { Group, Row, Switch } from './settings-controls.js';
 import s from './settings.module.css';
 
@@ -9,6 +10,7 @@ import s from './settings.module.css';
  * full (Claude summarizes its working memory and keeps going; the chat stays on screen).
  */
 export function ContextSettings() {
+  const t = useT();
   const api = useApi();
   const p = useApp((st) => st.prefs);
   const saved = clampThreshold(p.autoCompactAt);
@@ -19,21 +21,21 @@ export function ContextSettings() {
     if (at !== saved) void api.session.setPrefs({ autoCompactAt: at });
   };
   return (
-    <Group title="Context">
-      <Row label="Context meter" detail="How full each conversation is, beside the send button.">
-        <Switch label="Context meter" on={p.contextMeter} onChange={(v) => void api.session.setPrefs({ contextMeter: v })} />
+    <Group title={say('Context')}>
+      <Row label={say('Context meter')} detail={t('prefs.context.meterDetail')}>
+        <Switch label={say('Context meter')} on={p.contextMeter} onChange={(v) => void api.session.setPrefs({ contextMeter: v })} />
       </Row>
       <Row
-        label="Auto-compact when the context is nearly full"
-        detail={p.autoCompact ? 'Between turns, your agent summarizes what it’s keeping and carries on. Nothing leaves the chat.' : 'Your agent still compacts on its own right at the limit, so a run never breaks.'}
+        label={say('Auto-compact when the context is nearly full')}
+        detail={p.autoCompact ? t('prefs.context.autoOn') : t('prefs.context.autoOff')}
       >
-        <Switch label="Auto-compact" on={p.autoCompact} onChange={(v) => void api.session.setPrefs({ autoCompact: v })} />
+        <Switch label={t('prefs.context.autoSwitch')} on={p.autoCompact} onChange={(v) => void api.session.setPrefs({ autoCompact: v })} />
       </Row>
-      <Row label="Compact at" detail={`When a conversation is ${at}% full`}>
+      <Row label={say('Compact at')} detail={t('prefs.context.atDetail', { percent: at })}>
         <input
           className={s.slider}
           type="range"
-          aria-label="Compact at"
+          aria-label={say('Compact at')}
           min={AUTO_COMPACT_MIN}
           max={AUTO_COMPACT_MAX}
           step={1}

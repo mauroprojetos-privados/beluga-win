@@ -8,28 +8,33 @@ import { fontStack, looksDark } from '../lib/terminal-look.js';
 import { PRESET_FROM, TERMINAL_PRESETS } from '../lib/terminal-themes.js';
 import { setPrefs, usePrefs } from '../lib/prefs.js';
 import { Group, Row, Switch } from './settings-controls.js';
-import t from './terminal-settings.module.css';
+import tc from './terminal-settings.module.css';
 import { chordLabel } from '../lib/shortcuts-model.js';
+import { say, useT } from '../lib/i18n.js';
 
 /** A theme's look in a few lines of a terminal, its own colours (Beluga's when it has none). */
 function ThemeCard({ name, colors, on, onPick, font }: { readonly name: string; readonly colors: TermColors | undefined; readonly on: boolean; readonly onPick: () => void; readonly font: string }) {
   const a = (i: number): string | undefined => colors?.ansi[i] ?? undefined;
   return (
-    <button type="button" role="radio" aria-checked={on} aria-label={name} className={cx(t.themeCard, on && t.themeCardOn)} onClick={onPick}>
-      <span className={t.themeLines} style={{ fontFamily: fontStack(font), ...(colors?.background ? { background: colors.background } : {}), ...(colors?.foreground ? { color: colors.foreground } : {}) }}>
+    <button type="button" role="radio" aria-checked={on} aria-label={name} className={cx(tc.themeCard, on && tc.themeCardOn)} onClick={onPick}>
+      <span className={tc.themeLines} style={{ fontFamily: fontStack(font), ...(colors?.background ? { background: colors.background } : {}), ...(colors?.foreground ? { color: colors.foreground } : {}) }}>
         <span>
+          {/* i18n-ignore: a sample of a terminal's output */}
           <span style={{ color: a(2) ?? 'var(--ok)' }}>⏺</span> Read(auth.ts)
         </span>
+        {/* i18n-ignore */}
         <span style={{ opacity: 0.55 }}>{'  ⎿ 214 lines'}</span>
         <span>
+          {/* i18n-ignore: a sample of a terminal's output */}
           <span style={{ color: a(4) ?? 'var(--info)' }}>{'>'}</span> fix the <span style={{ color: a(1) ?? 'var(--error)' }}>failing</span> test
         </span>
+        {/* i18n-ignore */}
         <span style={{ color: a(3) ?? 'var(--warn)' }}>✻ Thinking…</span>
       </span>
-      <span className={t.themeName}>
+      <span className={tc.themeName}>
         {name}
         {on ? <Icon name="check" size={12} /> : null}
-        <span className={t.themeDots} aria-hidden>
+        <span className={tc.themeDots} aria-hidden>
           {[1, 2, 3, 4, 5].map((i) => (
             <i key={i} style={{ background: a(i) ?? 'var(--hairline-strong)' }} />
           ))}
@@ -44,15 +49,16 @@ function ThemeCard({ name, colors, on, onPick, font }: { readonly name: string; 
  * well-known one. Each shows as it will look; one with light colours follows Beluga's appearance.
  */
 export function ThemeGroup() {
+  const t = useT();
   const prefs = usePrefs();
   const dark = looksDark();
   const current = prefs.termTheme;
   const imported = current && current.from !== PRESET_FROM ? current : undefined;
   const pick = (theme: TermThemePref | null): void => setPrefs({ termTheme: theme });
   return (
-    <Group title="Colours">
-      <div className={t.themes} role="radiogroup" aria-label="Terminal colours">
-        <ThemeCard name="Beluga" colors={undefined} font={prefs.termFont} on={!current} onPick={() => pick(null)} />
+    <Group title={say('Colours')}>
+      <div className={tc.themes} role="radiogroup" aria-label={t('prefs.terminal.terminalColours')}>
+        <ThemeCard name="Beluga" /* i18n-ignore */ colors={undefined} font={prefs.termFont} on={!current} onPick={() => pick(null)} />
         {imported ? <ThemeCard name={imported.name} colors={colorsFor(imported, dark)} font={prefs.termFont} on onPick={() => pick(imported)} /> : null}
         {TERMINAL_PRESETS.map((p) => (
           <ThemeCard key={p.name} name={p.name} colors={colorsFor(p, dark)} font={prefs.termFont} on={current?.from === PRESET_FROM && current.name === p.name} onPick={() => pick(p)} />
@@ -68,21 +74,22 @@ export function ThemeGroup() {
  * as the chat, the terminal, or both, and this picks how ones you haven't switched open.
  */
 export function ViewGroup() {
+  const t = useT();
   const prefs = usePrefs();
   return (
-    <Group title="Advanced">
-      <Row label="Use Claude Code’s own terminal" detail={prefs.termView ? `A conversation’s header shows Chat · Terminal · Both (${chordLabel('Shift+Cmd+T')} switches). Graphs, tables and tasks open beside the terminal from their links.` : 'Off: conversations are the chat. On, you can talk to Claude in Claude Code’s own terminal app instead, on the same conversation.'}>
-        <Switch label="Use Claude Code’s own terminal" on={prefs.termView} onChange={(v) => setPrefs({ termView: v })} />
+    <Group title={say('Advanced')}>
+      <Row label={say('Use Claude Code’s own terminal')} detail={prefs.termView ? t('prefs.terminal.ownTerminalOn', { keys: chordLabel('Shift+Cmd+T') }) : t('prefs.terminal.ownTerminalOff')}>
+        <Switch label={t('prefs.terminal.ownTerminal')} on={prefs.termView} onChange={(v) => setPrefs({ termView: v })} />
       </Row>
-      {prefs.termView ? <Row label="Open conversations as" detail={prefs.convoDefault === 'chat' ? 'The chat, drawn. The header’s switch shows the terminal for one conversation.' : prefs.convoDefault === 'terminal' ? 'Your agent’s own terminal; graphs and tables open beside it from their links.' : 'Your agent’s terminal with the chat beside it.'}>
+      {prefs.termView ? <Row label={say('Open conversations as')} detail={prefs.convoDefault === 'chat' ? t('prefs.terminal.openAsChat') : prefs.convoDefault === 'terminal' ? t('prefs.terminal.openAsTerminal') : t('prefs.terminal.openAsBoth')}>
         <Segmented
-          label="Open conversations as"
+          label={t('prefs.terminal.openAs')}
           value={prefs.convoDefault}
           onChange={(v) => setPrefs({ convoDefault: v, convoDefaultPicked: true })}
           options={[
-            { value: 'chat', label: 'Chat', icon: 'chat' },
-            { value: 'terminal', label: 'Terminal', icon: 'terminal' },
-            { value: 'both', label: 'Both', icon: 'columns' },
+            { value: 'chat', label: t('prefs.terminal.chat'), icon: 'chat' },
+            { value: 'terminal', label: t('prefs.terminal.terminal'), icon: 'terminal' },
+            { value: 'both', label: t('prefs.terminal.both'), icon: 'columns' },
           ]}
         />
       </Row> : null}
@@ -95,26 +102,27 @@ export function ViewGroup() {
  * and whether they win over Beluga's shortcuts while the keyboard is in the terminal.
  */
 export function KeysGroup() {
+  const t = useT();
   const prefs = usePrefs();
   const rows = termKeyRows(termKeysOf(prefs.termKeys?.keys, prefs.termKeys?.from));
   return (
-    <Group title="Keys in the terminal view">
-      <Row label="The terminal’s keys come first" detail={prefs.termKeysFirst ? `While you type in the terminal, ${['Cmd+T', 'Cmd+W', 'Cmd+1'].map(chordLabel).join(', ')}… and the rest are the terminal’s, as in iTerm2 or Ghostty.` : 'Beluga’s shortcuts win; the terminal keeps only keys Beluga doesn’t use.'}>
-        <Switch label="The terminal’s keys come first" on={prefs.termKeysFirst} onChange={(v) => setPrefs({ termKeysFirst: v })} />
+    <Group title={say('Keys in the terminal view')}>
+      <Row label={say('The terminal’s keys come first')} detail={prefs.termKeysFirst ? t('prefs.terminal.keysFirstOn', { keys: ['Cmd+T', 'Cmd+W', 'Cmd+1'].map(chordLabel).join(', ') }) : t('prefs.terminal.keysFirstOff')}>
+        <Switch label={t('prefs.terminal.keysFirst')} on={prefs.termKeysFirst} onChange={(v) => setPrefs({ termKeysFirst: v })} />
       </Row>
-      <div className={t.keyList} role="list" aria-label="Terminal keys">
+      <div className={tc.keyList} role="list" aria-label={t('prefs.terminal.terminalKeys')}>
         {rows.map((r) => (
-          <div key={r.label} className={t.keyRow} role="listitem">
+          <div key={r.label} className={tc.keyRow} role="listitem">
             <span>{r.label}</span>
-            {r.from ? <span className={t.keyFrom}>from {r.from}</span> : null}
-            <span className={t.keyKeys}>{r.keys}</span>
+            {r.from ? <span className={tc.keyFrom}>{t('prefs.terminal.keyFrom', { from: r.from })}</span> : null}
+            <span className={tc.keyKeys}>{r.keys}</span>
           </div>
         ))}
       </div>
       {prefs.termKeys?.keys.length ? (
-        <Row label={`${prefs.termKeys.keys.length} keys from ${prefs.termKeys.from || 'your terminal'}`} detail="Brought with Import from…, over Beluga’s.">
+        <Row label={t('prefs.terminal.keysFrom', { count: prefs.termKeys.keys.length, from: prefs.termKeys.from || t('prefs.terminal.yourTerminal') })} detail={t('prefs.terminal.keysBrought')}>
           <Button size="small" onClick={() => setPrefs({ termKeys: null })}>
-            Use Beluga’s Keys
+            {t('prefs.terminal.useBelugaKeys')}
           </Button>
         </Row>
       ) : null}

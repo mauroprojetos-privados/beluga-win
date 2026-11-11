@@ -3,6 +3,7 @@ import { fireVars, SETUPS, setupOf, DEFAULT_FIRE, type FireLook, type FirePalett
 import { MaxFire } from '../chat/MaxFire.js';
 import { Icon } from '../components/Icon.js';
 import { Button, Segmented, cx } from '../components/ui.js';
+import { say, useT } from '../lib/i18n.js';
 import { setPrefs, usePrefs } from '../lib/prefs.js';
 import { Group, Row, Switch } from './settings-controls.js';
 import f from './fire-settings.module.css';
@@ -10,18 +11,20 @@ import m from '../chat/max.module.css';
 import s from './settings.module.css';
 
 /** The dials, in plain words at each end. */
-const DIALS = [
-  { key: 'fuel', label: 'Fuel', low: 'A few flames', high: 'A wall of fire' },
-  { key: 'height', label: 'Height', low: 'Low', high: 'Towering' },
-  { key: 'thickness', label: 'Thickness', low: 'Wispy', high: 'Thick' },
-  { key: 'wildness', label: 'Wildness', low: 'Calm', high: 'Wild' },
-] as const;
+const DIALS = () =>
+  [
+    { key: 'fuel', label: say('Fuel'), low: say('A few flames'), high: say('A wall of fire') },
+    { key: 'height', label: say('Height'), low: say('Low'), high: say('Towering') },
+    { key: 'thickness', label: say('Thickness'), low: say('Wispy'), high: say('Thick') },
+    { key: 'wildness', label: say('Wildness'), low: say('Calm'), high: say('Wild') },
+  ] as const;
 
 /** Only while typing: how soon it catches and goes out (and the seconds it is). */
-const TIMES = [
-  { key: 'catchAfter', label: 'Catches', low: 'At once', high: 'After a while' },
-  { key: 'outAfter', label: 'Goes out', low: 'At once', high: 'Lingers' },
-] as const;
+const TIMES = () =>
+  [
+    { key: 'catchAfter', label: say('Catches'), low: say('At once'), high: say('After a while') },
+    { key: 'outAfter', label: say('Goes out'), low: say('At once'), high: say('Lingers') },
+  ] as const;
 
 /** A slider with a word at each end, its track filled in the fire's colours (and, `shown`, its value at the end). */
 export function Dial({ label, low, high, value, min = 0, max = 1, step = 0.05, colors, shown, onChange }: { label: string; low: string; high: string; value: number; min?: number; max?: number; step?: number; colors: readonly string[]; shown?: string; onChange: (v: number) => void }) {
@@ -74,6 +77,7 @@ function Swatch({ colors }: { colors: readonly string[] }) {
  * or delete there to try it.
  */
 export function FireSettings() {
+  const t = useT();
   const look = usePrefs().maxFire;
   const set = (patch: Partial<FireLook>): void => {
     const next = { ...look, ...patch };
@@ -83,8 +87,8 @@ export function FireSettings() {
   return (
     <>
       <Preview look={look} />
-      <Group title="What’s on">
-        <div className={f.presets} role="radiogroup" aria-label="What’s on">
+      <Group title={say('What’s on')}>
+        <div className={f.presets} role="radiogroup" aria-label={say('What’s on')}>
           {SETUPS.map((x) => (
             <button key={x.id} type="button" role="radio" aria-checked={setupOf(look) === x.id} className={cx(f.preset, setupOf(look) === x.id && f.on)} onClick={() => set(x.set)}>
               <span className={f.presetName}>{x.name}</span>
@@ -92,21 +96,21 @@ export function FireSettings() {
             </button>
           ))}
         </div>
-        <Row label="Where" detail={look.where === 'max' ? 'Only on Max effort, so it tells you you’re on Max.' : 'With every model and effort.'}>
+        <Row label={say('Where')} detail={look.where === 'max' ? t('prefs.fire.whereMax') : t('prefs.fire.whereAll')}>
           <Segmented
-            label="Where"
+            label={say('Where')}
             radio
             value={look.where}
             onChange={(where) => set({ where })}
             options={[
-              { value: 'max', label: 'On Max Only' },
-              { value: 'everywhere', label: 'Everywhere' },
+              { value: 'max', label: t('prefs.fire.onMaxOnly') },
+              { value: 'everywhere', label: t('prefs.fire.everywhere') },
             ]}
           />
         </Row>
       </Group>
-      <Group title="Start from">
-        <div className={f.presets} role="radiogroup" aria-label="Fire presets">
+      <Group title={say('Start from')}>
+        <div className={f.presets} role="radiogroup" aria-label={t('prefs.fire.presets')}>
           {PRESETS.map((p) => (
             <button key={p.id} type="button" role="radio" aria-checked={look.preset === p.id} className={cx(f.preset, look.preset === p.id && f.on)} onClick={() => set(p.look)}>
               <Swatch colors={paletteOf({ palette: p.look.palette, palettes: look.palettes }).colors} />
@@ -117,80 +121,80 @@ export function FireSettings() {
           {look.preset === 'custom' ? (
             <div className={cx(f.preset, f.on)} role="radio" aria-checked>
               <Swatch colors={colors} />
-              <span className={f.presetName}>Your Own</span>
-              <span className={f.presetBlurb}>Tuned by you</span>
+              <span className={f.presetName}>{t('prefs.fire.yourOwn')}</span>
+              <span className={f.presetBlurb}>{t('prefs.fire.tunedByYou')}</span>
             </div>
           ) : null}
         </div>
       </Group>
-      <Group title="When and how">
-        <Row label="When it burns">
+      <Group title={say('When and how')}>
+        <Row label={say('When it burns')}>
           <Segmented
-            label="When it burns"
+            label={say('When it burns')}
             radio
             value={look.show}
             onChange={(show) => set({ show })}
             options={[
-              { value: 'always', label: 'Always' },
-              { value: 'typing', label: 'While Typing' },
-              { value: 'off', label: 'Never' },
+              { value: 'always', label: t('prefs.fire.always') },
+              { value: 'typing', label: t('prefs.fire.whileTypingOption') },
+              { value: 'off', label: t('prefs.fire.never') },
             ]}
           />
         </Row>
-        <Row label="Color the box" detail={look.border ? 'A rim and glow in the fire’s colours, fading with the fire.' : 'The box keeps its usual look; only the fire burns around it.'}>
-          <Switch label="Color the box" on={look.border} onChange={(border) => set({ border })} />
+        <Row label={say('Color the box')} detail={look.border ? t('prefs.fire.borderOn') : t('prefs.fire.borderOff')}>
+          <Switch label={say('Color the box')} on={look.border} onChange={(border) => set({ border })} />
         </Row>
-        <Row label="Style">
+        <Row label={say('Style')}>
           <Segmented
-            label="Style"
+            label={say('Style')}
             radio
             value={look.style}
             onChange={(style) => set({ style })}
             options={[
-              { value: 'toon', label: 'Flame' },
-              { value: 'pixel', label: 'Pixel Art' },
+              { value: 'toon', label: t('prefs.fire.flame') },
+              { value: 'pixel', label: t('prefs.fire.pixelArt') },
             ]}
           />
         </Row>
       </Group>
       {look.show === 'typing' ? (
-        <Group title="While typing">
-          {TIMES.map((d) => (
-            <Dial key={d.key} label={d.label} low={d.low} high={d.high} {...TIMING[d.key]} value={look[d.key]} colors={colors} shown={`${Number(look[d.key].toFixed(1))} s`} onChange={(v) => set({ [d.key]: v })} />
+        <Group title={say('While typing')}>
+          {TIMES().map((d) => (
+            <Dial key={d.key} label={d.label} low={d.low} high={d.high} {...TIMING[d.key]} value={look[d.key]} colors={colors} shown={t('prefs.fire.seconds', { seconds: Number(look[d.key].toFixed(1)) })} onChange={(v) => set({ [d.key]: v })} />
           ))}
         </Group>
       ) : null}
-      <Group title="The flames">
-        {DIALS.map((d) => (
+      <Group title={say('The flames')}>
+        {DIALS().map((d) => (
           <Dial key={d.key} label={d.label} low={d.low} high={d.high} value={look[d.key]} colors={colors} onChange={(v) => set({ [d.key]: v })} />
         ))}
       </Group>
       <Colors look={look} set={set} />
-      <Group title="Extras">
-        <Row label="Flare when you type fast" detail="It loses its temper and burns orange for a moment.">
-          <Switch label="Flare when you type fast" on={look.temper} onChange={(temper) => set({ temper })} />
+      <Group title={say('Extras')}>
+        <Row label={say('Flare when you type fast')} detail={t('prefs.fire.flareDetail')}>
+          <Switch label={say('Flare when you type fast')} on={look.temper} onChange={(temper) => set({ temper })} />
         </Row>
-        <Row label="As you type" detail="What flies from the caret.">
+        <Row label={say('As you type')} detail={t('prefs.fire.asYouTypeDetail')}>
           <Segmented
-            label="As you type"
+            label={say('As you type')}
             radio
             value={look.typing}
             onChange={(typing) => set({ typing })}
             options={[
-              { value: 'off', label: 'Nothing' },
-              { value: 'confetti', label: 'Confetti' },
-              { value: 'pixels', label: 'Pixels' },
+              { value: 'off', label: t('prefs.fire.nothing') },
+              { value: 'confetti', label: t('prefs.fire.confetti') },
+              { value: 'pixels', label: t('prefs.fire.pixels') },
             ]}
           />
         </Row>
-        <Row label="Deleting pops into pixels" detail="What you delete bursts into little pixels that fall away.">
-          <Switch label="Deleting pops into pixels" on={look.popDelete} onChange={(popDelete) => set({ popDelete })} />
+        <Row label={say('Deleting pops into pixels')} detail={t('prefs.fire.popDeleteDetail')}>
+          <Switch label={say('Deleting pops into pixels')} on={look.popDelete} onChange={(popDelete) => set({ popDelete })} />
         </Row>
       </Group>
       {(['preset', 'show', 'where', 'typing', 'popDelete', 'catchAfter', 'outAfter'] as const).some((k) => look[k] !== DEFAULT_FIRE[k]) ? (
         <div className={f.reset}>
           <Button size="small" onClick={() => setPrefs({ maxFire: { ...DEFAULT_FIRE, palettes: look.palettes } })}>
-            Back to the Default
+            {t('prefs.fire.backToDefault')}
           </Button>
         </div>
       ) : null}
@@ -200,6 +204,7 @@ export function FireSettings() {
 
 /** A box like the message box, burning with these settings: type or delete in it to try them (`className` replaces the stage's own look; the welcome's Fire step has its own). */
 export function Preview({ look, className }: { look: FireLook; className?: string }) {
+  const t = useT();
   const box = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const [text, setText] = useState('');
@@ -208,7 +213,7 @@ export function Preview({ look, className }: { look: FireLook; className?: strin
     <div className={className ?? f.stage} style={{ paddingTop: 200 }}>
       <div ref={box} data-fire={look.show} className={cx(f.fakeBox, look.show !== 'off' && look.border ? m.max : cx(f.plainBox, m.maxPlain))} style={fireVars(look) as React.CSSProperties}>
         <MaxFire box={box} input={input} look={look} />
-        <textarea ref={input} className={f.fakeInput} rows={2} value={text} placeholder="Type or delete here to try it" aria-label="Try the fire" onChange={(e) => setText(e.target.value)} />
+        <textarea ref={input} className={f.fakeInput} rows={2} value={text} placeholder={t('prefs.fire.tryPlaceholder')} aria-label={t('prefs.fire.tryAria')} onChange={(e) => setText(e.target.value)} />
       </div>
     </div>
   );
@@ -216,10 +221,11 @@ export function Preview({ look, className }: { look: FireLook; className?: strin
 
 /** The palettes: Beluga's and yours (named by you), and a maker for new ones. */
 function Colors({ look, set }: { look: FireLook; set: (patch: Partial<FireLook>) => void }) {
+  const t = useT();
   const [making, setMaking] = useState<FirePalette | undefined>();
   const mine = look.palettes;
   const save = (p: FirePalette): void => {
-    const name = p.name.trim() || 'My Colors';
+    const name = p.name.trim() || t('prefs.fire.myColors');
     const palettes = mine.some((x) => x.id === p.id) ? mine.map((x) => (x.id === p.id ? { ...p, name } : x)) : [...mine, { ...p, name }];
     set({ palettes, palette: p.id });
     setMaking(undefined);
@@ -229,8 +235,8 @@ function Colors({ look, set }: { look: FireLook; set: (patch: Partial<FireLook>)
     setMaking(undefined);
   };
   return (
-    <Group title="Colors">
-      <div className={f.palettes} role="radiogroup" aria-label="Fire colors">
+    <Group title={say('Colors')}>
+      <div className={f.palettes} role="radiogroup" aria-label={t('prefs.fire.fireColors')}>
         {[...PALETTES, ...mine].map((p) => {
           const own = mine.includes(p);
           return (
@@ -242,7 +248,7 @@ function Colors({ look, set }: { look: FireLook; set: (patch: Partial<FireLook>)
               className={cx(f.palette, look.palette === p.id && f.on)}
               onClick={() => set({ palette: p.id })}
               onDoubleClick={() => own && setMaking(p)}
-              title={own ? 'Double-click to change or rename' : undefined}
+              title={own ? t('prefs.fire.doubleClick') : undefined}
             >
               <Dots colors={p.colors} />
               {p.name}
@@ -251,7 +257,7 @@ function Colors({ look, set }: { look: FireLook; set: (patch: Partial<FireLook>)
                   className={f.edit}
                   role="button"
                   tabIndex={0}
-                  aria-label={`Change ${p.name}`}
+                  aria-label={t('prefs.fire.change', { name: p.name })}
                   onClick={(e) => {
                     e.stopPropagation();
                     setMaking(p);
@@ -265,7 +271,7 @@ function Colors({ look, set }: { look: FireLook; set: (patch: Partial<FireLook>)
         })}
         <button type="button" className={cx(f.palette, f.add)} onClick={() => setMaking({ id: `own-${Date.now().toString(36)}`, name: '', colors: [...paletteOf(look).colors] as [string, string, string] })}>
           <Icon name="plus" size={11} />
-          New Colors
+          {t('prefs.fire.newColors')}
         </button>
       </div>
       {making ? <Maker palette={making} isNew={!mine.some((x) => x.id === making.id)} onSave={save} onCancel={() => setMaking(undefined)} onDelete={() => remove(making.id)} /> : null}
@@ -275,6 +281,7 @@ function Colors({ look, set }: { look: FireLook; set: (patch: Partial<FireLook>)
 
 /** Three round wells (edge, middle, core) and a name. */
 function Maker({ palette, isNew, onSave, onCancel, onDelete }: { palette: FirePalette; isNew: boolean; onSave: (p: FirePalette) => void; onCancel: () => void; onDelete: () => void }) {
+  const t = useT();
   const [draft, setDraft] = useState(palette);
   const well = (i: 0 | 1 | 2, label: string) => (
     <label className={f.well}>
@@ -302,21 +309,21 @@ function Maker({ palette, isNew, onSave, onCancel, onDelete }: { palette: FirePa
       }}
     >
       <Swatch colors={draft.colors} />
-      {well(0, 'Edge')}
-      {well(1, 'Middle')}
-      {well(2, 'Core')}
-      <input className={cx(s.text, f.name)} placeholder="Name them, like Dragon’s Breath" aria-label="Name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} autoFocus />
+      {well(0, t('prefs.fire.edge'))}
+      {well(1, t('prefs.fire.middle'))}
+      {well(2, t('prefs.fire.core'))}
+      <input className={cx(s.text, f.name)} placeholder={t('prefs.fire.namePlaceholder')} aria-label={t('prefs.fire.name')} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} autoFocus />
       <span className={f.makerButtons}>
         {isNew ? null : (
           <Button size="small" variant="quiet" onClick={onDelete}>
-            Delete
+            {t('common.delete')}
           </Button>
         )}
         <Button size="small" variant="quiet" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button size="small" variant="primary" type="submit">
-          {isNew ? 'Add' : 'Save'}
+          {isNew ? t('prefs.fire.add') : t('common.save')}
         </Button>
       </span>
     </form>
