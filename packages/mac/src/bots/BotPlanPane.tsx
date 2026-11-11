@@ -3,6 +3,7 @@ import { planTitle } from '@beluga/core/plans/model.js';
 import { MAC_BOT, botStatusLine } from '@beluga/core/bots/schema.js';
 import { Button } from '../components/ui.js';
 import { useApp } from '../lib/beluga.js';
+import { useT } from '../lib/i18n.js';
 import { usePlanActions, usePlanView, usePlans } from '../plans/use-plans.js';
 import b from './bots.module.css';
 
@@ -32,35 +33,36 @@ export function BotPlanPane({ planId, line, onHide }: { planId: string; line?: s
   const view = usePlanView(plan);
   const { api, act, open } = usePlanActions();
   const [picked, setPicked] = useState<string>();
+  const t = useT();
   const keys = useMemo(() => new Map((view?.milestones ?? []).flatMap((m) => m.tasks.flatMap((t) => (t.issue ? [[t.task.id, t.issue.key] as const] : [])))), [view]);
   // Step by step, you start each ready task from here too; otherwise Beluga starts them.
   const startable = useMemo(() => new Set(plan?.autonomy === 'step' ? (view?.ready ?? []).filter((t) => !t.forYou).map((t) => t.task.id) : []), [view, plan]);
   if (!plan || !view) return null;
   const waiting = Boolean(plan.draft) || plan.status === 'draft';
   return (
-    <aside className={b.planPane} aria-label="The bot’s plan">
+    <aside className={b.planPane} aria-label={t('bots.plan.aria')}>
       <div className={b.planHead}>
         <div className={b.planTitle}>
           <strong>{planTitle(plan)}</strong>
-          <span>{line ?? `${view.done} of ${view.total} done`}</span>
+          <span>{line ?? t('bots.plan.progress', { done: view.done, total: view.total })}</span>
         </div>
         {waiting ? (
-          <Button size="small" variant="primary" icon="check" onClick={() => void act(() => api.approve(plan.id), 'Plan approved: its tasks are starting')}>
-            Approve
+          <Button size="small" variant="primary" icon="check" onClick={() => void act(() => api.approve(plan.id), t('bots.plan.approved'))}>
+            {t('bots.plan.approve')}
           </Button>
         ) : null}
         <Button size="small" variant="quiet" icon="external" onClick={() => open(plan.id)}>
-          Open Plan
+          {t('bots.plan.open')}
         </Button>
-        <Button size="small" variant="quiet" icon="x" aria-label="Hide the plan" onClick={onHide} />
+        <Button size="small" variant="quiet" icon="x" aria-label={t('bots.plan.hide')} onClick={onHide} />
       </div>
       <div className={b.planBody}>
         {view.milestones.length ? (
-          <Suspense fallback={<div className={b.planNote}>Laying out…</div>}>
+          <Suspense fallback={<div className={b.planNote}>{t('bots.plan.layingOut')}</div>}>
             <PlanCanvas view={view} keys={keys} selected={picked} onSelect={setPicked} onStart={(taskId) => void act(() => api.startTask(plan.id, taskId))} startable={startable} />
           </Suspense>
         ) : (
-          <div className={b.planNote}>The plan is being written…</div>
+          <div className={b.planNote}>{t('bots.plan.writing')}</div>
         )}
       </div>
     </aside>
@@ -72,6 +74,7 @@ export function WithBotPlan({ children }: { children: React.ReactNode }) {
   const bot = useBotOfView();
   const plan = useBotPlan(bot);
   const [hidden, setHidden] = useState<string>();
+  const t = useT();
   if (!plan) return <>{children}</>;
   if (hidden === plan.planId)
     return (
@@ -79,7 +82,7 @@ export function WithBotPlan({ children }: { children: React.ReactNode }) {
         {children}
         <span className={b.showPlan}>
           <Button size="small" variant="quiet" icon="graph" onClick={() => setHidden(undefined)}>
-            Show Plan
+            {t('bots.plan.show')}
           </Button>
         </span>
       </div>

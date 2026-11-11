@@ -1,6 +1,7 @@
 import { CATEGORY_INFO, shortCost, shortTokens } from '@beluga/core/routing/model.js';
 import { type ComboReport, DEFAULT_BASELINE, comboReport, savingsWords, strongerOf, successWords } from '@beluga/core/routing/outcomes.js';
 import { useApp } from '../../lib/beluga.js';
+import { useT } from '../../lib/i18n.js';
 import { Card } from './parts.js';
 import c from './combos.module.css';
 
@@ -15,6 +16,7 @@ const same = (a: readonly ComboReport[], b: readonly ComboReport[]): boolean => 
  */
 export function CombosCard() {
   const report = useApp((st) => comboReport(st.log, st.board.issues, st.selfId, { baseline: st.prefs.savingsBaseline ?? DEFAULT_BASELINE, ...strongerOf(st) }), same);
+  const t = useT();
   if (!report.length) return null;
   const baseline = report[0]!.baseline;
   const saved = report.reduce((n, u) => n + u.saved, 0);
@@ -22,11 +24,11 @@ export function CombosCard() {
   const good = report.reduce((n, u) => n + u.good, 0);
   const suggestions = report.flatMap((u) => u.suggestions);
   return (
-    <Card title="Combos" aside="Runs, tokens and cost by the agent each went to">
+    <Card title={t('routing.usage.title')} aside={t('routing.usage.aside')}>
       <div className={c.list}>
         <div className={c.summary}>
           <span>{savingsWords(saved, baseline)}</span>
-          <span className={c.total}>Tasks: {successWords(judged, good)}</span>
+          <span className={c.total}>{t('routing.usage.tasks', { words: successWords(judged, good) })}</span>
         </div>
         {report.map((u) => {
           const byTokens = u.tokens > 0;
@@ -34,17 +36,17 @@ export function CombosCard() {
             <section key={u.combo} className={c.combo} aria-label={u.name}>
               <header className={c.head}>
                 <span className={c.name}>{u.name}</span>
-                <span className={c.total}>{[`${u.runs} run${u.runs === 1 ? '' : 's'}`, u.tokens ? `${shortTokens(u.tokens)} tokens` : '', shortCost(u.cost), u.limited ? `${u.limited} at a limit` : '', u.tokens ? savingsWords(u.saved, u.baseline).replace(/ against .*| than .*/, '') : ''].filter(Boolean).join(' · ')}</span>
+                <span className={c.total}>{[t('routing.usage.runs', { count: u.runs }), u.tokens ? t('routing.usage.tokens', { tokens: shortTokens(u.tokens) }) : '', shortCost(u.cost), u.limited ? t('routing.usage.atLimit', { count: u.limited }) : '', u.tokens ? savingsWords(u.saved, u.baseline).replace(/ against .*| than .*/, '') : ''].filter(Boolean).join(' · ')}</span>
               </header>
-              {u.targets.map((t) => {
-                const share = byTokens ? t.tokens / u.tokens : t.runs / u.runs;
+              {u.targets.map((x) => {
+                const share = byTokens ? x.tokens / u.tokens : x.runs / u.runs;
                 return (
-                  <div key={`${t.runtime}-${t.target}`} className={c.row}>
-                    <span className={c.target}>{t.target}</span>
+                  <div key={`${x.runtime}-${x.target}`} className={c.row}>
+                    <span className={c.target}>{x.target}</span>
                     <span className={c.bar} aria-hidden>
                       <span className={c.fill} style={{ width: `${Math.max(2, Math.round(share * 100))}%` }} />
                     </span>
-                    <span className={c.figures}>{[`${t.runs}`, t.tokens ? shortTokens(t.tokens) : '', shortCost(t.cost), t.limited ? `${t.limited} at a limit` : ''].filter(Boolean).join(' · ')}</span>
+                    <span className={c.figures}>{[`${x.runs}`, x.tokens ? shortTokens(x.tokens) : '', shortCost(x.cost), x.limited ? t('routing.usage.atLimit', { count: x.limited }) : ''].filter(Boolean).join(' · ')}</span>
                   </div>
                 );
               })}
@@ -58,14 +60,14 @@ export function CombosCard() {
           );
         })}
         {suggestions.length ? (
-          <section className={c.suggestions} aria-label="Suggestions">
-            <span className={c.name}>Suggestions</span>
+          <section className={c.suggestions} aria-label={t('routing.usage.suggestions')}>
+            <span className={c.name}>{t('routing.usage.suggestions')}</span>
             {suggestions.map((s) => (
               <p key={s} className={c.suggestion}>
                 {s}
               </p>
             ))}
-            <span className={c.total}>Only suggestions: change a combo in Settings › Agent › Combos if you agree.</span>
+            <span className={c.total}>{t('routing.usage.onlySuggestions')}</span>
           </section>
         ) : null}
       </div>

@@ -7,29 +7,26 @@ import { useComboChoices } from '../components/agent-options.js';
 import { Select } from '../components/Select.js';
 import { Button, Dot } from '../components/ui.js';
 import { useApi, useApp } from '../lib/beluga.js';
+import { say, useT } from '../lib/i18n.js';
+import { t as tr } from '@beluga/shared/i18n/index.js';
 import { Group, Row } from './settings-controls.js';
 import s from './settings.module.css';
 
-const PRIVACY: ReadonlyArray<{ readonly value: ComboPrivacy; readonly label: string; readonly description: string }> = [
-  { value: 'any', label: 'Any of them', description: 'Every target may take the work' },
-  { value: 'no-third-party', label: 'No third parties', description: 'Only the agents’ own vendors, and endpoints on this computer' },
-  { value: 'local-only', label: 'This computer only', description: 'Only endpoints running here' },
+const PRIVACY = (): ReadonlyArray<{ readonly value: ComboPrivacy; readonly label: string; readonly description: string }> => [
+  { value: 'any', label: tr('routing.combos.privacy.any'), description: tr('routing.combos.privacy.anyDetail') },
+  { value: 'no-third-party', label: tr('routing.combos.privacy.noThirdParty'), description: tr('routing.combos.privacy.noThirdPartyDetail') },
+  { value: 'local-only', label: tr('routing.combos.privacy.localOnly'), description: tr('routing.combos.privacy.localOnlyDetail') },
 ];
 
-const DIFFICULTY_LABEL: Readonly<Record<Difficulty, string>> = { simple: 'Simple', normal: 'Normal', hard: 'Hard' };
+const difficultyLabel = (d: Difficulty): string => tr(`routing.combos.difficulty.${d}`);
 
-const EFFORTS: ReadonlyArray<{ readonly value: NonNullable<CategoryRoute['effort']>; readonly label: string }> = [
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
-  { value: 'xhigh', label: 'Extra High' },
-  { value: 'max', label: 'Max' },
-];
+const EFFORTS = (): ReadonlyArray<{ readonly value: NonNullable<CategoryRoute['effort']>; readonly label: string }> =>
+  (['low', 'medium', 'high', 'xhigh', 'max'] as const).map((value) => ({ value, label: tr(`routing.effort.${value}`) }));
 
 /** Two pickers side by side (a kind's combo and its effort). */
 const PAIR = { display: 'flex', gap: 6, alignItems: 'center' } as const;
 
-const ROLE_LABEL: Readonly<Record<Role, string>> = { planHead: 'Plan head', milestone: 'Milestones', checker: 'Checker', reviewer: 'PR reviewer' };
+const roleLabel = (r: Role): string => tr(`routing.combos.role.${r}`);
 
 /** Several pickers in one row, one under the other. */
 const STACK = { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 } as const;
@@ -73,6 +70,7 @@ function targetChoices(runtimes: readonly RuntimeChoice[], claudeModels: Readonl
  * you change one, the defaults as this computer has them; a change saves the whole list.
  */
 export function CombosSettings() {
+  const t = useT();
   const api = useApi();
   const runtimes = useApp((st) => st.runtimes);
   const claudeModels = useApp((st) => st.models);
@@ -143,46 +141,46 @@ export function CombosSettings() {
       }}
     >
       <label className={s.endpointField}>
-        <span>Name</span>
-        <input className={s.text} aria-label="Combo name" value={draft.name} maxLength={40} onChange={(ev) => setDraft({ ...draft, name: ev.target.value })} autoFocus />
+        <span>{t('routing.combos.name')}</span>
+        <input className={s.text} aria-label={t('routing.combos.nameAria')} value={draft.name} maxLength={40} onChange={(ev) => setDraft({ ...draft, name: ev.target.value })} autoFocus />
       </label>
-      {draft.targets.map((t, i) => (
-        <div key={`${targetValue(t)}-${i}`} className={s.endpointField}>
-          <span>{i === 0 ? 'First' : 'Then'}</span>
-          <span className={s.rowLabel}>{targetLabel(t, runtimes)}</span>
-          <Button size="small" variant="quiet" icon="chevronUp" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move up" />
-          <Button size="small" variant="quiet" icon="chevronDown" disabled={i === draft.targets.length - 1} onClick={() => move(i, 1)} aria-label="Move down" />
-          <Button size="small" variant="quiet" icon="x" disabled={draft.targets.length === 1} onClick={() => setDraft({ ...draft, targets: draft.targets.filter((_, j) => j !== i) })} aria-label="Remove" />
+      {draft.targets.map((x, i) => (
+        <div key={`${targetValue(x)}-${i}`} className={s.endpointField}>
+          <span>{i === 0 ? t('routing.combos.first') : t('routing.combos.then')}</span>
+          <span className={s.rowLabel}>{targetLabel(x, runtimes)}</span>
+          <Button size="small" variant="quiet" icon="chevronUp" disabled={i === 0} onClick={() => move(i, -1)} aria-label={t('routing.combos.moveUp')} />
+          <Button size="small" variant="quiet" icon="chevronDown" disabled={i === draft.targets.length - 1} onClick={() => move(i, 1)} aria-label={t('routing.combos.moveDown')} />
+          <Button size="small" variant="quiet" icon="x" disabled={draft.targets.length === 1} onClick={() => setDraft({ ...draft, targets: draft.targets.filter((_, j) => j !== i) })} aria-label={t('routing.combos.remove')} />
         </div>
       ))}
       {draft.targets.length < MAX_TARGETS ? (
         <label className={s.endpointField}>
-          <span>Add</span>
-          <Select label="Add a target" value="" placeholder="Add a target…" options={options.map((t) => ({ value: targetValue(t), label: targetLabel(t, runtimes) }))} onChange={(v) => v && setDraft({ ...draft, targets: [...draft.targets, targetOf(v)] })} />
+          <span>{t('routing.combos.add')}</span>
+          <Select label={t('routing.combos.addTarget')} value="" placeholder={t('routing.combos.addTargetPlaceholder')} options={options.map((x) => ({ value: targetValue(x), label: targetLabel(x, runtimes) }))} onChange={(v) => v && setDraft({ ...draft, targets: [...draft.targets, targetOf(v)] })} />
         </label>
       ) : null}
       <label className={s.endpointField}>
-        <span>Privacy</span>
-        <Select label="Privacy" value={draft.privacy ?? 'any'} options={PRIVACY.map((p) => ({ value: p.value, label: p.label, description: p.description }))} onChange={(v) => setDraft({ ...draft, ...(v === 'any' ? { privacy: undefined } : { privacy: v }) })} />
+        <span>{t('routing.combos.privacy')}</span>
+        <Select label={t('routing.combos.privacy')} value={draft.privacy ?? 'any'} options={PRIVACY().map((p) => ({ value: p.value, label: p.label, description: p.description }))} onChange={(v) => setDraft({ ...draft, ...(v === 'any' ? { privacy: undefined } : { privacy: v }) })} />
       </label>
       {error ? <div className={s.endpointError}>{error}</div> : null}
       <div className={s.endpointBar}>
         <Button size="small" variant="quiet" onClick={() => setDraft(undefined)}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button size="small" variant="primary" type="submit" disabled={busy || !draft.name.trim() || !draft.targets.length}>
-          {busy ? 'Saving…' : 'Save'}
+          {busy ? t('routing.combos.saving') : t('common.save')}
         </Button>
       </div>
     </form>
   ) : null;
 
   return (
-    <Group title="Combos">
-      <Row label="Agents in order" detail="A combo is a list of agents and models. Pick one in the agent box, New Task or Start with: each run goes to the first that can run then, skipping one that isn’t set up, isn’t signed in, isn’t answering or is at its usage limit.">
+    <Group title={say('Combos')}>
+      <Row label={say('Agents in order')} detail={t('routing.combos.inOrderDetail')}>
         {saved ? (
           <Button variant="quiet" disabled={busy} onClick={() => void api.routing.resetCombos().catch((err: unknown) => setError(errorText(err)))}>
-            Use the Defaults
+            {t('routing.combos.useDefaults')}
           </Button>
         ) : null}
         <Button
@@ -190,59 +188,62 @@ export function CombosSettings() {
           disabled={busy || combos.length >= MAX_COMBOS}
           onClick={() => {
             setError('');
-            setDraft({ id: comboIdFor('New combo', combos.map((c) => c.id)), name: 'New combo', targets: options.slice(0, 1), isNew: true });
+            // i18n-ignore: the id is made from the English name, whatever the language
+            setDraft({ id: comboIdFor('New combo', combos.map((c) => c.id)), name: t('routing.combos.newName'), targets: options.slice(0, 1), isNew: true });
           }}
         >
-          New Combo
+          {t('routing.combos.newCombo')}
         </Button>
       </Row>
       {draft?.isNew ? form : null}
       {combos.map((c) => {
         if (draft?.id === c.id && !draft.isNew) return <div key={c.id}>{form}</div>;
         const now = choices.find((x) => x.id === c.id);
-        const privacy = c.privacy && c.privacy !== 'any' ? ` · ${PRIVACY.find((p) => p.value === c.privacy)?.label}` : '';
+        const privacy = c.privacy && c.privacy !== 'any' ? ` · ${PRIVACY().find((p) => p.value === c.privacy)?.label}` : '';
         const used = usage.find((u) => u.combo === c.id);
+        const state = now?.now ? t('routing.combos.now', { now: now.now }) : now?.why ? t('routing.combos.cantRun', { why: now.why.replace(/^Nothing in .+? can run now: /, '') }) : '';
         return (
-          <Row key={c.id} label={c.name} detail={`${now?.summary ?? ''}${privacy}${now?.now ? ` · now: ${now.now}` : now?.why ? ` · Can’t run now: ${now.why.replace(/^Nothing in .+? can run now: /, '')}` : ''}${used ? ` · ${comboUsageWords(used)}` : ''}`}>
+          <Row key={c.id} label={c.name} detail={`${now?.summary ?? ''}${privacy}${state}${used ? ` · ${comboUsageWords(used)}` : ''}`}>
             <Dot tone={now?.now ? 'ok' : 'warn'} />
             <Button size="small" variant="quiet" disabled={busy} onClick={() => (setError(''), setDraft(c))}>
-              Edit…
+              {t('routing.combos.edit')}
             </Button>
             <Button size="small" variant="quiet" disabled={busy} onClick={() => void saveAll(whole(combos.filter((x) => x.id !== c.id)))}>
-              Delete
+              {t('common.delete')}
             </Button>
           </Row>
         );
       })}
       {error && !draft ? <div className={s.endpointError}>{error}</div> : null}
       {/* The pickers stack, one per line: side by side they squeeze the words to a word a line. */}
-      <Row label="By how hard a task is" detail="A task names how hard it looks when your agent writes it. One that names no agent of its own starts on this combo.">
+      <Row label={say('By how hard a task is')} detail={t('routing.combos.byHardDetail')}>
         <div style={STACK}>
           {DIFFICULTIES.map((d) => (
-            <Select key={d} label={`${DIFFICULTY_LABEL[d]} tasks`} value={byDifficulty?.[d] ?? ''} options={[{ value: '', label: `${DIFFICULTY_LABEL[d]}: your agent` }, ...combos.map((c) => ({ value: c.id, label: `${DIFFICULTY_LABEL[d]}: ${c.name}` }))]} onChange={(v) => setDifficulty(d, v)} />
+            <Select key={d} label={t('routing.combos.difficultyTasks', { difficulty: difficultyLabel(d) })} value={byDifficulty?.[d] ?? ''} options={[{ value: '', label: t('routing.combos.difficultyYourAgent', { difficulty: difficultyLabel(d) }) }, ...combos.map((c) => ({ value: c.id, label: t('routing.combos.pickedCombo', { what: difficultyLabel(d), name: c.name }) }))]} onChange={(v) => setDifficulty(d, v)} />
           ))}
         </div>
       </Row>
-      <Row label="By kind of work" detail="A task also says what kind of work it is (its drafter, or a quick look for one you made by hand). One that names no agent of its own starts on this combo, at this effort, over the one for how hard it is.">
+      <Row label={say('By kind of work')} detail={t('routing.combos.byKindDetail')}>
         <div style={STACK}>
           {WORK_CATEGORIES.map((k) => {
             const route = byKind?.[k];
+            const kind = CATEGORY_INFO[k].label;
             return (
               <div key={k} style={PAIR}>
-                <Select label={`${CATEGORY_INFO[k].label} work`} value={route?.combo ?? ''} options={[{ value: '', label: `${CATEGORY_INFO[k].label}: by difficulty`, description: CATEGORY_INFO[k].hint }, ...combos.map((c) => ({ value: c.id, label: `${CATEGORY_INFO[k].label}: ${c.name}`, description: CATEGORY_INFO[k].hint }))]} onChange={(v) => setKind(k, v ? { combo: v, ...(route?.effort ? { effort: route.effort } : {}) } : undefined)} />
-                {route ? <Select label={`${CATEGORY_INFO[k].label} effort`} value={route.effort ?? ''} options={[{ value: '', label: 'Its own effort' }, ...EFFORTS.map((e) => ({ value: e.value, label: e.label }))]} onChange={(v) => setKind(k, { combo: route.combo, ...(v ? { effort: v as CategoryRoute['effort'] } : {}) })} /> : null}
+                <Select label={t('routing.combos.kindWork', { kind })} value={route?.combo ?? ''} options={[{ value: '', label: t('routing.combos.kindByDifficulty', { kind }), description: CATEGORY_INFO[k].hint }, ...combos.map((c) => ({ value: c.id, label: t('routing.combos.pickedCombo', { what: kind, name: c.name }), description: CATEGORY_INFO[k].hint }))]} onChange={(v) => setKind(k, v ? { combo: v, ...(route?.effort ? { effort: route.effort } : {}) } : undefined)} />
+                {route ? <Select label={t('routing.combos.kindEffort', { kind })} value={route.effort ?? ''} options={[{ value: '', label: t('routing.combos.ownEffort') }, ...EFFORTS().map((e) => ({ value: e.value, label: e.label }))]} onChange={(v) => setKind(k, { combo: route.combo, ...(v ? { effort: v as CategoryRoute['effort'] } : {}) })} /> : null}
               </div>
             );
           })}
         </div>
       </Row>
-      <Row label="Savings against" detail="Usage › Combos says what your runs saved, priced against running everything on one model.">
-        <Select label="Savings against" value={baseline} options={SAVINGS_BASELINES.map((b) => ({ value: b, label: baselineWords(b).replace(/^e/, 'E') }))} onChange={(v) => void api.session.setPrefs({ savingsBaseline: v === DEFAULT_BASELINE ? null : (v as (typeof SAVINGS_BASELINES)[number]) })} />
+      <Row label={say('Savings against')} detail={t('routing.combos.savingsDetail')}>
+        <Select label={t('routing.combos.savings')} value={baseline} options={SAVINGS_BASELINES.map((b) => ({ value: b, label: baselineWords(b).replace(/^e/, 'E') }))} onChange={(v) => void api.session.setPrefs({ savingsBaseline: v === DEFAULT_BASELINE ? null : (v as (typeof SAVINGS_BASELINES)[number]) })} />
       </Row>
-      <Row label="By role" detail="The combo each role of a plan, and the pull-request reviewer, runs on. Pick one of another vendor for the checker to have work checked by a different model.">
+      <Row label={say('By role')} detail={t('routing.combos.byRoleDetail')}>
         <div style={STACK}>
           {ROLES.map((r) => (
-            <Select key={r} label={ROLE_LABEL[r]} value={byRole?.[r] ?? ''} options={[{ value: '', label: `${ROLE_LABEL[r]}: as now` }, ...combos.map((c) => ({ value: c.id, label: `${ROLE_LABEL[r]}: ${c.name}` }))]} onChange={(v) => setRole(r, v)} />
+            <Select key={r} label={roleLabel(r)} value={byRole?.[r] ?? ''} options={[{ value: '', label: t('routing.combos.roleAsNow', { role: roleLabel(r) }) }, ...combos.map((c) => ({ value: c.id, label: t('routing.combos.pickedCombo', { what: roleLabel(r), name: c.name }) }))]} onChange={(v) => setRole(r, v)} />
           ))}
         </div>
       </Row>

@@ -10,6 +10,7 @@ import { signalOf } from '../layout/attention-model.js';
 import { SignalMark } from '../layout/signal-marks.js';
 import { Row, Section } from '../layout/sidebar-parts.js';
 import { AssistantNav } from '../layout/AssistantNav.js';
+import { useT } from '../lib/i18n.js';
 import b from './bots.module.css';
 
 /** Which bot Settings › Bots shows (kept across opening and closing Settings). */
@@ -57,11 +58,12 @@ function BotRow({ bot }: { bot: BotInfo }) {
   const actions = useActions();
   const selected = useApp((st) => st.view.kind === 'bot' && st.view.id === bot.id);
   const signal = useApp((st) => signalOf(st, bot.channel), sameDeep);
+  const t = useT();
   return (
     <Row
       icon={<Icon name={botIcon(bot)} size={14} />}
       label={<BotLabel name={bot.name} bot={bot} />}
-      detail={signal.tip || bot.description || `${bot.name}: a bot of yours. It plans and hands work out; its files are in ${bot.dir}`}
+      detail={signal.tip || bot.description || t('bots.nav.rowDetail', { name: bot.name, dir: bot.dir })}
       selected={selected}
       onClick={() => actions.run({ type: 'view', view: { kind: 'bot', id: bot.id } })}
       trailing={<SignalMark signal={signal} />}
@@ -76,9 +78,10 @@ function BotRow({ bot }: { bot: BotInfo }) {
 export function BotsSection() {
   const others = useApp((st) => st.bots.bots.filter((x) => !x.mac), sameDeep);
   const studio = useOpenStudio();
+  const t = useT();
   if (!others.length) return null;
   return (
-    <Section id="bots" title="Bots" count={others.length + 1} action={<IconButton icon="plus" label="New Bot" onClick={() => studio('new')} />} keep={<AssistantNav />}>
+    <Section id="bots" title={t('bots.nav.title')} count={others.length + 1} action={<IconButton icon="plus" label={t('bots.list.newBot')} onClick={() => studio('new')} />} keep={<AssistantNav />}>
       <AssistantNav />
       {others.map((bot) => (
         <BotRow key={bot.id} bot={bot} />
@@ -91,15 +94,16 @@ export function BotsSection() {
 export function BotEmpty({ id }: { id: string }) {
   const bot = useApp((st) => st.bots.bots.find((x) => x.id === id), sameDeep);
   const studio = useOpenStudio();
-  if (!bot) return <Empty icon="bot" title="This bot was deleted" detail="Its folder and chats are gone." />;
+  const t = useT();
+  if (!bot) return <Empty icon="bot" title={t('bots.nav.deleted')} detail={t('bots.nav.deletedDetail')} />;
   return (
     <Empty
       icon={botIcon(bot)}
-      title={`Ask ${bot.name}`}
-      detail={`${bot.description ? `${bot.description}. ` : ''}It plans, hands parts to the right agent and model, and follows them up; you see its plan beside this chat. Its files are in ${bot.dir}.`}
+      title={t('bots.nav.ask', { name: bot.name })}
+      detail={bot.description ? t('bots.nav.emptyDetailWith', { description: bot.description, dir: bot.dir }) : t('bots.nav.emptyDetail', { dir: bot.dir })}
       action={
         <Button icon="gear" onClick={() => studio(id)}>
-          Open in Bot Studio
+          {t('bots.nav.openStudio')}
         </Button>
       }
     />
