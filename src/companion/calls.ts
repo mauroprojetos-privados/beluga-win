@@ -216,7 +216,7 @@ export const PhoneCalls = {
   // Needs You's Try Again for a used-up combo: the target that goes on ("Economy · Codex").
   'routing.retry': entry('routing.retry', z.string()),
   // Runs through combos, by combo and target.
-  'routing.usage': entry('routing.usage', z.array(z.object({ combo: z.string(), name: z.string(), runs: z.number(), limited: z.number(), ms: z.number(), targets: z.array(z.object({ target: z.string(), runtime: z.string(), runs: z.number(), limited: z.number(), ms: z.number() }).passthrough()) }).passthrough())),
+  'routing.usage': entry('routing.usage', z.array(z.object({ combo: z.string(), name: z.string(), runs: z.number(), limited: z.number(), ms: z.number(), tokens: z.number().optional(), cost: z.number().optional(), targets: z.array(z.object({ target: z.string(), runtime: z.string(), runs: z.number(), limited: z.number(), ms: z.number(), tokens: z.number().optional(), cost: z.number().optional() }).passthrough()) }).passthrough())),
 } as const;
 
 export type PhoneMethod = keyof typeof PhoneCalls;

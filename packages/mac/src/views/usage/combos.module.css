@@ -1,0 +1,58 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.combo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.combo + .combo {
+  padding-top: 12px;
+  border-top: 0.5px solid var(--card-line);
+}
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.name {
+  font-weight: 600;
+  color: var(--text);
+}
+.total {
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.row {
+  display: grid;
+  grid-template-columns: minmax(90px, 160px) minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+}
+.target {
+  color: var(--text-2, var(--text));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bar {
+  position: relative;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--card-line);
+  overflow: hidden;
+}
+.fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--series-1);
+}
+.figures {
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

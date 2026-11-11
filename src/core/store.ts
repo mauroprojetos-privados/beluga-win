@@ -131,8 +131,16 @@ export type LogItem =
       readonly betweenAt?: number;
       /** What it said before a later step: drawn quietly among its steps, not as its answer (see agentRemarks). */
       readonly remarks?: readonly Remark[];
+      /** What the run spent, as its usage reports added up (tokens: input, output and cache writes; cost in USD). Usage by combo reads it (docs/routing.md). */
+      readonly usage?: RunUsage;
     }
   | ShellItem;
+
+/** A run's tokens (input, output, cache writes) and cost (USD; 0 on your own endpoint). */
+export interface RunUsage {
+  readonly tokens: number;
+  readonly cost: number;
+}
 
 /** Words Claude said between its steps, and when (a step came after them, so they aren't its answer). */
 export interface Remark {
@@ -965,6 +973,26 @@ export function orderQueued(log: readonly LogItem[], owner: string, ids: readonl
   return slots.every((slot) => placed.get(slot) === log[slot]) ? log : log.map((l, i) => placed.get(i) ?? l);
 }
 
+/**
+ * A run's usage, added to its card: `text` is what this report added ({ tokens, cost }, the session's
+ * Workbench.onUsage works out the growth from running totals). No card for it: nothing.
+ */
+function reduceRunUsage(state: DomainState, a: Extract<Action, { type: 'agent_event' }>): DomainState {
+  const idx = state.log.findIndex((l) => l.type === 'agent' && l.requestId === a.requestId && l.owner === a.owner);
+  if (idx < 0) return state;
+  let add: { tokens?: unknown; cost?: unknown };
+  try {
+    add = JSON.parse(a.text) as { tokens?: unknown; cost?: unknown };
+  } catch {
+    return state;
+  }
+  const num = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : 0);
+  if (!num(add.tokens) && !num(add.cost)) return state;
+  const card = state.log[idx] as Extract<LogItem, { type: 'agent' }>;
+  const usage = { tokens: (card.usage?.tokens ?? 0) + num(add.tokens), cost: (card.usage?.cost ?? 0) + num(add.cost) };
+  return { ...state, log: state.log.map((l, i) => (i === idx ? { ...card, usage } : l)) };
+}
+
 function reduceAgent(state: DomainState, raw: Extract<Action, { type: 'agent_event' }>): DomainState {
   const a = { ...raw, text: clean(raw.text) };
   const idx = state.log.findIndex((l) => l.type === 'agent' && l.requestId === a.requestId && l.owner === a.owner);
@@ -1203,7 +1231,7 @@ export function reduceDomain(state: DomainState, action: Action): DomainState {
       return bumpUnread({ ...state, log: appendLog(state.log, item) }, item.channel, true);
     }
     case 'agent_event':
-      if (action.event === 'usage') return state;
+      if (action.event === 'usage') return reduceRunUsage(state, action);
       if (action.event === 'context' || action.event === 'compact') return reduceContext(state, action);
       return reduceAgent(state, action);
     case 'approval_add':

@@ -198,6 +198,8 @@ export function limitKey(runtime: string, model?: string): string {
 
 /** The part of a log item limits are read from (core/store.ts's agent card). */
 export interface LimitCard {
+  /** What the run spent (core/store.ts RunUsage). */
+  readonly usage?: { readonly tokens: number; readonly cost: number };
   readonly type: string;
   readonly owner?: string;
   readonly status?: string;
@@ -494,6 +496,9 @@ export interface TargetUsage {
   readonly limited: number;
   /** Time its runs took, start to end. */
   readonly ms: number;
+  /** Tokens its runs spent (input, output, cache writes), and their cost in USD (0 on your own endpoint or a plan that doesn't say). */
+  readonly tokens: number;
+  readonly cost: number;
 }
 
 /** A combo's runs, split by the target each went to (most runs first). */
@@ -503,6 +508,8 @@ export interface ComboUsage {
   readonly runs: number;
   readonly limited: number;
   readonly ms: number;
+  readonly tokens: number;
+  readonly cost: number;
   readonly targets: readonly TargetUsage[];
 }
 
@@ -513,28 +520,40 @@ const FINAL = new Set(['done', 'error', 'denied']);
  * target it ran on, the combo, when it began and ended, whether it stopped on a limit). From `since` on.
  */
 export function comboUsage(log: ReadonlyArray<LimitCard & { readonly agent?: AgentRef }>, selfId: string, since = 0): ComboUsage[] {
-  const by = new Map<string, { name: string; targets: Map<string, { target: string; runtime: string; runs: number; limited: number; ms: number }> }>();
+  const by = new Map<string, { name: string; targets: Map<string, { target: string; runtime: string; runs: number; limited: number; ms: number; tokens: number; cost: number }> }>();
   for (const item of log) {
     const a = item.agent;
     if (item.type !== 'agent' || item.owner !== selfId || !a?.combo || !item.status || !FINAL.has(item.status) || item.ts < since) continue;
     const combo = by.get(a.combo) ?? { name: a.comboName ?? a.combo, targets: new Map() };
     by.set(a.combo, combo);
     const key = `${a.runtime}|${a.model ?? ''}`;
-    const t = combo.targets.get(key) ?? { target: a.model ? `${a.label} · ${modelName(a.model)}` : a.label, runtime: a.runtime, runs: 0, limited: 0, ms: 0 };
+    const t = combo.targets.get(key) ?? { target: a.model ? `${a.label} · ${modelName(a.model)}` : a.label, runtime: a.runtime, runs: 0, limited: 0, ms: 0, tokens: 0, cost: 0 };
     t.runs += 1;
     if (item.status === 'error' && decodeFailure(item.text)?.kind === 'usage_limit') t.limited += 1;
     t.ms += Math.max(0, (item.endTs ?? item.ts) - item.ts);
+    t.tokens += item.usage?.tokens ?? 0;
+    t.cost += item.usage?.cost ?? 0;
     combo.targets.set(key, t);
   }
   return [...by].map(([id, c]) => {
     const targets = [...c.targets.values()].sort((x, y) => y.runs - x.runs);
-    const sum = (k: 'runs' | 'limited' | 'ms') => targets.reduce((n, t) => n + t[k], 0);
-    return { combo: id, name: c.name, runs: sum('runs'), limited: sum('limited'), ms: sum('ms'), targets };
+    const sum = (k: 'runs' | 'limited' | 'ms' | 'tokens' | 'cost') => targets.reduce((n, t) => n + t[k], 0);
+    return { combo: id, name: c.name, runs: sum('runs'), limited: sum('limited'), ms: sum('ms'), tokens: sum('tokens'), cost: sum('cost'), targets };
   }).sort((x, y) => y.runs - x.runs);
 }
 
-/** "12 runs: Codex 8, Claude · Sonnet 4 (1 at its limit)". */
+/** "1.2M", "340k", "812": tokens, short. */
+export const shortTokens = (n: number): string => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${Math.round(n / 1000)}k` : String(Math.round(n)));
+
+/** "$3.40", "<$0.01"; nothing for 0 (your own endpoint, or a plan that doesn't price it). */
+export const shortCost = (usd: number): string => (usd <= 0 ? '' : usd < 0.01 ? '<$0.01' : `$${usd.toFixed(2)}`);
+
+/** "12 runs · 1.2M tokens · $3.40: Codex 8 (800k), Claude · Sonnet 4 (400k, 1 at its limit)". */
 export function comboUsageWords(u: ComboUsage): string {
-  const parts = u.targets.map((t) => `${t.target} ${t.runs}${t.limited ? ` (${t.limited} at its limit)` : ''}`);
-  return `${u.runs} run${u.runs === 1 ? '' : 's'}: ${parts.join(', ')}`;
+  const spent = (tokens: number, cost: number): string[] => [tokens ? `${shortTokens(tokens)} tokens` : '', shortCost(cost)].filter(Boolean);
+  const parts = u.targets.map((t) => {
+    const more = [t.tokens ? shortTokens(t.tokens) : '', t.limited ? `${t.limited} at its limit` : ''].filter(Boolean);
+    return `${t.target} ${t.runs}${more.length ? ` (${more.join(', ')})` : ''}`;
+  });
+  return `${[`${u.runs} run${u.runs === 1 ? '' : 's'}`, ...spent(u.tokens, u.cost)].join(' · ')}: ${parts.join(', ')}`;
 }

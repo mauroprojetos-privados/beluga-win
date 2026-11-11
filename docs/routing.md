@@ -137,7 +137,14 @@ combo for its difficulty; none mapped, your agent, as before.
 
 ## Usage by combo and target (Phase 5)
 
-`comboUsage` reads your runs' cards: per combo, runs, how many stopped on a limit and the time they
-took, split by the target each went to. Settings › Agent › Combos shows it under each combo
-("12 runs: Codex 8, Claude · Sonnet 4 (1 at its limit)"); `routing.usage` gives it to the phone. It
-counts what the log holds; tokens per combo aren't kept yet.
+Each run's card keeps what it spent (`usage: { tokens, cost }`): the session adds what each of its
+usage reports grew by (the reports are running totals per conversation; `Workbench.onUsage` works
+out the growth, as a workspace's usage does). Tokens are input, output and cache writes; the cost is
+in USD, 0 on your own endpoint.
+
+`comboUsage` reads your runs' cards: per combo, runs, tokens, cost, how many stopped on a limit and
+the time they took, split by the target each went to. **Usage › Combos** draws it (a bar per target
+for its share of the combo's tokens), Settings › Agent › Combos says it under each combo ("12 runs ·
+1.2M tokens · $3.40: Codex 8 (850k), Claude · Sonnet 4 (350k, 1 at its limit)"), and
+`routing.usage` gives it to the phone. It counts the runs the log holds; runs from before this kept no
+tokens.

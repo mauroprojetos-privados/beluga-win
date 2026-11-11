@@ -11,6 +11,7 @@ import { type PlanLimit, SessionsCard } from './usage/SessionsCard.js';
 import { usagesOf } from '@beluga/agent/usage.js';
 import type { AppState } from '@beluga/core/store.js';
 import { StatsSection } from './usage/StatsSection.js';
+import { CombosCard } from './usage/CombosCard.js';
 import { YourCard } from './usage/YourCard.js';
 import { Chapter } from './usage/parts.js';
 import { useStats } from './usage/use-stats.js';
@@ -110,6 +111,8 @@ export function UsageView() {
           </div>
         </Chapter>
         <StatsSection state={state} got={got} />
+        {/* Combos (docs/routing.md): what each spent, by the agent each run went to. */}
+        <CombosCard />
         <Chapter title="Your disk" sub="The room your worktrees take, what’s safe to put away, and every project side by side.">
           <StorageCard rows={rows} measuring={measuring} measured={measured} onMeasure={measure} />
           {measured ? <CleanupCard items={cleanups(state, rows, now)} state={state} onDone={measure} /> : null}
