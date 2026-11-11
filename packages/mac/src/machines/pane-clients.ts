@@ -9,6 +9,7 @@ import { dndActive } from '@beluga/shared/quiet.js';
 import { currentMachines } from './use-machines.js';
 import { watchLink } from './link-health.js';
 import { everyWhileShown } from '../lib/window-active.js';
+import { t } from '../../../../src/shared/i18n/index.js';
 
 /**
  * This window's screens on your computers (BLG-784), one per computer, kept while the window runs:
@@ -86,7 +87,7 @@ function machineCaps(id: string, home: SocketClient): Capabilities {
     notify: async (raw: RawNotice) => {
       if (dndActive(home.store.getState().prefs.notify)) return;
       if (!once.first(noticeKey(id, raw))) return;
-      const name = currentMachines().find((m) => m.id === id)?.name ?? 'Your computer';
+      const name = currentMachines().find((m) => m.id === id)?.name ?? t('project.machines.yourComputerTitle');
       await notify(machineNotice({ id, name }, raw));
     },
   };

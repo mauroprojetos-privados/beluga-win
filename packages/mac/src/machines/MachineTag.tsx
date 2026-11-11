@@ -7,6 +7,7 @@ import { useBeluga, useMachine } from '../lib/beluga.js';
 import { MachineMark } from './MachineMark.js';
 import { useMachineView } from './use-machines.js';
 import c from './machines.module.css';
+import { useT } from '../lib/i18n.js';
 
 /** Inside a computer's page: its mark and name, for the toolbar's title ("on build-box"). */
 export function MachineTag() {
@@ -20,21 +21,22 @@ function Tag({ machine, home }: { machine: string; home: SocketClient }) {
   const view = useMachineView(home, machine);
   // The link as this window feels it (BLG-792): said when it's slow or lost, never felt as a freeze.
   const sample = useLinkSample(machine);
-  const name = view?.name ?? 'Your computer';
-  const link = sample ? linkHealth(sample, name) : { state: 'ok' as const, words: `Runs on ${name}` };
+  const t = useT();
+  const name = view?.name ?? t('project.machines.yourComputerTitle');
+  const link = sample ? linkHealth(sample, name) : { state: 'ok' as const, words: t('project.machines.runsOn', { name }) };
   return (
     <span className={cx(c.tag, link.state !== 'ok' && c.tagDim)} title={link.words} data-link={link.state}>
       {view ? <MachineMark machine={view} size={12} /> : null}
-      {view?.name ?? 'Your computer'}
+      {view?.name ?? t('project.machines.yourComputerTitle')}
       {link.state === 'slow' ? (
         <span className={cx(c.linkBadge, c.linkSlow)}>
           <Icon name="clock" size={10} />
-          Slow
+          {t('project.machines.slow')}
         </span>
       ) : link.state === 'lost' ? (
         <span className={cx(c.linkBadge, c.linkLost)}>
           <Icon name="refresh" size={10} />
-          Reconnecting
+          {t('project.machines.reconnecting')}
         </span>
       ) : null}
     </span>

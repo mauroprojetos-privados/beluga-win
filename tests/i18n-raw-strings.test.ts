@@ -327,6 +327,23 @@ const MIGRATED: readonly string[] = [
   'packages/mac/src/chat/use-attachments.tsx',
   'packages/mac/src/threads/ThreadLines.tsx',
   'packages/mac/src/threads/ThreadsSection.tsx',
+  // the project home, worktrees, the Phone pane and your computers in your language
+  'packages/mac/src/machines/GettingReady.tsx',
+  'packages/mac/src/machines/MachinePane.tsx',
+  'packages/mac/src/machines/MachineTag.tsx',
+  'packages/mac/src/machines/RemoteRows.tsx',
+  'packages/mac/src/machines/StartingThere.tsx',
+  'packages/mac/src/phone/Phone.tsx',
+  'packages/mac/src/phone/PhoneView.tsx',
+  'packages/mac/src/views/project/EarningsSection.tsx',
+  'packages/mac/src/views/project/EnvAsks.tsx',
+  'packages/mac/src/views/project/GitHubRow.tsx',
+  'packages/mac/src/views/project/MainSyncBar.tsx',
+  'packages/mac/src/views/project/PullRow.tsx',
+  'packages/mac/src/views/worktrees/BatchAlerts.tsx',
+  'packages/mac/src/views/worktrees/WorktreeItem.tsx',
+  'packages/mac/src/views/worktrees/WorktreesNav.tsx',
+  'packages/mac/src/views/worktrees/WorktreesView.tsx',
 ];
 
 describe('migrated screens say every word through t()', () => {

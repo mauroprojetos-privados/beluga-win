@@ -1,5 +1,6 @@
 // Relative, not @beluga: the root's tests and typecheck read this file too.
 import type { View } from '../../../../src/core/store.js';
+import { t } from '../../../../src/shared/i18n/index.js';
 
 /**
  * A page on one of your computers (BLG-784), as plain data. The window's own view says
@@ -74,7 +75,7 @@ export function paneViewFor(machine: string, windowView: View, paneView: View): 
 
 /** The app's socket for computer `id`: the daemon's own address with /machine/<id> (BLG-775). */
 export function machineSocketUrl(daemonUrl: string, id: string): string {
-  if (!isMachineId(id)) throw new Error('That isn’t one of your computers');
+  if (!isMachineId(id)) throw new Error(t('project.machines.notYours'));
   const url = new URL(daemonUrl);
   url.pathname = `/machine/${id}`;
   url.search = '';
