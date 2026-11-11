@@ -20,6 +20,7 @@ import { macNoticeTarget, openNoticeTarget } from '../lib/notices.js';
 import { sameDeep, sameFields } from '../lib/stable.js';
 import { type Waiting, type WaitingAction, bellCount, isCovered, noticeNeedView, waitingList } from './waiting-model.js';
 import s from './notifications.module.css';
+import { useT } from '../lib/i18n.js';
 
 /** A few marks the shared icon set doesn't have, drawn the same way (16 grid, 1.5 strokes). */
 const OWN: Partial<Record<NoticeLook | 'moon', string>> = {
@@ -60,21 +61,22 @@ function Mark({ look, size = 14 }: { look: NoticeLook | 'moon'; size?: number })
 function useNow(): number {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
   }, []);
   return now;
 }
 
 function Row({ n, now, onOpen }: { n: Notice; now: number; onOpen: (n: Notice) => void }) {
+  const t = useT();
   const api = useApi();
   const { look, tone } = noticeLook(n);
   const shown = brandNotice(n);
   const items: ActionItem[] = [
-    { label: 'Open', onSelect: () => onOpen(n) },
-    { label: n.read ? 'Mark as Unread' : 'Mark as Read', onSelect: () => void (n.read ? api.inbox.unread(n.id) : api.inbox.read({ id: n.id })) },
-    { label: 'Copy', icon: 'copy', separate: true, onSelect: () => void copyText(n.body ? `${n.title}\n${n.body}` : n.title) },
-    { label: 'Clear', danger: true, onSelect: () => void api.inbox.clear({ id: n.id }) },
+    { label: t('common.open'), onSelect: () => onOpen(n) },
+    { label: n.read ? t('sidebar.notifications.markUnreadMenu') : t('sidebar.notifications.markReadMenu'), onSelect: () => void (n.read ? api.inbox.unread(n.id) : api.inbox.read({ id: n.id })) },
+    { label: t('sidebar.notifications.copy'), icon: 'copy', separate: true, onSelect: () => void copyText(n.body ? `${n.title}\n${n.body}` : n.title) },
+    { label: t('sidebar.notifications.clear'), danger: true, onSelect: () => void api.inbox.clear({ id: n.id }) },
   ];
   return (
     <ActionsContext items={items}>
@@ -90,18 +92,18 @@ function Row({ n, now, onOpen }: { n: Notice; now: number; onOpen: (n: Notice) =
         <span className={s.time}>{noticeAgo(n.ts, now)}</span>
       </button>
       <span className={s.rowActions}>
-        <Tip label={n.read ? 'Mark as unread' : 'Mark as read'}>
-          <button type="button" className={s.rowAction} aria-label={n.read ? 'Mark as unread' : 'Mark as read'} onClick={() => void (n.read ? api.inbox.unread(n.id) : api.inbox.read({ id: n.id }))}>
+        <Tip label={n.read ? t('sidebar.notifications.markUnread') : t('sidebar.notifications.markRead')}>
+          <button type="button" className={s.rowAction} aria-label={n.read ? t('sidebar.notifications.markUnread') : t('sidebar.notifications.markRead')} onClick={() => void (n.read ? api.inbox.unread(n.id) : api.inbox.read({ id: n.id }))}>
             <span className={cx(s.readDot, !n.read && s.readDotOn)} />
           </button>
         </Tip>
-        <Tip label="Clear">
-          <button type="button" className={s.rowAction} aria-label="Clear" onClick={() => void api.inbox.clear({ id: n.id })}>
+        <Tip label={t('sidebar.notifications.clear')}>
+          <button type="button" className={s.rowAction} aria-label={t('sidebar.notifications.clear')} onClick={() => void api.inbox.clear({ id: n.id })}>
             <Icon name="x" size={11} />
           </button>
         </Tip>
       </span>
-      {!n.read ? <span className={s.unreadDot} aria-label="Unread" /> : null}
+      {!n.read ? <span className={s.unreadDot} aria-label={t('sidebar.notifications.unread')} /> : null}
     </li>
     </ActionsContext>
   );
@@ -109,6 +111,7 @@ function Row({ n, now, onOpen }: { n: Notice; now: number; onOpen: (n: Notice) =
 
 /** A plan's task news, folded under the plan: one line, opened to see each. */
 function PlanFold({ plan, notices, now, onOpen }: { plan: string; notices: readonly Notice[]; now: number; onOpen: (n: Notice) => void }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const found = useApp((st) => st.plans.plans.find((p) => p.id === plan));
   const unread = notices.some((n) => !n.read);
@@ -119,8 +122,8 @@ function PlanFold({ plan, notices, now, onOpen }: { plan: string; notices: reado
           <Icon name="flag" size={14} />
         </span>
         <span className={s.text}>
-          <span className={s.title}>{found ? planTitle(found) : 'A plan'}</span>
-          <span className={s.body}>{`${notices.length} updates from its tasks`}</span>
+          <span className={s.title}>{found ? planTitle(found) : t('sidebar.notifications.aPlan')}</span>
+          <span className={s.body}>{t('sidebar.notifications.planUpdates', { count: notices.length })}</span>
         </span>
         <span className={s.time}>{noticeAgo(notices[0]!.ts, now)}</span>
       </button>
@@ -160,6 +163,7 @@ function useGo(): (view: View) => void {
 /** Something waiting for you: who and where, answered right here, or opened where it lives. */
 /** `on`: one of your computers' (BLG-790), drawn with its client: its name in the line, opened there. */
 function WaitingRow({ w, now, close, on }: { w: Waiting; now: number; close: () => void; on?: { readonly name: string; readonly open: (view: View) => void } }) {
+  const t = useT();
   const { client } = useBeluga();
   const api = useApi();
   const go = useGo();
@@ -182,17 +186,17 @@ function WaitingRow({ w, now, close, on }: { w: Waiting; now: number; close: () 
   };
   const meta = [...new Set([item.from ?? '', w.place ?? '', on?.name ?? ''])].filter(Boolean).join(' · ');
   const items: ActionItem[] = [
-    ...(w.view ? [{ label: w.place ? `Open in ${w.place}` : 'Open', onSelect: open }] : []),
+    ...(w.view ? [{ label: w.place ? t('sidebar.notifications.openIn', { place: w.place }) : t('common.open'), onSelect: open }] : []),
     ...[...w.surface, ...w.more].map((a, i) => ({ label: a.label, ...(a.tone === 'danger' ? { danger: true } : {}), ...(i === 0 ? { separate: true } : {}), onSelect: () => answer(a) })),
     // Off every list (here and the phone) without answering it (BLG-359).
-    { label: 'Dismiss', separate: true, onSelect: () => void api.needs.dismiss(item.id) },
+    { label: t('sidebar.notifications.dismiss'), separate: true, onSelect: () => void api.needs.dismiss(item.id) },
   ];
   // A question that takes words or several picks is answered where it was asked.
   const typed = !w.surface.length;
   return (
     <ActionsContext items={items}>
       <li className={cx(s.row, s.unread, s.waiting)} data-need={item.id}>
-        <button type="button" className={s.rowMain} onClick={open} disabled={!w.view} aria-label={`${item.title}${w.place ? `, in ${w.place}` : ''}`}>
+        <button type="button" className={s.rowMain} onClick={open} disabled={!w.view} aria-label={`${item.title}${w.place ? t('sidebar.notifications.inPlace', { place: w.place }) : ''}`}>
           <span className={cx(s.tile, s.tone_warn)}>
             <Icon name={waitingIcon(w)} size={14} />
           </span>
@@ -200,12 +204,12 @@ function WaitingRow({ w, now, close, on }: { w: Waiting; now: number; close: () 
             <span className={s.title}>{item.title}</span>
             {meta ? <span className={s.where}>{meta}</span> : null}
           </span>
-          <span className={s.time}>{item.askedAt ? noticeAgo(item.askedAt, now) : 'now'}</span>
+          <span className={s.time}>{item.askedAt ? noticeAgo(item.askedAt, now) : t('sidebar.notifications.now')}</span>
         </button>
         <span className={s.answers}>
           {typed ? (
             <Button size="small" variant="primary" disabled={!w.view} onClick={open}>
-              Answer
+              {t('sidebar.notifications.answer')}
             </Button>
           ) : (
             w.surface.map((a) => (
@@ -221,8 +225,9 @@ function WaitingRow({ w, now, close, on }: { w: Waiting; now: number; close: () 
 }
 
 function Empty({ filter, any }: { filter: NoticeFilter; any: boolean }) {
-  const title = !any ? 'You’re all caught up' : filter === 'unread' ? 'Nothing unread' : filter === 'needsYou' ? 'Nothing waiting for you' : 'No mentions';
-  const detail = !any ? 'Beluga lists here when your agent finishes or needs you, and when friends come and go.' : 'The rest are under All.';
+  const t = useT();
+  const title = !any ? t('sidebar.notifications.allCaughtUp') : filter === 'unread' ? t('sidebar.notifications.nothingUnread') : filter === 'needsYou' ? t('sidebar.notifications.nothingWaiting') : t('sidebar.notifications.noMentions');
+  const detail = !any ? t('sidebar.notifications.emptyDetail') : t('sidebar.notifications.restUnderAll');
   return (
     <div className={s.empty}>
       <Icon name="bell" size={20} />
@@ -234,6 +239,7 @@ function Empty({ filter, any }: { filter: NoticeFilter; any: boolean }) {
 
 /** What happened while you were elsewhere: Today and Earlier, filters, read, clear. */
 function Center({ close }: { close: () => void }) {
+  const t = useT();
   const api = useApi();
   const actions = useActions();
   const { ui, client } = useBeluga();
@@ -270,16 +276,16 @@ function Center({ close }: { close: () => void }) {
   return (
     <>
       <header className={s.head}>
-        <h2 className={s.heading}>Notifications</h2>
+        <h2 className={s.heading}>{t('sidebar.notifications.title')}</h2>
         <button type="button" className={s.link} disabled={!unread} onClick={() => void api.inbox.read()}>
-          Mark all read
+          {t('sidebar.notifications.markAllRead')}
         </button>
         <button type="button" className={s.link} disabled={!inbox.length} onClick={() => void api.inbox.clear()}>
-          Clear all
+          {t('sidebar.notifications.clearAll')}
         </button>
         <IconButton
           icon="gear"
-          label="Notification settings"
+          label={t('sidebar.notifications.settings')}
           onClick={() => {
             close();
             ui.patch({ settings: 'notifications' });
@@ -289,13 +295,13 @@ function Center({ close }: { close: () => void }) {
       {quiet ? (
         <div className={s.quiet}>
           <Mark look="moon" size={13} />
-          <span>Do Not Disturb {dndLabel(notify, now)}</span>
+          <span>{t('sidebar.notifications.dndUntil', { when: dndLabel(notify, now) })}</span>
           <button type="button" className={s.link} onClick={() => void api.session.setPrefs({ notify: { ...notify, dnd: null } })}>
-            Turn off
+            {t('sidebar.notifications.turnOff')}
           </button>
         </div>
       ) : null}
-      <div className={s.filters} role="tablist" aria-label="Show">
+      <div className={s.filters} role="tablist" aria-label={t('sidebar.notifications.show')}>
         {NOTICE_FILTERS.map((f) => (
           <button key={f.value} type="button" role="tab" aria-selected={filter === f.value} className={cx(s.filter, filter === f.value && s.filterOn)} onClick={() => setFilter(f.value)}>
             {f.label}
@@ -305,9 +311,9 @@ function Center({ close }: { close: () => void }) {
       </div>
       <div className={s.scroll}>
         {shownWaiting.length ? (
-          <section className={s.group} aria-label="Waiting for you">
+          <section className={s.group} aria-label={t('sidebar.notifications.waitingForYou')}>
             <h3 className={s.groupTitle}>
-              Waiting for you <span className={s.count}>{shownWaiting.length}</span>
+              {t('sidebar.notifications.waitingForYou')} <span className={s.count}>{shownWaiting.length}</span>
             </h3>
             <ul className={s.list}>
               {shownWaiting.map((w) => (
@@ -341,6 +347,7 @@ function Center({ close }: { close: () => void }) {
  * with that computer's client so answering acts there; opening one opens its page there in the pane.
  */
 function RemoteWaiting({ close, now }: { close: () => void; now: number }) {
+  const t = useT();
   const remote = useRemoteAttention();
   const actions = useActions();
   const { ui } = useBeluga();
@@ -352,9 +359,9 @@ function RemoteWaiting({ close, now }: { close: () => void; now: number }) {
           const client = machineClientOf(r.machine.id);
           if (!client) return null;
           return (
-            <section key={r.machine.id} className={s.group} aria-label={`Waiting on ${r.machine.name}`}>
+            <section key={r.machine.id} className={s.group} aria-label={t('sidebar.notifications.waitingOn', { name: r.machine.name })}>
               <h3 className={s.groupTitle}>
-                Waiting on {r.machine.name} <span className={s.count}>{r.waiting.length}</span>
+                {t('sidebar.notifications.waitingOn', { name: r.machine.name })} <span className={s.count}>{r.waiting.length}</span>
               </h3>
               <MachineProvider machine={r.machine.id} client={client} ui={ui.windowStore}>
                 <ul className={s.list}>
@@ -372,6 +379,7 @@ function RemoteWaiting({ close, now }: { close: () => void; now: number }) {
 
 /** The bell in the toolbar: how many things are new, and the notification centre under it. */
 export function NotificationBell() {
+  const t = useT();
   const { ui } = useBeluga();
   const open = useUi((u) => u.notices);
   // Just the two counts: the bell is drawn again only when one of them changes.
@@ -384,14 +392,14 @@ export function NotificationBell() {
   const remote = useRemoteAttention();
   const waitingThere = remote.reduce((n, r) => n + r.waiting.length, 0);
   const newThere = remote.reduce((n, r) => n + r.bell - r.waiting.length, 0);
-  const label = `Notifications${waiting + waitingThere ? ` · ${waiting + waitingThere} waiting for you` : ''}${unread + newThere ? ` · ${unread + newThere} new` : ''}${quiet ? ' · Do Not Disturb' : ''}`;
+  const label = `${t('sidebar.notifications.title')}${waiting + waitingThere ? ` · ${t('sidebar.notifications.bellWaiting', { count: waiting + waitingThere })}` : ''}${unread + newThere ? ` · ${t('sidebar.notifications.bellNew', { count: unread + newThere })}` : ''}${quiet ? ` · ${t('sidebar.notifications.dnd')}` : ''}`;
   return (
     <Popover.Root open={open} onOpenChange={(o) => ui.patch({ notices: o })}>
       <Popover.Trigger asChild>
         <IconButton icon="bell" label={label} active={open} badge={waiting + unread + waitingThere + newThere} className={cx(quiet && s.bellQuiet)} />
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content className={s.popover} align="end" sideOffset={6} collisionPadding={12} aria-label="Notifications">
+        <Popover.Content className={s.popover} align="end" sideOffset={6} collisionPadding={12} aria-label={t('sidebar.notifications.title')}>
           <Center close={() => ui.patch({ notices: false })} />
         </Popover.Content>
       </Popover.Portal>

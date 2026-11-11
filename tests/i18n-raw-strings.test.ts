@@ -8,6 +8,14 @@ import { rawStrings } from '../scripts/i18n-raw-strings.mjs';
  * with `// i18n-ignore`.
  */
 const MIGRATED: readonly string[] = [
+  // The Mac's sidebar, Needs You (the bell, the chat's waiting cards, the request popup)
+  'packages/mac/src/layout/Sidebar.tsx',
+  'packages/mac/src/layout/SidebarSearch.tsx',
+  'packages/mac/src/layout/CategorySections.tsx',
+  'packages/mac/src/layout/UnreadSection.tsx',
+  'packages/mac/src/layout/NotificationCenter.tsx',
+  'packages/mac/src/chat/Attention.tsx',
+  'packages/mac/src/popup/RequestPopup.tsx',
   // The phone's main screens
   'packages/companion/app/(tabs)/_layout.tsx',
   'packages/companion/app/(tabs)/index.tsx',

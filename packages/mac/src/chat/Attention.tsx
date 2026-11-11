@@ -16,6 +16,7 @@ import { befriend } from '../network/use-net.js';
 import { Markdown } from './Markdown.js';
 import { useNow } from './Items.js';
 import s from './attention.module.css';
+import { useT } from '../lib/i18n.js';
 
 /**
  * What needs you right now, just above the box you type in: an approval, Claude's question or
@@ -40,6 +41,7 @@ export function Attention({ channel }: { channel?: string } = {}) {
  * is answered on its card in the chat instead.
  */
 function Approvals({ channel }: { channel?: string }) {
+  const t = useT();
   const api = useApi();
   const all = useApp((st) => st.approvals);
   const approvals = useMemo(() => (channel ? all.filter((a) => a.channel === channel && !a.task) : all), [all, channel]);
@@ -50,62 +52,62 @@ function Approvals({ channel }: { channel?: string }) {
   const others = approvals.slice(1);
   const left = first.askedAt && first.timeoutMs ? Math.max(0, first.askedAt + first.timeoutMs - now) : undefined;
   return (
-    <div className={`${s.card} ${s.urgent}`} role="alertdialog" aria-label="Approval needed">
+    <div className={`${s.card} ${s.urgent}`} role="alertdialog" aria-label={t('sidebar.attention.approvalNeeded')}>
       <div className={s.head}>
         <Dot tone="warn" />
         <span className={s.title}>{brandText(first.title)}</span>
         {others.length ? (
           <button type="button" className={s.moreButton} aria-expanded={showAll} onClick={() => setShowAll(!showAll)}>
-            {showAll ? 'Show less' : `+${others.length} more`}
+            {showAll ? t('sidebar.showLess') : t('sidebar.attention.more', { count: others.length })}
             <Icon name={showAll ? 'chevronUp' : 'chevronDown'} size={10} />
           </button>
         ) : null}
-        {left !== undefined ? <span className={s.countdown}>{Math.ceil(left / 60_000)} min left</span> : null}
+        {left !== undefined ? <span className={s.countdown}>{t('sidebar.attention.minLeft', { count: Math.ceil(left / 60_000) })}</span> : null}
       </div>
       {first.detail ? <pre className={`${s.detail} selectable`}>{first.detail}</pre> : null}
       {first.kind === 'secret' ? (
         // A .env file: once, always for this project, or always (Settings › Environment takes it back).
         <div className={s.actions}>
           <Button variant="primary" onClick={() => void api.host.answerApproval('yes', first.id)}>
-            Allow once
+            {t('needs.allowOnce')}
           </Button>
           {first.project ? (
-            <Tip label="Your agent reads this project’s .env files without asking. Change it in Settings › Environment.">
-              <Button onClick={() => void api.host.answerApproval('project', first.id)}>Always for {first.project}</Button>
+            <Tip label={t('sidebar.attention.envProjectTip')}>
+              <Button onClick={() => void api.host.answerApproval('project', first.id)}>{t('sidebar.attention.alwaysFor', { project: first.project })}</Button>
             </Tip>
           ) : null}
-          <Tip label="In every project. Change it in Settings › Environment.">
+          <Tip label={t('sidebar.attention.envEveryTip')}>
             <Button variant="quiet" onClick={() => void api.host.answerApproval('always', first.id)}>
-              Always
+              {t('needs.always')}
             </Button>
           </Tip>
           <Button variant="quiet" onClick={() => void api.host.answerApproval('no', first.id)}>
-            Don’t allow
+            {t('sidebar.attention.dontAllow')}
           </Button>
         </div>
       ) : first.once ? (
         // A friend's request for a secret: asked each time, so there's no Always.
         <div className={s.actions}>
           <Button variant="primary" onClick={() => void api.host.answerApproval('yes', first.id)}>
-            Allow once
+            {t('needs.allowOnce')}
           </Button>
           <Button variant="quiet" onClick={() => void api.host.answerApproval('no', first.id)}>
-            Decline
+            {t('needs.decline')}
           </Button>
         </div>
       ) : (
         <div className={s.actions}>
           <Button variant="primary" onClick={() => void api.host.answerApproval('yes', first.id)}>
-            Allow
+            {t('common.allow')}
           </Button>
-          <Button onClick={() => void api.host.answerApproval('always', first.id)}>Always allow</Button>
+          <Button onClick={() => void api.host.answerApproval('always', first.id)}>{t('sidebar.attention.alwaysAllow')}</Button>
           <Button variant="quiet" onClick={() => void api.host.answerApproval('no', first.id)}>
-            Deny
+            {t('common.deny')}
           </Button>
         </div>
       )}
       {showAll && others.length ? (
-        <ul className={s.others} aria-label="Also waiting for you">
+        <ul className={s.others} aria-label={t('sidebar.attention.alsoWaiting')}>
           {others.map((a) => (
             <li key={a.id} className={s.other}>
               <span className={s.otherText}>
@@ -113,10 +115,10 @@ function Approvals({ channel }: { channel?: string }) {
                 {a.detail ? <code className={s.otherDetail}>{a.detail}</code> : null}
               </span>
               <Button size="small" onClick={() => void api.host.answerApproval('yes', a.id)}>
-                Allow
+                {t('common.allow')}
               </Button>
               <Button size="small" variant="quiet" onClick={() => void api.host.answerApproval('no', a.id)}>
-                Deny
+                {t('common.deny')}
               </Button>
             </li>
           ))}
@@ -127,6 +129,7 @@ function Approvals({ channel }: { channel?: string }) {
 }
 
 function Question({ channel }: { channel?: string }) {
+  const t = useT();
   const actions = useActions();
   const { ui } = useBeluga();
   // Only the question shown and who asked, so other events don't draw the card again.
@@ -148,19 +151,19 @@ function Question({ channel }: { channel?: string }) {
       <div className={cx(s.card, full && s.cardFull)}>
         <div className={s.head}>
           <Icon name="wand" size={13} className={s.claude} />
-          <span className={s.title}>{owner && q.owner !== selfId ? `${owner}'s ${agent}` : agent} has a plan</span>
+          <span className={s.title}>{t('sidebar.attention.hasPlan', { who: owner && q.owner !== selfId ? t('sidebar.attention.ownersAgent', { owner, agent }) : agent })}</span>
           <Button size="small" variant="quiet" icon={full ? 'chevronDown' : 'chevronUp'} aria-expanded={full} onClick={() => ui.patch({ planFull: full ? undefined : q.qid })}>
-            {full ? 'Show less' : 'Read in full'}
+            {full ? t('sidebar.showLess') : t('sidebar.attention.readInFull')}
           </Button>
         </div>
-        <div ref={planRef} className={cx(s.plan, full && s.planFull, 'selectable')} role="region" aria-label="The plan">
+        <div ref={planRef} className={cx(s.plan, full && s.planFull, 'selectable')} role="region" aria-label={t('sidebar.attention.thePlan')}>
           <Markdown text={q.question.plan} />
         </div>
         <div className={s.actions}>
           <Button variant="primary" onClick={() => actions.run({ type: 'answer', qid: q.qid, pick: 'approve' })}>
-            Approve plan
+            {t('sidebar.attention.approvePlan')}
           </Button>
-          <span className={s.hint}>or type what to change below</span>
+          <span className={s.hint}>{t('sidebar.attention.typeToChange')}</span>
         </div>
       </div>
     );
@@ -174,12 +177,12 @@ function Question({ channel }: { channel?: string }) {
     <div className={s.card}>
       <div className={s.head}>
         <Icon name="claude" size={13} className={s.claude} />
-        <span className={s.title}>{current.header || `${agent} asks`}</span>
-        {total > 1 ? <span className={s.more}>{index + 1} of {total}</span> : null}
+        <span className={s.title}>{current.header || t('sidebar.attention.asks', { agent })}</span>
+        {total > 1 ? <span className={s.more}>{t('sidebar.attention.ofTotal', { index: index + 1, total })}</span> : null}
         {/* A decision of yours in a plan waits until you answer it (core/plans/decisions.ts). */}
         {isDecisionQid(q.qid) ? null : (
           <Button size="small" variant="quiet" onClick={() => actions.run({ type: 'answer', qid: q.qid, pick: 'skip' })}>
-            Skip
+            {t('needs.skip')}
           </Button>
         )}
       </div>
@@ -201,22 +204,23 @@ function Question({ channel }: { channel?: string }) {
       {current.multiSelect ? (
         <div className={s.actions}>
           <Button variant="primary" onClick={() => actions.run({ type: 'answer', qid: q.qid, pick: 'done', question: current.question })}>
-            Done
+            {t('common.done')}
           </Button>
         </div>
       ) : (
-        <div className={s.hint}>Pick one, or type your own answer below.</div>
+        <div className={s.hint}>{t('sidebar.attention.pickOne')}</div>
       )}
     </div>
   );
 }
 
 function Knock() {
+  const t = useT();
   const actions = useActions();
   const { knock, who, link } = useApp((st) => {
     const knock = st.knocks.find((k) => st.peers.some((p) => p.peerId === k.peerId));
     if (!knock) return { knock, who: undefined, link: undefined };
-    return { knock, who: st.peers.find((p) => p.peerId === knock.peerId)?.name ?? 'Someone', link: st.links.find((l) => l.id === knock.linkId) };
+    return { knock, who: st.peers.find((p) => p.peerId === knock.peerId)?.name ?? t('sidebar.someone'), link: st.links.find((l) => l.id === knock.linkId) };
   }, sameFields);
   if (!knock) return null;
   return (
@@ -224,16 +228,16 @@ function Knock() {
       <div className={s.head}>
         <Icon name="person" size={13} />
         <span className={s.title}>
-          {who} wants to join {link ? link.label : 'the room'}
+          {link ? t('sidebar.attention.wantsToJoin', { who: who ?? '', place: link.label }) : t('sidebar.attention.wantsToJoinRoom', { who: who ?? '' })}
         </span>
       </div>
       <div className={s.actions}>
         <Button variant="primary" onClick={() => actions.run({ type: 'knock', peerId: knock.peerId, pick: 'in' })}>
-          Let in
+          {t('needs.letIn')}
         </Button>
-        <Button onClick={() => actions.run({ type: 'knock', peerId: knock.peerId, pick: 'watch' })}>Let in to watch</Button>
+        <Button onClick={() => actions.run({ type: 'knock', peerId: knock.peerId, pick: 'watch' })}>{t('sidebar.attention.letInToWatch')}</Button>
         <Button variant="quiet" onClick={() => actions.run({ type: 'knock', peerId: knock.peerId, pick: 'decline' })}>
-          Not now
+          {t('needs.notNow')}
         </Button>
       </div>
     </div>
@@ -255,6 +259,7 @@ const notNow = (): Set<string> => {
  * host is offered as a friend, once. The room itself works as before.
  */
 function BefriendHost() {
+  const t = useT();
   const { client } = useBeluga();
   const [dismissed, setDismissed] = useState(notNow);
   const host = useApp((st) => hostToBefriend({ peers: st.peers, selfId: st.self?.peerId, friends: st.network.friends, ...(st.network.offers ? { offers: st.network.offers } : {}), dismissed }), sameDeep);
@@ -265,17 +270,17 @@ function BefriendHost() {
     setDismissed(next);
   };
   return (
-    <div className={s.card} role="group" aria-label={`Add ${host.name} as a friend`}>
+    <div className={s.card} role="group" aria-label={t('sidebar.attention.addAsFriendLabel', { name: host.name })}>
       <div className={s.head}>
         <Icon name="person" size={13} />
-        <span className={s.title}>Add {host.name} as a friend?</span>
+        <span className={s.title}>{t('sidebar.attention.addAsFriendAsk', { name: host.name })}</span>
       </div>
       <div className={s.actions}>
         <Button variant="primary" onClick={() => void befriend(client, host.peerId, host.name)}>
-          Add as Friend
+          {t('sidebar.attention.addAsFriend')}
         </Button>
         <Button variant="quiet" onClick={later}>
-          Not Now
+          {t('common.notNow')}
         </Button>
       </div>
     </div>
@@ -283,19 +288,20 @@ function BefriendHost() {
 }
 
 function TrustPrompt() {
+  const t = useT();
   const actions = useActions();
   const { peerId, who } = useApp((st) => {
     const peerId = st.trustPrompts.find((id) => st.peers.some((p) => p.peerId === id));
-    return { peerId, who: peerId ? (st.peers.find((p) => p.peerId === peerId)?.name ?? 'Someone') : undefined };
+    return { peerId, who: peerId ? (st.peers.find((p) => p.peerId === peerId)?.name ?? t('sidebar.someone')) : undefined };
   }, sameFields);
   if (!peerId) return null;
   return (
     <div className={s.card}>
       <div className={s.head}>
         <Icon name="lock" size={13} />
-        <span className={s.title}>How much do you trust {who}?</span>
+        <span className={s.title}>{t('sidebar.attention.trustWho', { who: who ?? '' })}</span>
         <Button size="small" variant="quiet" onClick={() => actions.run({ type: 'trust_later', peerId })}>
-          Later
+          {t('sidebar.later')}
         </Button>
       </div>
       <div className={s.trustRow}>
