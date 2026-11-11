@@ -1,7 +1,7 @@
 import { baseName } from '@beluga/shared/os-path.js';
 import * as Dialog from '@radix-ui/react-dialog';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { TRUST_INFO, trustOf } from '@beluga/core/trust.js';
+import { trustOf } from '@beluga/core/trust.js';
 import { BRANCH_PREFIX_RE, EFFORTS, type LowPower } from '@beluga/shared/settings-schema.js';
 import { agentChoices, agentForChoice, choiceForAgent } from '@beluga/ui/agent-choice.js';
 import { EFFORT_INFO, agentEntries, modelInfo, myModel, myRuntime, setMyAgent } from '../chat/ModelPicker.js';
@@ -63,6 +63,7 @@ import { LANGUAGE_CHOICES, LOCALE_NAMES, type LanguageChoice, resolveLocale } fr
 import { systemLanguages, useT } from '../lib/i18n.js';
 import { type Key, t } from '@beluga/shared/i18n/index.js';
 import { en as SETTINGS_WORDS } from '@beluga/shared/i18n/areas/settings.js';
+import { trustWords } from '@beluga/shared/i18n/words.js';
 
 /** One of the Settings area's plain sentences, by its English words. */
 type Said = Extract<(typeof SETTINGS_WORDS)[keyof typeof SETTINGS_WORDS], string>;
@@ -92,8 +93,7 @@ const PANE_KEYS: Partial<Record<SettingsPane, Key>> = {
   keyboard: 'settings.panes.keyboard',
   advanced: 'settings.panes.advanced',
   experimental: 'settings.panes.experimental',
-  about: 'settings.panes.about',
-};
+  about: 'settings.panes.about' };
 const paneName = (p: { id: SettingsPane; label: string }): string => {
   const key = PANE_KEYS[p.id];
   return key ? t(key) : p.label;
@@ -620,7 +620,7 @@ function People() {
           others.map((p) => {
             const friend = state.network.friends.some((f) => f.peerId === p.peerId);
             return (
-              <Row key={p.peerId} label={p.name} detail={t(friend ? 'settings.people.trustFriend' : 'settings.people.trustOther', { trust: TRUST_INFO[trustOf(state, p.peerId)].label })}>
+              <Row key={p.peerId} label={p.name} detail={t(friend ? 'settings.people.trustFriend' : 'settings.people.trustOther', { trust: trustWords(trustOf(state, p.peerId)).label })}>
                 <Avatar name={p.name} id={p.peerId} size={20} />
                 {friend ? (
                   <Button
@@ -647,7 +647,7 @@ function People() {
       {remembered.length ? (
         <Group title={say('Remembered from before')}>
           {remembered.map(([id, r]) => (
-            <Row key={id} label={r.name} detail={TRUST_INFO[r.trust].label}>
+            <Row key={id} label={r.name} detail={trustWords(r.trust).label}>
               <Button variant="quiet" onClick={() => void api.people.forget(id)}>
                 {t('settings.people.forget')}
               </Button>

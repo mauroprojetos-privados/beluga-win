@@ -37,11 +37,12 @@ import { ProjectIcon } from '../components/ProjectIcon.js';
 import { RepoPicker, useSeveralRepos } from './boards.js';
 import { showWorktreeFolder } from '../lib/remote-open.js';
 import { revealThereLabel } from '@beluga/machines/open.js';
-import { CATEGORY_INFO, WORK_CATEGORIES, type WorkCategory, taskRoute } from '@beluga/core/routing/model.js';
+import { WORK_CATEGORIES, type WorkCategory, taskRoute } from '@beluga/core/routing/model.js';
 import { type TaskKindLine, taskKindLine } from '@beluga/core/routing/outcomes.js';
 import { PickMenu } from './PickMenu.js';
 import { useT } from '../lib/i18n.js';
 import { formatDateWith } from '@beluga/shared/i18n/format.js';
+import { categoryHint, categoryLabel, statusLabel } from '@beluga/shared/i18n/words.js';
 
 /**
  * One task: its title (click to rename), what to do next (start a worktree with Claude on it, or
@@ -265,8 +266,7 @@ function ArchivedBanner({ issue }: { issue: Issue }) {
             message: t('tasks.deleteMessage', { title: issue.title }),
             confirm: t('tasks.deleteForGood'),
             destructive: true,
-            run: () => void act(() => api.remove(issue.id), t('tasks.deleted', { key: issue.key })).then(() => back(boardOf(issue))),
-          })
+            run: () => void act(() => api.remove(issue.id), t('tasks.deleted', { key: issue.key })).then(() => back(boardOf(issue))) })
         }
       >
         {t('tasks.deleteForGood')}
@@ -502,7 +502,7 @@ function Properties({ issue }: { issue: Issue }) {
         <StatusPicker issue={issue} align="end">
           <button type="button" className={css.propValue}>
             <StatusIcon status={issue.status} />
-            {STATUS_INFO[issue.status].label}
+            {statusLabel(issue.status)}
           </button>
         </StatusPicker>
       </Prop>
@@ -658,7 +658,7 @@ function KindProp({ issue }: { issue: Issue }) {
         <PickMenu<WorkCategory | ''>
           label={t('tasks.kindOfWork')}
           align="end"
-          choices={[...WORK_CATEGORIES.map((c) => ({ value: c, label: CATEGORY_INFO[c].label, hint: CATEGORY_INFO[c].hint })), { value: '' as const, label: t('tasks.kindNone'), hint: t('tasks.kindNoneHint') }]}
+          choices={[...WORK_CATEGORIES.map((c) => ({ value: c, label: categoryLabel(c), hint: categoryHint(c) })), { value: '' as const, label: t('tasks.kindNone'), hint: t('tasks.kindNoneHint') }]}
           chosen={[issue.category ?? '']}
           onPick={pick}
         >

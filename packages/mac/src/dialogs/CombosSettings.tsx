@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { type CategoryRoute, type Combo, type ComboPrivacy, type Difficulty, type Role, type RouteTarget, type WorkCategory, CATEGORY_INFO, WORK_CATEGORIES, DIFFICULTIES, ROLES, DEFAULT_COMBOS, MAX_COMBOS, MAX_TARGETS, comboIdFor, comboUsage, comboUsageWords, combosOf, targetLabel } from '@beluga/core/routing/model.js';
+import { type CategoryRoute, type Combo, type ComboPrivacy, type Difficulty, type Role, type RouteTarget, type WorkCategory, WORK_CATEGORIES, DIFFICULTIES, ROLES, DEFAULT_COMBOS, MAX_COMBOS, MAX_TARGETS, comboIdFor, comboUsage, comboUsageWords, combosOf, targetLabel } from '@beluga/core/routing/model.js';
 import { LOCAL_RUNTIME, OLLAMA_ID, parseLocalModel } from '@beluga/shared/local-endpoints.js';
 import { DEFAULT_BASELINE, SAVINGS_BASELINES, baselineWords } from '@beluga/core/routing/outcomes.js';
 import type { RuntimeChoice } from '@beluga/shared/agent-runtimes.js';
@@ -11,6 +11,7 @@ import { say, useT } from '../lib/i18n.js';
 import { t as tr } from '@beluga/shared/i18n/index.js';
 import { Group, Row } from './settings-controls.js';
 import s from './settings.module.css';
+import { categoryHint, categoryLabel } from '@beluga/shared/i18n/words.js';
 
 const PRIVACY = (): ReadonlyArray<{ readonly value: ComboPrivacy; readonly label: string; readonly description: string }> => [
   { value: 'any', label: tr('routing.combos.privacy.any'), description: tr('routing.combos.privacy.anyDetail') },
@@ -227,10 +228,10 @@ export function CombosSettings() {
         <div style={STACK}>
           {WORK_CATEGORIES.map((k) => {
             const route = byKind?.[k];
-            const kind = CATEGORY_INFO[k].label;
+            const kind = categoryLabel(k);
             return (
               <div key={k} style={PAIR}>
-                <Select label={t('routing.combos.kindWork', { kind })} value={route?.combo ?? ''} options={[{ value: '', label: t('routing.combos.kindByDifficulty', { kind }), description: CATEGORY_INFO[k].hint }, ...combos.map((c) => ({ value: c.id, label: t('routing.combos.pickedCombo', { what: kind, name: c.name }), description: CATEGORY_INFO[k].hint }))]} onChange={(v) => setKind(k, v ? { combo: v, ...(route?.effort ? { effort: route.effort } : {}) } : undefined)} />
+                <Select label={t('routing.combos.kindWork', { kind })} value={route?.combo ?? ''} options={[{ value: '', label: t('routing.combos.kindByDifficulty', { kind }), description: categoryHint(k) }, ...combos.map((c) => ({ value: c.id, label: t('routing.combos.pickedCombo', { what: kind, name: c.name }), description: categoryHint(k) }))]} onChange={(v) => setKind(k, v ? { combo: v, ...(route?.effort ? { effort: route.effort } : {}) } : undefined)} />
                 {route ? <Select label={t('routing.combos.kindEffort', { kind })} value={route.effort ?? ''} options={[{ value: '', label: t('routing.combos.ownEffort') }, ...EFFORTS().map((e) => ({ value: e.value, label: e.label }))]} onChange={(v) => setKind(k, { combo: route.combo, ...(v ? { effort: v as CategoryRoute['effort'] } : {}) })} /> : null}
               </div>
             );

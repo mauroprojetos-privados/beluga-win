@@ -2,7 +2,6 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { channelOf } from '@beluga/core/store.js';
 import { currentQuestion } from '@beluga/ui/collab-actions.js';
 import { isDecisionQid } from '@beluga/core/plans/decisions.js';
-import { TRUST_INFO } from '@beluga/core/trust.js';
 import { defaultAgentOf } from '@beluga/protocol.js';
 import { Icon } from '../components/Icon.js';
 import { Button, Dot, Tip, cx } from '../components/ui.js';
@@ -17,6 +16,7 @@ import { Markdown } from './Markdown.js';
 import { useNow } from './Items.js';
 import s from './attention.module.css';
 import { useT } from '../lib/i18n.js';
+import { trustWords } from '@beluga/shared/i18n/words.js';
 
 /**
  * What needs you right now, just above the box you type in: an approval, Claude's question or
@@ -306,9 +306,9 @@ function TrustPrompt() {
       </div>
       <div className={s.trustRow}>
         {(['ask', 'trusted', 'full', 'blocked'] as const).map((level) => (
-          <Tip key={level} label={TRUST_INFO[level].detail}>
+          <Tip key={level} label={trustWords(level).detail}>
             <button type="button" className={s.trust} onClick={() => actions.run({ type: 'trust', peerId, level })}>
-              <span className={s.optionLabel}>{TRUST_INFO[level].label}</span>
+              <span className={s.optionLabel}>{trustWords(level).label}</span>
             </button>
           </Tip>
         ))}

@@ -1,9 +1,10 @@
-import { CATEGORY_INFO, shortCost, shortTokens } from '@beluga/core/routing/model.js';
+import { shortCost, shortTokens } from '@beluga/core/routing/model.js';
 import { type ComboReport, DEFAULT_BASELINE, comboReport, savingsWords, strongerOf, successWords } from '@beluga/core/routing/outcomes.js';
 import { useApp } from '../../lib/beluga.js';
 import { useT } from '../../lib/i18n.js';
 import { Card } from './parts.js';
 import c from './combos.module.css';
+import { categoryLabel } from '@beluga/shared/i18n/words.js';
 
 const same = (a: readonly ComboReport[], b: readonly ComboReport[]): boolean => JSON.stringify(a) === JSON.stringify(b);
 
@@ -53,7 +54,7 @@ export function CombosCard() {
               {u.judged ? (
                 <div className={c.outcomes}>
                   {successWords(u.judged, u.good)}
-                  {u.categories.length ? `: ${u.categories.map((k) => `${CATEGORY_INFO[k.category].label} ${k.good}/${k.judged}`).join(', ')}` : ''}
+                  {u.categories.length ? `: ${u.categories.map((k) => `${categoryLabel(k.category)} ${k.good}/${k.judged}`).join(', ')}` : ''}
                 </div>
               ) : null}
             </section>
