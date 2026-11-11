@@ -13,6 +13,7 @@ import type { AgentBackend, RoomBridge } from '../agent/types.js';
 import type { AgentRuntime, RuntimeCapabilities, RuntimeId, RuntimeOptions } from '../agent/runtime/types.js';
 import { guardedBackend } from '../agent/runtime/guard.js';
 import { type SideRoute, routeSideCall, routedBackend } from '../agent/runtime/router.js';
+import { comboForRole, routeOf } from './routing/model.js';
 import { sideCalls } from '../agent/side-calls.js';
 import type { ChatAnswerRequest } from './chat/claude-prompt.js';
 import { localRuntime } from '../agent/runtime/local.js';
@@ -845,11 +846,10 @@ export class Session {
    * Claude's when it fails. A local model: Claude's only when Claude is signed in here (its side calls
    * can't run on the endpoint yet), never quietly to Anthropic otherwise. Claude, the demo, tests: the backend's.
    */
-  private sideRoute(project?: string): SideRoute {
+  private sideRoute(project?: string, agent: AgentRef = this.agentFor(project)): SideRoute {
     const rt = this.opts.runtime;
     if (!this.runtime || !rt) return { claude: () => this.agent };
     const claude = (): AgentBackend | undefined => (this.runtime?.id === CLAUDE_AGENT.runtime ? this.agent : this.backendFor(CLAUDE_AGENT.runtime));
-    const agent = this.agentFor(project);
     if (agent.runtime === CLAUDE_AGENT.runtime) return { claude };
     if (agent.runtime === LOCAL_RUNTIME) return { claude: async () => ((await this.claudeSignedIn()) ? claude() : undefined) };
     const own = rt.runtimes(agent.runtime);
@@ -958,7 +958,9 @@ export class Session {
 
   /** A pull request reviewed before a sentinel merges it (undefined without an agent to ask, or on trouble). */
   async reviewPr(input: import('../agent/pr-reviewer.js').PrReviewInput): Promise<import('../agent/pr-reviewer.js').PrReview | undefined> {
-    return routeSideCall(this.sideRoute(), (on) => on.reviewPr?.(input), undefined);
+    // Settings' reviewer combo (docs/routing.md): its first target that can run now does the review.
+    const routed = routeOf(this.store.getState(), comboForRole(this.store.getState(), 'reviewer'), Date.now());
+    return routeSideCall(routed?.ok ? this.sideRoute(undefined, routed.ready.agent) : this.sideRoute(), (on) => on.reviewPr?.(input), undefined);
   }
 
   /** Plan first in this conversation: Claude investigates read-only, then proposes a plan. */

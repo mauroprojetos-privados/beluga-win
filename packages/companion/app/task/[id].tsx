@@ -24,6 +24,9 @@ import { store } from '../../lib/store';
 import { color } from '../../lib/theme';
 import { agentName } from '../../../../src/shared/agent-label';
 
+/** How hard its drafter judged it (docs/routing.md). */
+const DIFFICULTY_WORDS = { simple: 'Simple', normal: 'Normal', hard: 'Hard' } as const;
+
 /**
  * One task (BLG-48): its goal (code folded), the acceptance criteria with their ticks, the
  * worktree and pull request doing it, and its activity, live. Comment below; start it in a new
@@ -93,6 +96,7 @@ export default function Task() {
                 {pr && t.priority !== 'none' ? <Pill label={pr.label} tone={pr.tone} /> : null}
                 <Pill label={t.assignee ?? 'No one'} Icon={User} tone={t.assignee ? 'lavender' : 'plain'} />
                 {/* On a combo (docs/routing.md): the combo, and the target its newest run went to ("Economy · Codex"). */}
+                {t.difficulty ? <Pill label={DIFFICULTY_WORDS[t.difficulty]} tone="plain" /> : null}
                 {t.agent || t.agents ? <Pill label={agentWords} Icon={t.agent?.comboName ? Route : markIcon(runtimeMark(agentRuntime))} tone="plain" /> : null}
                 {t.working ? <Pill label={t.working} Icon={User} tone="mint" /> : null}
                 {t.waiting ? <Pill label={t.waiting} Icon={Clock} tone="butter" /> : null}

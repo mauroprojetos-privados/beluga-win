@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Check, CircleCheck, Flag, Hand, Monitor, MessageCircleQuestion, PenLine, PhoneIncoming, SquareTerminal, X } from 'lucide-react-native';
+import { Check, CircleCheck, Flag, Gauge, Hand, Monitor, MessageCircleQuestion, PenLine, PhoneIncoming, SquareTerminal, X } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
@@ -20,7 +20,7 @@ import { Button, Card, haptic, IconBadge, More, Pill, Press, T, type Tone, toneB
  * card that says "Open on your Mac" (docs/companion.md, staying in step).
  */
 
-export const KNOWN = new Set(['approval', 'question', 'request', 'decision', 'confirm', 'call']);
+export const KNOWN = new Set(['approval', 'question', 'request', 'decision', 'confirm', 'call', 'combo']);
 
 export const kindOf = (kind: string): { label: string; tone: Tone; Icon: typeof Monitor } => {
   switch (kind) {
@@ -37,6 +37,9 @@ export const kindOf = (kind: string): { label: string; tone: Tone; Icon: typeof 
     // Someone rings you (BLG-706): swipe right answers on your Mac, left declines.
     case 'call':
       return { label: 'Call', tone: 'mint', Icon: PhoneIncoming };
+    // A combo used up (docs/routing.md): Try Again goes on with the first agent that can run.
+    case 'combo':
+      return { label: 'Usage limit', tone: 'butter', Icon: Gauge };
     default:
       return { label: 'On your Mac', tone: 'plain', Icon: Monitor };
   }

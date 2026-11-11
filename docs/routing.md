@@ -96,13 +96,48 @@ A combo picked before it was deleted doesn't run: the run says to pick another a
 | `routing.runRoute` | ✓ | the combo and target a conversation's newest run on a combo used (or one run's) |
 | `routing.setCombos` | Mac | save the whole list |
 | `routing.resetCombos` | Mac | back to the defaults |
+| `routing.retry` | ✓ | Needs You's Try Again on a used-up combo: on now with the first target that can run |
+| `routing.usage` | ✓ | your runs through combos, by combo and target |
 
 The phone (companion protocol 1.51) gets `comboName` on an agent: a run's answers say "Economy ·
-Codex", and a task's page says which target its worktree's newest run went to.
+Codex", a task's page says which target its worktree's newest run went to and how hard the task is
+(`difficulty`), and a used-up combo is a Needs You card of kind `combo` with Try Again.
 
-## Not yet
+## When a target hits its limit (Phase 2)
 
-- Handing a run to the next target when it hits its limit mid-run, and a Needs You item when every
-  target is used up (Phase 2).
-- Picking a combo by how hard a task is (Phase 3), per role (plan head, milestone agent, checker, PR
-  reviewer: Phase 4), and Usage split by combo and target (Phase 5).
+`src/core/routing/failover.ts` (`ComboFailover`, started with auto-continue in `daemon/core.ts`): when a
+run on a combo stops on its usage limit, its card records the limited target, so the conversation's
+next run already skips it. Beluga then tells the next target that can run to continue ("Continue
+where you left off."), once per stopped run. On another runtime, which can't read the session, the
+recent conversation goes with that message, as after a quiet switch (`WorkspaceController.carryOnCombo`).
+The chat says it: "Claude is at its usage limit: Economy · Codex goes on (Economy)." It follows
+Settings' **Continue after the limit**, and leaves child threads a stop reached alone.
+
+When nothing in the combo can run, you hear so once (a needs-you notification), and the
+conversation waits in **Needs You** (`needs-you.ts`, kind `combo`) with the reason target by target and
+**Try Again** (`routing.retry`, on the phone too). The card goes away by itself when a target can run
+again; at the reset auto-continue sends the conversation on, as for any limit.
+
+## By how hard a task is (Phase 3)
+
+The task drafter (`agent/task-drafter.ts`) also says how hard a task looks: `simple`, `normal` or
+`hard`, kept on the task (`Issue.difficulty`). **Settings › Agent › Combos › By how hard a task is**
+maps each to a combo (`prefs.difficultyCombos`). A task that names no agent of its own starts on the
+combo for its difficulty; none mapped, your agent, as before.
+
+## By role (Phase 4)
+
+**Settings › Agent › Combos › By role** (`prefs.roleCombos`): the combo each of these runs on.
+
+- **Plan head**: a new plan's own conversation.
+- **Milestones**: a plan's milestone agents and its tasks, when the plan names no agent.
+- **Checker**: a milestone's check and a draft's review, over the plan's agent. A combo that starts
+  with another vendor makes it a cross-vendor check.
+- **PR reviewer**: the pull-request review (a side call), on that combo's first target that can run.
+
+## Usage by combo and target (Phase 5)
+
+`comboUsage` reads your runs' cards: per combo, runs, how many stopped on a limit and the time they
+took, split by the target each went to. Settings › Agent › Combos shows it under each combo
+("12 runs: Codex 8, Claude · Sonnet 4 (1 at its limit)"); `routing.usage` gives it to the phone. It
+counts what the log holds; tokens per combo aren't kept yet.

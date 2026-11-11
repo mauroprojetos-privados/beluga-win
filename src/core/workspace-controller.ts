@@ -723,6 +723,17 @@ export class WorkspaceController {
   }
 
   /**
+   * A combo moved this conversation to another runtime (core/routing/failover.ts): its next run gets
+   * the recent conversation it can't read, as after a quiet switch. Nothing to carry, or the same runtime: nothing.
+   */
+  carryOnCombo(channel: string, from: string): void {
+    const ws = this.inChannel(channel);
+    if (!ws || (!ws.sessionId && !ws.forkFromSession)) return;
+    if (ws.sessionRuntime && ws.sessionRuntime === this.runtimeIn(ws.id)) return;
+    this.deps.manager.setCarry(ws.id, from);
+  }
+
+  /**
    * A message as its run starts: after a quiet switch (BLG-592) the first run carries the recent
    * conversation the new agent can't read, once (without the message itself, `requestId`'s).
    */

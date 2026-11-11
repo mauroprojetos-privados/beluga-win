@@ -73,6 +73,42 @@ export const SavedCombos = z
   .optional()
   .catch(undefined);
 
+/**
+ * How hard a task is (Phase 3, docs/routing.md): the task drafter says, and Settings › Agent ›
+ * Combos says which combo a task of each starts on when it names no agent of its own.
+ */
+export const DIFFICULTIES = ['simple', 'normal', 'hard'] as const;
+export type Difficulty = (typeof DIFFICULTIES)[number];
+
+/** Which combo a task of each difficulty starts on (unset: your agent, as before). */
+export const DifficultyCombos = z.object({ simple: z.string().regex(COMBO_ID).optional(), normal: z.string().regex(COMBO_ID).optional(), hard: z.string().regex(COMBO_ID).optional() });
+export type DifficultyCombos = z.infer<typeof DifficultyCombos>;
+
+/** The combo a task starts on by how hard it is, as the agent its worktree picks; undefined: none set (your agent). */
+export function comboForDifficulty(st: Pick<RoutingState, 'runtimes' | 'prefs'> & { readonly prefs: { readonly difficultyCombos?: DifficultyCombos } }, difficulty: Difficulty | undefined): AgentRef | undefined {
+  const id = difficulty ? st.prefs.difficultyCombos?.[difficulty] : undefined;
+  const combo = id ? combosIn(st).find((c) => c.id === id) : undefined;
+  return combo ? comboAgent(combo) : undefined;
+}
+
+/**
+ * Roles (Phase 4, docs/routing.md): the plan's head (its own conversation), the agent working a
+ * milestone or a plan's task, the checker (a milestone's check, a draft's review: pick a combo of
+ * another vendor for a cross-vendor check), and the pull-request reviewer. Each may run on a combo of
+ * its own; unset, as before (the plan's agent, else yours).
+ */
+export const ROLES = ['planHead', 'milestone', 'checker', 'reviewer'] as const;
+export type Role = (typeof ROLES)[number];
+export const RoleCombos = z.object({ planHead: z.string().regex(COMBO_ID).optional(), milestone: z.string().regex(COMBO_ID).optional(), checker: z.string().regex(COMBO_ID).optional(), reviewer: z.string().regex(COMBO_ID).optional() });
+export type RoleCombos = z.infer<typeof RoleCombos>;
+
+/** The combo a role runs on, as an agent; undefined: none set (the role's agent as before). */
+export function comboForRole(st: Pick<RoutingState, 'runtimes' | 'prefs'> & { readonly prefs: { readonly roleCombos?: RoleCombos } }, role: Role): AgentRef | undefined {
+  const id = st.prefs.roleCombos?.[role];
+  const combo = id ? combosIn(st).find((c) => c.id === id) : undefined;
+  return combo ? comboAgent(combo) : undefined;
+}
+
 /** The value a picker uses for a combo (agent-choice.ts's `runtime:model` for the rest). */
 export const COMBO_PREFIX = 'combo:';
 export const comboValue = (id: string): string => `${COMBO_PREFIX}${id}`;
@@ -389,4 +425,116 @@ export function runRouteOf(log: ReadonlyArray<LimitCard & { readonly channel?: s
     return { requestId: item.requestId, combo: a.combo, name, runtime: a.runtime, ...(a.model ? { model: a.model } : {}), target: a.label, words: `${name} · ${a.label}` };
   }
   return undefined;
+}
+
+// ---------------------------------------------------------------------------
+// A run on a combo that stopped on its limit (Phase 2: the next target goes on)
+// ---------------------------------------------------------------------------
+
+/** A worktree conversation whose newest run, on a combo, stopped on its usage limit. */
+export interface ComboStop {
+  readonly channel: string;
+  readonly requestId: string;
+  /** When it stopped. */
+  readonly at: number;
+  /** The target it ran on, with the combo. */
+  readonly agent: AgentRef;
+}
+
+/** Your conversations whose newest run went through a combo and stopped on its usage limit. */
+export function comboStops(log: ReadonlyArray<LimitCard & { readonly channel?: string; readonly requestId?: string; readonly agent?: AgentRef }>, selfId: string): ComboStop[] {
+  const last = new Map<string, (typeof log)[number]>();
+  for (const item of log) if (item.type === 'agent' && item.channel?.startsWith('ws:')) last.set(item.channel, item);
+  const out: ComboStop[] = [];
+  for (const [channel, card] of last) {
+    if (card.owner !== selfId || card.status !== 'error' || !card.agent?.combo || !card.requestId) continue;
+    if (decodeFailure(card.text)?.kind !== 'usage_limit') continue;
+    out.push({ channel, requestId: card.requestId, at: card.endTs ?? card.lastAt ?? card.ts, agent: card.agent });
+  }
+  return out;
+}
+
+/** The plan or endpoint a target's limit counts against (limitKey of its agent). */
+export const limitKeyOf = (agent: Pick<AgentRef, 'runtime' | 'model'>): string => limitKey(agent.runtime, agent.model);
+
+/** What routing reads to find a combo that's used up: the state and its worktrees' picks. */
+export interface ExhaustState extends Omit<RoutingState, 'log'> {
+  readonly log: ReadonlyArray<LimitCard & { readonly channel?: string; readonly requestId?: string; readonly agent?: AgentRef }>;
+  readonly projects: ReadonlyArray<{ readonly workspaces: ReadonlyArray<{ readonly id: string; readonly agent?: AgentRef }> }>;
+}
+
+/** A combo whose every target is out (its run stopped on a limit, and nothing else can run now): why. */
+export interface Exhausted {
+  readonly stop: ComboStop;
+  readonly name: string;
+  readonly why: string;
+}
+
+/** The conversations that still pick a combo whose run stopped on its limit, with nothing in the combo able to go on now. */
+export function exhaustedCombos(st: ExhaustState, now: number, clock?: (at: number) => string): Exhausted[] {
+  const picks = new Map<string, AgentRef | undefined>(st.projects.flatMap((p) => p.workspaces.map((w) => [`ws:${w.id}`, w.agent] as const)));
+  return comboStops(st.log, st.selfId).flatMap((stop) => {
+    const pick = picks.get(stop.channel);
+    if (!pick?.combo || pick.combo !== stop.agent.combo) return [];
+    const r = routeOf(st, pick, now, clock);
+    return r && !r.ok ? [{ stop, name: r.combo.name, why: r.why }] : [];
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Usage by combo and target (Phase 5)
+// ---------------------------------------------------------------------------
+
+/** One target's share of a combo's runs. */
+export interface TargetUsage {
+  readonly target: string;
+  readonly runtime: string;
+  readonly runs: number;
+  /** Runs that stopped on a usage limit. */
+  readonly limited: number;
+  /** Time its runs took, start to end. */
+  readonly ms: number;
+}
+
+/** A combo's runs, split by the target each went to (most runs first). */
+export interface ComboUsage {
+  readonly combo: string;
+  readonly name: string;
+  readonly runs: number;
+  readonly limited: number;
+  readonly ms: number;
+  readonly targets: readonly TargetUsage[];
+}
+
+const FINAL = new Set(['done', 'error', 'denied']);
+
+/**
+ * Your runs that went through a combo, by combo and by target (the run's card is the record: the
+ * target it ran on, the combo, when it began and ended, whether it stopped on a limit). From `since` on.
+ */
+export function comboUsage(log: ReadonlyArray<LimitCard & { readonly agent?: AgentRef }>, selfId: string, since = 0): ComboUsage[] {
+  const by = new Map<string, { name: string; targets: Map<string, { target: string; runtime: string; runs: number; limited: number; ms: number }> }>();
+  for (const item of log) {
+    const a = item.agent;
+    if (item.type !== 'agent' || item.owner !== selfId || !a?.combo || !item.status || !FINAL.has(item.status) || item.ts < since) continue;
+    const combo = by.get(a.combo) ?? { name: a.comboName ?? a.combo, targets: new Map() };
+    by.set(a.combo, combo);
+    const key = `${a.runtime}|${a.model ?? ''}`;
+    const t = combo.targets.get(key) ?? { target: a.model ? `${a.label} · ${modelName(a.model)}` : a.label, runtime: a.runtime, runs: 0, limited: 0, ms: 0 };
+    t.runs += 1;
+    if (item.status === 'error' && decodeFailure(item.text)?.kind === 'usage_limit') t.limited += 1;
+    t.ms += Math.max(0, (item.endTs ?? item.ts) - item.ts);
+    combo.targets.set(key, t);
+  }
+  return [...by].map(([id, c]) => {
+    const targets = [...c.targets.values()].sort((x, y) => y.runs - x.runs);
+    const sum = (k: 'runs' | 'limited' | 'ms') => targets.reduce((n, t) => n + t[k], 0);
+    return { combo: id, name: c.name, runs: sum('runs'), limited: sum('limited'), ms: sum('ms'), targets };
+  }).sort((x, y) => y.runs - x.runs);
+}
+
+/** "12 runs: Codex 8, Claude · Sonnet 4 (1 at its limit)". */
+export function comboUsageWords(u: ComboUsage): string {
+  const parts = u.targets.map((t) => `${t.target} ${t.runs}${t.limited ? ` (${t.limited} at its limit)` : ''}`);
+  return `${u.runs} run${u.runs === 1 ? '' : 's'}: ${parts.join(', ')}`;
 }

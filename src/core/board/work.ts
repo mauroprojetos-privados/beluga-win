@@ -12,6 +12,7 @@ import { Board, type IssuePatch, type NewIssue } from './board.js';
 import type { IssuePr } from './model.js';
 import { agentLabel, agentName } from '../../shared/agent-label.js';
 import { type AgentRef, defaultAgentOf } from '../../protocol.js';
+import { comboForDifficulty } from '../routing/model.js';
 import { chosenAgent } from '../settings.js';
 import { needsChecksText, unexplained } from './criteria.js';
 import { inSet, labelsFor } from './labels.js';
@@ -269,7 +270,7 @@ export class BoardWork {
   addDraft(place: string, d: TaskDraft, agent?: AgentRef): Issue[] {
     const { projectId, board } = this.placeOf(place);
     const who = d.epic ? undefined : this.whom(projectId, d.for);
-    const first = this.board.create({ projectId, board, title: d.title, labels: d.labels, ...(d.priority ? { priority: d.priority } : {}), ...(who ? { assignee: who } : {}), ...(agent ? { agent } : {}), brief: draftBrief(d) }, this.me());
+    const first = this.board.create({ projectId, board, title: d.title, labels: d.labels, ...(d.priority ? { priority: d.priority } : {}), ...(d.difficulty ? { difficulty: d.difficulty } : {}), ...(who ? { assignee: who } : {}), ...(agent ? { agent } : {}), brief: draftBrief(d) }, this.me());
     return [first, ...this.addMore(first, agent ? { agent } : {}, d)];
   }
 
@@ -332,6 +333,7 @@ export class BoardWork {
           status: first.status,
           labels: [...new Set([...(input.labels ?? []), ...m.labels])],
           ...(m.priority ? { priority: m.priority } : input.priority ? { priority: input.priority } : {}),
+          ...(m.difficulty ? { difficulty: m.difficulty } : {}),
           ...(who ? { assignee: who } : {}),
           ...(d.epic ? { parent: first.id } : input.parent ? { parent: input.parent } : {}),
           // One New Task message, one agent for all it made.
@@ -368,7 +370,8 @@ export class BoardWork {
     this.expecting.push(ticket);
     let ws: Workspace | undefined;
     try {
-      const agent = opts.agent ?? issue.agent;
+      // None named: by how hard it is, the combo Settings maps (docs/routing.md), else your agent.
+      const agent = opts.agent ?? issue.agent ?? comboForDifficulty(this.deps.store.getState(), issue.difficulty);
       ws = await controller.newWorktree(issue.projectId, name, { ...(opts.base ? { base: opts.base } : {}), ...(opts.quiet ? { quiet: true } : {}), ...(agent ? { agent } : {}) });
     } finally {
       const at = this.expecting.indexOf(ticket);

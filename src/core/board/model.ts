@@ -7,6 +7,7 @@
  */
 
 import type { AgentRef } from '../../protocol.js';
+import type { Difficulty } from '../routing/model.js';
 import type { LabelDef } from './labels.js';
 import { agentLabel } from '../../shared/agent-label.js';
 
@@ -207,6 +208,8 @@ export interface Issue {
   readonly drafting?: boolean;
   readonly status: IssueStatus;
   readonly priority: Priority;
+  /** How hard it is, as its drafter judged (docs/routing.md): the combo it starts on when it names no agent. */
+  readonly difficulty?: Difficulty;
   readonly labels: readonly string[];
   readonly estimate?: number;
   /** YYYY-MM-DD. */

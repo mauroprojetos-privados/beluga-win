@@ -21,4 +21,10 @@ export const ROUTING_API = {
   'routing.setCombos': { args: z.tuple([z.array(Combo).max(MAX_COMBOS)]) },
   // Back to the defaults. → the defaults as this computer has them
   'routing.resetCombos': { args: z.tuple([]) },
+  // A conversation whose combo was used up (Needs You): on now, with the first target that can run;
+  // still none, why. → the target's words ("Economy · Codex")
+  'routing.retry': { args: z.tuple([channel]) },
+  // Your runs through combos, by combo and by the target each went to (runs, at a limit, time),
+  // from `since` (ms) on. → ComboUsage[]
+  'routing.usage': { args: z.tuple([z.number().int().min(0).optional()]) },
 } as const;

@@ -722,6 +722,9 @@ export const PHONE: Record<Method, Side> = {
   'routing.runRoute': 'phone',
   'routing.setCombos': 'mac',
   'routing.resetCombos': 'mac',
+  // Needs You's Try Again for a used-up combo: like Continue, phone-sized.
+  'routing.retry': 'phone',
+  'routing.usage': 'phone',
 };
 
 /** A method the phone may call (unknown names are not). */

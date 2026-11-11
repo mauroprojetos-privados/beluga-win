@@ -1116,6 +1116,7 @@ export function taskPageView(state: DomainState, id: string, ctx?: ViewContext):
     // there (changed in its conversation); else its own (none: your default). The list is for Start with….
     ...(live ? { agent: agentRefView(live) } : i.agent ? { agent: agentRefView(i.agent) } : {}),
     ...(isStartable(i) ? { agents: workPicker(state, i.agent) } : {}),
+    ...(i.difficulty ? { difficulty: i.difficulty } : {}),
   };
 }
 

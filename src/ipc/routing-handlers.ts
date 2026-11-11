@@ -1,6 +1,9 @@
 import type { Session } from '../core/session.js';
 import { type Combo, comboChoices, combosIn, runRouteOf, worldOf } from '../core/routing/model.js';
 import { hhmm } from '../shared/clock.js';
+import { CONTINUE_PROMPT } from '../shared/run-failure.js';
+import { comboStops, comboUsage, routeOf, routeWords } from '../core/routing/model.js';
+import { sendAutomatic } from '../core/triage/launch.js';
 import type { Args, Method } from './api.js';
 
 /** What each `routing.*` method does (see routing-api.ts). */
@@ -28,6 +31,21 @@ export const ROUTING_HANDLERS = {
     const list = checked(combos);
     s.setPrefs({ combos: list });
     return list;
+  },
+  'routing.retry': (s, channel) => {
+    const st = s.store.getState();
+    const pick = s.workspaces?.agentIn(channel);
+    const r = routeOf(st, pick, Date.now(), hhmm);
+    if (!r) throw new Error('This conversation isn’t on a combo');
+    if (!r.ok) throw new Error(r.why);
+    const stop = comboStops(st.log, st.selfId).find((x) => x.channel === channel);
+    if (stop && r.ready.agent.runtime !== stop.agent.runtime) s.workspaces?.carryOnCombo(channel, stop.agent.label);
+    sendAutomatic(s, () => s.askOwnClaude(CONTINUE_PROMPT, channel, true));
+    return routeWords(r.ready.agent) ?? r.ready.agent.label;
+  },
+  'routing.usage': (s, since) => {
+    const st = s.store.getState();
+    return comboUsage(st.log, st.selfId, since ?? 0);
   },
   'routing.resetCombos': (s) => {
     s.setPrefs({ combos: null });

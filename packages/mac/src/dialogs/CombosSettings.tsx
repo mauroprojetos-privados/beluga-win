@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { type Combo, type ComboPrivacy, type RouteTarget, MAX_COMBOS, MAX_TARGETS, comboIdFor, combosOf, targetLabel } from '@beluga/core/routing/model.js';
+import { type Combo, type ComboPrivacy, type Difficulty, type Role, type RouteTarget, DIFFICULTIES, ROLES, MAX_COMBOS, MAX_TARGETS, comboIdFor, comboUsage, comboUsageWords, combosOf, targetLabel } from '@beluga/core/routing/model.js';
 import { LOCAL_RUNTIME, OLLAMA_ID, parseLocalModel } from '@beluga/shared/local-endpoints.js';
 import type { RuntimeChoice } from '@beluga/shared/agent-runtimes.js';
 import { useComboChoices } from '../components/agent-options.js';
@@ -14,6 +14,10 @@ const PRIVACY: ReadonlyArray<{ readonly value: ComboPrivacy; readonly label: str
   { value: 'no-third-party', label: 'No third parties', description: 'Only the agents’ own vendors, and endpoints on this computer' },
   { value: 'local-only', label: 'This computer only', description: 'Only endpoints running here' },
 ];
+
+const DIFFICULTY_LABEL: Readonly<Record<Difficulty, string>> = { simple: 'Simple', normal: 'Normal', hard: 'Hard' };
+
+const ROLE_LABEL: Readonly<Record<Role, string>> = { planHead: 'Plan head', milestone: 'Milestones', checker: 'Checker', reviewer: 'PR reviewer' };
 
 const errorText = (err: unknown): string => (err instanceof Error ? err.message.replace(/^Bad arguments for [\w.]+: /, '') : String(err));
 
@@ -59,11 +63,25 @@ export function CombosSettings() {
   const claudeModels = useApp((st) => st.models);
   const saved = useApp((st) => st.prefs.combos);
   const choices = useComboChoices();
+  // Each combo's runs so far, by target (docs/routing.md, Phase 5).
+  const usage = useApp((st) => comboUsage(st.log, st.selfId), (a, b) => JSON.stringify(a) === JSON.stringify(b));
   const combos = combosOf(saved, runtimes);
   const [draft, setDraft] = useState<Combo & { readonly isNew?: boolean }>();
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const options = targetChoices(runtimes, claudeModels);
+  const byDifficulty = useApp((st) => st.prefs.difficultyCombos);
+  const byRole = useApp((st) => st.prefs.roleCombos);
+  const setRole = (r: Role, id: string): void => {
+    const { [r]: _old, ...rest } = byRole ?? {};
+    const next = id ? { ...rest, [r]: id } : rest;
+    void api.session.setPrefs({ roleCombos: Object.keys(next).length ? next : null });
+  };
+  const setDifficulty = (d: Difficulty, id: string): void => {
+    const { [d]: _old, ...rest } = byDifficulty ?? {};
+    const next = id ? { ...rest, [d]: id } : rest;
+    void api.session.setPrefs({ difficultyCombos: Object.keys(next).length ? next : null });
+  };
 
   const saveAll = async (list: readonly Combo[]): Promise<void> => {
     setBusy(true);
@@ -154,13 +172,24 @@ export function CombosSettings() {
           New Combo
         </Button>
       </Row>
+      <Row label="By how hard a task is" detail="A task names how hard it looks when your agent writes it. One that names no agent of its own starts on this combo.">
+        {DIFFICULTIES.map((d) => (
+          <Select key={d} label={`${DIFFICULTY_LABEL[d]} tasks`} value={byDifficulty?.[d] ?? ''} options={[{ value: '', label: `${DIFFICULTY_LABEL[d]}: your agent` }, ...combos.map((c) => ({ value: c.id, label: `${DIFFICULTY_LABEL[d]}: ${c.name}` }))]} onChange={(v) => setDifficulty(d, v)} />
+        ))}
+      </Row>
+      <Row label="By role" detail="The combo each role of a plan, and the pull-request reviewer, runs on. Pick one of another vendor for the checker to have work checked by a different model.">
+        {ROLES.map((r) => (
+          <Select key={r} label={ROLE_LABEL[r]} value={byRole?.[r] ?? ''} options={[{ value: '', label: `${ROLE_LABEL[r]}: as now` }, ...combos.map((c) => ({ value: c.id, label: `${ROLE_LABEL[r]}: ${c.name}` }))]} onChange={(v) => setRole(r, v)} />
+        ))}
+      </Row>
       {draft?.isNew ? form : null}
       {combos.map((c) => {
         if (draft?.id === c.id && !draft.isNew) return <div key={c.id}>{form}</div>;
         const now = choices.find((x) => x.id === c.id);
         const privacy = c.privacy && c.privacy !== 'any' ? ` · ${PRIVACY.find((p) => p.value === c.privacy)?.label}` : '';
+        const used = usage.find((u) => u.combo === c.id);
         return (
-          <Row key={c.id} label={c.name} detail={`${now?.summary ?? ''}${privacy}${now?.now ? ` · now: ${now.now}` : now?.why ? ` · ${now.why}` : ''}`}>
+          <Row key={c.id} label={c.name} detail={`${now?.summary ?? ''}${privacy}${now?.now ? ` · now: ${now.now}` : now?.why ? ` · ${now.why}` : ''}${used ? ` · ${comboUsageWords(used)}` : ''}`}>
             <Dot tone={now?.now ? 'ok' : 'warn'} />
             <Button size="small" variant="quiet" disabled={busy} onClick={() => (setError(''), setDraft(c))}>
               Edit…

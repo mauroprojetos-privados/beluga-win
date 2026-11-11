@@ -218,6 +218,8 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'routing.runRoute': { refused: NO_TOOL },
   'routing.setCombos': { refused: NO_TOOL },
   'routing.resetCombos': { refused: NO_TOOL },
+  'routing.retry': { refused: NO_TOOL },
+  'routing.usage': { refused: STATS },
   'attachments.add': 'ui_only',
   'attachments.addFile': 'ui_only',
   'attachments.reattach': 'ui_only',

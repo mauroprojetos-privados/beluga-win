@@ -23,6 +23,8 @@ export const MACHINE: Record<Method, MachineSide> = {
   'routing.runRoute': 'drive',
   'routing.setCombos': 'drive',
   'routing.resetCombos': 'drive',
+  'routing.retry': 'drive',
+  'routing.usage': 'drive',
   'session.copyInvite': 'drive',
   'session.copyLastAnswer': 'drive',
   'session.copyText': 'drive',

@@ -11,6 +11,8 @@ import { type NeedsYou, Topic } from './protocol.js';
 import { plainLine, stripCode } from './strip.js';
 import { agentLabel } from '../shared/agent-label.js';
 import { type AgentRef, defaultAgentOf } from '../protocol.js';
+import { exhaustedCombos } from '../core/routing/model.js';
+import { hhmm } from '../shared/clock.js';
 
 /**
  * Everything waiting for you, each with the API calls its buttons make: the phone's Needs You
@@ -594,7 +596,26 @@ export function waitingNeeds(state: DomainState): NeedsYou[] {
     ...sharedPlanItems(state),
     ...sentinelItems(state),
     ...dialogueItems(state),
+    ...comboItems(state),
   ];
+}
+
+/**
+ * A conversation on a combo whose every target is out (docs/routing.md): its run stopped on a limit
+ * and nothing else in the combo can run now. Try Again hands it to the first that can; it also goes
+ * on by itself when the limit resets (auto-continue.ts).
+ */
+function comboItems(state: DomainState): NeedsYou[] {
+  return exhaustedCombos(state, Date.now(), hhmm).map(({ stop, name, why }) => ({
+    id: `combo:${stop.channel}`,
+    kind: 'combo',
+    title: clip(`Nothing in ${name} can run now`, 500),
+    detail: clip(why, 64_000),
+    from: clip(name, 100),
+    ...(convTopic(stop.channel) ? { topic: convTopic(stop.channel)! } : {}),
+    askedAt: Math.round(stop.at),
+    actions: [{ label: 'Try Again', tone: 'main' as const, method: 'routing.retry', args: [stop.channel] }],
+  }));
 }
 
 /** A notice's `need` names this item: its id, or the start of it (`gwq:<task>` for that task's question). */

@@ -847,6 +847,8 @@ export const TaskPageView = TaskSummary.extend({
    */
   agent: AgentRefView.optional(),
   agents: AgentPickerView.optional(),
+  /** 1.51 (docs/routing.md): how hard its drafter judged it; with a combo mapped for that, the one it starts on. */
+  difficulty: z.enum(['simple', 'normal', 'hard']).optional(),
 });
 export type TaskPageView = z.infer<typeof TaskPageView>;
 

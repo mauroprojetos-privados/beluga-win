@@ -41,7 +41,7 @@ import { CALLS_API } from './calls-api.js';
 import { TERMINAL_IMPORT_API } from './terminal-import-api.js';
 import { AGENT_TERM_API } from './agent-term-api.js';
 import { HANDOFF_MODES } from '../shared/agent-handoff.js';
-import { Combo, MAX_COMBOS } from '../core/routing/model.js';
+import { Combo, DifficultyCombos, MAX_COMBOS, RoleCombos } from '../core/routing/model.js';
 import { ROUTING_API } from './routing-api.js';
 
 /**
@@ -102,6 +102,10 @@ export const PrefsPatch = z
     projectAgents: z.record(z.string().min(1).max(80), AgentRef),
     // Your combos, the whole list each time (routing.setCombos checks them first); null: back to the defaults.
     combos: z.array(Combo).max(MAX_COMBOS).nullable(),
+    // Which combo a task of each difficulty starts on; null: none (your agent).
+    difficultyCombos: DifficultyCombos.nullable(),
+    // Which combo each role runs on; null: none (as before).
+    roleCombos: RoleCombos.nullable(),
     autoSetup: bool,
     branchPrefix: z.string().regex(BRANCH_PREFIX_RE, 'Use letters, digits and . _ - / only'),
     contextMeter: bool,
