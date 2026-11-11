@@ -1,4 +1,10 @@
 import type { Message } from './message.js';
+import * as sidebar from './areas/sidebar.js';
+import * as composer from './areas/composer.js';
+import * as settings from './areas/settings.js';
+import * as tasks from './areas/tasks.js';
+import * as plans from './areas/plans.js';
+import * as phone from './areas/phone.js';
 
 /**
  * English, the source catalog: every key is here first (docs/i18n.md). Keys are `area.thing`;
@@ -89,6 +95,14 @@ export const en = {
   'needs.milestoneMergeFailed': '“{title}” couldn’t merge: pass it again?',
   'needs.wantsToComeIn': '{name} wants to come in',
   'needsYou.count': { one: '{count} thing needs you', other: '{count} things need you' },
+
+  // ---- areas (src/shared/i18n/areas): each keeps its English and pt-BR side by side
+  ...sidebar.en,
+  ...composer.en,
+  ...settings.en,
+  ...tasks.en,
+  ...plans.en,
+  ...phone.en,
 } as const satisfies Record<string, Message>;
 
 /** Every key the app may say. */

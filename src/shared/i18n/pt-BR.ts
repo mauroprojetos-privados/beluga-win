@@ -1,5 +1,11 @@
 import type { Key } from './en.js';
 import type { Message } from './message.js';
+import * as sidebar from './areas/sidebar.js';
+import * as composer from './areas/composer.js';
+import * as settings from './areas/settings.js';
+import * as tasks from './areas/tasks.js';
+import * as plans from './areas/plans.js';
+import * as phone from './areas/phone.js';
 
 /**
  * Brazilian Portuguese. A key missing here is said in English (never blank); tests/i18n.test.ts
@@ -85,4 +91,11 @@ export const ptBR: Partial<Record<Key, Message>> = {
   'needs.milestoneMergeFailed': 'Não deu para fazer o merge de “{title}”: passar de novo?',
   'needs.wantsToComeIn': '{name} quer entrar',
   'needsYou.count': { one: '{count} coisa precisa de você', other: '{count} coisas precisam de você' },
+
+  ...sidebar.ptBR,
+  ...composer.ptBR,
+  ...settings.ptBR,
+  ...tasks.ptBR,
+  ...plans.ptBR,
+  ...phone.ptBR,
 };
