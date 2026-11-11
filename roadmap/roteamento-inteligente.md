@@ -590,7 +590,7 @@ Beluga de hoje.
 | Fase 3: classificar a tarefa | ✅ em parte: o redator marca `simple` / `normal` / `hard` (`Issue.difficulty`) e cada nível aponta para um combo. **Falta:** as categorias por nome (`quick`, `deep`, `visual`…) |
 | Fase 4: modelo por papel | ✅ feita: Settings › Agent › Combos › By role, com plano, etapas, verificador (o de outro fornecedor depende do combo escolhido) e revisor de PR |
 | Fase 5: medir | ✅ em parte: tokens e custo por combo e por alvo em Usage › Combos (`comboUsage`, `routing.usage` para o celular). **Falta:** taxa de sucesso, economia em relação a "tudo no Opus" e sugestões |
-| Fases 6, 6b e 6c: bots, bots especialistas e Bot Studio | não iniciadas |
+| Fases 6, 6b e 6c: bots, bots especialistas e Bot Studio | ✅ feitas na branch `claude/wonderful-sutherland-323187` (`src/core/bots/`, Settings › Bots, `docs/bots.md`): Your Mac como primeiro bot, bots em pastas com MCPs isolados, `plan_dispatch` com categoria → combo ou bot, conhecimento (OpenViking ou índice local), Bot Studio com git, exportar/importar e "Criar com o Claude". **Falta:** gatilhos de bot, MCPs em runtimes além do Claude Code, `openviking-server init` no WSL |
 | Código das fases 1 a 5 | na branch `feat/windows-port` (commits `10ab8653`, `cb7fcab5`, `659a0631`, `b2636afb`), que também está no GitHub (fork privado); no ar no motor do WSL |
 | Pendências para o celular | o telefone mostra o combo e o alvo de cada resposta, a dificuldade da tarefa e o Needs You de combo esgotado; editar combos é só no Mac, como manda o `CLAUDE.md` |
 | Fase 7: idiomas (pt-BR) | não iniciada; hoje não há biblioteca de tradução, e os textos estão escritos direto no código |

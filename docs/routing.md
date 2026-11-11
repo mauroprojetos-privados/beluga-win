@@ -148,3 +148,10 @@ for its share of the combo's tokens), Settings › Agent › Combos says it unde
 1.2M tokens · $3.40: Codex 8 (850k), Claude · Sonnet 4 (350k, 1 at its limit)"), and
 `routing.usage` gives it to the phone. It counts the runs the log holds; runs from before this kept no
 tokens.
+
+## Bots (Phases 6, 6b and 6c)
+
+A bot plans and dispatches with all of the above: its own combo for its conversation, and a map of
+**categories** (`quick`, `deep`, `supabase`…) to a combo or to another bot for the tasks it hands
+out, else their difficulty. Your Mac is the first bot; the others are folders in `~/.beluga/bots`.
+See [bots.md](bots.md).

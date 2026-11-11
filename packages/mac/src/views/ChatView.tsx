@@ -24,6 +24,8 @@ import { ConnectionStatus } from './room/ConnectionStatus.js';
 import { AssistantTabs } from '../chat/AssistantTabs.js';
 import { DrivingBanner } from '../agent-term/DrivingBanner.js';
 import { computerWord, yourComputer } from '../lib/os-words.js';
+import { BotEmpty } from '../bots/BotsNav.js';
+import { WithBotPlan } from '../bots/BotPlanPane.js';
 
 /** A conversation and the box to add to it: the room's group chat, a workspace, a shared workspace, a draft. */
 /** One-click ways to begin, under an empty conversation. */
@@ -119,6 +121,8 @@ export function ChatView() {
       <Empty icon="branch" title="A new worktree" detail="Describe the task below. Beluga makes a branch and a folder for it from the branch you pick, and your agent starts right away." />
     ) : view.kind === 'assistant' ? (
       <Empty icon="laptop" title={`Ask ${yourComputer()}`} detail={`Your agent for this whole ${computerWord()}, not one project: screenshots, what’s using the CPU, starting a worktree or a task. Keep several chats as tabs above; the open one is the one on your phone.`} action={<AssistantStarters />} />
+    ) : view.kind === 'bot' ? (
+      <BotEmpty id={view.id} />
     ) : view.kind === 'room' ? (
       <Empty icon="claude" title="Say hi to the room" detail="Everyone here sees this chat. Mention @claude to ask your agent." action={<Starters />} />
     ) : (
@@ -158,5 +162,6 @@ export function ChatView() {
     </div>
   );
   // The terminal is in the right panel or the drawer under the center (layout/panel), not beside the chat.
-  return chat;
+  // A bot's chat (Your Mac's too) has the plan it dispatched beside it (docs/bots.md).
+  return view.kind === 'assistant' || view.kind === 'bot' ? <WithBotPlan>{chat}</WithBotPlan> : chat;
 }

@@ -143,6 +143,7 @@ const PANE_SOURCES: Record<string, string> = {
   general: [s('General', 'PictureRow'), fn(read('dialogs/UpdateSettings.tsx'), 'UpdateSettingsGroup'), read('dialogs/EarningsSettings.tsx')].join('\n'),
   appearance: [s('Appearance'), read('dialogs/ThemePicker.tsx')].join('\n'),
   claude: [s('AgentPane', 'AgentsGroup'), ...['CombosSettings', 'LaunchFlagsSettings', 'McpSettings', 'LocalModelsSettings', 'ContextSettings', 'UsageLimitSettings', 'ParallelSettings', 'ChatLimitSettings'].map((f) => read(`dialogs/${f}.tsx`)), fn(read('dialogs/AgentThreadsSettings.tsx'), 'ThreadLimitsSettings'), ...THREAD_LIMIT_ROWS.map(({ label }) => `'${label}'`)].join('\n'),
+  bots: read('bots/BotsSettings.tsx'),
   notifications: ['dialogs/NotificationSettings.tsx', 'dialogs/sound/SoundSettings.tsx', 'dialogs/sound/TestNotification.tsx'].map(read).join('\n'),
   // Its toolbar buttons' rows are made from HIDEABLE_BUTTONS, and so are their entries.
   workspaces: [s('Workspaces', 'HiddenProjectsGroup', 'BranchPrefixRow'), ...HIDEABLE_BUTTONS.map(([, label]) => `'${label}'`)].join('\n'),

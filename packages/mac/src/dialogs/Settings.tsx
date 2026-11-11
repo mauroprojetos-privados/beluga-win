@@ -32,6 +32,7 @@ import { McpSettings } from './McpSettings.js';
 import { ExternalAgentsSettings } from './ExternalAgentsSettings.js';
 import { LaunchFlagsSettings } from './LaunchFlagsSettings.js';
 import { CombosSettings } from './CombosSettings.js';
+import { BotsSettings } from '../bots/BotsSettings.js';
 import { LocalModelsSettings } from './LocalModelsSettings.js';
 import { EarningsSettings } from './EarningsSettings.js';
 import { NotificationSettings } from './NotificationSettings.js';
@@ -665,6 +666,7 @@ const BODY: Record<SettingsPane, () => ReactNode> = {
   general: General,
   appearance: Appearance,
   claude: AgentPane,
+  bots: BotsSettings,
   notifications: NotificationSettings,
   workspaces: Workspaces,
   terminal: TerminalSettings,

@@ -180,7 +180,8 @@ function WaitingRow({ w, now, close, on }: { w: Waiting; now: number; close: () 
     (on?.open ?? go)(w.view);
     close();
   };
-  const meta = [...new Set([item.from ?? '', w.place ?? '', on?.name ?? ''])].filter(Boolean).join(' · ');
+  // The bot whose work asks comes first (docs/bots.md): "Your Mac › your Claude · Exportar CSV".
+  const meta = `${item.bot ? `${item.bot} › ` : ''}${[...new Set([item.from ?? '', w.place ?? '', on?.name ?? ''])].filter(Boolean).join(' · ')}`;
   const items: ActionItem[] = [
     ...(w.view ? [{ label: w.place ? `Open in ${w.place}` : 'Open', onSelect: open }] : []),
     ...[...w.surface, ...w.more].map((a, i) => ({ label: a.label, ...(a.tone === 'danger' ? { danger: true } : {}), ...(i === 0 ? { separate: true } : {}), onSelect: () => answer(a) })),
