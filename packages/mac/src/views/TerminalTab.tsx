@@ -5,6 +5,7 @@ import { cx } from '../components/ui.js';
 import { useApi } from '../lib/beluga.js';
 import m from '../components/SpecMenu.module.css';
 import s from './terminal.module.css';
+import { useT } from '../lib/i18n.js';
 
 export interface TerminalTabProps {
   readonly termKey: string;
@@ -25,6 +26,7 @@ export interface TerminalTabProps {
 
 /** Typing a terminal's new name in its tab: Return saves, Escape cancels, empty goes back to Shell N. */
 function NameField({ label, onDone }: { label: string; onDone: (name: string | undefined) => void }) {
+  const t = useT();
   const [text, setText] = useState(label);
   // Return (or Escape) ends it; the blur that follows mustn't end it again.
   const ended = useRef(false);
@@ -36,7 +38,7 @@ function NameField({ label, onDone }: { label: string; onDone: (name: string | u
   return (
     <input
       className={s.rename}
-      aria-label="Terminal name"
+      aria-label={t('views.termTab.name')}
       value={text}
       autoFocus
       spellCheck={false}
@@ -57,6 +59,7 @@ function NameField({ label, onDone }: { label: string; onDone: (name: string | u
 
 /** One terminal's tab: click to show it, double-click (or right-click › Rename…) to name it for every screen. */
 export function TerminalTab({ termKey, label, on, before, after, className, onClassName, onPick, onClose, renamable = true }: TerminalTabProps) {
+  const t = useT();
   const api = useApi();
   const [editing, setEditing] = useState(false);
   const done = (name: string | undefined): void => {
@@ -69,7 +72,7 @@ export function TerminalTab({ termKey, label, on, before, after, className, onCl
       role="tab"
       aria-selected={on}
       tabIndex={0}
-      title={renamable && !editing ? 'Double-click to rename' : undefined}
+      title={renamable && !editing ? t('views.termTab.rename') : undefined}
       onClick={onPick}
       onDoubleClick={() => renamable && setEditing(true)}
       onKeyDown={(e) => {
@@ -82,7 +85,7 @@ export function TerminalTab({ termKey, label, on, before, after, className, onCl
       {editing ? <NameField label={label} onDone={done} /> : label}
       {after}
       {onClose && !editing ? (
-        <button type="button" className={s.closeTab} aria-label={`Close ${label}`} onClick={(e) => (e.stopPropagation(), onClose())}>
+        <button type="button" className={s.closeTab} aria-label={t('views.termTab.close', { label })} onClick={(e) => (e.stopPropagation(), onClose())}>
           <Icon name="x" size={9} />
         </button>
       ) : null}
@@ -97,12 +100,12 @@ export function TerminalTab({ termKey, label, on, before, after, className, onCl
         <Context.Content className={m.menu} style={{ minWidth: 160 }} onCloseAutoFocus={(e) => e.preventDefault()}>
           {renamable ? (
             <Context.Item className={m.item} onSelect={() => setEditing(true)}>
-              <span className={m.label}>Rename…</span>
+              <span className={m.label}>{t('views.termTab.renameItem')}</span>
             </Context.Item>
           ) : null}
           {onClose ? (
             <Context.Item className={cx(m.item, m.danger)} onSelect={onClose}>
-              <span className={m.label}>Close</span>
+              <span className={m.label}>{t('common.close')}</span>
             </Context.Item>
           ) : null}
         </Context.Content>

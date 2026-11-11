@@ -8,6 +8,8 @@ import { hasRenderedLook, isVisualFile } from './reader/reader-model.js';
 import { peekFirst, readFirst } from './reader/streamed.js';
 import r from './reader/reader.module.css';
 import { ReaderContent } from './reader/reader-lazy.js';
+import { t } from '@beluga/shared/i18n/index.js';
+import { useT } from '../lib/i18n.js';
 
 /**
  * A changed file as itself, next to its diff: Markdown formatted, web pages drawn, pictures and PDFs as they look,
@@ -27,7 +29,7 @@ export const onlyAsFile = (path: string): boolean => isVisualFile(path);
 export const canShowFile = (f: Pick<Change, 'state'>): boolean => f.state !== 'deleted';
 
 /** The name of the "as itself" look: formatted Markdown is a preview, anything else the file. */
-export const fileLookLabel = (path: string): string => (hasRenderedLook(path) ? 'Preview' : 'File');
+export const fileLookLabel = (path: string): string => (hasRenderedLook(path) ? t('views.files.preview') : t('views.changed.file'));
 
 /** Where a changed file is, for the workspace (or the one shared with you) on screen. */
 export function changeLocation(state: Pick<AppState, 'view' | 'selfId' | 'shared'>, path: string): Location | undefined {
@@ -85,6 +87,7 @@ function useText(at: Location, skip: boolean, version: unknown, written: number 
 }
 
 export function ChangedFileView({ at, variant, wrap = true, version: own }: { at: Location; variant: DocVariant; wrap?: boolean; version?: string | number }) {
+  const t = useT();
   const visual = isVisualFile(at.path);
   // Read again when the changes are (or, given one, its own version: when it was last written), and when Beluga sees it written.
   const reviewed = useApp((st) => st.review?.data);
@@ -100,7 +103,7 @@ export function ChangedFileView({ at, variant, wrap = true, version: own }: { at
     scroll: 0,
   };
   return (
-    <Suspense fallback={<div className={r.opening}>Opening…</div>}>
+    <Suspense fallback={<div className={r.opening}>{t('views.reader.opening')}</div>}>
       <FileContent viewer={viewer} variant={variant} mode="rendered" onMode={() => undefined} wrap={wrap} version={own} />
     </Suspense>
   );

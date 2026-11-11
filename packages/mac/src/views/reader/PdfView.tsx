@@ -5,6 +5,7 @@ import { useApi } from '../../lib/beluga.js';
 import type { PDFDocumentProxy } from './pdf-lib.js';
 import { usePinchZoom } from '../../components/usePinchZoom.js';
 import r from './reader.module.css';
+import { useT } from '../../lib/i18n.js';
 
 /**
  * A PDF, page under page, as wide as the space it has (zoom in and out like an image). Pages are
@@ -71,6 +72,7 @@ function usePdf(at: Location, version: unknown): { doc?: PDFDocumentProxy; error
 
 /** One page: its place kept at the right size, drawn once it's near the screen. */
 function Page({ doc, n, scale, guess }: { doc: PDFDocumentProxy; n: number; scale: number; guess: Size }) {
+  const t = useT();
   const drawScale = useSettled(scale);
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -107,13 +109,14 @@ function Page({ doc, n, scale, guess }: { doc: PDFDocumentProxy; n: number; scal
   }, [near, drawScale, doc, n]);
   const s = size ?? guess;
   return (
-    <div ref={box} className={r.pdfPage} style={{ width: Math.round(s.w * scale), height: Math.round(s.h * scale) }} aria-label={`Page ${n}`} role="img">
+    <div ref={box} className={r.pdfPage} style={{ width: Math.round(s.w * scale), height: Math.round(s.h * scale) }} aria-label={t('views.pdf.page', { n })} role="img">
       <canvas ref={canvas} />
     </div>
   );
 }
 
 export function PdfView({ at, controls, version }: { at: Location; controls: boolean; version?: unknown }) {
+  const t = useT();
   const { doc, error } = usePdf(at, version);
   const [width, setWidth] = useState(0);
   const [first, setFirst] = useState<Size>();
@@ -149,8 +152,8 @@ export function PdfView({ at, controls, version }: { at: Location; controls: boo
   // Two fingers on the trackpad zoom the pages (they stretch at once and are redrawn sharp when you stop).
   const fittedNow = first && width > 0 ? Math.min(FIT_MAX, width / first.w) : 1;
   usePinchZoom(stageEl, zoom === 'fit' ? fittedNow : zoom, setZoom, { min: 0.25, max: 6 });
-  if (error) return <Empty icon="alert" title="Can’t show this PDF" detail={error} />;
-  if (!doc || !first) return <div className={r.opening}>Opening…</div>;
+  if (error) return <Empty icon="alert" title={t('views.pdf.cantShow')} detail={error} />;
+  if (!doc || !first) return <div className={r.opening}>{t('views.reader.opening')}</div>;
   const fitted = width > 0 ? Math.min(FIT_MAX, width / first.w) : 1;
   const scale = zoom === 'fit' ? fitted : zoom;
   const step = (dir: 1 | -1): void => {
@@ -160,21 +163,19 @@ export function PdfView({ at, controls, version }: { at: Location; controls: boo
   const pages = Array.from({ length: doc.numPages }, (_, i) => i + 1);
   return (
     <div className={r.imageView}>
-      <div ref={stage} className={cx(r.stage, r.pdfStage, zoom !== 'fit' && r.stageZoom)} style={{ gap: GAP }} aria-label={`PDF, ${doc.numPages} page${doc.numPages === 1 ? '' : 's'}`}>
+      <div ref={stage} className={cx(r.stage, r.pdfStage, zoom !== 'fit' && r.stageZoom)} style={{ gap: GAP }} aria-label={t('views.pdf.label', { count: doc.numPages })}>
         {pages.map((n) => (
           <Page key={n} doc={doc} n={n} scale={scale} guess={first} />
         ))}
       </div>
       {controls ? (
-        <div className={r.zoomBar} role="toolbar" aria-label="Zoom">
-          <IconButton icon="minus" label="Zoom out" onClick={() => step(-1)} />
-          <button type="button" className={r.zoomValue} onClick={() => setZoom(zoom === 'fit' ? 1 : 'fit')} aria-label={zoom === 'fit' ? 'Actual size' : 'Fit to window'}>
-            {zoom === 'fit' ? 'Fit' : `${Math.round(zoom * 100)}%`}
+        <div className={r.zoomBar} role="toolbar" aria-label={t('views.reader.zoom')}>
+          <IconButton icon="minus" label={t('views.reader.zoomOut')} onClick={() => step(-1)} />
+          <button type="button" className={r.zoomValue} onClick={() => setZoom(zoom === 'fit' ? 1 : 'fit')} aria-label={zoom === 'fit' ? t('views.reader.actualSize') : t('views.reader.fitToWindow')}>
+            {zoom === 'fit' ? t('views.reader.fit') : `${Math.round(zoom * 100)}%`}
           </button>
-          <IconButton icon="plus" label="Zoom in" onClick={() => step(1)} />
-          <span className={r.zoomSize}>
-            {doc.numPages} page{doc.numPages === 1 ? '' : 's'}
-          </span>
+          <IconButton icon="plus" label={t('views.reader.zoomIn')} onClick={() => step(1)} />
+          <span className={r.zoomSize}>{t('views.pdf.pages', { count: doc.numPages })}</span>
         </div>
       ) : null}
     </div>

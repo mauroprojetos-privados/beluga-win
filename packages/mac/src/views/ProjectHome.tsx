@@ -72,6 +72,7 @@ import d from "../chat/draft.module.css";
 import s from "./project-home.module.css";
 import a from "../lib/arrive.module.css";
 import { TeamOffers } from "../team/Team.js";
+import { useT } from "../lib/i18n.js";
 
 /**
  * A project's home: what you see when you click a project. Its main folder is never worked in,
@@ -81,6 +82,7 @@ import { TeamOffers } from "../team/Team.js";
  * and (with Stripe connected) a folded row of how it's earning.
  */
 export function ProjectHome({ id }: { id: string }) {
+  const t = useT();
   const project = useApp((st) =>
     st.projects.find((p) => p.id === id && p.root),
   );
@@ -93,8 +95,8 @@ export function ProjectHome({ id }: { id: string }) {
     return (
       <Empty
         icon="folder"
-        title="This project isn’t here anymore"
-        detail="It may have been hidden or moved. Pick another one in the sidebar."
+        title={t("views.home.gone")}
+        detail={t("views.home.goneDetail")}
       />
     );
   // A plan is one row: its conversation and its tasks' worktrees aren't counted or listed on their own.
@@ -108,7 +110,7 @@ export function ProjectHome({ id }: { id: string }) {
     },
   );
   return (
-    <div className={s.page} aria-label={`${project.name} home`}>
+    <div className={s.page} aria-label={t("views.home.pageLabel", { name: project.name })}>
       <div className={s.column}>
         <Header model={model} />
         <TeamOffers projectId={project.id} />
@@ -142,6 +144,7 @@ function useOpenOverview(): (
 }
 
 function Header({ model }: { model: HomeModel }) {
+  const t = useT();
   const { project, main, mainLine, stats } = model;
   const overview = useOpenOverview();
   // The default branch (main or master), even when the main folder has another one checked out.
@@ -158,7 +161,7 @@ function Header({ model }: { model: HomeModel }) {
               {branch}
             </span>
           ) : null}
-          <Tip label="Compared with what was last fetched from the remote">
+          <Tip label={t("views.home.syncTip")}>
             <span className={cx(s.sync, s[`tone_${mainLine.tone}`])}>
               <Dot tone={mainLine.tone === "muted" ? "muted" : mainLine.tone} />
               {mainLine.label}
@@ -170,9 +173,9 @@ function Header({ model }: { model: HomeModel }) {
         </div>
         <MainSyncBar project={project} line={mainLine} />
         {project.root ? <ProjectEnvAsks projectId={project.id} /> : null}
-        <div className={s.stats} role="group" aria-label="At a glance">
+        <div className={s.stats} role="group" aria-label={t("views.home.atAGlance")}>
           <span className={s.stat}>
-            <strong>{stats.active}</strong> active
+            <strong>{stats.active}</strong> {t("views.home.statActive")}
           </span>
           <button
             type="button"
@@ -180,7 +183,7 @@ function Header({ model }: { model: HomeModel }) {
             disabled={!stats.ready}
             onClick={() => overview(project.id, "ready")}
           >
-            <strong>{stats.ready}</strong> ready to merge
+            <strong>{stats.ready}</strong> {t("views.home.statReady")}
           </button>
           <button
             type="button"
@@ -188,7 +191,7 @@ function Header({ model }: { model: HomeModel }) {
             disabled={!stats.archived}
             onClick={() => overview(project.id, "archived")}
           >
-            <strong>{stats.archived}</strong> archived
+            <strong>{stats.archived}</strong> {t("views.home.statArchived")}
           </button>
           <EarningsPill key={project.id} root={project.root} projectId={project.id} />
           {project.root ? <EnvPill projectId={project.id} root={project.root} /> : null}
@@ -234,6 +237,7 @@ const errorText = (err: unknown): string =>
  * opens and Claude starts planning; with no text, the New Plan sheet).
  */
 function HomeComposer({ project }: { project: Project }) {
+  const t = useT();
   const agent = useMyAgentName();
   const api = useApi();
   const actions = useActions();
@@ -311,8 +315,8 @@ function HomeComposer({ project }: { project: Project }) {
         toast(
           client,
           worktree
-            ? "Describe the task, or give the worktree a name"
-            : "Type your question first",
+            ? t("views.home.needTask")
+            : t("views.home.needQuestion"),
           "info",
         );
       return;
@@ -334,7 +338,7 @@ function HomeComposer({ project }: { project: Project }) {
         );
       } catch (err) {
         putBack();
-        toast(client, `Couldn’t send the images: ${errorText(err)}`, "error");
+        toast(client, t("views.home.imagesFailed", { error: errorText(err) }), "error");
         return;
       }
     }
@@ -379,7 +383,7 @@ function HomeComposer({ project }: { project: Project }) {
         .catch((err: unknown) =>
           toast(
             client,
-            `Couldn’t create the worktree: ${errorText(err)}`,
+            t("views.home.worktreeFailed", { error: errorText(err) }),
             "error",
           ),
         );
@@ -392,7 +396,7 @@ function HomeComposer({ project }: { project: Project }) {
       setName("");
     } catch (err) {
       putBack();
-      toast(client, `Couldn’t start the chat: ${errorText(err)}`, "error");
+      toast(client, t("views.home.chatFailed", { error: errorText(err) }), "error");
     } finally {
       setBusy(false);
     }
@@ -416,12 +420,12 @@ function HomeComposer({ project }: { project: Project }) {
     <Tip
       label={
         worktree
-          ? "Make the branch and folder, then your agent starts on the task"
+          ? t("views.home.tipWorktree")
           : plan
             ? task
-              ? "Your agent reads the code and drafts milestones and tasks with you"
-              : "Write the goal in the New Plan sheet"
-            : "Start a questions-only chat in the main folder"
+              ? t("views.home.tipPlan")
+              : t("views.home.tipPlanSheet")
+            : t("views.home.tipAsk")
       }
       keys={sendKeys}
     >
@@ -435,19 +439,19 @@ function HomeComposer({ project }: { project: Project }) {
           name={worktree ? "branch" : plan ? "flag" : "chat"}
           size={12}
         />
-        {worktree ? "Create Worktree" : plan ? `Plan with ${agent}` : "Ask"}
+        {worktree ? t("views.home.createWorktree") : plan ? t("views.home.planWith", { agent }) : t("views.home.ask")}
         <span className={d.createKey}>{sendKeys}</span>
       </button>
     </Tip>
   );
 
   return (
-    <section className={s.composer} aria-label="Start something" data-drop-zone>
+    <section className={s.composer} aria-label={t("views.home.startSomething")} data-drop-zone>
       {att.dropTarget}
       <div className={s.composerHead}>
-        <h2 className={s.prompt}>What do you want to do in {project.name}?</h2>
+        <h2 className={s.prompt}>{t("views.home.whatToDo", { name: project.name })}</h2>
         <Segmented<Mode>
-          label="How to start"
+          label={t("views.home.howToStart")}
           value={mode}
           onChange={(m) => {
             setMode(m);
@@ -456,24 +460,24 @@ function HomeComposer({ project }: { project: Project }) {
           options={[
             {
               value: "worktree",
-              label: "New Worktree",
+              label: t("views.home.newWorktree"),
               icon: "branch",
-              hint: "Your agent works on its own branch and folder, made from the latest origin",
+              hint: t("views.home.newWorktreeHint"),
             },
             {
               value: "ask",
-              label: "Just Ask",
+              label: t("views.home.justAsk"),
               icon: "chat",
-              hint: "A question about the project: your agent reads the main folder and changes nothing",
+              hint: t("views.home.justAskHint"),
             },
             // Plans run in the Beluga app only.
             ...(plansOn
               ? [
                   {
                     value: "plan" as const,
-                    label: "New Plan",
+                    label: t("views.home.newPlan"),
                     icon: "flag" as const,
-                    hint: "Big work: your agent cuts it into milestones and tasks; nothing reaches the board until you approve",
+                    hint: t("views.home.newPlanHint"),
                   },
                 ]
               : []),
@@ -500,17 +504,17 @@ function HomeComposer({ project }: { project: Project }) {
             className={`${s.input} ${c.overHighlight} selectable`}
             aria-label={
               worktree
-                ? "Task for the new worktree"
+                ? t("views.home.taskLabel")
                 : plan
-                  ? `Goal for a plan in ${project.name}`
-                  : `Question about ${project.name}`
+                  ? t("views.home.goalLabel", { name: project.name })
+                  : t("views.home.questionLabel", { name: project.name })
             }
             placeholder={
               worktree
-                ? "Describe a task: “Add a health check endpoint with a test”"
+                ? t("views.home.taskPlaceholder")
                 : plan
-                  ? "What should be built, and what done looks like: “Let customers pay by card, with refunds from the admin”"
-                  : `Ask about ${project.name}…`
+                  ? t("views.home.goalPlaceholder")
+                  : t("views.home.askPlaceholder", { name: project.name })
             }
             value={text}
             rows={3}
@@ -524,26 +528,26 @@ function HomeComposer({ project }: { project: Project }) {
           {worktree ? (
             <>
               <label className={d.field}>
-                <span className={d.fieldLabel}>Based on</span>
-                <Tip label="The branch the new one starts from (origin branches are fetched first, so it's the latest)">
+                <span className={d.fieldLabel}>{t("views.home.basedOn")}</span>
+                <Tip label={t("views.home.basedOnTip")}>
                   <Select
                     className={d.select}
                     size="small"
                     mono
-                    label="Based on"
+                    label={t("views.home.basedOn")}
                     value={chosen}
                     onChange={setBase}
                     options={branchOptions(options, branches?.base)}
-                    searchPlaceholder="Find a branch"
+                    searchPlaceholder={t("views.home.findBranch")}
                   />
                 </Tip>
               </label>
               <label className={d.field}>
-                <span className={d.fieldLabel}>Name</span>
+                <span className={d.fieldLabel}>{t("views.home.name")}</span>
                 <input
                   className={`${d.name} ${s.nameInput} selectable`}
-                  aria-label="Worktree name"
-                  placeholder="from the task"
+                  aria-label={t("views.home.worktreeName")}
+                  placeholder={t("views.home.fromTheTask")}
                   value={name}
                   maxLength={60}
                   spellCheck={false}
@@ -557,13 +561,12 @@ function HomeComposer({ project }: { project: Project }) {
           ) : plan ? (
             <span className={s.note}>
               <Icon name="flag" size={12} />
-              Nothing reaches the board until you approve the plan.
+              {t("views.home.planNote")}
             </span>
           ) : (
             <span className={s.note}>
               <Icon name="eye" size={12} />
-              Questions only: your agent reads the main folder and won’t change
-              anything.
+              {t("views.home.askNote")}
             </span>
           )}
           {/* Where it runs (BLG-786): a worktree, a question or a plan alike. Only with a computer paired. */}
@@ -571,11 +574,11 @@ function HomeComposer({ project }: { project: Project }) {
           <span className={s.flex} />
           {plan ? (
             <label className={d.field}>
-              <span className={d.fieldLabel}>Runs</span>
+              <span className={d.fieldLabel}>{t("views.home.runs")}</span>
               <Select<Autonomy>
                 className={d.select}
                 size="small"
-                label="How it runs"
+                label={t("views.home.howItRuns")}
                 value={autonomy}
                 onChange={setAutonomy}
                 options={AUTONOMIES.map((a) => ({
@@ -589,7 +592,7 @@ function HomeComposer({ project }: { project: Project }) {
           <MicButton box={ref} />
           {worktree ? (
             // Create Worktree, and its ▾: the same worktree worked by another agent (BLG-506).
-            <SplitButton label="Create with another agent" caretClassName={cx(d.create, ready && d.createReady)} items={startWith(undefined, (a) => void send(a))}>
+            <SplitButton label={t("views.home.createWithAnother")} caretClassName={cx(d.create, ready && d.createReady)} items={startWith(undefined, (a) => void send(a))}>
               {createButton}
             </SplitButton>
           ) : (
@@ -602,6 +605,7 @@ function HomeComposer({ project }: { project: Project }) {
 }
 
 function Lists({ model }: { model: HomeModel }) {
+  const t = useT();
   const overview = useOpenOverview();
   const { project, worktrees, archived } = model;
   // A plan's own conversation is listed under Plans, not as a question.
@@ -611,7 +615,7 @@ function Lists({ model }: { model: HomeModel }) {
     <div className={s.lists}>
       <HomePlans projectId={project.id} />
       <Section
-        title="Worktrees"
+        title={t("views.home.worktrees")}
         count={worktrees.length}
         action={
           // Worktrees made outside Beluga that can go (any tool's), ticked in one list.
@@ -624,7 +628,7 @@ function Lists({ model }: { model: HomeModel }) {
                 openSheet({ kind: "clean_up_worktrees", projectId: project.id })
               }
             >
-              Clean Up Worktrees…
+              {t("views.home.cleanUp")}
             </Button>
           ) : null
         }
@@ -633,16 +637,15 @@ function Lists({ model }: { model: HomeModel }) {
           worktrees.map((w) => <Row key={w.id} ws={w} />)
         ) : (
           <p className={s.none}>
-            No worktrees yet. Describe a task above and your agent starts one from
-            the latest origin.
+            {t("views.home.noWorktrees")}
           </p>
         )}
       </Section>
       {asks.length ? (
         <Section
-          title="Questions"
+          title={t("views.home.questions")}
           count={asks.length}
-          hint="Asked in the main folder: your agent only reads there"
+          hint={t("views.home.questionsHint")}
         >
           {asks.map((w) => (
             <Row key={w.id} ws={w} ask />
@@ -656,7 +659,7 @@ function Lists({ model }: { model: HomeModel }) {
       <HomeHistory projectId={project.id} />
       {archived.length ? (
         <Section
-          title="Recently Archived"
+          title={t("views.home.recentlyArchived")}
           count={archived.length}
           action={
             <Button
@@ -664,7 +667,7 @@ function Lists({ model }: { model: HomeModel }) {
               variant="quiet"
               onClick={() => overview(project.id, "archived")}
             >
-              Show All in Overview
+              {t("views.home.showAllInOverview")}
             </Button>
           }
         >
@@ -687,6 +690,7 @@ const HOME_PULLS = 4;
  * recently active first. Nothing when it isn't on GitHub, gh isn't set up, or none are open.
  */
 function HomePulls({ projectId }: { projectId: string }) {
+  const t = useT();
   const list = usePullList(projectId);
   const actions = useActions();
   const shown = list?.kind === "github" ? list.pulls.slice(0, HOME_PULLS) : [];
@@ -697,29 +701,29 @@ function HomePulls({ projectId }: { projectId: string }) {
   return (
     <Section
       arrive={late}
-      title="Pull Requests"
+      title={t("views.home.pullRequests")}
       count={list.total}
-      hint="Open on GitHub"
+      hint={t("views.home.openOnGitHub")}
       action={
         <>
           {/* GitHub's mark in place of its name: the button stays short beside See All. */}
           <Button
             size="small"
             variant="quiet"
-            aria-label="See all on GitHub"
+            aria-label={t("views.home.seeAllOnGitHub")}
             onClick={() => actions.openLink({ kind: "url", url: `${repo.url}/pulls` })}
           >
             <span className={s.onGitHub}>
-              See All on <GitHubMark />
+              {t("views.home.seeAllOn")} <GitHubMark />
             </span>
           </Button>
           <Button
             size="small"
             variant="quiet"
-            aria-label="See all pull requests"
+            aria-label={t("views.home.seeAllPulls")}
             onClick={() => actions.run({ type: "view", view: { kind: "pulls", projectId } })}
           >
-            See All
+            {t("views.home.seeAll")}
           </Button>
         </>
       }
@@ -741,6 +745,7 @@ const HOME_TASKS = 3;
  * and the way to the whole board. Nothing when the board has never had a task for this repo.
  */
 function HomeTasks({ projectId }: { projectId: string }) {
+  const t = useT();
   const board = useApp((st) => st.board);
   const { open, openList } = useTaskActions();
   const tasks = useMemo(() => homeTasks(board, projectId, HOME_TASKS), [board, projectId]);
@@ -748,12 +753,12 @@ function HomeTasks({ projectId }: { projectId: string }) {
   if (!tasks.any) return null;
   return (
     <Section
-      title="Tasks"
+      title={t("views.home.tasks")}
       count={tasks.open}
-      hint="Open on the board, the latest moved first"
+      hint={t("views.home.tasksHint")}
       action={
         <Button size="small" variant="quiet" onClick={() => openList(projectId)}>
-          Show All Tasks
+          {t("views.home.showAllTasks")}
         </Button>
       }
     >
@@ -764,7 +769,7 @@ function HomeTasks({ projectId }: { projectId: string }) {
           </div>
         ))
       ) : (
-        <p className={s.none}>Nothing open. Finished tasks are on the board.</p>
+        <p className={s.none}>{t("views.home.noOpenTasks")}</p>
       )}
     </Section>
   );
@@ -806,6 +811,7 @@ const HOME_ISSUES = 3;
  * the way to the closed ones. Nothing when it isn't on GitHub or gh isn't set up (Issues says how).
  */
 function HomeIssues({ projectId }: { projectId: string }) {
+  const t = useT();
   const { list } = useIssueList(projectId, "open", "");
   const { openList } = useIssueActions();
   const shown = list?.kind === "github" ? list.issues.slice(0, HOME_ISSUES) : [];
@@ -815,12 +821,12 @@ function HomeIssues({ projectId }: { projectId: string }) {
   return (
     <Section
       arrive={late}
-      title="Issues"
+      title={t("views.home.issues")}
       count={list.issues.length}
-      hint={list.more ? "The most recently active, from GitHub" : "Open on GitHub"}
+      hint={list.more ? t("views.home.issuesHintMore") : t("views.home.openOnGitHub")}
       action={
         <Button size="small" variant="quiet" onClick={() => openList(projectId)}>
-          Show All Issues
+          {t("views.home.showAllIssues")}
         </Button>
       }
     >
@@ -831,7 +837,7 @@ function HomeIssues({ projectId }: { projectId: string }) {
           </div>
         ))
       ) : (
-        <p className={s.none}>No open issues on GitHub.</p>
+        <p className={s.none}>{t("views.home.noIssues")}</p>
       )}
     </Section>
   );
@@ -846,6 +852,7 @@ const HOME_RUNS = 5;
  * GitHub, gh isn't set up, or nothing has run.
  */
 function HomeActions({ projectId }: { projectId: string }) {
+  const t = useT();
   const { list } = useRuns(projectId);
   const { openList } = useCiActions();
   const runs = useMemo(() => (list?.kind === "github" ? sortRuns(list.runs) : []), [list]);
@@ -858,12 +865,12 @@ function HomeActions({ projectId }: { projectId: string }) {
   return (
     <Section
       arrive={late}
-      title="Actions"
+      title={t("views.home.actions")}
       count={running || runs.length}
-      hint={running ? `${running} running · live` : "The latest workflow runs, from GitHub"}
+      hint={running ? t("views.home.runningLive", { count: running }) : t("views.home.actionsHint")}
       action={
         <Button size="small" variant="quiet" onClick={() => openList(projectId)}>
-          Show All Runs
+          {t("views.home.showAllRuns")}
         </Button>
       }
     >
@@ -881,13 +888,14 @@ const HOME_PLANS = 3;
 
 /** The project's plans (running first), a few rows each opening its plan; none: nothing shown. */
 function HomePlans({ projectId }: { projectId: string }) {
+  const t = useT();
   const state = usePlans();
   const { openList } = usePlanActions();
   const plans = plansOf(state, projectId);
   if (!plans.length) return null;
   return (
     <Section
-      title="Plans"
+      title={t("views.home.plans")}
       count={plans.length}
       action={
         plans.length > HOME_PLANS ? (
@@ -896,7 +904,7 @@ function HomePlans({ projectId }: { projectId: string }) {
             variant="quiet"
             onClick={() => openList(projectId)}
           >
-            Show All Plans
+            {t("views.home.showAllPlans")}
           </Button>
         ) : null
       }
@@ -909,6 +917,7 @@ function HomePlans({ projectId }: { projectId: string }) {
 }
 
 function PlanRow({ plan }: { plan: Plan }) {
+  const t = useT();
   const view = usePlanView(plan)!;
   const { open } = usePlanActions();
   const status = planStatus(view);
@@ -930,8 +939,8 @@ function PlanRow({ plan }: { plan: Plan }) {
           </span>
           <span className={s.rowLast}>
             {plan.body
-              ? `${view.done} of ${view.total} tasks done`
-              : `${view.milestones.length} milestones · ${view.total} tasks · draft`}
+              ? t("views.home.planDone", { done: view.done, total: view.total })
+              : t("views.home.planDraft", { milestones: view.milestones.length, total: view.total })}
           </span>
         </span>
         <TonePill tone={status.tone} live={status.tone === "claude"}>
@@ -977,14 +986,15 @@ function Section({
   );
 }
 
-const PR_STATE: Record<PullRequest["state"], string> = {
-  OPEN: "Open",
-  MERGED: "Merged",
-  CLOSED: "Closed",
-};
+const PR_STATE = {
+  OPEN: "views.home.prOpen",
+  MERGED: "views.home.prMerged",
+  CLOSED: "views.home.prClosed",
+} as const satisfies Record<PullRequest["state"], string>;
 
 /** A worktree's PR on its row: #n, its state, and a mark for its checks (✓ ✗ or running). A button: it opens the PR sheet. */
 function PrChip({ pr, onOpen }: { pr: PullRequest; onOpen?: () => void }) {
+  const t = useT();
   const open = pr.state === "OPEN";
   const tone =
     pr.state === "MERGED"
@@ -1001,7 +1011,7 @@ function PrChip({ pr, onOpen }: { pr: PullRequest; onOpen?: () => void }) {
         ? {
             type: "button" as const,
             onClick: onOpen,
-            "aria-label": `${describePr(pr)}: show its checks and merge`,
+            "aria-label": t("views.home.prShowChecks", { pr: describePr(pr) }),
           }
         : {})}
       className={cx(s.rowPr, s[`pr_${tone}`])}
@@ -1010,17 +1020,17 @@ function PrChip({ pr, onOpen }: { pr: PullRequest; onOpen?: () => void }) {
       data-pr-checks={pr.checks}
       title={
         onOpen
-          ? `${describePr(pr)}: click for its checks and to merge`
+          ? t("views.home.prClickChecks", { pr: describePr(pr) })
           : describePr(pr)
       }
     >
       <Icon name={pr.state === "MERGED" ? "merge" : "pr"} size={11} />
       <span>#{pr.number}</span>
       <span className={s.rowPrState}>
-        {pr.draft && open ? "Draft" : PR_STATE[pr.state]}
+        {pr.draft && open ? t("views.home.prDraft") : t(PR_STATE[pr.state])}
       </span>
       {open && pr.checks !== "none" ? (
-        <span className={s.rowPrChecks} aria-label={`checks ${pr.checks}`}>
+        <span className={s.rowPrChecks} aria-label={t("views.home.prChecks", { checks: pr.checks })}>
           {pr.checks === "pending" ? (
             <span className={s.rowPrRunning} />
           ) : (
@@ -1034,6 +1044,7 @@ function PrChip({ pr, onOpen }: { pr: PullRequest; onOpen?: () => void }) {
 
 /** One worktree or question: its state, name, last line and when; a click opens it (its PR: the PR sheet). */
 function Row({ ws, ask }: { ws: Workspace; ask?: boolean }) {
+  const t = useT();
   const actions = useActions();
   // What the row shows, worked out when the shared state changes (the "when" too, as before):
   // drawn again only when some of it reads differently.
@@ -1046,7 +1057,7 @@ function Row({ ws, ask }: { ws: Workspace; ask?: boolean }) {
     }),
     (a, b) => sameDeep(a, b, 2),
   );
-  const title = ws.kind === "main" ? "Main folder conversation" : ws.name;
+  const title = ws.kind === "main" ? t("views.home.mainConversation") : ws.name;
   const open = (): void =>
     actions.run(
       ws.archived

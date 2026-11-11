@@ -6,9 +6,11 @@ import { ActionsContext } from '../components/SpecMenu.js';
 import { copyText } from '../lib/copy.js';
 import { useApi, useApp, useBeluga, useUi } from '../lib/beluga.js';
 import s from './lists.module.css';
+import { useT } from '../lib/i18n.js';
 
 /** Search every conversation (yours and the ones shared with you), and jump to a result. */
 export function SearchView() {
+  const t = useT();
   const api = useApi();
   const actions = useActions();
   const { client, ui } = useBeluga();
@@ -31,8 +33,8 @@ export function SearchView() {
     ui.patch({ searchQuery: undefined });
   }, [from, ui]);
   useEffect(() => {
-    const t = setTimeout(() => void api.workbench.search(query), 120);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => void api.workbench.search(query), 120);
+    return () => clearTimeout(timer);
   }, [query]);
   const open = (i: number): void => {
     client.store.dispatch({ type: 'search_cursor', cursor: i });
@@ -46,7 +48,7 @@ export function SearchView() {
           ref={input}
           className="selectable"
           value={query}
-          placeholder="Search every conversation"
+          placeholder={t('views.search.placeholder')}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -55,26 +57,26 @@ export function SearchView() {
             } else if (e.key === 'Enter' && search.hits.length) open(search.cursor);
           }}
         />
-        {search.query ? <span className={s.dim}>{search.hits.length} in {search.searched} conversations</span> : null}
+        {search.query ? <span className={s.dim}>{t('views.search.count', { hits: search.hits.length, count: search.searched })}</span> : null}
       </div>
       {!query.trim() ? (
-        <Empty icon="search" title="Find anything anyone said" detail="Every conversation: the room, your workspaces (archived ones too), and workspaces shared with you." />
+        <Empty icon="search" title={t('views.search.findAnything')} detail={t('views.search.findDetail')} />
       ) : !search.hits.length ? (
-        <Empty icon="search" title="No matches" detail={`Nothing says “${query}”.`} />
+        <Empty icon="search" title={t('views.search.noMatches')} detail={t('views.search.nothingSays', { query })} />
       ) : (
         <div ref={list} className={s.list} role="listbox">
           {search.hits.map((h, i) => (
             <ActionsContext
               key={`${h.channel}:${h.ts}:${i}`}
               items={[
-                { label: 'Open Conversation', icon: 'chat', onSelect: () => open(i) },
-                { label: 'Copy Message', icon: 'copy', separate: true, onSelect: () => void copyText(h.text).then(() => client.store.dispatch({ type: 'toast', text: 'Copied the message', level: 'success' })) },
+                { label: t('views.search.openConversation'), icon: 'chat', onSelect: () => open(i) },
+                { label: t('views.search.copyMessage'), icon: 'copy', separate: true, onSelect: () => void copyText(h.text).then(() => client.store.dispatch({ type: 'toast', text: t('views.search.copied'), level: 'success' })) },
               ]}
             >
             <div role="option" aria-selected={i === search.cursor} className={cx(s.hit, i === search.cursor && s.hitOn)} onClick={() => open(i)}>
               <div className={s.hitHead}>
                 <span className={s.place}>{h.place}</span>
-                {h.archived ? <span className={s.dim}>archived</span> : null}
+                {h.archived ? <span className={s.dim}>{t('views.search.archived')}</span> : null}
                 <span className={s.dim}>{h.who}</span>
                 <span className={s.when}>{new Date(h.ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
               </div>

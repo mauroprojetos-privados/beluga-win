@@ -7,6 +7,7 @@ import { type EditSession, setDraft } from './edit-store.js';
 import { alignTokens, indentOf } from './editor-model.js';
 import c from '../../components/markdown/code.module.css';
 import r from './reader.module.css';
+import { useT } from '../../lib/i18n.js';
 
 /**
  * A file you chose to edit: a plain text box over the same colored lines the reader shows (the
@@ -47,6 +48,7 @@ function useSettled(text: string, ms: number): string {
 }
 
 export function FileEditor({ session, lang, variant }: { session: EditSession; lang: string | undefined; variant: DocVariant }) {
+  const t = useT();
   const area = useRef<HTMLTextAreaElement>(null);
   const draft = session.draft;
   const settled = useSettled(draft, 140);
@@ -105,7 +107,7 @@ export function FileEditor({ session, lang, variant }: { session: EditSession; l
         autoCapitalize="off"
         autoCorrect="off"
         autoComplete="off"
-        aria-label={`Edit ${session.path}`}
+        aria-label={t('views.editor.label', { path: session.path })}
         onChange={(e) => setDraft(session.key, e.target.value)}
         onKeyDown={onKey}
         // Its text lines up with the lines under it only while it never scrolls by itself.
