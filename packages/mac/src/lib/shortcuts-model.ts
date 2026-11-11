@@ -12,6 +12,7 @@
  */
 
 import { fileManagerFor } from '../../../../src/shared/assistant.js';
+import { type Key, isKey, t } from '../../../../src/shared/i18n/index.js';
 
 export type KeyPlatform = 'mac' | 'windows' | 'linux';
 
@@ -167,10 +168,41 @@ const MAC_SHORTCUTS: readonly ShortcutDef[] = [
 /** Every shortcut with a Mac's keys (tests check the other keyboards' with keysOn). */
 export const MAC_SHORTCUTS_FOR_TESTS = MAC_SHORTCUTS;
 
+/** A catalog sentence, or the English written here when the catalog has none. */
+const sayKey = (key: string, english: string): string => (isKey(key) ? t(key) : english);
+
+/**
+ * A shortcut whose name and hint are said in the app's language when read (macLib.shortcuts.<id>):
+ * the English above stays the source, the screens and the search read these.
+ */
+function said(d: ShortcutDef): ShortcutDef {
+  const out: ShortcutDef = { ...d };
+  const label = d.id === 'ws-finder' ? (): string => (platform === 'linux' ? t('macLib.shortcuts.ws-finder.folder') : t('macLib.shortcuts.ws-finder', { app: fileManagerFor(platform) })) : (): string => sayKey(`macLib.shortcuts.${d.id}`, d.label);
+  Object.defineProperty(out, 'label', { get: label, enumerable: true });
+  const hint = d.hint;
+  if (hint !== undefined) Object.defineProperty(out, 'hint', { get: () => (d.id.startsWith('panel-') ? t('macLib.shortcuts.panelHint') : sayKey(`macLib.shortcuts.${d.id}.hint`, hint)), enumerable: true });
+  return out;
+}
+
 /** Every shortcut, with this keyboard's keys out of the box. */
-export const SHORTCUTS: readonly ShortcutDef[] = MAC_SHORTCUTS.map((d) => ({ ...d, keys: keysOn(d.id, d.keys) }));
+export const SHORTCUTS: readonly ShortcutDef[] = MAC_SHORTCUTS.map((d) => said({ ...d, keys: keysOn(d.id, d.keys) }));
 
 export const SECTIONS: readonly ShortcutSection[] = ['General', 'View', 'Go', 'Conversation', 'Workspace', 'Message box', 'Pages', 'Requests', 'Sidebar'];
+
+const SECTION_WORDS: Readonly<Record<ShortcutSection, Key>> = {
+  General: 'macLib.shortcuts.section.general',
+  View: 'macLib.shortcuts.section.view',
+  Go: 'macLib.shortcuts.section.go',
+  Conversation: 'macLib.shortcuts.section.conversation',
+  Workspace: 'macLib.shortcuts.section.workspace',
+  'Message box': 'macLib.shortcuts.section.messageBox',
+  Pages: 'macLib.shortcuts.section.pages',
+  Requests: 'macLib.shortcuts.section.requests',
+  Sidebar: 'macLib.shortcuts.section.sidebar',
+};
+
+/** A section's title in the app's language ("General", "Geral"). */
+export const sectionTitle = (section: ShortcutSection): string => t(SECTION_WORDS[section]);
 
 const BY_ID = new Map(SHORTCUTS.map((d) => [d.id, d]));
 export const shortcutDef = (id: string): ShortcutDef | undefined => BY_ID.get(id);
@@ -219,7 +251,39 @@ const OTHER_BUILT_IN: ReadonlyArray<readonly [string, string]> = [
   ['Alt+Cmd+Delete', 'Security Options'],
 ];
 
-export const BUILT_IN: ReadonlyArray<readonly [string, string]> = onMac() ? MAC_BUILT_IN : OTHER_BUILT_IN;
+const BUILT_IN_WORDS: Readonly<Record<string, Key>> = {
+  'Quit Beluga': 'macLib.shortcuts.builtIn.quit',
+  'Close Window': 'macLib.shortcuts.builtIn.closeWindow',
+  'Hide Beluga': 'macLib.shortcuts.builtIn.hide',
+  'Hide Others': 'macLib.shortcuts.builtIn.hideOthers',
+  Minimize: 'macLib.shortcuts.builtIn.minimize',
+  Undo: 'macLib.shortcuts.builtIn.undo',
+  Redo: 'macLib.shortcuts.builtIn.redo',
+  Cut: 'macLib.shortcuts.builtIn.cut',
+  Copy: 'macLib.shortcuts.builtIn.copy',
+  Paste: 'macLib.shortcuts.builtIn.paste',
+  'Select All': 'macLib.shortcuts.builtIn.selectAll',
+  'Full Screen': 'macLib.shortcuts.builtIn.fullScreen',
+  'Switch Apps': 'macLib.shortcuts.builtIn.switchApps',
+  Spotlight: 'macLib.shortcuts.builtIn.spotlight',
+  'Switch Windows': 'macLib.shortcuts.builtIn.switchWindows',
+  'Lock Screen': 'macLib.shortcuts.builtIn.lockScreen',
+  Screenshot: 'macLib.shortcuts.builtIn.screenshot',
+  'Show Desktop': 'macLib.shortcuts.builtIn.showDesktop',
+  Files: 'macLib.shortcuts.builtIn.files',
+  'Security Options': 'macLib.shortcuts.builtIn.security',
+};
+
+/** The system's keys, their names said in the app's language when read. */
+const saidBuiltIn = (rows: ReadonlyArray<readonly [string, string]>): ReadonlyArray<readonly [string, string]> =>
+  rows.map(([chord, label]) => {
+    const row: [string, string] = [chord, label];
+    const key = BUILT_IN_WORDS[label];
+    if (key) Object.defineProperty(row, 1, { get: () => t(key), enumerable: true });
+    return row;
+  });
+
+export const BUILT_IN: ReadonlyArray<readonly [string, string]> = saidBuiltIn(onMac() ? MAC_BUILT_IN : OTHER_BUILT_IN);
 
 /* ---------- Chords ---------- */
 
@@ -439,20 +503,20 @@ export const builtInFor = (chord: string): string | undefined => BUILT_IN.find((
 export function refusal(id: string, chord: string): string | undefined {
   const c = parseChord(chord);
   const d = BY_ID.get(id);
-  if (!c || !d) return 'That isn’t a key';
+  if (!c || !d) return t('macLib.shortcuts.notAKey');
   const taken = builtInFor(chord);
-  if (taken) return `${chordLabel(chord)} is ${taken}: ${onMac() ? 'macOS' : platform === 'windows' ? 'Windows' : 'the system'} keeps it`;
-  if (c.key === 'Escape' && !c.cmd && !c.ctrl && !c.alt) return 'esc closes things: pick another key';
+  if (taken) return t('macLib.shortcuts.taken', { keys: chordLabel(chord), what: taken, system: onMac() ? 'macOS' : platform === 'windows' ? 'Windows' : t('macLib.shortcuts.theSystem') }); // i18n-ignore: system names
+  if (c.key === 'Escape' && !c.cmd && !c.ctrl && !c.alt) return t('macLib.shortcuts.escCloses');
   // The talk shortcut is held down: ↩ and esc are what you press while it listens.
-  if (id === TALK_ID && (c.key === 'Enter' || c.key === 'Escape')) return `${chordLabel(chord)} sends while you talk: pick another key`;
+  if (id === TALK_ID && (c.key === 'Enter' || c.key === 'Escape')) return t('macLib.shortcuts.talkSends', { keys: chordLabel(chord) });
   const fn = /^F\d{1,2}$/.test(c.key);
   // ⌥ alone over a letter, digit or sign types a character on many keyboards (⌥3 is # on a British
   // or Turkish Mac, ⌥L is @ on a German one), and the menu bar would take it from every text box.
-  if (c.alt && !c.cmd && !c.ctrl && [...c.key].length === 1) return `${chordLabel(chord)} types a character on some keyboards: add ${onMac() ? '⌘ or ⌃' : 'Ctrl'}`;
+  if (c.alt && !c.cmd && !c.ctrl && [...c.key].length === 1) return onMac() ? t('macLib.shortcuts.typesCharMac', { keys: chordLabel(chord) }) : t('macLib.shortcuts.typesChar', { keys: chordLabel(chord) });
   if (c.cmd || c.ctrl || c.alt || fn) return undefined;
   if (d.scope === 'composer' && c.shift && (c.key === 'Enter' || c.key === 'Tab')) return undefined;
   if (d.bare && !c.shift) return undefined;
-  return `${chordLabel(chord)} would type: add ${onMac() ? '⌘, ⌃ or ⌥' : 'Ctrl or Alt'}`;
+  return onMac() ? t('macLib.shortcuts.wouldTypeMac', { keys: chordLabel(chord) }) : t('macLib.shortcuts.wouldType', { keys: chordLabel(chord) });
 }
 
 /** A gentle word about a chord that works, but not everywhere. */
@@ -461,8 +525,8 @@ export function caveat(id: string, chord: string): string | undefined {
   const d = BY_ID.get(id);
   if (!c || !d) return undefined;
   // In a terminal, keys without ⌘ are the shell's (App.tsx); only ⌃Tab still moves places.
-  if (!c.cmd && d.scope === 'app' && !(c.ctrl && c.key === 'Tab')) return `In a terminal, ${chordLabel(chord)} goes to the shell`;
-  if (d.menu && !menuAccel(chord)) return 'The menu bar can’t show this key, but it works';
+  if (!c.cmd && d.scope === 'app' && !(c.ctrl && c.key === 'Tab')) return t('macLib.shortcuts.inTerminal', { keys: chordLabel(chord) });
+  if (d.menu && !menuAccel(chord)) return t('macLib.shortcuts.menuCantShow');
   return undefined;
 }
 
@@ -550,7 +614,7 @@ export function menuKeys(bindings: Bindings): Record<string, string | null> {
 
 /** Search shortcuts by name, section, hint or keys ("commit", "⇧⌘", "panel"). */
 export function searchShortcuts(bindings: Bindings, q: string): ShortcutDef[] {
-  const t = q.trim().toLowerCase();
-  if (!t) return [...SHORTCUTS];
-  return SHORTCUTS.filter((d) => `${d.label} ${d.section} ${d.hint ?? ''} ${(bindings[d.id] ?? []).map(chordLabel).join(' ')}`.toLowerCase().includes(t));
+  const want = q.trim().toLowerCase();
+  if (!want) return [...SHORTCUTS];
+  return SHORTCUTS.filter((d) => `${d.label} ${sectionTitle(d.section)} ${d.hint ?? ''} ${(bindings[d.id] ?? []).map(chordLabel).join(' ')}`.toLowerCase().includes(want));
 }

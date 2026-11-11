@@ -1,6 +1,7 @@
 import type { AppState } from '@beluga/core/store.js';
 import { type TopTab, topTabs } from '@beluga/ui/workspace-models.js';
 import { shortcutKeys } from './shortcuts.js';
+import { t as tr } from '../../../../src/shared/i18n/index.js';
 
 /**
  * The Mac app's places: Overview and Tasks (the sidebar's top), then Search, Usage, Terminal and
@@ -34,7 +35,7 @@ export function macTabs(state: AppState): Place[] {
   const tabs = topTabs(state);
   return GO_ORDER.flatMap((kind): Place[] => {
     const key = KEYS[kind];
-    if (kind === 'tasks') return state.board.enabled ? [{ kind, key, label: 'Tasks', short: 'Tasks', hint: withKeys('Plan and track the work', kind), badge: 0 }] : [];
+    if (kind === 'tasks') return state.board.enabled ? [{ kind, key, label: tr('macLib.go.tasks'), short: tr('macLib.go.tasks'), hint: withKeys(tr('macLib.go.tasksHint'), kind), badge: 0 }] : [];
     const t = tabs.find((x) => x.kind === kind);
     return t ? [{ ...t, kind, key, hint: withKeys(t.hint.replace(/ · (⌥|Alt\+)\d$/, ''), kind) }] : [];
   });

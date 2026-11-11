@@ -1,4 +1,5 @@
 import { midi, type Note, type SoundSpec } from './synth.js';
+import { isKey, t } from '../../../../../src/shared/i18n/index.js';
 
 /**
  * Sounds made from a number (the seed): a short pentatonic motif, 2–4 notes, played by a soft
@@ -78,7 +79,14 @@ const NOUNS = ['Bell', 'Drop', 'Bloom', 'Spark', 'Ripple', 'Lantern', 'Pebble', 
 /** A name to tell your generated sounds apart ("Amber Ripple"), from the seed. */
 export function generatedName(seed: number): string {
   const r = rng(seed ^ 0x5bd1e995);
-  return `${pick(r, ADJECTIVES)} ${pick(r, NOUNS)}`;
+  const adj = pick(r, ADJECTIVES);
+  const noun = pick(r, NOUNS);
+  const say = (kind: 'adj' | 'noun', word: string): string => {
+    const key = `macLib.generated.${kind}.${word}`;
+    return isKey(key) ? t(key) : word;
+  };
+  // The words stay the seed's (the English above); each is said in the app's language.
+  return t('macLib.generated.name', { adj: say('adj', adj), noun: say('noun', noun) });
 }
 
 /** A new seed nobody else is likely to have. */

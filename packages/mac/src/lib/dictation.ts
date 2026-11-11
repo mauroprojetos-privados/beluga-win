@@ -9,6 +9,7 @@ import { joinPhrases, PhraseCutter, PHRASE_RATE, promptFrom, Resampler } from '@
 import { cleanWords, DICTATION_MAX_SECONDS, dictationAudio, HOLD_MS, matchesAccel, parseAccel, spoken, wavFromFloats } from './dictation-model.js';
 import { isRecording } from './shortcuts.js';
 import { microphoneSettings, thisComputer } from './os-words.js';
+import { t } from '../../../../src/shared/i18n/index.js';
 
 /**
  * Speak instead of typing (BLG-145): the microphone beside Send, and the talk shortcut (Settings ›
@@ -209,13 +210,13 @@ function writeDown(from: number, to: number): void {
 export async function startDictation(prefer?: HTMLTextAreaElement | null): Promise<void> {
   if (state.kind !== 'off' || !client) return;
   into = pickTarget(prefer);
-  if (!into) return set({ kind: 'off', error: 'Open a chat to speak into' });
+  if (!into) return set({ kind: 'off', error: t('macLib.dictation.openChat') });
   const model = voiceModelOf(getPrefs());
   set({ kind: 'getting', model, progress: 0 });
   try {
     if (!(await modelReady(model))) return;
   } catch (e) {
-    return set({ kind: 'off', error: `Couldn’t get ${VOICE_MODELS[model].label}: ${errorText(e)}` });
+    return set({ kind: 'off', error: t('macLib.dictation.couldntGet', { model: VOICE_MODELS[model].label, error: errorText(e) }) });
   }
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: dictationAudio(getPrefs().voiceMic) });
@@ -255,7 +256,7 @@ export async function startDictation(prefer?: HTMLTextAreaElement | null): Promi
   } catch (e) {
     stopRecording();
     const denied = e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
-    set({ kind: 'off', error: denied ? `Beluga can’t use the microphone: allow it in ${microphoneSettings()}` : `Couldn’t start listening: ${errorText(e)}` });
+    set({ kind: 'off', error: denied ? t('macLib.dictation.micDenied', { settings: microphoneSettings() }) : t('macLib.dictation.couldntStart', { error: errorText(e) }) });
   }
 }
 
@@ -283,11 +284,11 @@ export async function finishDictation(opts: { send?: boolean } = {}): Promise<vo
   const words = joinPhrases(phrases.map((x) => x.text));
   const failed = phrases.some((x) => x.status === 'failed');
   if (!target) return set({ kind: 'off' });
-  if (!words) return set({ kind: 'off', error: failed ? 'Couldn’t write that down. Try again.' : 'Didn’t catch that. Try again a little closer to the microphone.' });
+  if (!words) return set({ kind: 'off', error: failed ? t('macLib.dictation.couldntWrite') : t('macLib.dictation.didntCatch') });
   const el = target.el();
-  if (!el?.isConnected) return set({ kind: 'off', error: 'That chat closed before it was written down' });
+  if (!el?.isConnected) return set({ kind: 'off', error: t('macLib.dictation.chatClosed') });
   insertText(el, spoken(el.value.slice(0, el.selectionStart ?? el.value.length), words));
-  set(failed ? { kind: 'off', error: 'A part of it couldn’t be written down: read it over.' } : { kind: 'off' });
+  set(failed ? { kind: 'off', error: t('macLib.dictation.partLost') } : { kind: 'off' });
   // After React has the words in its state; a part missing never goes unread.
   if (send && !failed) requestAnimationFrame(() => target.send());
 }
@@ -314,7 +315,7 @@ export const clearDictationError = (): void => {
 
 /** The bar's words for the model coming. */
 export const gettingLine = (s: Extract<DictationState, { kind: 'getting' }>): string =>
-  s.progress > 0 ? `Getting ${VOICE_MODELS[s.model].label} on ${thisComputer()} · ${Math.round(s.progress * 100)}% of ${voiceSize(VOICE_MODELS[s.model].files.mac?.bytes ?? 0)}, once` : 'Getting ready…';
+  s.progress > 0 ? t('macLib.dictation.getting', { model: VOICE_MODELS[s.model].label, computer: thisComputer(), percent: Math.round(s.progress * 100), size: voiceSize(VOICE_MODELS[s.model].files.mac?.bytes ?? 0) }) : t('macLib.dictation.gettingReady');
 
 /* ---------- The shortcut ---------- */
 

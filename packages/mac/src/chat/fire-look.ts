@@ -3,6 +3,8 @@
  * colours fine-tune it (and make it your own). Kept on this Mac, with the window's other prefs.
  */
 
+import { t } from '../../../../src/shared/i18n/index.js';
+
 export type FlameStyle = 'toon' | 'pixel';
 /** When it burns: whenever the box is showing, only while you type, or never. */
 export type FireShow = 'always' | 'typing' | 'off';
@@ -47,13 +49,55 @@ export interface FireLook {
 }
 
 export const PALETTES: readonly FirePalette[] = [
-  { id: 'blue', name: 'Blue', colors: ['#2346c8', '#3fa2ff', '#d4f6ff'] },
-  { id: 'red', name: 'Red', colors: ['#8f1022', '#e0293b', '#ff9a8a'] },
-  { id: 'rose', name: 'Rose', colors: ['#b8336a', '#f27aa6', '#ffe1ec'] },
-  { id: 'ember', name: 'Ember', colors: ['#c2261a', '#ff7a1f', '#ffd84a'] },
-  { id: 'gold', name: 'Gold', colors: ['#b45309', '#f5b82e', '#fff3c4'] },
-  { id: 'venom', name: 'Venom', colors: ['#166534', '#3fd47a', '#e0fbe9'] },
-  { id: 'violet', name: 'Violet', colors: ['#5b21b6', '#a78bfa', '#efe9ff'] },
+  {
+    id: 'blue',
+    get name() {
+      return t('macLib.fire.palette.blue');
+    },
+    colors: ['#2346c8', '#3fa2ff', '#d4f6ff'],
+  },
+  {
+    id: 'red',
+    get name() {
+      return t('macLib.fire.palette.red');
+    },
+    colors: ['#8f1022', '#e0293b', '#ff9a8a'],
+  },
+  {
+    id: 'rose',
+    get name() {
+      return t('macLib.fire.palette.rose');
+    },
+    colors: ['#b8336a', '#f27aa6', '#ffe1ec'],
+  },
+  {
+    id: 'ember',
+    get name() {
+      return t('macLib.fire.palette.ember');
+    },
+    colors: ['#c2261a', '#ff7a1f', '#ffd84a'],
+  },
+  {
+    id: 'gold',
+    get name() {
+      return t('macLib.fire.palette.gold');
+    },
+    colors: ['#b45309', '#f5b82e', '#fff3c4'],
+  },
+  {
+    id: 'venom',
+    get name() {
+      return t('macLib.fire.palette.venom');
+    },
+    colors: ['#166534', '#3fd47a', '#e0fbe9'],
+  },
+  {
+    id: 'violet',
+    get name() {
+      return t('macLib.fire.palette.violet');
+    },
+    colors: ['#5b21b6', '#a78bfa', '#efe9ff'],
+  },
 ];
 
 /** What typing fast flares to. */
@@ -62,12 +106,66 @@ export const TEMPER: readonly [string, string, string] = ['#d8361c', '#ff8a1f', 
 type Tuning = Pick<FireLook, 'style' | 'fuel' | 'height' | 'thickness' | 'wildness' | 'palette' | 'temper'>;
 
 export const PRESETS: ReadonlyArray<{ readonly id: string; readonly name: string; readonly blurb: string; readonly look: Tuning }> = [
-  { id: 'hades', name: 'Hades', blurb: 'Blue, lively, flares when you rush', look: { style: 'toon', fuel: 0.55, height: 0.5, thickness: 0.5, wildness: 0.55, palette: 'blue', temper: true } },
-  { id: 'candle', name: 'Candle', blurb: 'A few calm, gold tips', look: { style: 'toon', fuel: 0.2, height: 0.3, thickness: 0.3, wildness: 0.15, palette: 'gold', temper: false } },
-  { id: 'bonfire', name: 'Bonfire', blurb: 'Tall, thick and wild', look: { style: 'toon', fuel: 0.9, height: 0.9, thickness: 0.75, wildness: 0.75, palette: 'ember', temper: false } },
-  { id: 'rose', name: 'Rose Garden', blurb: 'Soft pink, gently swaying', look: { style: 'toon', fuel: 0.45, height: 0.45, thickness: 0.6, wildness: 0.3, palette: 'rose', temper: false } },
-  { id: 'arcade', name: 'Arcade', blurb: 'Pixel fire, like an old game', look: { style: 'pixel', fuel: 0.6, height: 0.55, thickness: 0.55, wildness: 0.5, palette: 'red', temper: true } },
-  { id: 'ghost', name: 'Ghost', blurb: 'Tall violet pixels, calm and eerie', look: { style: 'pixel', fuel: 0.6, height: 0.75, thickness: 0.5, wildness: 0.35, palette: 'violet', temper: false } },
+  {
+    id: 'hades',
+    get name() {
+      return t('macLib.fire.preset.hades.name');
+    },
+    get blurb() {
+      return t('macLib.fire.preset.hades.blurb');
+    },
+    look: { style: 'toon', fuel: 0.55, height: 0.5, thickness: 0.5, wildness: 0.55, palette: 'blue', temper: true },
+  },
+  {
+    id: 'candle',
+    get name() {
+      return t('macLib.fire.preset.candle.name');
+    },
+    get blurb() {
+      return t('macLib.fire.preset.candle.blurb');
+    },
+    look: { style: 'toon', fuel: 0.2, height: 0.3, thickness: 0.3, wildness: 0.15, palette: 'gold', temper: false },
+  },
+  {
+    id: 'bonfire',
+    get name() {
+      return t('macLib.fire.preset.bonfire.name');
+    },
+    get blurb() {
+      return t('macLib.fire.preset.bonfire.blurb');
+    },
+    look: { style: 'toon', fuel: 0.9, height: 0.9, thickness: 0.75, wildness: 0.75, palette: 'ember', temper: false },
+  },
+  {
+    id: 'rose',
+    get name() {
+      return t('macLib.fire.preset.rose.name');
+    },
+    get blurb() {
+      return t('macLib.fire.preset.rose.blurb');
+    },
+    look: { style: 'toon', fuel: 0.45, height: 0.45, thickness: 0.6, wildness: 0.3, palette: 'rose', temper: false },
+  },
+  {
+    id: 'arcade',
+    get name() {
+      return t('macLib.fire.preset.arcade.name');
+    },
+    get blurb() {
+      return t('macLib.fire.preset.arcade.blurb');
+    },
+    look: { style: 'pixel', fuel: 0.6, height: 0.55, thickness: 0.55, wildness: 0.5, palette: 'red', temper: true },
+  },
+  {
+    id: 'ghost',
+    get name() {
+      return t('macLib.fire.preset.ghost.name');
+    },
+    get blurb() {
+      return t('macLib.fire.preset.ghost.blurb');
+    },
+    look: { style: 'pixel', fuel: 0.6, height: 0.75, thickness: 0.5, wildness: 0.35, palette: 'violet', temper: false },
+  },
 ];
 
 /** Only while typing, how quickly it catches and goes out: the most and least each can be (seconds), and the step its slider moves in. */
@@ -128,10 +226,46 @@ export const fireVars = (look: Pick<FireLook, 'palette' | 'palettes'>): Record<s
 
 /** One tap for what's on: the fire, what typing throws, deleting's pops (the look itself stays). */
 export const SETUPS: ReadonlyArray<{ readonly id: string; readonly name: string; readonly blurb: string; readonly set: Pick<FireLook, 'show' | 'typing' | 'popDelete'> }> = [
-  { id: 'full', name: 'Full Fire', blurb: 'Flames, confetti and pops', set: { show: 'always', typing: 'confetti', popDelete: true } },
-  { id: 'pixels', name: 'Just Pixels', blurb: 'No flames: pixels as you type and delete', set: { show: 'off', typing: 'pixels', popDelete: true } },
-  { id: 'pops', name: 'Pops Only', blurb: 'Only what you delete pops', set: { show: 'off', typing: 'off', popDelete: true } },
-  { id: 'off', name: 'Off', blurb: 'Nothing at all', set: { show: 'off', typing: 'off', popDelete: false } },
+  {
+    id: 'full',
+    get name() {
+      return t('macLib.fire.setup.full.name');
+    },
+    get blurb() {
+      return t('macLib.fire.setup.full.blurb');
+    },
+    set: { show: 'always', typing: 'confetti', popDelete: true },
+  },
+  {
+    id: 'pixels',
+    get name() {
+      return t('macLib.fire.setup.pixels.name');
+    },
+    get blurb() {
+      return t('macLib.fire.setup.pixels.blurb');
+    },
+    set: { show: 'off', typing: 'pixels', popDelete: true },
+  },
+  {
+    id: 'pops',
+    get name() {
+      return t('macLib.fire.setup.pops.name');
+    },
+    get blurb() {
+      return t('macLib.fire.setup.pops.blurb');
+    },
+    set: { show: 'off', typing: 'off', popDelete: true },
+  },
+  {
+    id: 'off',
+    get name() {
+      return t('macLib.fire.setup.off.name');
+    },
+    get blurb() {
+      return t('macLib.fire.setup.off.blurb');
+    },
+    set: { show: 'off', typing: 'off', popDelete: false },
+  },
 ];
 
 export const setupOf = (look: FireLook): string | undefined => SETUPS.find((x) => x.set.show === look.show && x.set.typing === look.typing && x.set.popDelete === look.popDelete)?.id;
@@ -146,9 +280,36 @@ const tuningOf = (id: string): Tuning => PRESETS.find((p) => p.id === id)!.look;
 
 /** The welcome's three (onboarding › Fire): two pixel fires and none at all. Each sets what's on and the look; None keeps the look for later. */
 export const STARTERS: ReadonlyArray<{ readonly id: string; readonly name: string; readonly blurb: string; readonly set: Partial<FireLook> }> = [
-  { id: 'arcade', name: 'Arcade', blurb: 'Red pixel fire that flares when you rush, and pixels fly as you type.', set: { ...tuningOf('arcade'), preset: 'arcade', show: 'always', typing: 'pixels', popDelete: true, border: true } },
-  { id: 'ghost', name: 'Ghost', blurb: 'Tall, calm violet pixels that burn while you type.', set: { ...tuningOf('ghost'), preset: 'ghost', show: 'typing', typing: 'pixels', popDelete: true, border: true } },
-  { id: 'none', name: 'None', blurb: 'A plain box: no fire, nothing flies. Settings has it if you change your mind.', set: { show: 'off', typing: 'off', popDelete: false } },
+  {
+    id: 'arcade',
+    get name() {
+      return t('macLib.fire.starter.arcade.name');
+    },
+    get blurb() {
+      return t('macLib.fire.starter.arcade.blurb');
+    },
+    set: { ...tuningOf('arcade'), preset: 'arcade', show: 'always', typing: 'pixels', popDelete: true, border: true },
+  },
+  {
+    id: 'ghost',
+    get name() {
+      return t('macLib.fire.starter.ghost.name');
+    },
+    get blurb() {
+      return t('macLib.fire.starter.ghost.blurb');
+    },
+    set: { ...tuningOf('ghost'), preset: 'ghost', show: 'typing', typing: 'pixels', popDelete: true, border: true },
+  },
+  {
+    id: 'none',
+    get name() {
+      return t('macLib.fire.starter.none.name');
+    },
+    get blurb() {
+      return t('macLib.fire.starter.none.blurb');
+    },
+    set: { show: 'off', typing: 'off', popDelete: false },
+  },
 ];
 
 /** Which of the welcome's three these settings are, if any. */

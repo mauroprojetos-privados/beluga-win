@@ -10,6 +10,7 @@ import {
   type AssignMode,
   BUILT_IN,
   SECTIONS,
+  sectionTitle,
   SHORTCUTS,
   type ShortcutDef,
   type ShortcutOverrides,
@@ -372,7 +373,7 @@ export function KeyboardSettings() {
       {!keyQuery && !shown.length && !builtInRows.length ? <div className={k.free}>{t('prefs.keyboard.noMatch')}</div> : null}
 
       {shown.map(([section, list]) => (
-        <Group key={section} title={section}>
+        <Group key={section} title={sectionTitle(section)}>
           {list.map(row)}
         </Group>
       ))}

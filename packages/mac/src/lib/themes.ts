@@ -6,6 +6,8 @@
  * One table drives the CSS, Settings' previews and the readability test.
  */
 
+import { t as tr } from '../../../../src/shared/i18n/index.js';
+
 export type ThemeBase = 'light' | 'dark';
 
 /** The colours a theme gives (each one a design token of the same name). */
@@ -65,7 +67,9 @@ export const THEMES: readonly AppTheme[] = [
   // ---- Dark
   {
     id: 'dark',
-    name: 'Dark',
+    get name() {
+      return tr('macLib.themes.dark');
+    },
     base: 'dark',
     by: 'beluga',
     builtin: true,
@@ -73,7 +77,9 @@ export const THEMES: readonly AppTheme[] = [
   },
   {
     id: 'super-dark',
-    name: 'Super Dark',
+    get name() {
+      return tr('macLib.themes.superDark');
+    },
     base: 'dark',
     by: 'beluga',
     lit: true,
@@ -81,7 +87,9 @@ export const THEMES: readonly AppTheme[] = [
   },
   {
     id: 'oled',
-    name: 'OLED Black',
+    get name() {
+      return tr('macLib.themes.oled');
+    },
     base: 'dark',
     by: 'beluga',
     accent: '#3fb4ff',
@@ -211,7 +219,9 @@ export const THEMES: readonly AppTheme[] = [
   // ---- Light
   {
     id: 'light',
-    name: 'Light',
+    get name() {
+      return tr('macLib.themes.light');
+    },
     base: 'light',
     by: 'beluga',
     builtin: true,

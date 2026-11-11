@@ -12,6 +12,7 @@ import { openSupport } from '../lib/support.js';
 import { SHOW_WELCOME } from '../onboarding/onboarding-model.js';
 import { previewRequestPopup } from '../gateway/request-native.js';
 import { revealLabel } from '../lib/os-words.js';
+import { t } from '../../../../src/shared/i18n/index.js';
 
 export interface PaletteCommand {
   readonly id: string;
@@ -41,21 +42,21 @@ function workspaceCommands({ ui, actions, state }: Ctx): PaletteCommand[] {
   const project = state.projects.find((p) => p.id === ws.projectId);
   const worktree = ws.kind === 'worktree';
   const list: Array<[WorkspaceAction, PaletteCommand, boolean]> = [
-    ['pr', cmd('pr', 'pr', state.prs[ws.id] ? 'Pull Request…' : 'Create Pull Request…', 'pr', act('pr'), 'Your agent pushes and opens one'), worktree],
-    ['fork', cmd('fork', 'fork', 'Fork This Workspace…', 'branch', act('fork'), 'A copy with its conversation'), ws.kind !== 'chat'],
-    ['handoff', cmd('handoff', 'handoff', 'Hand Off to Someone…', 'hand', act('handoff'), 'Their agent continues it'), worktree],
-    ['commit', cmd('commit', 'commit', 'Commit All Changes…', 'commit', act('commit')), worktree && Boolean(ws.status?.changed)],
-    ['merge', cmd('merge', 'merge', 'Merge into the Main Folder…', 'merge', act('merge')), worktree],
-    ['compact', cmd('compact', 'compact', 'Compact the Conversation…', 'wand', act('compact'), 'Your agent keeps what matters'), true],
-    ['run', cmd('run', 'run', 'Run the Project', 'play', act('run')), Boolean(project?.scripts?.run)],
-    ['setup', cmd('setup', 'setup', 'Run Setup Again', 'refresh', act('setup')), Boolean(project?.scripts?.setup)],
+    ['pr', cmd('pr', 'pr', state.prs[ws.id] ? t('macLib.palette.pr') : t('macLib.palette.createPr'), 'pr', act('pr'), t('macLib.palette.prHint')), worktree],
+    ['fork', cmd('fork', 'fork', t('macLib.palette.fork'), 'branch', act('fork'), t('macLib.palette.forkHint')), ws.kind !== 'chat'],
+    ['handoff', cmd('handoff', 'handoff', t('macLib.palette.handoff'), 'hand', act('handoff'), t('macLib.palette.handoffHint')), worktree],
+    ['commit', cmd('commit', 'commit', t('macLib.palette.commit'), 'commit', act('commit')), worktree && Boolean(ws.status?.changed)],
+    ['merge', cmd('merge', 'merge', t('macLib.palette.merge'), 'merge', act('merge')), worktree],
+    ['compact', cmd('compact', 'compact', t('macLib.palette.compact'), 'wand', act('compact'), t('macLib.palette.compactHint')), true],
+    ['run', cmd('run', 'run', t('macLib.palette.run'), 'play', act('run')), Boolean(project?.scripts?.run)],
+    ['setup', cmd('setup', 'setup', t('macLib.palette.setup'), 'refresh', act('setup')), Boolean(project?.scripts?.setup)],
     ['finder', cmd('finder', 'finder', revealLabel(), 'folder', act('finder')), true],
-    ['archive', cmd('archive', 'archive', 'Archive This Workspace…', 'archive', act('archive')), ws.kind !== 'main'],
-    ['delete', cmd('delete', 'delete', 'Delete This Workspace…', 'alert', act('delete')), ws.kind !== 'main'],
+    ['archive', cmd('archive', 'archive', t('macLib.palette.archive'), 'archive', act('archive')), ws.kind !== 'main'],
+    ['delete', cmd('delete', 'delete', t('macLib.palette.delete'), 'alert', act('delete')), ws.kind !== 'main'],
   ];
   return [
     ...list.filter(([action, , ok]) => ok && !here.has(action)).map(([, c]) => c),
-    ...(project?.root ? [cmd('project', 'scripts', 'Project Settings…', 'terminal', () => ui.openMenu({ kind: 'scripts', projectId: project.id }), 'Setup and Run commands')] : []),
+    ...(project?.root ? [cmd('project', 'scripts', t('macLib.palette.projectSettings'), 'terminal', () => ui.openMenu({ kind: 'scripts', projectId: project.id }), t('macLib.palette.projectSettingsHint'))] : []),
   ];
 }
 
@@ -74,59 +75,59 @@ export function paletteCommands(ctx: Ctx): PaletteCommand[] {
     ...workspaceCommands(ctx),
     ...(talking
       ? [
-          cmd('clear', 'clear', state.view.kind === 'room' ? 'Clear the Group Chat…' : 'Clear This Conversation…', 'x', () => ui.openMenu({ kind: 'clear', channel, host: state.isHost })),
-          cmd('plan', 'plan', state.planMode[channel] ? 'Turn Off Plan First' : 'Turn On Plan First', 'claude', () => ctx.actions.run({ type: 'plan_toggle', channel }), 'Your agent plans, you approve, then it works'),
-          cmd('visualize', 'visualize', 'Draw This as a Graph', 'grid', () => void api.session.submit('/visualize', { channel }), 'Your agent draws this conversation as an interactive diagram'),
-          cmd('model', 'model', 'Choose the Model…', 'spark', () => ui.openMenu({ kind: 'model', ...(channel === 'room' ? {} : { channel }) }), 'For this conversation'),
+          cmd('clear', 'clear', state.view.kind === 'room' ? t('macLib.palette.clearGroup') : t('macLib.palette.clearConversation'), 'x', () => ui.openMenu({ kind: 'clear', channel, host: state.isHost })),
+          cmd('plan', 'plan', state.planMode[channel] ? t('macLib.palette.planOff') : t('macLib.palette.planOn'), 'claude', () => ctx.actions.run({ type: 'plan_toggle', channel }), t('macLib.palette.planHint')),
+          cmd('visualize', 'visualize', t('macLib.palette.visualize'), 'grid', () => void api.session.submit('/visualize', { channel }), t('macLib.palette.visualizeHint')),
+          cmd('model', 'model', t('macLib.palette.model'), 'spark', () => ui.openMenu({ kind: 'model', ...(channel === 'room' ? {} : { channel }) }), t('macLib.palette.modelHint')),
         ]
       : []),
     ...(state.board.enabled
       ? [
-          { id: 'tasks:new', label: 'New Task…', icon: 'task' as const, hint: 'Plan a piece of work', keywords: ['task', 'issue', 'todo', 'ticket'], run: () => openSheet({ kind: 'new_task' }) },
-          { id: 'plans:new', label: 'New Plan…', icon: 'flag' as const, hint: 'Plan big work with your agent: milestones, tasks, what runs side by side', keywords: ['plan', 'milestone', 'roadmap', 'project'], run: () => openSheet({ kind: 'new_plan' }) },
-          { id: 'plans:open', label: 'Go to Plans', icon: 'flag' as const, hint: 'Your plans, project by project', keywords: ['plans', 'milestones', 'roadmap'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'plans' } }) },
-          { id: 'tasks:open', label: 'Go to Tasks', icon: 'task' as const, hint: 'Every project’s board', keywords: ['tasks', 'board', 'issues', 'backlog', 'kanban'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'tasks' } }) },
-          { id: 'issues:open', label: 'Go to Issues', icon: 'issue' as const, hint: 'A project’s GitHub issues: your agent investigates, fixes, or writes them up as tasks', keywords: ['issues', 'github', 'bugs', 'triage', 'investigate', 'fix'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'issues' } }) },
-          { id: 'pulls:open', label: 'Go to Pull Requests', icon: 'pr' as const, hint: 'A project’s open pull requests on GitHub, anyone’s: open one in a worktree', keywords: ['pull requests', 'prs', 'pulls', 'github', 'review', 'merge'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'pulls' } }) },
-          { id: 'actions:open', label: 'Go to Actions', icon: 'pulse' as const, hint: 'A project’s GitHub Actions: runs as they go, and each workflow as a graph', keywords: ['actions', 'github', 'ci', 'workflows', 'runs', 'builds', 'checks', 'pipeline'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'actions' } }) },
+          { id: 'tasks:new', label: t('macLib.palette.newTask'), icon: 'task' as const, hint: t('macLib.palette.newTaskHint'), keywords: ['task', 'issue', 'todo', 'ticket'], run: () => openSheet({ kind: 'new_task' }) },
+          { id: 'plans:new', label: t('macLib.palette.newPlan'), icon: 'flag' as const, hint: t('macLib.palette.newPlanHint'), keywords: ['plan', 'milestone', 'roadmap', 'project'], run: () => openSheet({ kind: 'new_plan' }) },
+          { id: 'plans:open', label: t('macLib.palette.goPlans'), icon: 'flag' as const, hint: t('macLib.palette.goPlansHint'), keywords: ['plans', 'milestones', 'roadmap'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'plans' } }) },
+          { id: 'tasks:open', label: t('macLib.palette.goTasks'), icon: 'task' as const, hint: t('macLib.palette.goTasksHint'), keywords: ['tasks', 'board', 'issues', 'backlog', 'kanban'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'tasks' } }) },
+          { id: 'issues:open', label: t('macLib.palette.goIssues'), icon: 'issue' as const, hint: t('macLib.palette.goIssuesHint'), keywords: ['issues', 'github', 'bugs', 'triage', 'investigate', 'fix'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'issues' } }) },
+          { id: 'pulls:open', label: t('macLib.palette.goPulls'), icon: 'pr' as const, hint: t('macLib.palette.goPullsHint'), keywords: ['pull requests', 'prs', 'pulls', 'github', 'review', 'merge'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'pulls' } }) },
+          { id: 'actions:open', label: t('macLib.palette.goActions'), icon: 'pulse' as const, hint: t('macLib.palette.goActionsHint'), keywords: ['actions', 'github', 'ci', 'workflows', 'runs', 'builds', 'checks', 'pipeline'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'actions' } }) },
         ]
       : []),
     ...(state.sentinel.enabled
       ? [
-          { id: 'sentinel:open', label: 'Go to Sentinel', icon: 'sentinel' as const, hint: 'Watchers that run your agent, a script or a notification on a schedule', keywords: ['sentinel', 'schedule', 'cron', 'watch', 'every morning', 'brief', 'recurring'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'sentinel' } }) },
-          { id: 'dashboard:open', label: 'Go to Dashboard', icon: 'gauge' as const, hint: 'Sentinel’s dashboard: what your sentinels keep, as tiles', keywords: ['dashboard', 'numbers', 'metrics', 'kpi', 'stats', 'revenue', 'subscribers', 'tiles'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'dashboard' } }) },
-          { id: 'sentinel:chat', label: 'Go to Sentinel Chat', icon: 'chat' as const, hint: 'Talk to your agent about all of Sentinel', keywords: ['sentinel', 'chat', 'ask', 'watchers'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'sentinel_chat', ...(ctx.state.sentinel.chats?.active ? { chat: ctx.state.sentinel.chats.active } : {}) } }) },
-          { id: 'sentinel:new', label: 'New Sentinel…', icon: 'sentinel' as const, hint: 'Say what it should do, start from a recipe, or build it yourself', keywords: ['sentinel', 'schedule', 'cron', 'watch', 'recipe', 'automate'], run: () => openSheet({ kind: 'new_sentinel' }) },
+          { id: 'sentinel:open', label: t('macLib.palette.goSentinel'), icon: 'sentinel' as const, hint: t('macLib.palette.goSentinelHint'), keywords: ['sentinel', 'schedule', 'cron', 'watch', 'every morning', 'brief', 'recurring'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'sentinel' } }) },
+          { id: 'dashboard:open', label: t('macLib.palette.goDashboard'), icon: 'gauge' as const, hint: t('macLib.palette.goDashboardHint'), keywords: ['dashboard', 'numbers', 'metrics', 'kpi', 'stats', 'revenue', 'subscribers', 'tiles'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'dashboard' } }) },
+          { id: 'sentinel:chat', label: t('macLib.palette.goSentinelChat'), icon: 'chat' as const, hint: t('macLib.palette.goSentinelChatHint'), keywords: ['sentinel', 'chat', 'ask', 'watchers'], run: () => ctx.actions.run({ type: 'view', view: { kind: 'sentinel_chat', ...(ctx.state.sentinel.chats?.active ? { chat: ctx.state.sentinel.chats.active } : {}) } }) },
+          { id: 'sentinel:new', label: t('macLib.palette.newSentinel'), icon: 'sentinel' as const, hint: t('macLib.palette.newSentinelHint'), keywords: ['sentinel', 'schedule', 'cron', 'watch', 'recipe', 'automate'], run: () => openSheet({ kind: 'new_sentinel' }) },
         ]
       : []),
-    cmd('template', 'template-new', 'New Template…', 'wand', () => openSheet({ kind: 'template' }), 'A way to start a task you do often'),
-    cmd('template', 'templates', 'Manage Templates…', 'wand', () => ui.openMenu({ kind: 'templates', manage: true })),
-    ...(canRun ? [cmd('run', 'peer-run', 'Run a Command on a Friend’s Computer…', 'terminal', () => openSheet({ kind: 'peer_run' }), 'The output shows in the chat')] : []),
-    ...(following ? [cmd('unfollow', 'unfollow', `Stop Following ${following.name}`, 'eye', () => void api.session.follow(undefined))] : []),
-    ...(state.myShares.length ? [cmd('unshare', 'unshare', 'Stop Sharing a Folder…', 'share', () => ui.openMenu({ kind: 'share_folder', launchDir: client.launchDir, mine: state.myShares }))] : []),
-    cmd('name', 'name', 'Change Your Name…', 'person', () => openSettings(ui, 'general', 'settings-name'), state.self?.name ? `Now: ${state.self.name}` : undefined),
-    cmd('people', 'people', 'People & Access…', 'people', () => openSettings(ui, 'people'), 'Who can use your agent, and how'),
+    cmd('template', 'template-new', t('macLib.palette.newTemplate'), 'wand', () => openSheet({ kind: 'template' }), t('macLib.palette.newTemplateHint')),
+    cmd('template', 'templates', t('macLib.palette.manageTemplates'), 'wand', () => ui.openMenu({ kind: 'templates', manage: true })),
+    ...(canRun ? [cmd('run', 'peer-run', t('macLib.palette.peerRun'), 'terminal', () => openSheet({ kind: 'peer_run' }), t('macLib.palette.peerRunHint'))] : []),
+    ...(following ? [cmd('unfollow', 'unfollow', t('macLib.palette.unfollow', { name: following.name }), 'eye', () => void api.session.follow(undefined))] : []),
+    ...(state.myShares.length ? [cmd('unshare', 'unshare', t('macLib.palette.unshare'), 'share', () => ui.openMenu({ kind: 'share_folder', launchDir: client.launchDir, mine: state.myShares }))] : []),
+    cmd('name', 'name', t('macLib.palette.name'), 'person', () => openSettings(ui, 'general', 'settings-name'), state.self?.name ? t('macLib.palette.nameNow', { name: state.self.name }) : undefined),
+    cmd('people', 'people', t('macLib.palette.people'), 'people', () => openSettings(ui, 'people'), t('macLib.palette.peopleHint')),
     earningsCommand(state),
-    { id: 'cmd:support', label: 'Support Beluga…', icon: 'cup', hint: 'Buy the maker a coffee, or star Beluga on GitHub', keywords: ['support', 'coffee', 'donate', 'tip', 'sponsor', 'star', 'github'], run: () => openSupport('coffee') },
-    cmd('env', 'env', 'Environment Variables…', 'lock', () => openSettings(ui, 'environment'), 'For your shells, scripts and agents'),
-    cmd('shell', 'shell', 'Terminal Settings…', 'terminal', () => openSettings(ui, 'terminal'), 'Which shell, and how it starts'),
+    { id: 'cmd:support', label: t('macLib.palette.support'), icon: 'cup', hint: t('macLib.palette.supportHint'), keywords: ['support', 'coffee', 'donate', 'tip', 'sponsor', 'star', 'github'], run: () => openSupport('coffee') },
+    cmd('env', 'env', t('macLib.palette.env'), 'lock', () => openSettings(ui, 'environment'), t('macLib.palette.envHint')),
+    cmd('shell', 'shell', t('macLib.palette.shell'), 'terminal', () => openSettings(ui, 'terminal'), t('macLib.palette.shellHint')),
     {
       id: 'cmd:popup-preview',
-      label: 'Preview Request Pop-up',
+      label: t('macLib.palette.popup'),
       icon: 'bell',
-      hint: 'The card a friend’s request, or your agent needing you, gets on top of other apps (a pretend one)',
+      hint: t('macLib.palette.popupHint'),
       keywords: ['popup', 'pop-up', 'request', 'notification', 'preview', 'test', 'friend'],
       run: previewRequestPopup,
     },
-    { id: 'cmd:welcome', label: 'Onboard Again', icon: 'spark', hint: 'The welcome, the tour and the first settings', keywords: ['onboarding', 'welcome', 'tour', 'intro'], run: () => void document.dispatchEvent(new CustomEvent(SHOW_WELCOME)) },
+    { id: 'cmd:welcome', label: t('macLib.palette.welcome'), icon: 'spark', hint: t('macLib.palette.welcomeHint'), keywords: ['onboarding', 'welcome', 'tour', 'intro'], run: () => void document.dispatchEvent(new CustomEvent(SHOW_WELCOME)) },
     ...(state.isHost
       ? [
-          cmd('lock', 'lock', state.roomOpen ? 'Close the Room to New People' : 'Let New People Join', 'lock', () => void api.session.setRoomOpen(!state.roomOpen)),
-          cmd('newlink', 'newlink', 'Make a New Invite Link…', 'link', () =>
-            openSheet({ kind: 'confirm', title: 'Make a new invite link?', message: 'The current link stops working. People already in the room stay.', confirm: 'New Link', run: () => void api.session.newInviteLink() }),
+          cmd('lock', 'lock', state.roomOpen ? t('macLib.palette.closeRoom') : t('macLib.palette.openRoom'), 'lock', () => void api.session.setRoomOpen(!state.roomOpen)),
+          cmd('newlink', 'newlink', t('macLib.palette.newLink'), 'link', () =>
+            openSheet({ kind: 'confirm', title: t('macLib.palette.newLinkTitle'), message: t('macLib.palette.newLinkMessage'), confirm: t('macLib.palette.newLinkConfirm'), run: () => void api.session.newInviteLink() }),
           ),
         ]
-      : [cmd('quit', 'quit', 'Leave the Room…', 'x', () => openSheet({ kind: 'confirm', title: 'Leave the room?', message: 'Beluga disconnects and closes. You can come back with the invite link.', confirm: 'Leave', destructive: true, run: () => void api.session.quit() }))]),
+      : [cmd('quit', 'quit', t('macLib.palette.leave'), 'x', () => openSheet({ kind: 'confirm', title: t('macLib.palette.leaveTitle'), message: t('macLib.palette.leaveMessage'), confirm: t('macLib.palette.leaveConfirm'), destructive: true, run: () => void api.session.quit() }))]),
   ];
 }
 
@@ -137,8 +138,8 @@ function earningsCommand(state: AppState): PaletteCommand {
   const connected = project ? Boolean(state.earnings[project.root] || state.revenuecat[project.root]) : false;
   return {
     id: 'cmd:earnings',
-    label: project ? (connected ? `${project.name} Earnings…` : `Connect Earnings to ${project.name}…`) : 'Connect Earnings…',
-    hint: 'All-time earnings beside a project in the sidebar',
+    label: project ? (connected ? t('macLib.palette.earnings', { name: project.name }) : t('macLib.palette.connectEarningsTo', { name: project.name })) : t('macLib.palette.connectEarnings'),
+    hint: t('macLib.palette.earningsHint'),
     icon: 'coin',
     keywords: ['stripe', 'revenuecat', 'earnings', 'revenue', 'money', 'sales'],
     run: () => openEarnings(project?.id),

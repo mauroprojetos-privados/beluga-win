@@ -1,5 +1,7 @@
 import type { ImportedTheme, TermColors, TerminalFound, TerminalLook } from '../../../../src/terminal/import/look.js';
 import type { ImportedKey } from '../../../../src/terminal/import/keys.js';
+import { formatNumber } from '../../../../src/shared/i18n/format.js';
+import { type Key, t } from '../../../../src/shared/i18n/index.js';
 
 /**
  * Bringing another terminal's look into Beluga's (BLG-212), the window's side: what an import
@@ -30,7 +32,7 @@ export function themeOf(raw: unknown): TermThemePref | null {
   const colors = colorsOf(r['colors']);
   if (!colors) return null;
   const light = colorsOf(r['light']);
-  return { name: typeof r['name'] === 'string' ? r['name'] : 'Imported', from: typeof r['from'] === 'string' ? r['from'] : '', colors, ...(light ? { light } : {}) };
+  return { name: typeof r['name'] === 'string' ? r['name'] : t('macLib.termImport.imported'), from: typeof r['from'] === 'string' ? r['from'] : '', colors, ...(light ? { light } : {}) };
 }
 
 /** The terminal settings an import can change (a part of UiPrefs). */
@@ -94,24 +96,24 @@ export function importPatch(look: TerminalLook, from: string, fontInstalled: (fa
   return { patch, ...(skippedFont ? { skippedFont } : {}) };
 }
 
-const CURSORS = { block: 'Block', bar: 'Bar', underline: 'Underline' } as const;
+const CURSORS: Readonly<Record<'block' | 'bar' | 'underline', Key>> = { block: 'macLib.termImport.cursorBlock', bar: 'macLib.termImport.cursorBar', underline: 'macLib.termImport.cursorUnderline' };
 
 /** What an import brings, a few words each ("Catppuccin Mocha colours", "JetBrains Mono 13 pt"…). */
 export function importSummary(look: TerminalLook, fontInstalled: (family: string) => boolean = () => true): string[] {
   const out: string[] = [];
-  if (look.theme) out.push(`${look.theme.name} colours${look.theme.light ? ', light and dark' : ''}`);
+  if (look.theme) out.push(look.theme.light ? t('macLib.termImport.coloursBoth', { name: look.theme.name }) : t('macLib.termImport.colours', { name: look.theme.name }));
   if (look.font !== undefined || look.fontSize) {
-    const font = look.font === undefined ? '' : look.font === '' ? 'SF Mono' : fontInstalled(look.font) ? look.font : `${look.font} (not installed here)`;
-    out.push([font, look.fontSize ? `${look.fontSize} pt` : ''].filter(Boolean).join(' '));
+    const font = look.font === undefined ? '' : look.font === '' ? 'SF Mono' : fontInstalled(look.font) ? look.font : t('macLib.termImport.notInstalled', { font: look.font });
+    out.push([font, look.fontSize ? t('macLib.termImport.pt', { n: look.fontSize }) : ''].filter(Boolean).join(' '));
   }
   if (look.cursor || look.cursorBlink !== undefined) {
-    const shape = look.cursor ? `${CURSORS[look.cursor]} cursor` : 'Cursor';
-    out.push(look.cursorBlink === undefined ? shape : `${shape}, ${look.cursorBlink ? 'blinking' : 'steady'}`);
+    const shape = look.cursor ? t(CURSORS[look.cursor]) : t('macLib.termImport.cursor');
+    out.push(look.cursorBlink === undefined ? shape : look.cursorBlink ? t('macLib.termImport.blinking', { shape }) : t('macLib.termImport.steady', { shape }));
   }
-  if (look.lineHeight !== undefined) out.push(`${look.lineHeight.toFixed(2)}× lines`);
-  if (look.scrollback !== undefined) out.push(`${nearestScrollback(look.scrollback).toLocaleString('en-US')} lines back`);
-  if (look.optionMeta !== undefined) out.push(look.optionMeta ? 'Option as Meta' : 'Option types symbols');
-  if (look.keys?.length) out.push(`${look.keys.length} ${look.keys.length === 1 ? 'key' : 'keys'} (tabs, splits…)`);
+  if (look.lineHeight !== undefined) out.push(t('macLib.termImport.lineHeight', { n: formatNumber(look.lineHeight, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }));
+  if (look.scrollback !== undefined) out.push(t('macLib.termImport.scrollback', { n: formatNumber(nearestScrollback(look.scrollback)) }));
+  if (look.optionMeta !== undefined) out.push(look.optionMeta ? t('macLib.termImport.optionMeta') : t('macLib.termImport.optionSymbols'));
+  if (look.keys?.length) out.push(t('macLib.termImport.keys', { count: look.keys.length }));
   return out;
 }
 

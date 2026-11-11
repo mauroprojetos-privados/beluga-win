@@ -4,6 +4,7 @@ import { colorsFor, xtermColors } from './terminal-import-model.js';
 import { keyPlatform } from './shortcuts-model.js';
 import { TERMINAL_PRESETS } from './terminal-themes.js';
 import { themeFor } from './themes.js';
+import { t } from '../../../../src/shared/i18n/index.js';
 
 export { SCROLLBACK_CHOICES } from './terminal-import-model.js';
 
@@ -51,8 +52,8 @@ export function fontChoices(picked: string): Array<{ value: string; label: strin
   const mac = keyPlatform() === 'mac';
   // Menlo is always on a Mac; elsewhere only what's really installed.
   const fonts = TERMINAL_FONTS.filter((f) => (mac && f === 'Menlo') || hasFont(f));
-  const extra = picked && !fonts.includes(picked) ? [{ value: picked, label: hasFont(picked) ? picked : `${picked} (not installed)` }] : [];
-  return [{ value: '', label: mac ? 'SF Mono (system)' : 'System monospace' }, ...fonts.map((f) => ({ value: f, label: f })), ...extra];
+  const extra = picked && !fonts.includes(picked) ? [{ value: picked, label: hasFont(picked) ? picked : t('macLib.termLook.notInstalled', { font: picked }) }] : [];
+  return [{ value: '', label: mac ? t('macLib.termLook.sfMono') : t('macLib.termLook.systemMono') }, ...fonts.map((f) => ({ value: f, label: f })), ...extra];
 }
 
 /** xterm's options for your terminal look. */

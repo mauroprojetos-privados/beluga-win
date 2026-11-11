@@ -8,6 +8,27 @@ import { useApp } from './beluga.js';
 /** This computer's languages, best first (the web view's are the system's). */
 export const systemLanguages = (): readonly string[] => (typeof navigator === 'undefined' ? [] : navigator.languages?.length ? navigator.languages : [navigator.language]);
 
+/** The main window's language, for its other windows (the call card, the sharer's overlay), which never hear the daemon's prefs. */
+const LOCALE_KEY = 'beluga.locale';
+
+/** A window without the daemon: speak the language the main window last spoke, and follow it when it changes. */
+export function followMainLanguage(): void {
+  const take = (value: string | null): void => {
+    if (!value) return;
+    const locale = resolveLocale(value, systemLanguages());
+    setLocale(locale);
+    document.documentElement.lang = locale;
+  };
+  try {
+    take(localStorage.getItem(LOCALE_KEY));
+  } catch {
+    // No storage: English.
+  }
+  window.addEventListener('storage', (e) => {
+    if (e.key === LOCALE_KEY) take(e.newValue);
+  });
+}
+
 /** Speak the chosen language: App calls it once, and every `useT` screen redraws when it changes. */
 export function useLanguage(): Locale {
   const choice = useApp((st) => st.prefs.language);
@@ -15,6 +36,11 @@ export function useLanguage(): Locale {
   useEffect(() => {
     setLocale(locale);
     document.documentElement.lang = locale;
+    try {
+      localStorage.setItem(LOCALE_KEY, locale);
+    } catch {
+      // No storage: the other windows stay in English.
+    }
   }, [locale]);
   return locale;
 }

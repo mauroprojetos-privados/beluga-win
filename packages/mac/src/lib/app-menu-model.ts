@@ -7,6 +7,8 @@
  * Log, which opens a folder on the server) and what the toolbar already shows for the screen in
  * front (the Conversation and Workspace menus).
  */
+import { isKey, t } from '../../../../src/shared/i18n/index.js';
+
 export interface AppMenuRow {
   /** The menu-bar id it runs; none for a submenu. */
   readonly id?: string;
@@ -18,7 +20,15 @@ export interface AppMenuRow {
 
 export type Appearance = 'system' | 'light' | 'dark';
 
-const row = (id: string, label: string, separate?: boolean): AppMenuRow => (separate ? { id, label, separate } : { id, label });
+/** A label said in the app's language when read (macLib.appMenu.<id>); the English here is the menu bar's. */
+function said<R extends { label: string }>(r: R, key: string): R {
+  const english = r.label;
+  Object.defineProperty(r, 'label', { get: () => (isKey(key) ? t(key) : english), enumerable: true });
+  return r;
+}
+
+const row = (id: string, label: string, separate?: boolean): AppMenuRow => said(separate ? { id, label, separate } : { id, label }, `macLib.appMenu.${id}`);
+const menu = (name: string, label: string, submenu: readonly AppMenuRow[], separate?: boolean): AppMenuRow => said(separate ? { label, separate, submenu } : { label, submenu }, `macLib.appMenu.menu.${name}`);
 
 const FILE: readonly AppMenuRow[] = [
   row('new-chat', 'New Chat'),
@@ -37,7 +47,7 @@ const VIEW: readonly AppMenuRow[] = [
   row('toggle-sidebar', 'Toggle Sidebar'),
   row('toggle-inspector', 'Toggle Panel'),
   row('toggle-dock', 'Toggle Terminal'),
-  { label: 'Appearance', separate: true, submenu: APPEARANCE },
+  menu('appearance', 'Appearance', APPEARANCE, true),
   row('zoom-in', 'Bigger Text'),
   row('zoom-out', 'Smaller Text'),
   row('zoom-reset', 'Actual Size'),
@@ -64,9 +74,9 @@ export const APP_MENU: readonly AppMenuRow[] = [
   row('settings', 'Settings…'),
   row('help-keys', 'Keys and Commands'),
   row('palette', 'Everything You Can Do…'),
-  { label: 'File', separate: true, submenu: FILE },
-  { label: 'View', submenu: VIEW },
-  { label: 'Go', submenu: GO },
+  menu('file', 'File', FILE, true),
+  menu('view', 'View', VIEW),
+  menu('go', 'Go', GO),
   row('help-welcome', 'Welcome to Beluga', true),
 ];
 

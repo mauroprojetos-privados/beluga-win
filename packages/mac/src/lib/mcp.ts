@@ -3,22 +3,48 @@ import type { McpServerRow } from '@beluga/shared/mcp.js';
 import type { SocketClient } from '@beluga/ipc/socket-client.js';
 import { toast } from './beluga.js';
 import { openExternal } from './system.js';
+import { t } from '../../../../src/shared/i18n/index.js';
 
 /** Where a server comes from, in words. */
 export const MCP_FROM: Record<McpServerRow['from'], (where?: string) => string> = {
-  user: () => 'Yours, in every project',
-  project: (where) => (where ? `Set for ${where}` : 'Set for one project'),
-  plugin: (where) => (where ? `From the ${where} plugin` : 'From a plugin'),
-  'claude.ai': () => 'A claude.ai connector',
+  user: () => t('macLib.mcp.fromUser'),
+  project: (where) => (where ? t('macLib.mcp.fromProjectIn', { where }) : t('macLib.mcp.fromProject')),
+  plugin: (where) => (where ? t('macLib.mcp.fromPluginNamed', { where }) : t('macLib.mcp.fromPlugin')),
+  'claude.ai': () => t('macLib.mcp.fromClaudeAi'),
 };
 
 /** How a server is, in words, with its dot. */
 export const MCP_STATUS: Record<McpServerRow['status'], { readonly words: string; readonly tone: 'ok' | 'warn' | 'error' | 'muted' }> = {
-  connected: { words: 'Connected', tone: 'ok' },
-  'needs-auth': { words: 'Needs you to sign in', tone: 'warn' },
-  failed: { words: 'Couldn’t connect', tone: 'error' },
-  pending: { words: 'Still starting', tone: 'muted' },
-  disabled: { words: 'Turned off', tone: 'muted' },
+  connected: {
+    get words() {
+      return t('macLib.mcp.connected');
+    },
+    tone: 'ok',
+  },
+  'needs-auth': {
+    get words() {
+      return t('macLib.mcp.needsAuth');
+    },
+    tone: 'warn',
+  },
+  failed: {
+    get words() {
+      return t('macLib.mcp.failed');
+    },
+    tone: 'error',
+  },
+  pending: {
+    get words() {
+      return t('macLib.mcp.pending');
+    },
+    tone: 'muted',
+  },
+  disabled: {
+    get words() {
+      return t('macLib.mcp.disabled');
+    },
+    tone: 'muted',
+  },
 };
 
 /** How long a list stays fresh: asking means starting its agent, so the box and Settings share one. */
@@ -71,7 +97,7 @@ export async function signInMcp(client: SocketClient, row: McpServerRow, runtime
     if ('url' in started) {
       await openExternal(started.url);
       const ok = await client.api.claudeCode.mcpSignedIn(row.name, runtime);
-      toast(client, ok ? `Signed in to ${row.label}` : `Didn’t hear back from ${row.label}. Try again when you’re ready.`, ok ? 'success' : 'warn');
+      toast(client, ok ? t('macLib.mcp.signedIn', { name: row.label }) : t('macLib.mcp.noAnswer', { name: row.label }), ok ? 'success' : 'warn');
     }
     await checkMcp(client, runtime);
   } finally {
@@ -111,6 +137,6 @@ export function mcpSummary(rows: readonly McpServerRow[]): { readonly connected:
   const connected = rows.filter((r) => r.status === 'connected').length;
   const needYou = rows.filter((r) => r.status === 'needs-auth').length;
   const failed = rows.filter((r) => r.status === 'failed').length;
-  const parts = [`${connected} of ${rows.length} connected`, ...(needYou ? [`${needYou} to sign in`] : []), ...(failed ? [`${failed} failed`] : [])];
+  const parts = [t('macLib.mcp.summary', { n: connected, of: rows.length }), ...(needYou ? [t('macLib.mcp.toSignIn', { n: needYou })] : []), ...(failed ? [t('macLib.mcp.summaryFailed', { n: failed })] : [])];
   return { connected, needYou, line: parts.join(' · ') };
 }

@@ -5,6 +5,7 @@ import type { ProjectRevenueCat } from '@beluga/core/revenuecat-store.js';
 import type { Project } from '@beluga/workspaces/types.js';
 import { type ConvertedSummary, convertSummary, currencyName } from './money.js';
 import { useApi, useApp } from './beluga.js';
+import { t } from '../../../../src/shared/i18n/index.js';
 
 /**
  * Earnings from Stripe and RevenueCat in this window: the currency they're shown in (yours, or
@@ -73,7 +74,7 @@ export function useCurrencyChoice(): { value: string; options: Array<{ value: st
   const auto = mainCurrency(earnings, fx);
   const options = useMemo(
     () => [
-      { value: AUTOMATIC, label: `Automatic (${auto.toUpperCase()})`, short: `Automatic (${auto.toUpperCase()})` },
+      { value: AUTOMATIC, label: t('macLib.earnings.automatic', { code: auto.toUpperCase() }), short: t('macLib.earnings.automatic', { code: auto.toUpperCase() }) },
       ...currencyChoices(fx, chosen).map((c) => ({ value: c, label: currencyName(c), short: c.toUpperCase() })),
     ],
     [auto, fx, chosen],
@@ -83,21 +84,21 @@ export function useCurrencyChoice(): { value: string; options: Array<{ value: st
 
 /** "just now", "12 min ago", "3h ago", "2 days ago". */
 export function updatedAgo(ts: number | undefined, now: number = Date.now()): string {
-  if (!ts) return 'not counted yet';
+  if (!ts) return t('macLib.earnings.notCounted');
   const m = Math.round((now - ts) / 60_000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m} min ago`;
+  if (m < 1) return t('helpers.ago.justNow');
+  if (m < 60) return t('helpers.ago.min', { n: m });
   const h = Math.round(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return t('helpers.ago.hShort', { n: h });
   const d = Math.round(h / 24);
-  return d === 1 ? 'yesterday' : `${d} days ago`;
+  return d === 1 ? t('helpers.ago.yesterday') : t('helpers.ago.days', { n: d });
 }
 
 /** "Stripe", "RevenueCat" or "Stripe and RevenueCat": what a set of projects' earnings come from. */
 export function sourcesOf(items: ReadonlyArray<{ readonly stripe?: unknown; readonly revenuecat?: unknown }>): string {
   const stripe = items.some((i) => i.stripe);
   const rc = items.some((i) => i.revenuecat);
-  return stripe && rc ? 'Stripe and RevenueCat' : rc ? 'RevenueCat' : 'Stripe';
+  return stripe && rc ? t('macLib.earnings.bothSources') : rc ? 'RevenueCat' : 'Stripe'; // i18n-ignore: product names
 }
 
 /** Count again now: both sources (one project, or every project). */
@@ -249,7 +250,7 @@ export const useEarningsSheet = (): EarningsSheetState | undefined =>
 
 /** "Connect Earnings…" for a project's right-click and ⋯ menus ("Earnings…" once something is connected). */
 export function earningsMenuItem(project: Project, connected: boolean): { label: string; onSelect: () => void; separate: boolean } {
-  return { label: connected ? 'Earnings…' : 'Connect Earnings…', onSelect: () => openEarnings(project.id), separate: true };
+  return { label: connected ? t('macLib.earnings.menu') : t('macLib.earnings.connectMenu'), onSelect: () => openEarnings(project.id), separate: true };
 }
 
 // ---- the one-time hint ("Track this project's earnings")

@@ -1,5 +1,6 @@
 import type { View } from '../../../../src/core/store.js';
 import { isSentinelView } from '../sentinel/sentinel-model.js';
+import { wordRecord } from '../../../../src/shared/i18n/words.js';
 
 /**
  * The right panel, as plain data: which tabs a view has, which one it opens on, how wide it may
@@ -11,7 +12,17 @@ export type PanelTab = 'changes' | 'files' | 'terminal' | 'info' | 'history' | '
 /** Every tab in its fixed place: ⌥⌘1 is always Changes, ⌥⌘4 always Info, ⌥⌘5 History, ⌥⌘6 Scratch, ⌥⌘7 Background, ⌥⌘8 Phone. */
 export const PANEL_TABS: readonly PanelTab[] = ['changes', 'files', 'terminal', 'info', 'history', 'scratch', 'background', 'phone'];
 
-export const PANEL_LABELS: Record<PanelTab, string> = { changes: 'Changes', files: 'Files', terminal: 'Terminal', info: 'Info', history: 'History', scratch: 'Scratch', background: 'Background', phone: 'Phone' };
+/** Each tab's name, in the app's language when read. */
+export const PANEL_LABELS: Readonly<Record<PanelTab, string>> = wordRecord({
+  changes: 'macLib.panel.changes',
+  files: 'macLib.panel.files',
+  terminal: 'macLib.panel.terminal',
+  info: 'macLib.panel.info',
+  history: 'macLib.panel.history',
+  scratch: 'macLib.panel.scratch',
+  background: 'macLib.panel.background',
+  phone: 'macLib.panel.phone',
+});
 
 /**
  * The panel is two panes, one above the other, each with its own tabs: by default what Claude

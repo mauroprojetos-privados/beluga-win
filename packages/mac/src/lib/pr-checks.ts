@@ -1,5 +1,7 @@
 import type { PrCheck, PullRequest } from '@beluga/core/work-store.js';
 import type { MergeMethod } from '@beluga/workspaces/pr.js';
+import { t } from '../../../../src/shared/i18n/index.js';
+import { wordTable } from '../../../../src/shared/i18n/words.js';
 
 /** How one check is doing, as the PR sheet draws it: a spinner, a clock, ✓, ✗ or a dash. */
 export type CheckTone = 'running' | 'queued' | 'passed' | 'failed' | 'skipped';
@@ -24,7 +26,7 @@ export function sortChecks(checks: readonly PrCheck[]): PrCheck[] {
 
 /** "42s", "3m 05s", "1h 02m": how long it ran, or has been running (`now`). Empty when unknown. */
 export function checkDuration(c: PrCheck, now: number): string {
-  if (checkTone(c) === 'skipped') return 'Skipped';
+  if (checkTone(c) === 'skipped') return t('macLib.prChecks.skipped');
   const start = c.startedAt ? Date.parse(c.startedAt) : NaN;
   const end = c.completedAt ? Date.parse(c.completedAt) : c.state === 'in_progress' ? now : NaN;
   if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return '';
@@ -39,14 +41,24 @@ export function checksSummary(checks: readonly PrCheck[]): string {
   const n = { running: 0, queued: 0, passed: 0, failed: 0, skipped: 0 };
   for (const c of checks) n[checkTone(c)]++;
   const counted = checks.length - n.skipped;
-  return [`${n.passed} of ${counted} passed`, n.failed ? `${n.failed} failed` : '', n.running + n.queued ? `${n.running + n.queued} running` : ''].filter(Boolean).join(' · ');
+  return [t('macLib.prChecks.passed', { n: n.passed, of: counted }), n.failed ? t('macLib.prChecks.failed', { n: n.failed }) : '', n.running + n.queued ? t('macLib.prChecks.running', { n: n.running + n.queued }) : ''].filter(Boolean).join(' · ');
 }
 
-export const MERGE_METHODS: ReadonlyArray<{ readonly method: MergeMethod; readonly label: string; readonly hint: string }> = [
-  { method: 'squash', label: 'Squash and Merge', hint: 'One commit on the base branch' },
-  { method: 'merge', label: 'Create a Merge Commit', hint: 'Every commit, joined by a merge commit' },
-  { method: 'rebase', label: 'Rebase and Merge', hint: 'Every commit, replayed on the base branch' },
-];
+const METHOD_WORDS = wordTable({
+  squash: { label: 'macLib.prChecks.squash', hint: 'macLib.prChecks.squashHint' },
+  merge: { label: 'macLib.prChecks.merge', hint: 'macLib.prChecks.mergeHint' },
+  rebase: { label: 'macLib.prChecks.rebase', hint: 'macLib.prChecks.rebaseHint' },
+});
+
+export const MERGE_METHODS: ReadonlyArray<{ readonly method: MergeMethod; readonly label: string; readonly hint: string }> = (['squash', 'merge', 'rebase'] as const).map((method) => ({
+  method,
+  get label() {
+    return METHOD_WORDS[method].label;
+  },
+  get hint() {
+    return METHOD_WORDS[method].hint;
+  },
+}));
 
 /** Whether "Merge When Checks Pass" makes sense: something is still to come (checks or a review). */
 export const canAutoMerge = (pr: PullRequest): boolean => pr.state === 'OPEN' && !pr.autoMerge && (pr.checks === 'pending' || pr.review === 'REVIEW_REQUIRED');

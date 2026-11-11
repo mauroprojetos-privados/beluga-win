@@ -4,6 +4,8 @@
  * (packages/mac/src-tauri/src/engine.rs); this is what the pane shows of it.
  */
 
+import { t } from '../../../../src/shared/i18n/index.js';
+
 export type EnginePlace = 'windows' | 'wsl';
 
 /** What the shell's `engine_location` says. */
@@ -30,18 +32,17 @@ export function choiceOf(value: string): { place: EnginePlace; distro: string | 
 /** This PC first, then each distro; the one chosen before still shows when WSL no longer lists it. */
 export function engineOptions(distros: readonly string[], st: Pick<EngineStatus, 'place' | 'distro'>): Array<{ value: string; label: string }> {
   const names = st.place === 'wsl' && st.distro && !distros.includes(st.distro) ? [...distros, st.distro] : distros;
-  return [{ value: ON_WINDOWS, label: 'This PC (Windows)' }, ...names.map((d) => ({ value: `${WSL_PREFIX}${d}`, label: `WSL · ${d}` }))];
+  return [{ value: ON_WINDOWS, label: t('macLib.engine.thisPc') }, ...names.map((d) => ({ value: `${WSL_PREFIX}${d}`, label: `WSL · ${d}` }))];
 }
 
 /** The line under the choice. */
 export function engineDetail(st: EngineStatus): string {
-  if (st.place !== 'wsl' || !st.distro) return 'Beluga’s engine runs here, on Windows. Pick a WSL distro to use the projects, tools and agents you have in Linux instead.';
-  const via = st.route ? `, reached at 127.0.0.1 through ${st.route}` : '';
-  return `Beluga’s engine runs in ${st.distro}${via}. Your projects, terminals and agents are the ones in Linux.`;
+  if (st.place !== 'wsl' || !st.distro) return t('macLib.engine.onWindows');
+  return st.route ? t('macLib.engine.inDistroVia', { distro: st.distro, route: st.route }) : t('macLib.engine.inDistro', { distro: st.distro });
 }
 
 /** What it says while it moves. */
 export const movingText = (value: string): string => {
   const c = choiceOf(value);
-  return c.place === 'wsl' ? `Starting Beluga in ${c.distro}…` : 'Going back to the engine on Windows…';
+  return c.place === 'wsl' ? t('macLib.engine.starting', { distro: c.distro ?? '' }) : t('macLib.engine.goingBack');
 };
