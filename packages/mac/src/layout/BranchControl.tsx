@@ -13,6 +13,8 @@ import { openSheet } from '../lib/sheets.js';
 import { askBeforeWork } from '../lib/work-confirm.js';
 import { useWsBusy, whileBusy } from '../lib/ws-busy.js';
 import s from './BranchControl.module.css';
+import { useT } from '../lib/i18n.js';
+import { t as tr } from '@beluga/shared/i18n/index.js';
 
 const PILL_ICON: Record<BranchTone, IconName> = { merged: 'merge', ok: 'check', error: 'alert', warn: 'alert', wait: 'clock', info: 'branch', muted: 'branch' };
 
@@ -20,13 +22,34 @@ export type BranchFold = 'none' | 'pill' | 'all';
 
 const STEP_ICON: Partial<Record<BranchStep['id'], IconName>> = { merge_pr: 'merge', merge: 'merge', merge_base: 'merge', merge_auto: 'clock', cancel_auto: 'x', update_branch: 'refresh', mark_ready: 'check', open_pr: 'pr', continue_after_merge: 'branch', archive: 'archive', delete: 'x', commit: 'commit', pr: 'pr', pr_draft: 'pr', pr_original: 'pr', push: 'up', rerun_checks: 'refresh' };
 
-const STEP_SHORT: Partial<Record<BranchStep['id'], string>> = { pr: 'Create PR', open_pr: 'Open PR', pr_draft: 'Draft PR', pr_original: 'Create PR', pr_claude: 'Create PR', pr_custom: 'Create PR', merge_pr: 'Merge', merge: 'Merge', merge_base: 'Merge', merge_auto: 'Auto-merge', merge_admin: 'Merge', cancel_auto: 'Cancel', update_branch: 'Update', mark_ready: 'Ready', review_claude: 'Review', fix_checks: 'Fix Checks', resolve_pr: 'Resolve Conflicts', merge_claude: 'Resolve Conflicts', push: 'Push', rerun_checks: 'Re-run' };
+const STEP_SHORT = (): Partial<Record<BranchStep['id'], string>> => ({
+  pr: tr('layout.changes.createPr'),
+  open_pr: tr('layout.branch.short.openPr'),
+  pr_draft: tr('layout.branch.short.draftPr'),
+  pr_original: tr('layout.changes.createPr'),
+  pr_claude: tr('layout.changes.createPr'),
+  pr_custom: tr('layout.changes.createPr'),
+  merge_pr: tr('layout.branch.short.merge'),
+  merge: tr('layout.branch.short.merge'),
+  merge_base: tr('layout.branch.short.merge'),
+  merge_auto: tr('layout.branch.short.autoMerge'),
+  merge_admin: tr('layout.branch.short.merge'),
+  cancel_auto: tr('common.cancel'),
+  update_branch: tr('layout.branch.short.update'),
+  mark_ready: tr('layout.branch.short.ready'),
+  review_claude: tr('layout.changes.review'),
+  fix_checks: tr('layout.branch.short.fixChecks'),
+  resolve_pr: tr('layout.branch.short.resolveConflicts'),
+  merge_claude: tr('layout.branch.short.resolveConflicts'),
+  push: tr('layout.branch.short.push'),
+  rerun_checks: tr('layout.branch.short.rerun'),
+});
 
 /**
  * A step in a word or two, for the folded toolbar: the icon alone didn't say enough ("PR" alone didn't
  * either), and a bare "Resolve" or "Fix" read as the review comments or anything at all (BLG-753).
  */
-export const shortLabel = (step: BranchStep): string => STEP_SHORT[step.id] ?? step.label.replace(/…$/, '').split(' ')[0]!;
+export const shortLabel = (step: BranchStep): string => STEP_SHORT()[step.id] ?? step.label.replace(/…$/, '').split(' ')[0]!;
 
 /**
  * Folded, a quiet pill (no pull request, nothing to fix: "3 changes") is only an icon that reads as
@@ -43,6 +66,7 @@ export const pillHidden = (branch: BranchState, fold: BranchFold): boolean => fo
  * one short word ("PR", "Merge"), the full words moving to their tips.
  */
 export function BranchControl({ wsId, branch, fold = 'none' }: { wsId: string; branch: BranchState; fold?: BranchFold }) {
+  const t = useT();
   const api = useApi();
   const actions = useActions();
   const [method, setMethod] = useState<MergeMethod>(lastMethod);
@@ -96,9 +120,9 @@ export function BranchControl({ wsId, branch, fold = 'none' }: { wsId: string; b
         // It pushes to the shared branch, which isn't easily undone: say so first.
         return openSheet({
           kind: 'confirm',
-          title: `Merge ${branch.branch} into ${branch.into}?`,
-          message: `No pull request: ${step.hint.replace(/^No pull request: /, '')}. Everyone pulling ${branch.into} gets it; your main folder isn’t touched.`,
-          confirm: `Merge into ${branch.into}`,
+          title: t('layout.branch.mergeTitle', { branch: branch.branch, into: branch.into }),
+          message: t('layout.branch.mergeMessage', { hint: step.hint.replace(/^No pull request: /, ''), into: branch.into }),
+          confirm: t('layout.branch.mergeInto', { into: branch.into }),
           run: () => void whileBusy(wsId, async () => showGitTrouble(wsId, await api.workbench.mergeToBase(wsId), 'merge_base')),
         });
       default:
@@ -112,7 +136,7 @@ export function BranchControl({ wsId, branch, fold = 'none' }: { wsId: string; b
   const methods: ActionItem[] = main?.id === 'merge_pr' ? MERGE_METHODS.map((m) => ({ label: m.label, hint: m.hint, checked: m.method === method, onSelect: () => void merge(m.method) })) : [];
   const items: ActionItem[] = [
     ...methods,
-    ...rest.map((step, i) => ({ label: labelOf(step), hint: step.claude ? `Agent · ${step.hint}` : step.hint, icon: iconOf(step), ...(step.danger ? { danger: true } : {}), separate: i === 0 && methods.length > 0, onSelect: () => requestAnimationFrame(() => run(step)) })),
+    ...rest.map((step, i) => ({ label: labelOf(step), hint: step.claude ? t('layout.branch.agentHint', { hint: step.hint }) : step.hint, icon: iconOf(step), ...(step.danger ? { danger: true } : {}), separate: i === 0 && methods.length > 0, onSelect: () => requestAnimationFrame(() => run(step)) })),
   ];
   const hidePill = pillHidden(branch, fold);
   const variant = main && (main.id === 'merge_pr' || main.id === 'merge') ? 'merge' : 'primary';
@@ -125,9 +149,9 @@ export function BranchControl({ wsId, branch, fold = 'none' }: { wsId: string; b
   );
 
   return (
-    <span className={s.wrap} role="group" aria-label={`Branch: ${branch.label}`}>
+    <span className={s.wrap} role="group" aria-label={t('layout.branch.aria', { label: branch.label })}>
       {hidePill ? null : (
-        <Tip label={`${fold === 'none' ? '' : `${branch.label}: `}${branch.detail}${branch.pr ? ' · open the pull request' : ''}`}>
+        <Tip label={`${fold === 'none' ? '' : `${branch.label}: `}${branch.pr ? t('layout.branch.detailPr', { detail: branch.detail }) : branch.detail}`}>
           {branch.pr ? (
             <button type="button" className={s.pillButton} onClick={() => actions.run({ type: 'ws', id: wsId, action: 'pr' })}>
               {pill}
@@ -139,14 +163,14 @@ export function BranchControl({ wsId, branch, fold = 'none' }: { wsId: string; b
       )}
       {main ? (
         <span className={s.split}>
-          <Tip label={`${hidePill ? `${branch.detail} · ` : ''}${fold === 'all' ? `${labelOf(main)}: ` : ''}${main.claude ? `Agent · ${main.hint}` : main.hint}`}>
+          <Tip label={`${hidePill ? `${branch.detail} · ` : ''}${fold === 'all' ? `${labelOf(main)}: ` : ''}${main.claude ? t('layout.branch.agentHint', { hint: main.hint }) : main.hint}`}>
             <Button variant={variant} icon={iconOf(main)} aria-label={fold === 'all' ? labelOf(main) : undefined} className={cx(s.main, items.length > 0 && s.mainSplit, branch.tone === 'error' && s.mainError, branch.tone === 'merged' && s.mainMerged)} disabled={busy} data-branch-step={main.id} data-tool-ws={wsId} onClick={() => run(main)}>
-              {busy ? (fold === 'all' ? '…' : 'Working…') : fold === 'all' ? shortLabel(main) : labelOf(main)}
+              {busy ? (fold === 'all' ? '…' : t('layout.branch.working')) : fold === 'all' ? shortLabel(main) : labelOf(main)}
             </Button>
           </Tip>
           {items.length ? (
             <ActionsDropdown items={items} align="end">
-              <Button variant={variant} className={cx(s.more, branch.tone === 'error' && s.mainError, branch.tone === 'merged' && s.mainMerged)} disabled={busy} aria-label="Other steps for this branch" data-branch-more={wsId}>
+              <Button variant={variant} className={cx(s.more, branch.tone === 'error' && s.mainError, branch.tone === 'merged' && s.mainMerged)} disabled={busy} aria-label={t('layout.branch.otherSteps')} data-branch-more={wsId}>
                 <Icon name="chevronDown" size={11} />
               </Button>
             </ActionsDropdown>

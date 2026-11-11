@@ -7,12 +7,14 @@ import { useBeluga } from '../lib/beluga.js';
 import { runMenuItem } from '../lib/native.js';
 import { usePrefs } from '../lib/prefs.js';
 import { useShortcutKeys } from '../lib/shortcuts.js';
+import { useT } from '../lib/i18n.js';
 
 /**
  * The menu bar in a browser (lib/app-menu-model.ts): one button where the Mac's traffic lights
  * would be, Settings first. The app has its menu bar, so there it shows nothing.
  */
 export function AppMenu() {
+  const t = useT();
   const { client, ui } = useBeluga();
   const actions = useActions();
   const keysOf = useShortcutKeys();
@@ -32,7 +34,7 @@ export function AppMenu() {
   };
   return (
     <ActionsDropdown items={APP_MENU.map(toItem)} align="start">
-      <IconButton icon="gear" label="Settings and menus" />
+      <IconButton icon="gear" label={t('layout.appMenu.label')} />
     </ActionsDropdown>
   );
 }

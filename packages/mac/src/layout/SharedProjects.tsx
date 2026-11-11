@@ -16,6 +16,7 @@ import side from './Sidebar.module.css';
 import g from './project-groups.module.css';
 import s from './shared-projects.module.css';
 import { computerTitle, thisComputer } from '../lib/os-words.js';
+import { useT } from '../lib/i18n.js';
 
 /**
  * What friends shared with you, apart from your own projects: a section per friend ("Ata's
@@ -49,6 +50,7 @@ function SharedIcon({ p, size = 16 }: { p: SharedProject; size?: number }) {
 
 /** `room`: worktrees shared through today's room (they go when the room ends), grouped as their project. */
 function SharedProjectBlock({ p, room = false }: { p: SharedProject; room?: boolean }) {
+  const t = useT();
   const actions = useActions();
   const api = useApi();
   const { client } = useBeluga();
@@ -68,25 +70,25 @@ function SharedProjectBlock({ p, room = false }: { p: SharedProject; room?: bool
   const copy = p.copy;
   const copyAgain = (): void => void api.sharing.copyProject(p.owner, p.id).catch((err: unknown) => toast(client, err instanceof Error ? err.message : String(err), 'error'));
   const items: ActionItem[] = [
-    ...(copy?.state === 'ready' && copy.projectId ? [{ label: 'Open Your Copy', icon: 'folder' as const, onSelect: () => actions.run({ type: 'view', view: { kind: 'project', id: copy.projectId! } }) }] : []),
-    ...(copy?.state === 'failed' ? [{ label: `Copy to This ${computerTitle()} Again`, icon: 'download' as const, onSelect: copyAgain }] : []),
-    { label: 'Leave Project', icon: 'x', danger: true, onSelect: leave },
+    ...(copy?.state === 'ready' && copy.projectId ? [{ label: t('layout.shared.openCopy'), icon: 'folder' as const, onSelect: () => actions.run({ type: 'view', view: { kind: 'project', id: copy.projectId! } }) }] : []),
+    ...(copy?.state === 'failed' ? [{ label: t('layout.shared.copyAgain', { computer: computerTitle() }), icon: 'download' as const, onSelect: copyAgain }] : []),
+    { label: t('layout.shared.leave'), icon: 'x', danger: true, onSelect: leave },
   ];
   const detail = room
-    ? 'in your room'
+    ? t('layout.shared.inRoom')
     : owner.state === 'offline'
-      ? `${p.ownerName} is offline`
+      ? t('layout.shared.offline', { name: p.ownerName })
       : owner.state === 'update'
-        ? `${p.ownerName}'s Beluga needs an update`
+        ? t('layout.shared.needsUpdate', { name: p.ownerName })
         : copy?.state === 'copying'
-          ? `Copying to ${thisComputer()}…`
+          ? t('layout.shared.copying', { computer: thisComputer() })
           : copy?.state === 'failed'
-            ? 'Couldn’t copy it here'
+            ? t('layout.shared.couldntCopy')
             : copy?.state === 'ready'
-              ? `Your copy: ${tilde(copy.path ?? '')}`
+              ? t('layout.shared.yourCopy', { path: tilde(copy.path ?? '') })
               : p.role === 'contribute'
-                ? 'you can work here'
-                : 'you can follow along';
+                ? t('layout.shared.canWork')
+                : t('layout.shared.canFollow');
   const shown = open ? rows : rows.filter((r) => r.w.id === here);
   return (
     <>
@@ -94,11 +96,11 @@ function SharedProjectBlock({ p, room = false }: { p: SharedProject; room?: bool
         <Row
           className={cx(side.projectRow, here && side.currentProject, owner.state === 'offline' && s.away)}
           aria-expanded={rows.length ? open : undefined}
-          aria-label={`${p.name}, shared by ${p.ownerName}`}
+          aria-label={t('layout.shared.sharedBy', { name: p.name, owner: p.ownerName })}
           icon={
             <span className={g.projectIcon}>
               {rows.length ? (
-                <button type="button" className={g.foldButton} aria-label={open ? `Fold ${p.name}` : `Show what's in ${p.name}`} onClick={(e) => (e.stopPropagation(), toggle())}>
+                <button type="button" className={g.foldButton} aria-label={open ? t('layout.tree.foldName', { name: p.name }) : t('layout.tree.showWhatsIn', { name: p.name })} onClick={(e) => (e.stopPropagation(), toggle())}>
                   <Icon name="chevronRight" size={9} className={cx(g.disclosure, open && g.disclosureOpen)} />
                 </button>
               ) : (
@@ -116,7 +118,7 @@ function SharedProjectBlock({ p, room = false }: { p: SharedProject; room?: bool
             <>
               <span className={side.hoverTools}>
                 <ActionsDropdown items={items}>
-                  <IconButton icon="more" label={`More for ${p.name}`} onClick={(e) => e.stopPropagation()} />
+                  <IconButton icon="more" label={t('layout.tree.moreFor', { name: p.name })} onClick={(e) => e.stopPropagation()} />
                 </ActionsDropdown>
               </span>
             </>
@@ -135,7 +137,7 @@ function SharedProjectBlock({ p, room = false }: { p: SharedProject; room?: bool
             aria-label={w.name}
             icon={<Icon name={w.branch ? 'branch' : 'chat'} size={13} />}
             label={<span className={nameClass(signal)}>{w.name}</span>}
-            detail={signal.tip || (w.branch ? w.branch : 'chat')}
+            detail={signal.tip || (w.branch ? w.branch : t('layout.shared.chat'))}
             onClick={() => actions.run({ type: 'open_shared', owner: p.owner, id: w.id, tab: 'chat' })}
             trailing={<SignalMark signal={signal} />}
           />
@@ -149,6 +151,7 @@ const tilde = (p: string): string => p.replace(/^\/Users\/[^/]+/, '~');
 
 /** One section per friend who shared something with you: "Ata's conversations". */
 export function SharedProjects() {
+  const t = useT();
   const projects = useApp((st) => st.sharedProjects);
   const room = useApp((st) => roomProjects(st), sameDeep);
   const all = [...projects.map((p) => ({ p, room: false })), ...room.map((p) => ({ p, room: true }))];
@@ -156,7 +159,7 @@ export function SharedProjects() {
   return (
     <>
       {owners.map(([owner, name]) => (
-        <Section key={owner} id={`shared:${owner}`} title={`${name}’s conversations`}>
+        <Section key={owner} id={`shared:${owner}`} title={t('layout.shared.conversations', { name })}>
           {all
             .filter(({ p }) => p.owner === owner)
             .map(({ p, room: inRoom }) => (

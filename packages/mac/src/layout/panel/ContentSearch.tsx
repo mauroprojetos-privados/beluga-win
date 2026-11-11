@@ -5,6 +5,8 @@ import { cx } from '../../components/ui.js';
 import { useBeluga } from '../../lib/beluga.js';
 import s from './panel.module.css';
 import k from './content-search.module.css';
+import { useT } from '../../lib/i18n.js';
+import { formatNumber } from '@beluga/shared/i18n/format.js';
 
 /**
  * The Files tab searching what's in the files (not their names): as you type, a moment after you
@@ -112,6 +114,7 @@ function MarkedLine({ m }: { m: LineMatch }): ReactNode {
 
 /** The toggles at the end of the search box: Match Case, Whole Word, Regular Expression. */
 export function FlagToggles({ flags, onChange }: { flags: SearchFlags; onChange: (f: SearchFlags) => void }) {
+  const t = useT();
   const toggle = (flag: keyof SearchFlags, label: string, glyph: string) => (
     <button type="button" className={cx(k.flag, flags[flag] && k.flagOn)} aria-pressed={flags[flag]} aria-label={label} title={label} onMouseDown={(e) => e.preventDefault()} onClick={() => onChange({ ...flags, [flag]: !flags[flag] })}>
       {glyph}
@@ -119,9 +122,9 @@ export function FlagToggles({ flags, onChange }: { flags: SearchFlags; onChange:
   );
   return (
     <span className={k.flags}>
-      {toggle('caseSensitive', 'Match Case', 'Aa')}
-      {toggle('wholeWord', 'Whole Word', 'ab')}
-      {toggle('regex', 'Regular Expression', '.*')}
+      {toggle('caseSensitive', t('layout.search.matchCase'), 'Aa')}
+      {toggle('wholeWord', t('layout.search.wholeWord'), 'ab')}
+      {toggle('regex', t('layout.search.regex'), '.*')}
     </span>
   );
 }
@@ -133,6 +136,7 @@ interface Pick {
 
 /** The results, by file; ↑↓ move, Return opens, ← → fold a file. */
 export function ContentResultsList({ state, query, listRef, onOpen, onEscape }: { state: SearchState; query: string; listRef: RefObject<HTMLDivElement | null>; onOpen: (path: string, line: number) => void; onEscape: () => void }) {
+  const t = useT();
   const [folded, setFolded] = useState<ReadonlySet<string>>(new Set());
   const [cursor, setCursor] = useState<Pick>();
   const files = state.results?.files ?? [];
@@ -167,21 +171,20 @@ export function ContentResultsList({ state, query, listRef, onOpen, onEscape }: 
   const note = state.error ? (
     <div className={cx(s.treeNote, k.error)}>{state.error}</div>
   ) : query.trim().length < MIN_QUERY && !r ? (
-    <div className={s.treeNote}>Type to search in the files’ contents</div>
+    <div className={s.treeNote}>{t('layout.search.typeToSearch')}</div>
   ) : r && !r.count && !state.searching ? (
-    <div className={s.treeNote}>No lines with “{state.query}”</div>
+    <div className={s.treeNote}>{t('layout.search.noLines', { query: state.query ?? '' })}</div>
   ) : null;
 
   return (
-    <div ref={listRef} className={cx(s.list, s.tree)} role="tree" aria-label="Lines found" aria-busy={state.searching} tabIndex={0} onKeyDown={onKey}>
+    <div ref={listRef} className={cx(s.list, s.tree)} role="tree" aria-label={t('layout.search.linesFound')} aria-busy={state.searching} tabIndex={0} onKeyDown={onKey}>
       {r && r.count ? (
         <div className={k.summary} role="status">
-          {r.count === 1 ? '1 line' : `${r.count.toLocaleString()} lines`} in {r.files.length === 1 ? '1 file' : `${r.files.length.toLocaleString()} files`}
-          {r.truncated ? ' (the first ones)' : ''}
+          {t(r.truncated ? 'layout.search.summaryFirst' : 'layout.search.summary', { lines: t('layout.search.lines', { count: r.count, n: formatNumber(r.count) }), files: t('layout.search.files', { count: r.files.length, n: formatNumber(r.files.length) }) })}
           {state.searching ? <Icon name="refresh" size={11} className={k.busy} /> : null}
         </div>
       ) : state.searching ? (
-        <div className={s.treeNote}>Searching…</div>
+        <div className={s.treeNote}>{t('layout.files.searching')}</div>
       ) : null}
       {note}
       {files.map((f) => {

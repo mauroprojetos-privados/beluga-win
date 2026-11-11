@@ -39,6 +39,8 @@ import { shortcutKeys } from '../lib/shortcuts.js';
 import { sentinelSubtitle } from '../sentinel/sentinel-model.js';
 import { CallButton } from '../call/CallStrip.js';
 import { AppMenu } from './AppMenu.js';
+import { useT } from '../lib/i18n.js';
+import { t as tr } from '@beluga/shared/i18n/index.js';
 
 /** Room the title keeps, and the window buttons on the right (search, bell, panel). */
 const TITLE_MIN = 210;
@@ -47,7 +49,19 @@ const RIGHT_FIXED = 3 * 30 + 16;
 const NAV_W = 2 * 30;
 const FOLDS: BranchFold[] = ['none', 'pill', 'all'];
 
-const TITLES: Partial<Record<string, string>> = { overview: 'Overview', search: 'Search', usage: 'Usage', terminal: 'Terminal', files: 'Files', draft: 'New chat', draft_worktree: 'New worktree', claude_code: 'Activity', requests: 'Requests', tasks: 'Tasks', worktrees: 'Worktrees' };
+const TITLES = (): Partial<Record<string, string>> => ({
+  overview: tr('layout.toolbar.title.overview'),
+  search: tr('layout.toolbar.title.search'),
+  usage: tr('layout.toolbar.title.usage'),
+  terminal: tr('layout.toolbar.title.terminal'),
+  files: tr('layout.toolbar.title.files'),
+  draft: tr('layout.toolbar.title.draft'),
+  draft_worktree: tr('layout.toolbar.title.draftWorktree'),
+  claude_code: tr('layout.toolbar.title.activity'),
+  requests: tr('layout.toolbar.title.requests'),
+  tasks: tr('layout.toolbar.title.tasks'),
+  worktrees: tr('layout.toolbar.title.worktrees'),
+});
 
 /** How wide the toolbar is (buttons that don't fit move under ⋯). */
 function useToolbarWidth(): [React.RefObject<HTMLElement | null>, number] {
@@ -65,23 +79,26 @@ function useToolbarWidth(): [React.RefObject<HTMLElement | null>, number] {
 
 /** Search every conversation, from any view (⇧⌘F; ⌘F finds in what's open). */
 function SearchButton() {
+  const t = useT();
   const actions = useActions();
   const on = useApp((st) => st.view.kind === 'search');
-  return <IconButton icon="search" label="Search" keys={shortcutKeys('find')} active={on} onClick={() => actions.run({ type: 'view', view: { kind: 'search' } })} />;
+  return <IconButton icon="search" label={t('common.search')} keys={shortcutKeys('find')} active={on} onClick={() => actions.run({ type: 'view', view: { kind: 'search' } })} />;
 }
 
 /** Back and forward between pages, with what was open on each (⌘[ ⌘]; off with nowhere to go). */
 function NavButtons() {
+  const t = useT();
   const can = useNavAbility();
   return (
-    <span className={s.nav} role="group" aria-label="Back and forward">
-      <IconButton icon="back" label="Go back" keys={shortcutKeys('nav-back')} disabled={!can.back} onClick={() => void navBack()} />
-      <IconButton icon="forward" label="Go forward" keys={shortcutKeys('nav-forward')} disabled={!can.forward} onClick={() => void navForward()} />
+    <span className={s.nav} role="group" aria-label={t('layout.toolbar.backAndForward')}>
+      <IconButton icon="back" label={t('layout.toolbar.goBack')} keys={shortcutKeys('nav-back')} disabled={!can.back} onClick={() => void navBack()} />
+      <IconButton icon="forward" label={t('layout.toolbar.goForward')} keys={shortcutKeys('nav-forward')} disabled={!can.forward} onClick={() => void navForward()} />
     </span>
   );
 }
 
 function Shell({ title, subtitle, center, right, headerRef }: { title: ReactNode; subtitle?: ReactNode; center?: ReactNode; right?: ReactNode; headerRef: React.RefObject<HTMLElement | null> }) {
+  const t = useT();
   const prefs = usePrefs();
   const view = useApp((st) => st.view);
   // A plan's page has no panel: its chat is its right side (the plan's header shows and hides it, ⌥⌘0 too).
@@ -95,7 +112,7 @@ function Shell({ title, subtitle, center, right, headerRef }: { title: ReactNode
         <span className={s.lead}>
           {/* The sidebar's menu-bar button (a browser's), beside it while the sidebar is hidden. */}
           <AppMenu />
-          <IconButton icon="sidebar" label="Show sidebar" keys={shortcutKeys('toggle-sidebar')} onClick={() => setPrefs({ sidebar: true })} />
+          <IconButton icon="sidebar" label={t('layout.toolbar.showSidebar')} keys={shortcutKeys('toggle-sidebar')} onClick={() => setPrefs({ sidebar: true })} />
         </span>
       )}
       <NavButtons />
@@ -121,7 +138,7 @@ function Shell({ title, subtitle, center, right, headerRef }: { title: ReactNode
         {fits ? (
           <IconButton
             icon="panelRight"
-            label={prefs.inspector ? 'Hide the panel' : 'Show the panel: changes, files, terminal, info'}
+            label={prefs.inspector ? t('layout.toolbar.hidePanel') : t('layout.toolbar.showPanel')}
             keys={shortcutKeys('toggle-inspector')}
             active={prefs.inspector}
             onClick={() => togglePanel(view)}
@@ -168,6 +185,7 @@ function sameToolbar(a: ReturnType<typeof toolbarPick>, b: ReturnType<typeof too
 }
 
 export function Toolbar() {
+  const t = useT();
   const [headerRef, width] = useToolbarWidth();
   const actions = useActions();
   const beluga = useBeluga();
@@ -179,7 +197,7 @@ export function Toolbar() {
 
   if (view.kind === 'workspace') {
     const ws = state.ws;
-    if (!ws) return <Shell headerRef={headerRef} title="Workspace" />;
+    if (!ws) return <Shell headerRef={headerRef} title={t('layout.toolbar.workspace')} />;
     const project = state.projects.find((p) => p.id === ws.projectId);
     // A sub-agent's own worktree is the agent: its name, no worktree actions (it's Claude's, not yours).
     if (isAgentWorktree(ws) || !state.made) {
@@ -190,10 +208,10 @@ export function Toolbar() {
           title={
             <>
               {project?.root ? <span className={s.crumb}>{project.name}</span> : null}
-              <span className={s.name}>{sub ? agentTitle(sub.agent) : 'Sub-agent'}</span>
+              <span className={s.name}>{sub ? agentTitle(sub.agent) : t('layout.toolbar.subAgent')}</span>
             </>
           }
-          subtitle={<span className={s.meta}>Sub-agent · its own worktree{ws.branch ? ` · ${ws.branch}` : ''}</span>}
+          subtitle={<span className={s.meta}>{ws.branch ? t('layout.toolbar.subAgentOwnBranch', { branch: ws.branch }) : t('layout.toolbar.subAgentOwn')}</span>}
         />
       );
     }
@@ -251,12 +269,12 @@ export function Toolbar() {
                 <span className={s.ellipsis}>{ws.branch}</span>
               </span>
             ) : ws.kind === 'chat' ? (
-              <span className={s.meta}>{ws.askOnly ? (planForHome(state.plans, `ws:${ws.id}`) ? 'The plan’s conversation · main folder' : 'Questions only · main folder') : 'Agent chat'}</span>
+              <span className={s.meta}>{ws.askOnly ? (planForHome(state.plans, `ws:${ws.id}`) ? t('layout.toolbar.planConversation') : t('layout.toolbar.questionsOnly')) : t('layout.toolbar.agentChat')}</span>
             ) : null}
             {pr && !branch ? (
               <span className={cx(s.meta, s.metaPr, pr.state === 'MERGED' && s.metaMerged)} title={describePr(pr)} data-pr-state={pr.state}>
                 <Icon name={pr.state === 'MERGED' ? 'merge' : 'pr'} size={11} />
-                <span className={s.ellipsis}>{pr.state === 'MERGED' ? `PR #${pr.number}` : describePr(pr)}</span>
+                <span className={s.ellipsis}>{pr.state === 'MERGED' ? t('layout.toolbar.prNumber', { number: pr.number }) : describePr(pr)}</span>
               </span>
             ) : null}
           </>
@@ -282,13 +300,13 @@ export function Toolbar() {
                 </span>
               </Tip>
             ) : null}
-            <span className={s.tools} role="group" aria-label="Workspace actions">
+            <span className={s.tools} role="group" aria-label={t('layout.toolbar.workspaceActions')}>
               {icons.slice(0, fit).map((a) => (
                 <IconButton key={a.id} icon={a.icon} label={a.disabled ? `${a.label}: ${a.hint}` : (a.tip ?? `${a.label} · ${a.hint}`)} keys={a.keys} aria-disabled={a.disabled} data-tool={a.action} data-tool-ws={ws.id} className={cx(a.disabled && s.off, a.tone === 'error' && s.toolError)} onClick={() => run(a)} />
               ))}
               {overflow.length || teamItems.length || continueItem || linkItems.length ? (
                 <ActionsDropdown items={[...menu.map(({ a, separate }) => ({ label: a.label, icon: a.icon, hint: a.disabled ? a.hint : undefined, keys: a.keys, disabled: a.disabled, danger: a.danger, separate, onSelect: () => requestAnimationFrame(() => run(a)) })), ...teamItems, ...(continueItem ? [continueItem] : []), ...linkItems]}>
-                  <IconButton icon="more" label="More for this workspace" data-tool="more" data-tool-ws={ws.id} />
+                  <IconButton icon="more" label={t('layout.toolbar.moreForWorkspace')} data-tool="more" data-tool-ws={ws.id} />
                 </ActionsDropdown>
               ) : null}
             </span>
@@ -302,28 +320,28 @@ export function Toolbar() {
   if (view.kind === 'shared') {
     const w = state.shared.find((x) => x.id === view.id);
     const ui = beluga.ui;
-    const owner = state.peers.find((p) => p.peerId === view.owner)?.name ?? state.friends.find((f) => f.peerId === view.owner)?.name ?? 'Someone';
+    const owner = state.peers.find((p) => p.peerId === view.owner)?.name ?? state.friends.find((f) => f.peerId === view.owner)?.name ?? t('layout.toolbar.someone');
     return (
       <Shell
         headerRef={headerRef}
-        title={w?.name ?? 'Shared workspace'}
+        title={w?.name ?? t('layout.toolbar.sharedWorkspace')}
         // Whose machine and which agent runs there: the owner's (BLG-448), never yours.
         subtitle={
           <span className={s.meta}>
-            {`${owner}'s ${w?.project ?? 'project'} ·`}
+            {t('layout.toolbar.ownersProject', { owner, project: w?.project ?? t('layout.toolbar.project') })}
             <Icon name={agentMark(w?.agent)} size={11} />
-            {`${agentLabel(w?.agent, owner, false, { model: true })} on their computer · ${w?.role === 'contribute' ? 'you can work here' : 'you’re following along'}`}
+            {t(w?.role === 'contribute' ? 'layout.toolbar.onTheirComputerWork' : 'layout.toolbar.onTheirComputerFollow', { agent: agentLabel(w?.agent, owner, false, { model: true }) })}
           </span>
         }
         center={
           <Segmented
-            label="Views"
+            label={t('layout.toolbar.views')}
             value={view.tab === 'terminal' ? 'files' : view.tab}
             onChange={(tab) => actions.run({ type: 'open_shared', owner: view.owner, id: view.id, tab })}
             options={[
-              { value: 'chat', label: 'Chat', icon: 'chat' },
-              { value: 'files', label: 'Files', icon: 'folder', hint: 'Browse and search the files' },
-              { value: 'diff', label: 'Diff', icon: 'diff' },
+              { value: 'chat', label: t('layout.toolbar.chat'), icon: 'chat' },
+              { value: 'files', label: t('layout.toolbar.files'), icon: 'folder', hint: t('layout.toolbar.filesHint') },
+              { value: 'diff', label: t('layout.toolbar.diff'), icon: 'diff' },
             ]}
           />
         }
@@ -331,7 +349,7 @@ export function Toolbar() {
           <>
             <ForkToMacButton owner={view.owner} wsId={view.id} />
             <PeopleHere wsId={view.id} />
-            <IconButton icon="people" label={`About ${w?.name ?? 'this workspace'}: who's here, leave`} onClick={() => ui.openMenu({ kind: 'shared', owner: view.owner, id: view.id })} />
+            <IconButton icon="people" label={t('layout.toolbar.aboutShared', { name: w?.name ?? t('layout.toolbar.thisWorkspace') })} onClick={() => ui.openMenu({ kind: 'shared', owner: view.owner, id: view.id })} />
           </>
         }
       />
@@ -341,13 +359,13 @@ export function Toolbar() {
   if (view.kind === 'conversation') return <ConversationBar id={view.id} headerRef={headerRef} />;
 
   if (view.kind === 'assistant') {
-    return <Shell headerRef={headerRef} title={<span className={s.name}>{ASSISTANT_TITLE}</span>} subtitle={<span className={s.meta}>Your agent for {THIS_COMPUTER} as a whole · the open chat is the one on your phone</span>} />;
+    return <Shell headerRef={headerRef} title={<span className={s.name}>{ASSISTANT_TITLE}</span>} subtitle={<span className={s.meta}>{t('layout.toolbar.assistantSub', { computer: THIS_COMPUTER })}</span>} />;
   }
 
   if (view.kind === 'room') {
     // The room's group chat (BLG-871: no page while you're alone), and its call (BLG-716) while there's someone to call.
     const solo = state.peers.length <= 1;
-    return <Shell headerRef={headerRef} title={state.room || 'Group chat'} subtitle={<span className={s.meta}>{solo ? 'Everyone else has left the room' : `${state.peers.length} people · everyone’s agent can join in`}</span>} right={solo ? undefined : <CallButton id="room" label="the Room" />} />;
+    return <Shell headerRef={headerRef} title={state.room || t('layout.toolbar.groupChat')} subtitle={<span className={s.meta}>{solo ? t('layout.toolbar.everyoneLeft') : t('layout.toolbar.roomPeople', { count: state.peers.length })}</span>} right={solo ? undefined : <CallButton id="room" label={t('layout.toolbar.theRoom')} />} />;
   }
 
   if (view.kind === 'draft' || view.kind === 'draft_worktree') {
@@ -359,16 +377,17 @@ export function Toolbar() {
         title={
           <>
             {project ? <span className={s.crumb}>{project.name}</span> : null}
-            <span className={s.name}>{worktree ? 'New Worktree' : 'New Chat'}</span>
+            <span className={s.name}>{worktree ? t('layout.toolbar.newWorktree') : t('layout.toolbar.newChat')}</span>
           </>
         }
-        subtitle={<span className={s.meta}>{worktree ? 'Its own branch and folder; your agent starts on your task right away' : project ? `Your agent works in ${project.name}’s main folder` : 'Nothing is created until you send the first message'}</span>}
+        subtitle={<span className={s.meta}>{worktree ? t('layout.toolbar.newWorktreeSub') : project ? t('layout.toolbar.newChatIn', { project: project.name }) : t('layout.toolbar.newChatSub')}</span>}
       />
     );
   }
 
   // Sentinel is one page (BLG-300): its list, its board and its chat say Sentinel, with how it's doing.
   if (view.kind === 'sentinel' || view.kind === 'dashboard' || (view.kind === 'sentinel_chat' && !view.about)) {
+    // i18n-ignore
     return <Shell headerRef={headerRef} title={<span className={s.name}>Sentinel</span>} subtitle={<span className={s.meta}>{sentinelSubtitle(state.sentinel)}</span>} />;
   }
 
@@ -381,8 +400,10 @@ export function Toolbar() {
         headerRef={headerRef}
         title={
           <>
+            {/* i18n-ignore */}
             <span className={s.crumb}>{project?.name ?? (item ? ASSISTANT_TITLE : 'Sentinel')}</span>
-            <span className={s.name}>{view.kind === 'sentinel_run' ? `${item?.name ?? 'Sentinel'} · Run` : (item?.name ?? 'Sentinel')}</span>
+            {/* i18n-ignore */}
+            <span className={s.name}>{view.kind === 'sentinel_run' ? t('layout.toolbar.run', { name: item?.name ?? 'Sentinel' }) : (item?.name ?? 'Sentinel')}</span>
           </>
         }
       />
@@ -391,16 +412,16 @@ export function Toolbar() {
 
   if (view.kind === 'tasks') {
     // One project's tasks (its name is the switcher at the top of the view).
-    return <Shell headerRef={headerRef} title={<span className={s.name}>Tasks</span>} />;
+    return <Shell headerRef={headerRef} title={<span className={s.name}>{t('layout.toolbar.title.tasks')}</span>} />;
   }
 
-  if (view.kind === 'plans') return <Shell headerRef={headerRef} title={<span className={s.name}>Plans</span>} />;
+  if (view.kind === 'plans') return <Shell headerRef={headerRef} title={<span className={s.name}>{t('layout.toolbar.plans')}</span>} />;
 
-  if (view.kind === 'issues') return <Shell headerRef={headerRef} title={<span className={s.name}>Issues</span>} subtitle={<span className={s.meta}>From GitHub · your agent investigates, fixes, or writes them up as tasks</span>} />;
+  if (view.kind === 'issues') return <Shell headerRef={headerRef} title={<span className={s.name}>{t('layout.toolbar.issues')}</span>} subtitle={<span className={s.meta}>{t('layout.toolbar.issuesSub')}</span>} />;
 
-  if (view.kind === 'pulls') return <Shell headerRef={headerRef} title={<span className={s.name}>Pull Requests</span>} subtitle={<span className={s.meta}>From GitHub · anyone’s open pull requests, each one a worktree away</span>} />;
+  if (view.kind === 'pulls') return <Shell headerRef={headerRef} title={<span className={s.name}>{t('layout.toolbar.pulls')}</span>} subtitle={<span className={s.meta}>{t('layout.toolbar.pullsSub')}</span>} />;
 
-  if (view.kind === 'actions') return <Shell headerRef={headerRef} title={<span className={s.name}>Actions</span>} subtitle={<span className={s.meta}>From GitHub · runs as they go, and each workflow as a graph</span>} />;
+  if (view.kind === 'actions') return <Shell headerRef={headerRef} title={<span className={s.name}>{t('layout.toolbar.actions')}</span>} subtitle={<span className={s.meta}>{t('layout.toolbar.actionsSub')}</span>} />;
 
   if (view.kind === 'gh_run') {
     const project = state.projects.find((p) => p.id === view.projectId);
@@ -409,8 +430,8 @@ export function Toolbar() {
         headerRef={headerRef}
         title={
           <>
-            <span className={s.crumb}>{project?.name ?? 'Actions'}</span>
-            <span className={s.name}>Workflow Run</span>
+            <span className={s.crumb}>{project?.name ?? t('layout.toolbar.actions')}</span>
+            <span className={s.name}>{t('layout.toolbar.workflowRun')}</span>
           </>
         }
       />
@@ -424,8 +445,8 @@ export function Toolbar() {
         headerRef={headerRef}
         title={
           <>
-            <span className={s.crumb}>{project?.name ?? 'Issues'}</span>
-            <span className={s.name}>Issue #{view.number}</span>
+            <span className={s.crumb}>{project?.name ?? t('layout.toolbar.issues')}</span>
+            <span className={s.name}>{t('layout.toolbar.issue', { number: view.number })}</span>
           </>
         }
       />
@@ -442,8 +463,8 @@ export function Toolbar() {
         headerRef={headerRef}
         title={
           <>
-            <span className={s.crumb}>{project?.name ?? 'Plans'}</span>
-            <span className={s.name}>Plan</span>
+            <span className={s.crumb}>{project?.name ?? t('layout.toolbar.plans')}</span>
+            <span className={s.name}>{t('layout.toolbar.plan')}</span>
           </>
         }
         {...(branch ? { subtitle: branch } : {})}
@@ -459,8 +480,8 @@ export function Toolbar() {
         headerRef={headerRef}
         title={
           <>
-            <span className={s.crumb}>{project?.name ?? 'Tasks'}</span>
-            <span className={s.name}>{issue?.key ?? 'Task'}</span>
+            <span className={s.crumb}>{project?.name ?? t('layout.toolbar.title.tasks')}</span>
+            <span className={s.name}>{issue?.key ?? t('layout.toolbar.task')}</span>
           </>
         }
         subtitle={issue ? <span className={s.meta}>{issue.title}</span> : undefined}
@@ -477,17 +498,18 @@ export function Toolbar() {
           title={
             <>
               {project ? <span className={s.crumb}>{project.name}</span> : null}
-              <span className={s.name}>History</span>
+              <span className={s.name}>{t('layout.toolbar.history')}</span>
             </>
           }
-          subtitle={<span className={s.meta}>Who committed what, and when · every branch</span>}
+          subtitle={<span className={s.meta}>{t('layout.toolbar.historySub')}</span>}
         />
       );
     }
-    return <Shell headerRef={headerRef} title={project?.name ?? 'Project'} subtitle={<span className={s.meta}>Work happens in worktrees · the main folder is for questions</span>} />;
+    return <Shell headerRef={headerRef} title={project?.name ?? t('layout.toolbar.projectTitle')} subtitle={<span className={s.meta}>{t('layout.toolbar.projectSub')}</span>} />;
   }
 
-  return <Shell headerRef={headerRef} title={TITLES[view.kind] ?? 'Beluga'} />;
+  // i18n-ignore
+  return <Shell headerRef={headerRef} title={TITLES()[view.kind] ?? 'Beluga'} />;
 }
 
 /** A conversation with friends or a group: who it's with, their status, the group's people. */

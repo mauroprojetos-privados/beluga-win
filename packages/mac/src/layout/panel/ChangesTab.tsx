@@ -24,6 +24,7 @@ import { showGitTrouble } from '../../lib/git-trouble.js';
 import s from './panel.module.css';
 import { shortcutKeys } from '../../lib/shortcuts.js';
 import { useFirstPaintMark } from '../../lib/first-paint.js';
+import { useT } from '../../lib/i18n.js';
 
 /** The last answer Claude finished in this workspace (its edits may have changed what's shown). */
 function useLastTurn(wsId: string): string {
@@ -59,29 +60,30 @@ function useChanges(wsId: string): { data: Review | undefined; loading: boolean;
 }
 
 function Summary({ data, loading, grouped, onReload }: { data: Review; loading: boolean; grouped: boolean; onReload: () => void }) {
-  const totals = data.files.reduce((t, f) => ({ add: t.add + f.added, del: t.del + f.removed }), { add: 0, del: 0 });
+  const t = useT();
+  const totals = data.files.reduce((sum, f) => ({ add: sum.add + f.added, del: sum.del + f.removed }), { add: 0, del: 0 });
   const commitItems = useCommitItems();
   const [showCommits, setShowCommits] = useState(false);
   return (
     <div className={s.summary}>
       <div className={s.summaryRow}>
         <span className={s.summaryTitle}>
-          {data.files.length} file{data.files.length === 1 ? '' : 's'} changed
+          {t('layout.changes.filesChanged', { count: data.files.length })}
         </span>
         <span className={d.add}>+{totals.add}</span>
         <span className={d.del}>−{totals.del}</span>
         <span className={s.flex} />
-        <IconButton icon="folder" label={grouped ? 'Show as One List' : 'Group by Folder'} active={grouped} aria-pressed={grouped} onClick={() => setPrefs({ changesByFolder: !grouped })} />
-        <IconButton icon="refresh" label={loading ? 'Looking for changes…' : 'Look again'} className={cx(loading && s.spinning)} onClick={onReload} />
+        <IconButton icon="folder" label={grouped ? t('layout.changes.oneList') : t('layout.changes.byFolder')} active={grouped} aria-pressed={grouped} onClick={() => setPrefs({ changesByFolder: !grouped })} />
+        <IconButton icon="refresh" label={loading ? t('layout.changes.looking') : t('layout.changes.lookAgain')} className={cx(loading && s.spinning)} onClick={onReload} />
       </div>
       <div className={s.summaryMeta}>
         <span className={s.base} title={data.base}>
-          vs {/^[0-9a-f]{40}$/.test(data.base) ? data.base.slice(0, 7) : data.base}
+          {t('layout.changes.vs', { base: /^[0-9a-f]{40}$/.test(data.base) ? data.base.slice(0, 7) : data.base })}
         </span>
         {data.commits.length ? (
           <button type="button" className={s.disclose} aria-expanded={showCommits} onClick={() => setShowCommits(!showCommits)}>
             <Icon name={showCommits ? 'chevronDown' : 'chevronRight'} size={9} />
-            {data.commits.length} commit{data.commits.length === 1 ? '' : 's'} ahead
+            {t('layout.changes.commitsAhead', { count: data.commits.length })}
           </button>
         ) : null}
       </div>
@@ -99,7 +101,7 @@ function Summary({ data, loading, grouped, onReload }: { data: Review; loading: 
               </span>
             </ActionsContext>
           ))}
-          {data.commits.length > 20 ? <div className={s.dim}>and {data.commits.length - 20} earlier</div> : null}
+          {data.commits.length > 20 ? <div className={s.dim}>{t('layout.changes.andEarlier', { count: data.commits.length - 20 })}</div> : null}
         </div>
       ) : null}
     </div>
@@ -108,6 +110,7 @@ function Summary({ data, loading, grouped, onReload }: { data: Review; loading: 
 
 /** Commit, a pull request, Claude's review: what you do with changes, right under them. */
 function Actions({ wsId }: { wsId: string }) {
+  const t = useT();
   const agent = useMyAgentName();
   const actions = useActions();
   const api = useApi();
@@ -124,41 +127,41 @@ function Actions({ wsId }: { wsId: string }) {
   return (
     <div className={s.actions}>
       {worktree && changed ? (
-        <Tip label={`Commit ${changed} changed file${changed === 1 ? '' : 's'}`} keys={shortcutKeys('ws-commit')}>
+        <Tip label={t('layout.changes.commitTip', { count: changed })} keys={shortcutKeys('ws-commit')}>
           <Button size="small" variant="primary" icon="check" onClick={() => run('commit')}>
-            Commit
+            {t('layout.changes.commit')}
           </Button>
         </Tip>
       ) : null}
       {worktree && pr ? (
-        <Tip label="Open it, fix checks, or update it" keys={shortcutKeys('ws-pr')}>
+        <Tip label={t('layout.changes.prTip')} keys={shortcutKeys('ws-pr')}>
           <Button size="small" icon="pr" onClick={() => run('pr')}>
-            {`PR #${pr.number}`}
+            {t('layout.toolbar.prNumber', { number: pr.number })}
           </Button>
         </Tip>
       ) : worktree && (ahead || changed) ? (
         <>
-          <Tip label="Pushes and opens a pull request, titled from its commits">
+          <Tip label={t('layout.changes.createPrTip')}>
             <Button size="small" icon="pr" disabled={opening} onClick={() => quick()}>
-              {opening ? 'Opening…' : 'Create PR'}
+              {opening ? t('layout.inspector.opening') : t('layout.changes.createPr')}
             </Button>
           </Tip>
           <ActionsDropdown
             items={[
-              { label: `Create PR with ${agent}`, hint: 'Your agent writes the title and description: what, why, how to test', icon: 'claude', onSelect: () => void api.workbench.createPr(wsId) },
-              { label: 'Create PR with Instructions…', hint: 'Tell your agent anything extra for this one', icon: 'claude', onSelect: () => requestAnimationFrame(() => run('pr')) },
-              { label: 'Create Draft PR', hint: 'It can’t merge until it’s marked ready', icon: 'pr', onSelect: () => quick(true) },
+              { label: t('layout.changes.createPrWith', { agent }), hint: t('layout.changes.createPrWithHint'), icon: 'claude', onSelect: () => void api.workbench.createPr(wsId) },
+              { label: t('layout.changes.createPrInstructions'), hint: t('layout.changes.createPrInstructionsHint'), icon: 'claude', onSelect: () => requestAnimationFrame(() => run('pr')) },
+              { label: t('layout.changes.createDraftPr'), hint: t('layout.changes.createDraftPrHint'), icon: 'pr', onSelect: () => quick(true) },
             ]}
           >
-            <Button size="small" variant="quiet" disabled={opening} aria-label="Other ways to create the pull request">
+            <Button size="small" variant="quiet" disabled={opening} aria-label={t('layout.changes.otherWays')}>
               <Icon name="chevronDown" size={11} />
             </Button>
           </ActionsDropdown>
         </>
       ) : null}
-      <Tip label="Ask your agent to check everything: bugs, security, tests and quality" keys={shortcutKeys('ws-review')}>
+      <Tip label={t('layout.changes.reviewTip')} keys={shortcutKeys('ws-review')}>
         <Button size="small" variant="quiet" icon="claude" onClick={() => run('review_claude')}>
-          Review
+          {t('layout.changes.review')}
         </Button>
       </Tip>
     </div>
@@ -192,6 +195,7 @@ function peekDiff(wsId: string, path: string, data: object): string | undefined 
  * PDF only as itself), with the way to see it full size or in Files.
  */
 function FileDiff({ wsId, path, onClose }: { wsId: string; path: string; onClose: () => void }) {
+  const t = useT();
   const api = useApi();
   const { client } = useBeluga();
   const prefs = usePrefs();
@@ -218,7 +222,7 @@ function FileDiff({ wsId, path, onClose }: { wsId: string; path: string; onClose
     void api.files.open(at);
   };
   return (
-    <section className={s.preview} aria-label={`Changes in ${name}`}>
+    <section className={s.preview} aria-label={t('layout.changes.changesIn', { name })}>
       <div className={s.previewHead}>
         {st ? <span className={cx(d.letter, st.tone)}>{st.letter}</span> : <Icon name="file" size={13} />}
         <span className={s.previewName} title={path}>
@@ -233,25 +237,25 @@ function FileDiff({ wsId, path, onClose }: { wsId: string; path: string; onClose
         <span className={s.flex} />
         {showable && !onlyAsFile(path) ? (
           <Segmented
-            label="Show"
+            label={t('layout.changes.show')}
             value={look}
             onChange={(v) => setPrefs({ changeLook: v })}
             options={[
-              { value: 'diff', label: 'Changes', hint: 'What changed, line by line' },
-              { value: 'file', label: fileLookLabel(path), hint: 'The file as it is now' },
+              { value: 'diff', label: t('layout.changes.changes'), hint: t('layout.changes.changesHint') },
+              { value: 'file', label: fileLookLabel(path), hint: t('layout.changes.fileHint') },
             ]}
           />
         ) : null}
-        {showable ? <IconButton icon="folder" label="Show in Files" onClick={showInFiles} /> : null}
-        <IconButton icon="expand" label="Open in full" keys={chordLabel('Cmd+Enter')} onClick={() => openFocus('diff', wsId)} />
-        <IconButton icon="x" label="Close" keys="Esc" onClick={onClose} />
+        {showable ? <IconButton icon="folder" label={t('layout.changes.showInFiles')} onClick={showInFiles} /> : null}
+        <IconButton icon="expand" label={t('layout.changes.openInFull')} keys={chordLabel('Cmd+Enter')} onClick={() => openFocus('diff', wsId)} />
+        <IconButton icon="x" label={t('common.close')} keys="Esc" onClick={onClose} />
       </div>
       {look === 'file' && at ? (
         <div className={cx(s.previewBody, s.previewFile, 'selectable')} tabIndex={0}>
           <ChangedFileView at={at} variant="panel" />
         </div>
       ) : (
-        <div className={cx(s.previewBody, d.code, 'selectable')} tabIndex={0}>{diff === undefined ? <div className={s.dimPad}>Loading the diff…</div> : lines.length ? <UnifiedDiff lines={lines} compact comments={comments} /> : <div className={s.dimPad}>{diff || 'No differences in the text.'}</div>}</div>
+        <div className={cx(s.previewBody, d.code, 'selectable')} tabIndex={0}>{diff === undefined ? <div className={s.dimPad}>{t('layout.changes.loadingDiff')}</div> : lines.length ? <UnifiedDiff lines={lines} compact comments={comments} /> : <div className={s.dimPad}>{diff || t('layout.changes.noDifferences')}</div>}</div>
       )}
     </section>
   );
@@ -259,6 +263,7 @@ function FileDiff({ wsId, path, onClose }: { wsId: string; path: string; onClose
 
 /** The right panel's Changes: the changed files and, picked one, its diff under them. */
 export function ChangesTab({ wsId }: { wsId: string }) {
+  const t = useT();
   const api = useApi();
   const { client } = useBeluga();
   const prefs = usePrefs();
@@ -349,12 +354,12 @@ export function ChangesTab({ wsId }: { wsId: string }) {
     }
   };
 
-  if (!data && error) return <Empty icon="alert" title="Couldn’t read the changes" detail={error} />;
-  if (!data) return <div className={s.dimPad}>Looking at what changed…</div>;
+  if (!data && error) return <Empty icon="alert" title={t('layout.changes.couldntRead')} detail={error} />;
+  if (!data) return <div className={s.dimPad}>{t('layout.changes.lookingAt')}</div>;
   if (!files.length && !data.commits.length) {
     return (
       <div className={s.emptyTab}>
-        <Empty icon="check" title="No changes yet" detail={`Everything matches ${data.base}. Your agent’s edits show up here as they happen.`} />
+        <Empty icon="check" title={t('layout.changes.noChanges')} detail={t('layout.changes.noChangesDetail', { base: data.base })} />
       </div>
     );
   }
@@ -398,16 +403,16 @@ export function ChangesTab({ wsId }: { wsId: string }) {
     <div ref={box} className={s.stack}>
       <div className={s.top} style={shown ? { flex: `0 0 ${Math.round(split * 100)}%` } : undefined}>
         <Summary data={data} loading={loading} grouped={grouped} onReload={reload} />
-        <div ref={listRef} className={s.list} role="listbox" aria-label="Changed files" tabIndex={0} onKeyDown={onKey}>
+        <div ref={listRef} className={s.list} role="listbox" aria-label={t('layout.changes.changedFiles')} tabIndex={0} onKeyDown={onKey}>
           {grouped
             ? groups.map((g) => {
                 const shut = folded.has(g.dir);
                 return (
-                  <div key={g.dir} role="group" aria-label={g.dir || 'Top level'}>
-                    <button type="button" tabIndex={-1} className={s.folderRow} aria-expanded={!shut} title={g.dir || 'Top level'} onClick={() => fold(g.dir)}>
+                  <div key={g.dir} role="group" aria-label={g.dir || t('layout.changes.topLevel')}>
+                    <button type="button" tabIndex={-1} className={s.folderRow} aria-expanded={!shut} title={g.dir || t('layout.changes.topLevel')} onClick={() => fold(g.dir)}>
                       <Icon name={shut ? 'chevronRight' : 'chevronDown'} size={9} />
                       <Icon name="folder" size={13} />
-                      <span className={cx(s.rowName, !g.dir && s.dim)}>{g.dir || 'Top level'}</span>
+                      <span className={cx(s.rowName, !g.dir && s.dim)}>{g.dir || t('layout.changes.topLevel')}</span>
                       <span className={s.rowCounts}>
                         <span className={s.dim}>{g.files.length}</span>
                         {g.added ? <span className={d.add}>+{g.added}</span> : null}
@@ -426,7 +431,7 @@ export function ChangesTab({ wsId }: { wsId: string }) {
         <>
           <ResizeHandle
             axis="y"
-            label="Resize the list"
+            label={t('layout.changes.resizeList')}
             onMove={(y) => {
               const r = box.current?.getBoundingClientRect();
               if (r) setPrefs({ panelSplit: clampShare((y - r.top) / r.height, SPLIT_MIN, SPLIT_MAX) });

@@ -16,6 +16,7 @@ import { DotMark, nameClass, signalClass } from './signal-marks.js';
 import { triageItems } from './row-triage-actions.js';
 import { Row } from './sidebar-parts.js';
 import m from './signal.module.css';
+import { useT } from '../lib/i18n.js';
 
 /**
  * A plan under its project: one row for the plan, its conversation and all its task worktrees
@@ -25,6 +26,7 @@ import m from './signal.module.css';
  * It stays marked while you're in its conversation or in one of its tasks.
  */
 export function PlanRow({ plan, indent }: { plan: Plan; indent: number }) {
+  const t = useT();
   const view = usePlanView(plan)!;
   const { open, openList } = usePlanActions();
   const uiPrefs = usePrefs();
@@ -37,18 +39,18 @@ export function PlanRow({ plan, indent }: { plan: Plan; indent: number }) {
   const unread = inside.unread;
   const planNeeds = status.tone === 'accent' || status.tone === 'error';
   const needs = planNeeds || inside.level === 'needs';
-  const working = view.active.some((t) => t.state === 'running') || inside.working;
+  const working = view.active.some((x) => x.state === 'running') || inside.working;
   const next = nextWords(view.next);
   const why = planNeeds ? (next.detail ? `${next.title}: ${next.detail}` : next.title) : inside.level === 'needs' ? inside.tip : status.label;
-  const tip = [`${title}: ${why}`, view.total ? `${view.done} of ${view.total} tasks done` : '', unread ? `${unread} new message${unread === 1 ? '' : 's'}` : inside.inside && !needs ? 'New in its tasks' : ''].filter(Boolean).join(' · ');
+  const tip = [`${title}: ${why}`, view.total ? t('layout.plan.tasksDone', { count: view.total, done: view.done }) : '', unread ? t('layout.plan.newMessages', { count: unread }) : inside.inside && !needs ? t('layout.plan.newInTasks') : ''].filter(Boolean).join(' · ');
   const signal = { level: needs ? 'needs' : unread ? 'unread' : working ? 'working' : 'idle', unread, working, tip } as const;
   const actions = useActions();
   const { client } = useBeluga();
   const items = (): ActionItem[] => [
-    { label: 'Open Plan', icon: 'chevronRight', onSelect: () => open(plan.id) },
+    { label: t('layout.plan.open'), icon: 'chevronRight', onSelect: () => open(plan.id) },
     ...triageItems(client.store.getState(), `plan:${plan.id}`, actions.run, client),
     ...(plan.status === 'active' ? [taskChatsItem(plan.id, uiPrefs)] : []),
-    { label: 'All Plans', separate: true, onSelect: () => openList(plan.projectId) },
+    { label: t('layout.plan.all'), separate: true, onSelect: () => openList(plan.projectId) },
   ];
   return (
     <ActionsContext items={items}>

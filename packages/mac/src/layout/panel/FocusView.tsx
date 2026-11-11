@@ -8,13 +8,15 @@ import { type FocusKind, closeFocus, filesWsOf, usePanelRuntime } from '../../li
 import { ChatView } from '../../views/ChatView.js';
 import { ConvoCenter } from '../../agent-term/ConvoCenter.js';
 import s from './panel.module.css';
+import { useT } from '../../lib/i18n.js';
+import { t as tr } from '@beluga/shared/i18n/index.js';
 
 const DiffView = lazyView('views/DiffView', () => import('../../views/DiffView.js').then((m) => m.DiffView), false);
 const FileFocus = lazyView('views/reader/FileFocus', () => import('../../views/reader/FileFocus.js').then((m) => m.FileFocus));
 const PrPage = lazyView('pr/PrPage', () => import('../../pr/PrPage.js').then((m) => m.PrPage));
 const TerminalView = lazyView('views/TerminalView', () => import('../../views/TerminalView.js').then((m) => m.TerminalView), false);
 
-const TITLES: Record<FocusKind, string> = { diff: 'Changes', file: 'File', terminal: 'Terminal', pr: 'Pull Request' };
+const TITLES = (): Record<FocusKind, string> => ({ diff: tr('layout.changes.changes'), file: tr('layout.focus.file'), terminal: tr('layout.toolbar.title.terminal'), pr: tr('layout.focus.pr') });
 
 /** Escape goes back to the chat, unless it's closing something else first (a menu, a field, the terminal's own use). */
 function useEscapeBack(): void {
@@ -44,6 +46,7 @@ function useEscapeBack(): void {
 
 /** A diff, a file or the terminal across the whole center for a while; the chat is one click (or Esc) away. */
 function FocusView({ kind, wsId }: { kind: FocusKind; wsId: string }) {
+  const t = useT();
   useEscapeBack();
   const viewer = useApp((st) => (st.viewer && st.viewer.owner === st.selfId && st.viewer.share === shareNameOf(wsId) ? st.viewer : undefined));
   const path = useApp((st) => (kind === 'diff' ? st.review?.data?.files[st.review.selected]?.path : undefined));
@@ -62,13 +65,14 @@ function FocusView({ kind, wsId }: { kind: FocusKind; wsId: string }) {
   return (
     <div className={s.focus}>
       <div className={s.focusBar}>
-        <button type="button" className={s.back} onClick={closeFocus} aria-label="Back to Chat">
+        <button type="button" className={s.back} onClick={closeFocus} aria-label={t('layout.focus.back')}>
           <Icon name="back" size={12} />
-          Back to Chat
+          {t('layout.focus.back')}
+          {/* i18n-ignore */}
           <Kbd>Esc</Kbd>
         </button>
         <span className={s.focusTitle}>
-          {TITLES[kind]}
+          {TITLES()[kind]}
           {path ? <span className={s.focusPath}>{path}</span> : null}
         </span>
       </div>
