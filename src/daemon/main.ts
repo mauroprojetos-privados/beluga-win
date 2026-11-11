@@ -25,6 +25,7 @@ import { WebAccess, attachWebAccess, readWebConfig } from './web-access.js';
 import { publicWords } from './reach/public.js';
 import { tailscaleWords } from './reach/tailscale.js';
 import { dropGitLocalEnv } from '../core/git-env.js';
+import { t } from '../shared/i18n/index.js';
 
 /** How long the daemon waits after the last screen closes before leaving the room. */
 export const LINGER_MS = 3000;
@@ -245,7 +246,7 @@ export async function runDaemon(config: Config, opts: DaemonOptions): Promise<vo
   process.on('unhandledRejection', (err) => {
     log(`unhandled: ${errorText(err)}`);
     box.incident('unhandled rejection', err instanceof Error ? (err.stack ?? err.message) : String(err));
-    daemon.core.session.toast(`Something went wrong: ${errorText(err)}`.slice(0, 200), 'error');
+    daemon.core.session.toast(t('toasts.daemon.wentWrong', { error: errorText(err) }).slice(0, 200), 'error');
   });
   // Everyone's screens and the room hang off this process: log a stray throw rather than die.
   process.on('uncaughtException', (err) => {

@@ -24,6 +24,7 @@ import { COPY_TTL_MS, cloneFrom, cloneFromBundle, cloneUrl, copiesHome, copyTarg
 import { ShareCourier, type ShareMesh } from './courier.js';
 import { type ForkHistory, fetchFork, haveOf, packFork, placeFork, unpackFork } from './fork.js';
 import { HISTORY_TEXT, HISTORY_TEXT_LONG, type ShareMsg, historyPageOf } from './protocol.js';
+import { t } from '../../shared/i18n/index.js';
 
 /**
  * Sharing with friends over the network, with nobody hosting (docs/network.md, "Sharing with
@@ -205,7 +206,7 @@ export class FriendShares implements FriendSharing {
     this.publishGrants();
     this.resync();
     const what = only?.length === 1 ? (project.workspaces.find((w) => w.id === only[0])?.name ?? project.name) : project.name;
-    this.opts.session.toast(`${name} ${role === 'contribute' ? 'can now work with you' : 'can now follow along'} in ${what}`, 'success');
+    this.opts.session.toast(role === 'contribute' ? t('toasts.friendShare.canWork', { name, what }) : t('toasts.friendShare.canFollow', { name, what }), 'success');
   }
 
   unshareFriend(share: Omit<FriendShareInput, 'role'>): void {
@@ -223,7 +224,7 @@ export class FriendShares implements FriendSharing {
       }
     }
     this.dropGrant(project.id, share.peerId, true);
-    this.opts.session.toast(`Stopped sharing ${project.name} with ${this.opts.mesh.nameFor(share.peerId)}`, 'success');
+    this.opts.session.toast(t('toasts.friendShare.stoppedSharing', { name: project.name, who: this.opts.mesh.nameFor(share.peerId) }), 'success');
   }
 
   /**
@@ -679,7 +680,7 @@ export class FriendShares implements FriendSharing {
     for (const gone of (before?.worktrees ?? []).filter((w) => !worktrees.some((x) => x.id === w.id))) this.leaveWs(from, gone.id);
     this.saveReceived();
     this.publishReceived(false);
-    if (!before) this.opts.session.toast(`${ownerName} shared ${next.name} with you${m.role === 'view' ? ' (to follow along)' : ''}. It's in Projects`, 'success');
+    if (!before) this.opts.session.toast(m.role === 'view' ? t('toasts.friendShare.sharedFollow', { who: ownerName, name: next.name }) : t('toasts.friendShare.shared', { who: ownerName, name: next.name }), 'success');
     // Shared whole: you get your own copy of it, once (Get a Copy tries again after a failure).
     if (m.copy && !next.copy) void this.makeCopy(from, m.id);
   }
@@ -739,7 +740,7 @@ export class FriendShares implements FriendSharing {
     await ctl?.refresh();
     this.setCopy(owner, id, { state: 'ready', path: dest, ...(projectId ? { projectId } : {}) });
     const rec = this.received[keyOf(owner, id)];
-    if (rec) this.opts.session.toast(`Your copy of ${rec.name} is in ${dest.replace(/^\/Users\/[^/]+/, '~')}`, 'success');
+    if (rec) this.opts.session.toast(t('toasts.friendShare.copyIn', { name: rec.name, path: dest.replace(/^\/Users\/[^/]+/, '~') }), 'success');
   }
 
   /**
@@ -903,7 +904,7 @@ export class FriendShares implements FriendSharing {
       if (full) this.opts.session.workbench?.onWorktreeCreated(ws);
       this.setFork(m.ws, { state: 'ready', wsId: ws.id });
       this.forkNames.delete(m.ws);
-      this.opts.session.toast(`Your fork of ${rec.ownerName}’s ${ws.name} is ready on ${branch}`, 'success');
+      this.opts.session.toast(t('toasts.friendShare.forkReady', { who: rec.ownerName, name: ws.name, branch }), 'success');
     } catch (err) {
       // Don't leave a half-made branch behind.
       if (made && !ctl.manager.list.some((p) => p.workspaces.some((w) => w.branch === made!.branch))) await git(made.root, ['branch', '-D', '--', made.branch]).catch(() => undefined);
@@ -934,7 +935,7 @@ export class FriendShares implements FriendSharing {
 
   private forkFailed(wsId: string, error: string): void {
     this.setFork(wsId, { state: 'failed', error });
-    this.opts.session.toast(`Couldn’t fork it: ${error}`, 'warn');
+    this.opts.session.toast(t('toasts.friendShare.forkFailed', { error }), 'warn');
   }
 
   private setCopy(owner: string, id: string, copy: SharedCopy): void {
@@ -946,7 +947,7 @@ export class FriendShares implements FriendSharing {
     this.publishReceived(false);
     // A fork waiting on it says so itself.
     const forking = [...this.forksWaiting.values()].includes(key);
-    if (copy.state === 'failed' && !forking) this.opts.session.toast(`Couldn’t copy ${rec.name}: ${copy.error ?? 'it didn’t work'}`, 'warn');
+    if (copy.state === 'failed' && !forking) this.opts.session.toast(t('toasts.friendShare.copyFailed', { name: rec.name, error: copy.error ?? t('toasts.friendShare.didntWork') }), 'warn');
     this.resumeForks(key, copy);
   }
 
@@ -954,7 +955,7 @@ export class FriendShares implements FriendSharing {
     const before = this.received[keyOf(from, id)];
     if (!before) return;
     this.forget(from, id);
-    this.opts.session.toast(`${before.ownerName} stopped sharing ${before.name} with you`, 'warn');
+    this.opts.session.toast(t('toasts.friendShare.theyStopped', { who: before.ownerName, name: before.name }), 'warn');
   }
 
   private leaveWs(owner: string, id: string): void {
@@ -1019,7 +1020,7 @@ export class FriendShares implements FriendSharing {
     if (m.active) {
       const isNew = !this.friendFolders[key];
       this.friendFolders = { ...this.friendFolders, [key]: { owner: from, ownerName: this.opts.mesh.nameFor(from), name: m.name, label: clean(m.label) || m.name, writable: m.writable, since: this.friendFolders[key]?.since ?? Date.now() } };
-      if (isNew) this.opts.session.toast(`${this.opts.mesh.nameFor(from)} shared the folder ${clean(m.label) || m.name} with you. It's in Files`, 'success');
+      if (isNew) this.opts.session.toast(t('toasts.friendShare.sharedFolder', { who: this.opts.mesh.nameFor(from), name: clean(m.label) || m.name }), 'success');
     } else this.friendFolders = Object.fromEntries(Object.entries(this.friendFolders).filter(([k]) => k !== key));
     this.saveReceived();
     this.publishFolders();

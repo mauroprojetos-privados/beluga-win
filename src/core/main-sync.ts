@@ -5,6 +5,7 @@ import type { WorkspaceManager } from '../workspaces/manager.js';
 import * as sync from '../workspaces/sync.js';
 import type { Project, Workspace } from '../workspaces/types.js';
 import { paced } from './power-saver.js';
+import { t } from '../shared/i18n/index.js';
 
 /**
  * Keeping each project's main folder current, for the project home's Update main / Fetch: a
@@ -198,10 +199,10 @@ export class MainSync {
 
   /** Say how an update went, for the outcomes that need no decision. */
   private report(outcome: sync.UpdateOutcome, extra = ''): void {
-    if (outcome.kind === 'updated') this.deps.toast(`${outcome.branch} is up to date${outcome.commits ? ` (${plural(outcome.commits, 'new commit')})` : ''}${extra}`, 'success');
-    else if (outcome.kind === 'up_to_date') this.deps.toast(`${outcome.branch} is already up to date with ${outcome.upstream}${outcome.ahead ? ` (and ${outcome.ahead} ahead)` : ''}${extra}`, 'info');
+    if (outcome.kind === 'updated') this.deps.toast(`${outcome.commits ? t('toasts.mainSync.updatedCommits', { branch: outcome.branch, count: outcome.commits }) : t('toasts.mainSync.updated', { branch: outcome.branch })}${extra}`, 'success');
+    else if (outcome.kind === 'up_to_date') this.deps.toast(`${outcome.ahead ? t('toasts.mainSync.upToDateAhead', { branch: outcome.branch, upstream: outcome.upstream, ahead: outcome.ahead }) : t('toasts.mainSync.upToDate', { branch: outcome.branch, upstream: outcome.upstream })}${extra}`, 'info');
     else if (outcome.kind === 'fetch_failed') this.deps.toast(outcome.message, outcome.reason === 'auth' ? 'warn' : 'error');
-    else if (outcome.kind === 'no_upstream') this.deps.toast(`${outcome.branch} doesn’t track a remote branch, so there’s nothing to update from`, 'info');
+    else if (outcome.kind === 'no_upstream') this.deps.toast(t('toasts.mainSync.noUpstream', { branch: outcome.branch }), 'info');
   }
 
   /** "Stash, update, and put them back". */
@@ -209,7 +210,7 @@ export class MainSync {
     const project = this.project(projectId);
     const outcome = await this.alone(projectId, () => sync.stashAndUpdate(project.root, project.base));
     await this.deps.refresh();
-    if (outcome.restored) this.report(outcome, outcome.kind === 'updated' || outcome.kind === 'up_to_date' ? ' · your changes are back' : '');
+    if (outcome.restored) this.report(outcome, outcome.kind === 'updated' || outcome.kind === 'up_to_date' ? ` · ${t('toasts.mainSync.changesBack')}` : '');
     return outcome;
   }
 
@@ -217,8 +218,8 @@ export class MainSync {
   async moveAndUpdate(projectId: string, name?: string): Promise<{ wsId: string; outcome: sync.UpdateOutcome }> {
     const { ws, outcome } = await this.alone(projectId, () => this.deps.manager.moveChangesToWorktree(projectId, name));
     await this.deps.refresh();
-    this.report(outcome, ` · your changes are in ${ws.name}`);
-    if (outcome.kind !== 'updated' && outcome.kind !== 'up_to_date') this.deps.toast(`Your changes are in the worktree ${ws.name}`, 'success');
+    this.report(outcome, ` · ${t('toasts.mainSync.changesIn', { name: ws.name })}`);
+    if (outcome.kind !== 'updated' && outcome.kind !== 'up_to_date') this.deps.toast(t('toasts.mainSync.changesInWorktree', { name: ws.name }), 'success');
     return { wsId: ws.id, outcome };
   }
 
@@ -232,7 +233,7 @@ export class MainSync {
     if (mode === 'move') {
       const { ws, branch } = await this.alone(projectId, () => this.deps.manager.moveBranchToWorktree(projectId));
       await this.deps.refresh();
-      this.deps.toast(`The main folder is on ${branch}; ${ws.branch ?? ws.name} and its changes are in the worktree ${ws.name}`, 'success');
+      this.deps.toast(t('toasts.mainSync.movedBranch', { branch, moved: ws.branch ?? ws.name, name: ws.name }), 'success');
       return { kind: 'switched', wsId: ws.id };
     }
     if (mode === 'stash') {
@@ -240,12 +241,12 @@ export class MainSync {
       await this.deps.refresh();
       if (out.kind !== 'switched' && !out.restored) return { kind: 'conflicts', files: out.conflicts ?? [], message: `Couldn’t switch to ${project.sync?.branch ?? 'the default branch'}, and putting your changes back conflicted. They’re safe in the stash “${out.stash?.message}”.` };
       if (out.kind === 'switched' && !out.restored) return { kind: 'conflicts', files: out.conflicts ?? [], message: `Switched to ${out.branch}, but your changes conflicted with it. They’re kept in the stash “${out.stash?.message}”.` };
-      if (out.kind === 'switched') this.deps.toast(`The main folder is on ${out.branch}, with your changes`, 'success');
+      if (out.kind === 'switched') this.deps.toast(t('toasts.mainSync.switchedWithChanges', { branch: out.branch }), 'success');
       return out;
     }
     const out = await this.alone(projectId, () => sync.switchToDefault(project.root, project.base));
     await this.deps.refresh();
-    if (out.kind === 'switched') this.deps.toast(`The main folder is on ${out.branch}`, 'success');
+    if (out.kind === 'switched') this.deps.toast(t('toasts.mainSync.switched', { branch: out.branch }), 'success');
     return out;
   }
 
@@ -259,7 +260,7 @@ export class MainSync {
     const project = this.project(projectId);
     const line = await sync.defaultBranch(project.root, project.base);
     if (!line.upstream) {
-      this.deps.toast(`${line.branch} doesn’t track a remote branch, so there’s nothing to update from`, 'info');
+      this.deps.toast(t('toasts.mainSync.noUpstream', { branch: line.branch }), 'info');
       return undefined;
     }
     const files = line.dirty ? await sync.dirtyFiles(project.root) : [];
@@ -331,14 +332,14 @@ export class MainSync {
     const merged = await mergeUpstream(repo, fork.forkBranch, this.deps.gh ?? runGh);
     if (merged.kind === 'conflict') return { kind: 'conflict', message: `Your fork’s ${fork.forkBranch} and ${original}’s ${fork.branch} change the same lines, so GitHub couldn’t sync them.` };
     if (merged.kind === 'failed') {
-      this.deps.toast(`Couldn’t sync with ${original}: ${merged.message}`, 'error');
+      this.deps.toast(t('toasts.mainSync.syncFailed', { original, error: merged.message }), 'error');
       return { kind: 'failed', message: merged.message };
     }
     this.forks.set(projectId, { url, at: this.now, fork: { ...fork, behind: 0 } });
     this.deps.manager.setFork(projectId, { ...fork, behind: 0 });
-    const said = merged.kind === 'none' ? ` · your fork already had everything from ${original}` : merged.kind === 'merge' ? ` · synced with ${original} (a merge commit on your fork)` : ` · synced with ${original}`;
+    const said = ` · ${merged.kind === 'none' ? t('toasts.mainSync.forkHadAll', { original }) : merged.kind === 'merge' ? t('toasts.mainSync.syncedMerge', { original }) : t('toasts.mainSync.synced', { original })}`;
     const update = await this.alone(projectId, () => this.doUpdate(projectId, said));
-    if (update.kind !== 'updated' && update.kind !== 'up_to_date' && merged.kind !== 'none') this.deps.toast(`Your fork on GitHub has ${original}’s new commits`, 'success');
+    if (update.kind !== 'updated' && update.kind !== 'up_to_date' && merged.kind !== 'none') this.deps.toast(t('toasts.mainSync.forkHasNew', { original }), 'success');
     return { kind: 'synced', how: merged.kind, update };
   }
 
@@ -346,7 +347,7 @@ export class MainSync {
   async syncForkWithClaude(projectId: string, situation?: string): Promise<string | undefined> {
     const fork = this.project(projectId).fork ?? (await this.learnFork(projectId));
     if (!fork) {
-      this.deps.toast('This project’s origin isn’t a fork on GitHub', 'warn');
+      this.deps.toast(t('toasts.mainSync.notAFork'), 'warn');
       return undefined;
     }
     const ws = await this.deps.newWorktree(projectId, `sync-${fork.owner}`, {});

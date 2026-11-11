@@ -1,7 +1,7 @@
 import { actingVia, asActingAgent } from './acting-agent.js';
 import { setSideLanguage } from '../agent/side-language.js';
 import { appLocale } from './language.js';
-import { setLocale } from '../shared/i18n/index.js';
+import { setLocale, t } from '../shared/i18n/index.js';
 import { closePreviews } from '../preview/off.js';
 import { experimentOn } from '../shared/experiments.js';
 import { createHash, randomUUID } from 'node:crypto';
@@ -518,7 +518,7 @@ export class Session {
         for (const t of parsed.to) this.requestAgent(t.peerId, parsed.prompt, false, 'room', urgent && t.peerId === this.selfId, undefined, undefined, t.named ? t.agent : undefined);
         // On your own, a name nobody has is still a line for your agent, as plain chat always is.
         if (parsed.to.length === 0 && state.peers.length <= 1 && this.agent) this.requestAgent(this.selfId, parsed.text, false, 'room', urgent);
-        else if (parsed.to.length === 0 && parsed.notes.length === 0) this.toast('No agent is online', 'warn');
+        else if (parsed.to.length === 0 && parsed.notes.length === 0) this.toast(t('toasts.session.noAgentOnline'), 'warn');
         return true;
     }
   }
@@ -566,22 +566,22 @@ export class Session {
   async copyInvite(): Promise<void> {
     const { invite, hosting } = this.store.getState();
     if (!invite) {
-      if (hosting && hosting.phase !== 'failed') return this.toast('The invite link is still being created…');
-      if (!this.opts.startInvite) return this.toast('No invite link available', 'warn');
+      if (hosting && hosting.phase !== 'failed') return this.toast(t('toasts.session.inviteBeingMade'));
+      if (!this.opts.startInvite) return this.toast(t('toasts.session.noInvite'), 'warn');
       this.opts.startInvite();
-      this.toast('Opening a secure link for friends… it will be copied when ready');
+      this.toast(t('toasts.session.openingLink'));
       return;
     }
-    await this.copyOrShow(invite, 'Invite copied. Paste it to a friend');
+    await this.copyOrShow(invite, t('toasts.session.inviteCopied'));
   }
 
   async copyLastAnswer(): Promise<void> {
     const last = [...this.store.getState().log].reverse().find((l) => l.type === 'agent' && l.status === 'done');
     if (!last || last.type !== 'agent') {
-      this.toast('No agent answer to copy yet', 'warn');
+      this.toast(t('toasts.session.noAnswer'), 'warn');
       return;
     }
-    await this.copyOrShow(last.text, `Copied ${agentLabel(last.agent, last.ownerName, false)}'s answer`);
+    await this.copyOrShow(last.text, t('toasts.session.answerCopied', { agent: agentLabel(last.agent, last.ownerName, false) }));
   }
 
   /** Copy text for you to paste (shown in the chat when there's no clipboard). */
@@ -595,7 +595,7 @@ export class Session {
       this.toast(success, 'success');
     } catch {
       this.system(text);
-      this.toast('Could not reach the clipboard. Copy it from the chat instead', 'warn');
+      this.toast(t('toasts.session.noClipboard'), 'warn');
     }
   }
 
@@ -617,11 +617,11 @@ export class Session {
       return;
     }
     if (this.store.getState().self?.guest && !this.store.getState().peers.find((p) => p.peerId === this.selfId && !p.guest)) {
-      this.toast("You came in with a link to a project, so there's no group chat here. Open it in Projects", 'warn');
+      this.toast(t('toasts.session.noGroupChat'), 'warn');
       return;
     }
     if (!this.send({ kind: 'chat', text: text.slice(0, MAX_TEXT), byAgent, mid, ...agent, ...via }, { keep: true })) {
-      this.toast('Not connected, so the message was not sent', 'error');
+      this.toast(t('toasts.session.notConnected'), 'error');
     }
   }
 
@@ -658,7 +658,7 @@ export class Session {
   askOwnClaude(prompt: string, channel: string, urgent = false, echo: boolean | string = true, shown?: string): string | undefined {
     const shared = this.sharing.sharedFor(channel);
     if (shared && shared.role !== 'contribute') {
-      this.toast(`You can follow ${shared.name}, but not ask its agent. Ask the owner to let you contribute`, 'warn');
+      this.toast(t('toasts.session.followOnly', { name: shared.name }), 'warn');
       return undefined;
     }
     // Load the saved conversation first, so what's said now is kept with it.
@@ -700,7 +700,7 @@ export class Session {
     }
     terms.open(wsId, undefined, prompt).catch((err: unknown) => {
       const why = (err instanceof Error ? err.message : String(err)).replace(/^Error: /, '');
-      if (!isTermBusy(why)) this.toast(`The terminal couldn’t open (${why}), so your message went to the chat`, 'warn');
+      if (!isTermBusy(why)) this.toast(t('toasts.session.termFailed', { why }), 'warn');
       this.askOwnClaude(prompt, channel, false, true, requestId);
     });
     return requestId;
@@ -843,7 +843,7 @@ export class Session {
   setFriendWorktrees(value: 'ask' | 'off'): void {
     this.setPrefs({ friendWorktrees: value });
     this.offerProjects();
-    this.toast(value === 'ask' ? 'Friends can ask to start work on this computer; you approve each request' : 'Friends can no longer start work on this computer', 'success');
+    this.toast(value === 'ask' ? t('toasts.session.friendsCanAsk') : t('toasts.session.friendsCant'), 'success');
   }
 
   /** Whether Claude is signed in here, asked once in a while (a local model's side calls go to Claude only then). */
@@ -990,9 +990,9 @@ export class Session {
   /** Plan first in this conversation: Claude investigates read-only, then proposes a plan. */
   setPlanMode(channel: string, on: boolean): void {
     // A plan's own conversation: its head Claude runs the plan, and stopping to have a plan of its own approved would stall it.
-    if (on && isPlanHome(this.store.getState().plans, channel)) return this.toast('A plan’s own conversation has no plan mode: talk the plan through on its page', 'info');
+    if (on && isPlanHome(this.store.getState().plans, channel)) return this.toast(t('toasts.session.planHomeNoMode'), 'info');
     this.store.dispatch({ type: 'plan_mode', channel, on });
-    this.toast(on ? 'Plan mode: your agent looks first and asks you to approve a plan before changing anything' : 'Plan mode off: your agent works right away', 'success');
+    this.toast(on ? t('toasts.session.planModeOn') : t('toasts.session.planModeOff'), 'success');
   }
 
   openLocation(at: Location, opts: { by?: string; broadcast?: boolean } = {}): Promise<void> {
@@ -1039,13 +1039,13 @@ export class Session {
   follow(name: string | undefined): void {
     if (!name) {
       this.store.dispatch({ type: 'follow', peerId: undefined });
-      this.toast('Stopped following');
+      this.toast(t('toasts.session.stoppedFollowing'));
       return;
     }
     const peer = this.findPeer(name);
-    if (!peer) return this.toast(`Nobody named "${name}" is here`, 'warn');
+    if (!peer) return this.toast(t('toasts.session.nobodyNamed', { name }), 'warn');
     this.store.dispatch({ type: 'follow', peerId: peer.peerId });
-    this.toast(`Following ${peer.name} and their agent. /unfollow to stop`, 'success');
+    this.toast(t('toasts.session.following', { name: peer.name }), 'success');
     const state = this.store.getState();
     const latest = [state.focus[peer.peerId], state.focus[`${peer.peerId}:agent`]]
       .filter((f) => f !== undefined)
@@ -1068,14 +1068,14 @@ export class Session {
     this.people.setTrust(peerId, 'blocked');
     room.removePerson(peerId);
     this.system(`You removed ${name} from the room. The invite link changed, so the old one no longer works.`);
-    this.toast(`${name} was removed. Use Copy invite for the new link`, 'success');
+    this.toast(t('toasts.session.personRemoved', { name }), 'success');
   }
 
   /** Host only: replace the invite link (people already here stay). */
   newInviteLink(): void {
-    if (!this.opts.room) return this.toast('Only the host can change the invite link', 'warn');
+    if (!this.opts.room) return this.toast(t('toasts.session.hostOnlyInvite'), 'warn');
     this.opts.room.newInvite();
-    this.toast('New invite link made. The old one no longer works', 'success');
+    this.toast(t('toasts.session.newInvite'), 'success');
     void this.copyInvite();
   }
 
@@ -1088,10 +1088,10 @@ export class Session {
 
   /** Host only: stop (or start again) letting new people in. */
   setRoomOpen(open: boolean): void {
-    if (!this.opts.room) return this.toast('Only the host can close the room', 'warn');
+    if (!this.opts.room) return this.toast(t('toasts.session.hostOnlyClose'), 'warn');
     this.opts.room.setOpen(open);
     this.store.dispatch({ type: 'room_open', open });
-    this.toast(open ? 'The room takes new people again' : "Room closed: nobody new can join, even with the link. People here stay", 'success');
+    this.toast(open ? t('toasts.session.roomOpen') : t('toasts.session.roomClosed'), 'success');
   }
 
   /**
@@ -1104,21 +1104,21 @@ export class Session {
     if (channel === 'room' && opts.everyone && this.opts.room) {
       this.opts.room.clearHistory();
       this.send({ kind: 'room_cleared' });
-      this.toast('Group chat cleared for everyone', 'success');
+      this.toast(t('toasts.session.clearedEveryone'), 'success');
       return;
     }
     if (opts.fresh && channel.startsWith('ws:')) {
       this.workspaces?.forgetConversation(channel.slice(3));
       this.store.dispatch({ type: 'context_reset', channel });
       this.host.forgetContext(channel);
-      this.toast('Cleared. Your agent starts a fresh conversation here', 'success');
+      this.toast(t('toasts.session.clearedFresh'), 'success');
       return;
     }
     if (opts.fresh && isAssistant(channel)) {
       assistantOf(this)?.forget(channel);
       this.store.dispatch({ type: 'context_reset', channel });
       this.host.forgetContext(channel);
-      this.toast(`Cleared. ${ASSISTANT_TITLE} starts a fresh conversation`, 'success');
+      this.toast(t('toasts.session.clearedAssistant', { name: ASSISTANT_TITLE }), 'success');
       return;
     }
     // A bot's chat or its Test chat (core/bots): a fresh conversation in its folder.
@@ -1126,10 +1126,10 @@ export class Session {
       botsOf(this)?.forget(channel);
       this.store.dispatch({ type: 'context_reset', channel });
       this.host.forgetContext(channel);
-      this.toast('Cleared. The bot starts a fresh conversation', 'success');
+      this.toast(t('toasts.session.clearedBot'), 'success');
       return;
     }
-    this.toast(channel.startsWith('ws:') || isAssistant(channel) ? 'Messages cleared. Your agent still remembers the conversation' : 'Cleared on your screen', 'success');
+    this.toast(channel.startsWith('ws:') || isAssistant(channel) ? t('toasts.session.clearedRemembers') : t('toasts.session.clearedScreen'), 'success');
   }
 
   findPeer(name: string): PeerInfo | undefined {
@@ -1286,7 +1286,7 @@ export class Session {
         return;
       case 'share_offer':
         this.store.dispatch({ type: 'offer', offer: { owner: from, name: body.name, writable: body.writable }, active: body.active });
-        if (body.active) this.toast(`${peerName(this.store.getState(), from)} shared ${body.name} with you. It's in Files`, 'success');
+        if (body.active) this.toast(t('toasts.session.sharedWithYou', { who: peerName(this.store.getState(), from), name: body.name }), 'success');
         return;
       case 'agent_question':
         return this.questions.onQuestion(from, body);
@@ -1396,12 +1396,12 @@ export class Session {
   rename(raw: string | undefined): void {
     const name = (raw ?? '').replace(/[^\w.-]/g, '').slice(0, 32);
     if (!name) {
-      this.toast('Usage: /name <new name> (letters, numbers, . - _)', 'warn');
+      this.toast(t('toasts.session.nameUsage'), 'warn');
       return;
     }
     this.updateProfile({ name });
     this.opts.saveSettings?.({ name });
-    this.toast(`You're now ${name}`, 'success');
+    this.toast(t('toasts.session.renamed', { name }), 'success');
   }
 
   /**
@@ -1419,7 +1419,7 @@ export class Session {
 
   /** Make the terminal's text bigger or smaller, without needing a keyboard shortcut. */
   async zoom(dir: ZoomDir): Promise<void> {
-    if (!this.opts.zoom) return this.toast('Text size can only be changed from a terminal', 'warn');
+    if (!this.opts.zoom) return this.toast(t('toasts.session.zoomTerminalOnly'), 'warn');
     // No window open (a server): said, not thrown.
     const result = await this.opts.zoom(dir).catch((err: unknown) => ({ ok: false, message: err instanceof Error ? err.message : String(err) }));
     this.toast(result.message, result.ok ? 'success' : 'warn');
@@ -1463,7 +1463,7 @@ export class Session {
    */
   shareFolder(dir: string, writable = false, only?: readonly string[]): void {
     const spec = parseShareSpec(`${dir}${writable ? ':rw' : ''}`, process.cwd());
-    if (!existsSync(spec.root)) return this.toast(`${spec.root} doesn't exist`, 'warn');
+    if (!existsSync(spec.root)) return this.toast(t('toasts.session.noSuchFolder', { path: spec.root }), 'warn');
     const previous = this.opts.shares.configs.find((c) => path.resolve(c.root) === path.resolve(spec.root) && !c.name.startsWith('ws-') && !c.name.startsWith('local-') && c.name !== ATTACHMENT_SHARE);
     if (previous) this.unshareFolder(previous.name, true);
     const config = only?.length ? { ...spec, private: true, allowed: [...only] } : spec;
@@ -1472,18 +1472,18 @@ export class Session {
     this.publishShares();
     for (const to of only ?? []) this.send({ kind: 'share_offer', name: config.name, writable: config.writable, active: true }, { to });
     const state = this.store.getState();
-    const who = only?.length ? only.map((id) => peerName(state, id)).join(', ') : 'the room';
-    this.toast(`Sharing ${spec.name} with ${who}${writable ? ' (your agent may edit it)' : ' (read-only)'}`, 'success');
+    const who = only?.length ? only.map((id) => peerName(state, id)).join(', ') : t('toasts.session.theRoom');
+    this.toast(writable ? t('toasts.session.sharingWritable', { name: spec.name, who }) : t('toasts.session.sharingReadOnly', { name: spec.name, who }), 'success');
   }
 
   unshareFolder(name: string, quiet = false): void {
     const config = this.opts.shares.configs.find((c) => c.name === name);
-    if (!config) return quiet ? undefined : this.toast(`Nothing called ${name} is shared`, 'warn');
+    if (!config) return quiet ? undefined : this.toast(t('toasts.session.nothingShared', { name }), 'warn');
     for (const to of config.private ? (config.allowed ?? []) : []) this.send({ kind: 'share_offer', name, writable: config.writable, active: false }, { to });
     this.opts.shares.remove(name);
     this.updateProfile({ shares: this.opts.shares.infos });
     this.publishShares();
-    if (!quiet) this.toast(`Stopped sharing ${name}`);
+    if (!quiet) this.toast(t('toasts.session.stoppedSharing', { name }));
   }
 
   /** Your shared folders (not workspaces), for the Share menu. */

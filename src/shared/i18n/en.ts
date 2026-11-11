@@ -23,6 +23,9 @@ import * as phoneApp from './areas/phoneApp.js';
 import * as phoneParts from './areas/phoneParts.js';
 import * as helpers from './areas/helpers.js';
 import * as daemon from './areas/daemon.js';
+import * as toasts from './areas/toasts.js';
+import * as macLib from './areas/macLib.js';
+import * as shared from './areas/shared.js';
 
 /**
  * English, the source catalog: every key is here first (docs/i18n.md). Keys are `area.thing`;
@@ -158,6 +161,9 @@ export const en = {
   ...phoneParts.en,
   ...helpers.en,
   ...daemon.en,
+  ...toasts.en,
+  ...macLib.en,
+  ...shared.en,
 } as const satisfies Record<string, Message>;
 
 /** Every key the app may say. */

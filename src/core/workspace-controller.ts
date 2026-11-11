@@ -35,6 +35,7 @@ import { claudeHome } from './claude-code/launch.js';
 import { HistorySaver } from './history-saver.js';
 import { forgetViews } from './views/forget.js';
 import { nothingAhead, pendingWorktree, withAhead } from './optimistic.js';
+import { t } from '../shared/i18n/index.js';
 
 /** What adding a folder did: the project it added, how many a watched folder holds, or why it couldn't. */
 export interface AddResult {
@@ -156,13 +157,13 @@ export type WorktreeEvent =
  * session per workspace, history saved to disk), and every workspace action.
  */
 /** What the archive did, in words. */
-const threadsText = (did: string, n: number): string | undefined => (n ? `Also ${did} ${n} thread${n === 1 ? '' : 's'}.` : undefined);
+const threadsText = (did: 'archived' | 'deleted', n: number): string | undefined => (n ? t(did === 'archived' ? 'toasts.workspace.alsoArchivedThreads' : 'toasts.workspace.alsoDeletedThreads', { count: n }) : undefined);
 
 export function archivedText(m: ArchiveManifest | undefined): string {
-  if (!m) return 'Archived. The branch and conversation are kept; restore it any time.';
-  const freed = m.freedBytes ? ` Freed ${formatBytes(m.freedBytes)} of dependencies, builds and caches (made again when you restore it).` : '';
-  const left = m.leftover ? ` Some of its folder couldn’t be removed (${m.dir}): it’s set aside when you restore it, and you can delete it.` : '';
-  return `Archived: everything of yours is kept, uncommitted work included.${freed}${left}`;
+  if (!m) return t('toasts.workspace.archivedSimple');
+  const freed = m.freedBytes ? ` ${t('toasts.workspace.archivedFreed', { size: formatBytes(m.freedBytes) })}` : '';
+  const left = m.leftover ? ` ${t('toasts.workspace.archivedLeftover', { dir: m.dir })}` : '';
+  return `${t('toasts.workspace.archived')}${freed}${left}`;
 }
 
 /** How long a diff worked out ahead answers a pick. */
@@ -399,7 +400,7 @@ export class WorkspaceController {
           try {
             const changes = await this.deps.manager.envChangesAsync(w.id, await filesOf(w));
             const added = this.deps.manager.applyNewEnvKeys(w.id, changes).flatMap((f) => f.keys);
-            if (added.length) this.deps.toast(`${w.name} added ${added.join(', ')}: put in the main folder’s .env too, so the next worktree has ${added.length === 1 ? 'it' : 'them'}`, 'success');
+            if (added.length) this.deps.toast(t('toasts.workspace.envKeysBack', { count: added.length, name: w.name, keys: added.join(', ') }), 'success');
           } catch {
             // gone meanwhile
           }
@@ -421,7 +422,7 @@ export class WorkspaceController {
       }
     }
     if (!isDeepStrictEqual(asks, state.envAsks)) this.deps.store.dispatch({ type: 'env_asks', asks });
-    if (followed.length) this.deps.toast(`The main folder’s env changed: updated ${followed.length === 1 ? followed[0] : `${followed.length} worktrees`} too`, 'info');
+    if (followed.length) this.deps.toast(followed.length === 1 ? t('toasts.workspace.envFollowedOne', { name: followed[0]! }) : t('toasts.workspace.envFollowed', { count: followed.length }), 'info');
   }
 
   /**
@@ -434,9 +435,9 @@ export class WorkspaceController {
     try {
       const n = this.deps.env.merge(ws.projectId, this.deps.manager.envValues(id));
       this.deps.manager.keepEnvHere(id);
-      this.deps.toast(n ? `Saved ${n} variable${n === 1 ? '' : 's'} in Beluga: every worktree of this project gets ${n === 1 ? 'it' : 'them'}` : 'Nothing to save: those files aren’t KEY=value', n ? 'success' : 'info');
+      this.deps.toast(n ? t('toasts.workspace.envSaved', { count: n }) : t('toasts.workspace.envNothing'), n ? 'success' : 'info');
     } catch (err) {
-      this.deps.toast(`Couldn't save them: ${errorText(err)}`, 'error');
+      this.deps.toast(t('toasts.workspace.envSaveFailed', { error: errorText(err) }), 'error');
     }
     void this.checkEnv(ws.projectId);
   }
@@ -446,7 +447,7 @@ export class WorkspaceController {
     try {
       this.deps.manager.keepEnvHere(id);
     } catch (err) {
-      this.deps.toast(`Couldn't keep them: ${errorText(err)}`, 'error');
+      this.deps.toast(t('toasts.workspace.envKeepFailed', { error: errorText(err) }), 'error');
     }
     void this.checkEnv(this.deps.manager.find(id)?.projectId);
   }
@@ -472,7 +473,7 @@ export class WorkspaceController {
   /** Show a workspace (chat, files, diff or terminal), loading its saved conversation the first time. */
   open(id: string, tab: WorkspaceTab = 'chat', req?: string): void {
     const ws = this.deps.manager.find(id);
-    if (!ws) return this.deps.toast('That workspace no longer exists', 'warn');
+    if (!ws) return this.deps.toast(t('toasts.workspace.workspaceGone'), 'warn');
     // A project's main checkout is no conversation (BLG-70): the chat its old one became, else the project's home.
     if (ws.kind === 'main') {
       const chat = ws.movedTo ? this.deps.manager.find(ws.movedTo) : undefined;
@@ -558,11 +559,11 @@ export class WorkspaceController {
     const channel = `${WS_PREFIX}${id}`;
     this.ensureLoaded(id);
     if (ws.sessionId || !this.onlyImported(channel)) {
-      this.deps.toast('You’ve already talked in this worktree here, so it keeps that conversation', 'warn');
+      this.deps.toast(t('toasts.workspace.keepsConversation'), 'warn');
       return false;
     }
     const shown = await this.importConversation(id, ws.path, channel, sessionId);
-    if (!shown) this.deps.toast('That conversation has nothing to show', 'warn');
+    if (!shown) this.deps.toast(t('toasts.workspace.nothingToShow'), 'warn');
     this.deps.intend({ type: 'navigate', view: { kind: 'workspace', id, tab: 'chat' } });
     return shown;
   }
@@ -625,12 +626,12 @@ export class WorkspaceController {
     const listed = project ? await this.outsideConversations(project.id, dir).catch(() => undefined) : undefined;
     const found = listed?.conversations.find((c) => c.sessionId === sessionId);
     if (!project || !found) {
-      this.deps.toast('That conversation isn’t in that folder any more', 'warn');
+      this.deps.toast(t('toasts.workspace.notInFolder'), 'warn');
       return undefined;
     }
     if (found.wsId) return found.wsId;
     const named = name?.trim() || slugify(found.title) || 'conversation';
-    const made = await this.act("Couldn't bring the conversation in", async () => {
+    const made = await this.act(t('toasts.workspace.bringInFailed'), async () => {
       const head = (await git(found.cwd, ['rev-parse', 'HEAD']).catch(() => '')).trim();
       const same = /^[0-9a-f]{40}$/.test(head) && (await git(project.root, ['cat-file', '-e', `${head}^{commit}`]).then(() => true, () => false));
       const branch = await this.deps.manager.freeBranchName(project.root, named);
@@ -648,7 +649,7 @@ export class WorkspaceController {
     // Nothing in it to show (only tool calls, say): Claude still resumes it.
     if (!(await this.importConversation(ws.id, ws.path, channel, sessionId, found.cwd))) this.deps.manager.rememberSession(ws.id, sessionId);
     this.deps.store.dispatch({ type: 'system', channel, text: `On a new branch from ${made.from}. The conversation in ${tilde(found.cwd)} stays as it was, and so do that folder’s uncommitted changes.` });
-    this.deps.toast(`Continuing “${found.title}” in ${ws.name}`, 'success');
+    this.deps.toast(t('toasts.workspace.continuingTitle', { title: found.title, name: ws.name }), 'success');
     this.created(ws, { about: found.title });
     return ws.id;
   }
@@ -876,12 +877,12 @@ export class WorkspaceController {
       this.publish();
       if (!opts.quiet) this.deps.intend({ type: 'navigate', view: { kind: 'workspace', id, tab: 'chat' } });
     }
-    const ws = await this.act("Couldn't create the worktree", () => this.deps.manager.createWorktree(projectId, name, opts.base, { id, ...(opts.agent ? { agent: opts.agent } : {}), ...(opts.thread ? { thread: opts.thread } : {}) }), undefined, { later: true });
+    const ws = await this.act(t('toasts.workspace.createFailed'), () => this.deps.manager.createWorktree(projectId, name, opts.base, { id, ...(opts.agent ? { agent: opts.agent } : {}), ...(opts.thread ? { thread: opts.thread } : {}) }), undefined, { later: true });
     const shown = this.ahead.making.delete(id);
     this.publish();
     if (ws) {
       if (!opts.quiet) {
-        this.deps.toast(`Worktree ${ws.name} is ready on ${ws.branch}`, 'success');
+        this.deps.toast(t('toasts.workspace.worktreeReady', { name: ws.name, branch: ws.branch ?? '' }), 'success');
         // Its page is open already (you may have gone elsewhere since: you stay there).
         if (shown) this.ensureLoaded(ws.id);
         else this.open(ws.id);
@@ -911,7 +912,7 @@ export class WorkspaceController {
   private async openPullNow(projectId: string, pull: PullHead): Promise<Workspace | undefined> {
     const project = this.deps.manager.list.find((p) => p.id === projectId && p.root);
     if (!project) {
-      this.deps.toast('That project is gone', 'warn');
+      this.deps.toast(t('toasts.workspace.projectGone'), 'warn');
       return undefined;
     }
     const mine = (branch: string): boolean => branch === pull.branch || (Boolean(pull.fork) && branch === `pr-${pull.number}`);
@@ -924,7 +925,7 @@ export class WorkspaceController {
     this.ahead.making.set(id, pendingWorktree({ id, project, name: `pr-${pull.number}`, ...(pull.base ? { base: `origin/${pull.base}` } : {}) }));
     this.publish();
     this.deps.intend({ type: 'navigate', view: { kind: 'workspace', id, tab: 'chat' } });
-    const ws = await this.act(`Couldn't open #${pull.number} in a worktree`, () => this.deps.manager.createPullWorktree(projectId, pull, { id }), undefined, { later: true });
+    const ws = await this.act(t('toasts.workspace.pullOpenFailed', { number: pull.number }), () => this.deps.manager.createPullWorktree(projectId, pull, { id }), undefined, { later: true });
     const shown = this.ahead.making.delete(id);
     this.publish();
     if (!ws) {
@@ -933,7 +934,7 @@ export class WorkspaceController {
     }
     const pushes = pull.fork ? 'It’s from a fork, so pushing here doesn’t change it; git pull brings its new commits.' : 'Pushing here updates the pull request.';
     this.deps.store.dispatch({ type: 'system', channel: `${WS_PREFIX}${ws.id}`, text: `Pull request #${pull.number}${pull.title ? ` “${pull.title}”` : ''}, checked out on ${ws.branch}. ${pushes}` });
-    this.deps.toast(`#${pull.number} is checked out in ${ws.name}`, 'success');
+    this.deps.toast(t('toasts.workspace.pullCheckedOut', { number: pull.number, name: ws.name }), 'success');
     if (shown) this.ensureLoaded(ws.id);
     else this.open(ws.id);
     this.created(ws);
@@ -942,7 +943,7 @@ export class WorkspaceController {
 
   /** `quiet`: made for something else's page (a plan's conversation), so it doesn't take you there. */
   async newChat(projectId: string, title: string, inDir?: string, opts: { readonly quiet?: boolean; readonly dir?: string; readonly thread?: ThreadRecord } = {}): Promise<Workspace | undefined> {
-    const ws = await this.act("Couldn't start the chat", () => this.deps.manager.createChat(projectId, title, inDir, { ...(opts.dir ? { dir: opts.dir } : {}), ...(opts.thread ? { thread: opts.thread } : {}) }), undefined, { later: true });
+    const ws = await this.act(t('toasts.workspace.chatFailed'), () => this.deps.manager.createChat(projectId, title, inDir, { ...(opts.dir ? { dir: opts.dir } : {}), ...(opts.thread ? { thread: opts.thread } : {}) }), undefined, { later: true });
     if (ws && !opts.quiet) this.open(ws.id);
     return ws;
   }
@@ -1038,7 +1039,7 @@ export class WorkspaceController {
       this.deps.planHere(channel);
       return true;
     } catch (err) {
-      this.deps.toast(`Couldn’t plan it with tasks (${err instanceof Error ? err.message : String(err)}): its agent plans first instead`, 'warn');
+      this.deps.toast(t('toasts.workspace.planTasksFailed', { error: err instanceof Error ? err.message : String(err) }), 'warn');
       return false;
     }
   }
@@ -1080,7 +1081,7 @@ export class WorkspaceController {
     const source = this.deps.manager.find(id);
     const project = source && this.deps.manager.list.find((p) => p.id === source.projectId && p.root);
     if (!source || !project) {
-      this.deps.toast(source ? 'Only conversations in a project can continue in a worktree' : 'That conversation no longer exists', 'warn');
+      this.deps.toast(source ? t('toasts.workspace.continueNeedsProject') : t('toasts.workspace.conversationGone'), 'warn');
       return undefined;
     }
     const from = `${WS_PREFIX}${id}`;
@@ -1096,7 +1097,7 @@ export class WorkspaceController {
     this.deps.store.dispatch({ type: 'system', channel: from, text: "Moving to a new worktree…" });
     this.saver.flush(); // the copy gets everything said so far
     const fromName = this.nameIn(id);
-    const made = await this.act("Couldn't create the worktree", () => this.deps.manager.fork(id, name, { base: opts.base ?? project.base }));
+    const made = await this.act(t('toasts.workspace.createFailed'), () => this.deps.manager.fork(id, name, { base: opts.base ?? project.base }));
     if (!made) return undefined;
     // Started with another agent (BLG-506): the new worktree runs it from its first turn.
     if (opts.agent) this.deps.manager.setAgent(made.id, opts.agent);
@@ -1113,7 +1114,7 @@ export class WorkspaceController {
     const memory = goesOn ? 'Your agent remembers the conversation.' : `${who} can’t pick up this conversation, so it starts fresh here, handed the conversation so far.`;
     this.deps.store.dispatch({ type: 'system', channel: to, text: `Continued from “${source.name}”, on a new branch from ${ws.base ?? project.base}. ${memory}` });
     this.deps.store.dispatch({ type: 'system', channel: from, text: `Continued in the worktree ${ws.name} (${ws.branch}).` });
-    this.deps.toast(goesOn ? `Continuing in ${ws.name}, with the conversation so far` : `Continuing in ${ws.name}: ${who} starts fresh, handed the conversation so far`, 'success');
+    this.deps.toast(goesOn ? t('toasts.workspace.continuing', { name: ws.name }) : t('toasts.workspace.continuingFresh', { name: ws.name, agent: who }), 'success');
     this.created(ws, { from: id, about });
     const prompt = task || CONTINUE_PROMPT;
     // A handoff carries the whole conversation: only the task shows as your message.
@@ -1136,7 +1137,7 @@ export class WorkspaceController {
     const channel = `${WS_PREFIX}${source.id}`;
     this.deps.store.dispatch({ type: 'system', channel, text: 'Making this chat a worktree…' });
     const fromName = this.nameIn(source.id);
-    const made = await this.act("Couldn't create the worktree", () => this.deps.manager.chatToWorktree(source.id, name, { base: opts.base ?? project.base }));
+    const made = await this.act(t('toasts.workspace.createFailed'), () => this.deps.manager.chatToWorktree(source.id, name, { base: opts.base ?? project.base }));
     if (!made) return undefined;
     // Started with another agent (BLG-506): it goes on here from the next turn.
     if (opts.agent) this.deps.manager.setAgent(source.id, opts.agent);
@@ -1147,7 +1148,7 @@ export class WorkspaceController {
     const who = this.nameIn(ws.id);
     const memory = goesOn ? 'Your agent remembers the conversation and can make changes.' : `${who} can’t pick up this conversation, so it starts fresh here, handed the conversation so far, and can make changes.`;
     this.deps.store.dispatch({ type: 'system', channel, text: `This chat is now the worktree ${ws.name} (${ws.branch}), on a new branch from ${ws.base ?? project.base}. ${memory}` });
-    this.deps.toast(goesOn ? `${ws.name} is a worktree now; your agent goes on here` : `${ws.name} is a worktree now; ${who} starts fresh here, handed the conversation so far`, 'success');
+    this.deps.toast(goesOn ? t('toasts.workspace.nowWorktree', { name: ws.name }) : t('toasts.workspace.nowWorktreeFresh', { name: ws.name, agent: who }), 'success');
     this.created(ws, { from: source.id, about: opts.about });
     void (async () => {
       if (opts.after) await Promise.race([opts.after, new Promise<void>((r) => setTimeout(r, CONTINUE_WAIT_MS).unref())]);
@@ -1168,9 +1169,9 @@ export class WorkspaceController {
   }
 
   async fork(id: string, name: string): Promise<Workspace | undefined> {
-    const ws = await this.act("Couldn't fork", () => this.deps.manager.fork(id, name));
+    const ws = await this.act(t('toasts.workspace.forkFailed'), () => this.deps.manager.fork(id, name));
     if (ws) {
-      this.deps.toast(`Forked into ${ws.name}, with the conversation so far`, 'success');
+      this.deps.toast(t('toasts.workspace.forkedWith', { name: ws.name }), 'success');
       this.loaded.delete(`${WS_PREFIX}${ws.id}`);
       this.open(ws.id);
       this.created(ws, { from: id });
@@ -1202,14 +1203,14 @@ export class WorkspaceController {
   async editPrompt(id: string, lineId: string, text: string, mode: 'here' | 'fork'): Promise<string | undefined> {
     const ws = this.deps.manager.find(id);
     const prompt = text.trim();
-    if (!ws || ws.kind === 'main' || ws.archived) return void this.deps.toast('That conversation can’t be edited here', 'warn');
-    if (!prompt) return void this.deps.toast('Write the message first', 'warn');
+    if (!ws || ws.kind === 'main' || ws.archived) return void this.deps.toast(t('toasts.workspace.cantEditHere'), 'warn');
+    if (!prompt) return void this.deps.toast(t('toasts.workspace.writeFirst'), 'warn');
     const channel = `${WS_PREFIX}${id}`;
     this.ensureLoaded(id);
     const items = this.deps.store.getState().log.filter((l) => l.channel === channel);
     const at = items.findIndex((l) => l.id === lineId);
     const line = items[at];
-    if (!line || line.type !== 'chat' || line.byAgent || line.from !== this.deps.selfId()) return void this.deps.toast('Only your own messages can be edited', 'warn');
+    if (!line || line.type !== 'chat' || line.byAgent || line.from !== this.deps.selfId()) return void this.deps.toast(t('toasts.workspace.onlyOwnMessages'), 'warn');
     const kept = items.slice(0, at);
     // Claude stops here first, so nothing more lands after the cut.
     if (mode === 'here') await this.deps.stopHere?.(channel);
@@ -1221,7 +1222,7 @@ export class WorkspaceController {
     const snap = ws.kind === 'worktree' && line.request ? await snapshotAt(ws.path, promptRef(id, line.request)) : undefined;
     const fresh = noRewind ? ` ${noRewind}` : cut ? '' : ' Your agent couldn’t go back to exactly that point, so it starts afresh from here.';
     if (mode === 'here') {
-      if (snap && !(await this.act("Couldn't put the files back", () => restoreSnapshot(ws.path, id, snap)))) return undefined;
+      if (snap && !(await this.act(t('toasts.workspace.filesBackFailed'), () => restoreSnapshot(ws.path, id, snap)))) return undefined;
       this.deps.manager.rewindSession(id, cut?.sessionId ?? null);
       this.deps.forgetContext?.(channel);
       this.deps.store.dispatch({ type: 'history', channel, items: kept });
@@ -1233,7 +1234,7 @@ export class WorkspaceController {
     }
     const name = slugify(prompt);
     const history = kept.map((l) => settleRun(l));
-    const made = await this.act("Couldn't fork", () =>
+    const made = await this.act(t('toasts.workspace.forkFailed'), () =>
       ws.kind === 'chat'
         ? this.deps.manager.forkChat(id, name, { session: cut?.sessionId ?? null, history })
         : this.deps.manager.fork(id, name, { ...(snap ? { at: snap } : {}), session: cut?.sessionId ?? null, history }),
@@ -1246,7 +1247,7 @@ export class WorkspaceController {
     this.open(made.id);
     const files = made.kind !== 'worktree' ? '' : snap ? ', with the files as they were then' : ', with its committed files as they are now (Beluga has no copy of them from then)';
     this.deps.store.dispatch({ type: 'system', channel: to, text: `Forked from “${ws.name}” at your edited message${files}. “${ws.name}” stays as it was.${fresh}` });
-    this.deps.toast(`Forked into ${made.name}`, 'success');
+    this.deps.toast(t('toasts.workspace.forked', { name: made.name }), 'success');
     if (made.kind === 'worktree') this.created(made, { from: id, about: prompt });
     this.deps.askClaude(prompt, to);
     return to;
@@ -1283,7 +1284,7 @@ export class WorkspaceController {
     await this.endRunsIn(id, 'Stopped: its worktree was archived');
     const done = await this.inLane(ws?.projectRoot || ws?.path || id, () =>
       this.act(
-        "Couldn't archive",
+        t('toasts.workspace.archiveFailed'),
         async () => {
           try {
             manifest = await this.deps.manager.archive(id, phase);
@@ -1292,7 +1293,7 @@ export class WorkspaceController {
           }
           return true;
         },
-        ws ? `${ws.name} is back in the sidebar, as it was.` : undefined,
+        ws ? t('toasts.workspace.backAsItWas', { name: ws.name }) : undefined,
       ),
     );
     settle();
@@ -1401,9 +1402,9 @@ export class WorkspaceController {
   applyEnvBack(id: string): void {
     try {
       const n = this.deps.manager.applyEnvBack(id);
-      this.deps.toast(n ? `Copied env changes from ${n} file(s) into the main folder` : 'No env changes to copy', 'success');
+      this.deps.toast(n ? t('toasts.workspace.envCopied', { count: n }) : t('toasts.workspace.envNoChanges'), 'success');
     } catch (err) {
-      this.deps.toast(`Couldn't copy env changes: ${errorText(err)}`, 'error');
+      this.deps.toast(t('toasts.workspace.envCopyFailed', { error: errorText(err) }), 'error');
     }
     // The main folder changed: the other worktrees' untouched copies follow it.
     void this.checkEnv(this.deps.manager.find(id)?.projectId);
@@ -1423,9 +1424,9 @@ export class WorkspaceController {
 
   /** Free space in a worktree you keep (its dependencies, builds and caches) → bytes freed. */
   async freeSpace(id: string): Promise<number> {
-    const freed = await this.act("Couldn't free space", () => this.deps.manager.freeSpace(id));
+    const freed = await this.act(t('toasts.workspace.freeFailed'), () => this.deps.manager.freeSpace(id));
     if (!freed) return 0;
-    this.deps.toast(`Freed ${formatBytes(freed.bytes)}.${freed.remake.length ? ` Run ${freed.remake.map((r) => `\`${r}\``).join(', then ')} to work in it again.` : ''}`, 'success');
+    this.deps.toast(freed.remake.length ? t('toasts.workspace.freedRemake', { size: formatBytes(freed.bytes), commands: freed.remake.map((r) => `\`${r}\``).join(t('toasts.workbench.thenJoin')) }) : t('toasts.workspace.freed', { size: formatBytes(freed.bytes) }), 'success');
     return freed.bytes;
   }
 
@@ -1434,14 +1435,15 @@ export class WorkspaceController {
     // Still being archived (it shows as archived already): restoring now would find nothing to bring back.
     const archiving = this.archiving.get(id);
     if (archiving) {
-      this.deps.toast(`Restoring ${this.deps.manager.find(id)?.name ?? 'it'} once it’s done archiving…`, 'info');
+      const name = this.deps.manager.find(id)?.name;
+      this.deps.toast(name ? t('toasts.workspace.restoreLater', { name }) : t('toasts.workspace.restoreLaterIt'), 'info');
       if (!(await archiving)) return; // it never went: nothing to restore
     }
     const ws = this.deps.manager.find(id);
     let manifest: ArchiveManifest | undefined;
     // In the repo's lane, like archiving and deleting (git locks its worktrees).
     const done = await this.inLane(ws?.projectRoot || ws?.path || id, () =>
-      this.act("Couldn't restore", async () => {
+      this.act(t('toasts.workspace.restoreFailed'), async () => {
         manifest = await this.deps.manager.restore(id);
         return true;
       }),
@@ -1476,12 +1478,12 @@ export class WorkspaceController {
     await this.endRunsIn(id, 'Stopped: its worktree was deleted');
     const done = await this.inLane(ws?.projectRoot || ws?.path || id, () =>
       this.act(
-        "Couldn't delete",
+        t('toasts.workspace.deleteFailed'),
         async () => {
           await this.deps.manager.remove(id);
           return true;
         },
-        ws ? `${ws.name} is back in the sidebar, as it was.` : undefined,
+        ws ? t('toasts.workspace.backAsItWas', { name: ws.name }) : undefined,
       ),
     );
     settle();
@@ -1495,15 +1497,15 @@ export class WorkspaceController {
       forgetViews(answers, 'deleted', () => this.answersElsewhere(id));
       this.keepThreads(id, ws?.name, () => true);
       const also = await this.removeAgentWorktrees(agents);
-      if (!opts.quiet) this.deps.toast(['Deleted.', threadsText('deleted', threads), also].filter(Boolean).join(' '), 'success');
+      if (!opts.quiet) this.deps.toast([t('toasts.workspace.deleted'), threadsText('deleted', threads), also].filter(Boolean).join(' '), 'success');
       this.emit({ kind: 'removed', id });
     }
   }
 
   /** → whether anything was committed; undefined when it failed (a toast says why). */
   async commit(id: string, message = 'Work from Beluga'): Promise<boolean | undefined> {
-    const committed = await this.act("Couldn't commit", () => this.deps.manager.commitAll(id, message));
-    if (committed !== undefined) this.deps.toast(committed ? 'Committed all changes' : 'Nothing to commit', committed ? 'success' : 'info');
+    const committed = await this.act(t('toasts.workspace.commitFailed'), () => this.deps.manager.commitAll(id, message));
+    if (committed !== undefined) this.deps.toast(committed ? t('toasts.workspace.committed') : t('toasts.workspace.nothingToCommit'), committed ? 'success' : 'info');
     return committed;
   }
 
@@ -1512,11 +1514,11 @@ export class WorkspaceController {
   async merge(id: string): Promise<MergeResult | undefined> {
     const ws = this.deps.manager.find(id);
     if (!ws) return undefined;
-    const result = await this.act("Couldn't merge", () => this.deps.manager.merge(id));
+    const result = await this.act(t('toasts.workspace.mergeFailed'), () => this.deps.manager.merge(id));
     if (!result) return undefined;
     this.deps.store.dispatch({ type: 'conflicts', id, files: !result.ok && result.reason === 'conflict' ? result.files : [] });
     if (result.ok) {
-      this.deps.toast(`Merged ${ws.branch} into the main folder`, 'success');
+      this.deps.toast(t('toasts.workspace.mergedMain', { branch: ws.branch ?? '' }), 'success');
       // A line across its chat: what's above it is in the main folder now.
       this.ensureLoaded(id);
       const mark = { into: 'the main folder' };
@@ -1525,21 +1527,21 @@ export class WorkspaceController {
       return result;
     }
     if (result.reason === 'wrong_branch') {
-      this.deps.toast(`The main folder is on ${result.current}, not ${result.expected}. Switch it to ${result.expected} first.`, 'warn');
+      this.deps.toast(t('toasts.workspace.mainWrongBranch', { current: result.current, expected: result.expected }), 'warn');
       return result;
     }
     if (result.reason === 'dirty') {
-      this.deps.toast(`The main folder has uncommitted changes (${result.files.slice(0, 3).join(', ')}). Commit or stash them first.`, 'warn');
+      this.deps.toast(t('toasts.workspace.mainDirty', { files: result.files.slice(0, 3).join(', ') }), 'warn');
       return result;
     }
-    this.deps.toast(`Merge conflict in ${result.files.length} file(s). Click "Solve merge conflict" to let your agent handle it.`, 'warn');
+    this.deps.toast(t('toasts.workspace.mergeConflict', { count: result.files.length }), 'warn');
     return result;
   }
 
   /** Put a project in a group (or none). */
   async cleanAgentWorktrees(projectId: string): Promise<void> {
-    const res = await this.act("Couldn't clean up", () => this.deps.manager.cleanAgentWorktrees(projectId));
-    if (res) this.deps.toast(`Removed ${res.removed} finished agent worktree${res.removed === 1 ? '' : 's'}${res.kept ? ` · kept ${res.kept} with uncommitted work` : ''}`, 'success');
+    const res = await this.act(t('toasts.workspace.cleanFailed'), () => this.deps.manager.cleanAgentWorktrees(projectId));
+    if (res) this.deps.toast(`${t('toasts.workspace.cleaned', { count: res.removed })}${res.kept ? ` · ${t('toasts.workspace.cleanedKept', { count: res.kept })}` : ''}`, 'success');
   }
 
   /** Start a fresh Claude conversation in this workspace (the old one is no longer resumed). */
@@ -1551,7 +1553,7 @@ export class WorkspaceController {
     try {
       this.deps.manager.setGroup(projectId, group);
       await this.refresh();
-      this.deps.toast(group ? `Moved to group "${group}"` : 'Removed from its group', 'success');
+      this.deps.toast(group ? t('toasts.workspace.movedToGroup', { group }) : t('toasts.workspace.removedFromGroup'), 'success');
     } catch (err) {
       this.deps.toast(errorText(err), 'error');
     }
@@ -1569,7 +1571,7 @@ export class WorkspaceController {
   async ungroup(name: string): Promise<void> {
     this.deps.manager.ungroup(name);
     await this.refresh();
-    this.deps.toast(`Group "${name}" removed; its projects stay`, 'success');
+    this.deps.toast(t('toasts.workspace.groupRemoved', { name }), 'success');
   }
 
   /** Move a project or group in the sidebar (see WorkspaceManager.arrange). False: it couldn't. */
@@ -1611,7 +1613,7 @@ export class WorkspaceController {
   async hideProject(projectId: string): Promise<void> {
     this.deps.manager.hideProject(projectId);
     await this.refresh();
-    this.deps.toast('Project hidden. Add it back with /project add <path>', 'success');
+    this.deps.toast(t('toasts.workspace.projectHidden'), 'success');
   }
 
   /**
@@ -1633,16 +1635,17 @@ export class WorkspaceController {
     const phase = (id: string, p?: ArchivePhase): void => void this.deps.store.dispatch({ type: 'archiving', id, ...(p ? { phase: p } : {}) });
     const res = await this.inLane(project?.root || projectId, () =>
       this.act(
-        "Couldn't delete the project",
+        t('toasts.workspace.deleteProjectFailed'),
         () => this.deps.manager.removeProject(projectId, { trash, onPhase: phase, ...(this.deps.moveToTrash ? { toTrash: this.deps.moveToTrash } : {}) }),
-        project ? `${project.name} is back in the sidebar.` : undefined,
+        project ? t('toasts.workspace.projectBack', { name: project.name }) : undefined,
       ),
     );
     this.ahead.projects.delete(projectId);
     this.publish();
     if (!res) return false;
-    const kept = res.archived ? ` ${res.archived} worktree${res.archived === 1 ? '' : 's'} archived (nothing lost).` : '';
-    this.deps.toast(`Removed ${project?.name ?? 'the project'} from Beluga.${res.trashed ? ' Its folder is in the Trash.' : ''}${kept}`, 'success');
+    const kept = res.archived ? ` ${t('toasts.workspace.projectArchivedWorktrees', { count: res.archived })}` : '';
+    const removed = project ? t('toasts.workspace.projectRemoved', { name: project.name }) : t('toasts.workspace.projectRemovedIt');
+    this.deps.toast(`${removed}${res.trashed ? ` ${t('toasts.workspace.projectTrashed')}` : ''}${kept}`, 'success');
     return true;
   }
 
@@ -1686,7 +1689,7 @@ export class WorkspaceController {
   openInFinder(id: string): void {
     try {
       this.deps.manager.openInFinder(id);
-      this.deps.toast(`Opened in ${FILE_MANAGER}`);
+      this.deps.toast(t('toasts.workspace.openedIn', { app: FILE_MANAGER }));
     } catch (err) {
       this.deps.toast(errorText(err), 'error');
     }
@@ -1704,7 +1707,7 @@ export class WorkspaceController {
         return this.deps.manager.loadAdded(dir);
       });
       this.publish();
-      this.deps.toast('Project added', 'success');
+      this.deps.toast(t('toasts.workspace.projectAdded'), 'success');
       void this.refresh().catch(() => undefined);
       return project ? { project: { id: project.id, name: project.name } } : {};
     } catch (err) {
@@ -1718,7 +1721,7 @@ export class WorkspaceController {
     try {
       const found = this.deps.manager.addFolder(dir);
       await this.refresh();
-      this.deps.toast(`Watching ${dir}: ${found} project(s) found`, 'success');
+      this.deps.toast(t('toasts.workspace.watching', { dir, count: found }), 'success');
       return { found };
     } catch (err) {
       const error = errorText(err);

@@ -43,6 +43,7 @@ import { agentForAsk } from './gateway/serve.js';
 import { fromMachine } from './client-context.js';
 import { buildPreviewAppend } from '../agent/preview-prompt.js';
 import { experimentOn } from '../shared/experiments.js';
+import { t } from '../shared/i18n/index.js';
 
 /** How an external agent's message goes in, and what happened to it. */
 export type ExternalSendMode = 'auto' | 'queue' | 'steer' | 'restart';
@@ -242,7 +243,7 @@ const QUIT_SETTLE_MS = 2_000;
 /** Said when a run that wouldn't take an interrupt was stopped for your message. */
 /** A message in a conversation its terminal is driving (BLG-534). */
 export const TERMINAL_DRIVING = 'The terminal is driving this conversation: type there, or Take over to talk here.';
-const STOPPED_FOR_YOU = 'Your agent didn’t stop when asked, so its run was stopped for your message';
+const STOPPED_FOR_YOU = (): string => t('toasts.agentHost.stoppedForYou');
 /** Said when an agent that can't read a message mid-turn (OpenCode) had its turn stopped to read yours. */
 const STOPPED_TO_READ = 'Stopped to read your message';
 
@@ -254,7 +255,7 @@ const STOPPED_TO_READ = 'Stopped to read your message';
  */
 export function planSteer(status: LiveStatus | undefined, now: number): { kind: 'steer' } | { kind: 'interrupt' | 'restart'; note: string } {
   if (!status) return { kind: 'steer' };
-  if (status.alive === false) return { kind: 'restart', note: 'The agent’s run had ended without finishing: started over with your message' };
+  if (status.alive === false) return { kind: 'restart', note: t('toasts.agentHost.restartEnded') };
   if (status.between) return { kind: 'steer' };
   if (status.tool) {
     const ran = now - status.tool.since;
@@ -262,7 +263,7 @@ export function planSteer(status: LiveStatus | undefined, now: number): { kind: 
   }
   const quiet = now - status.lastEventAt;
   // Thinking is Claude at work (its process still runs): interrupted, never taken for dead.
-  if (quiet >= DEAD_RUN_MS && !status.thinking) return { kind: 'restart', note: `The agent had gone quiet for ${span(quiet)}: stopped to start over with your message` };
+  if (quiet >= DEAD_RUN_MS && !status.thinking) return { kind: 'restart', note: t('toasts.agentHost.restartQuiet', { time: span(quiet) }) };
   if (quiet >= STEER_QUIET_MS) return { kind: 'interrupt', note: `Interrupted: the agent was ${status.thinking ? 'thinking' : 'quiet'} for ${span(quiet)}; reading your message` };
   return { kind: 'steer' };
 }
@@ -361,14 +362,14 @@ export class AgentHost {
    * stays). Waits for Claude's current turn there to end first; once is enough when asked twice.
    */
   compact(channel: string, instructions = ''): void {
-    if (!this.agent) return this.toast('No agent is running on this computer', 'warn');
+    if (!this.agent) return this.toast(t('toasts.agentHost.noAgent'), 'warn');
     const cant = this.noCompact(channel);
     if (cant) return this.toast(cant, 'warn');
     const lane = this.lane(channel);
     if (lane.waiting.some((w) => w.compact)) return;
     const body: BodyOf<'agent_request'> = { kind: 'agent_request', requestId: `compact-${randomUUID()}`, prompt: instructions.slice(0, 2000), viaAgent: false, channel, urgent: false, plan: false };
     lane.waiting.push({ from: this.selfId, body, compact: true });
-    if (lane.current) this.toast('Your agent compacts this conversation when it finishes what it’s doing');
+    if (lane.current) this.toast(t('toasts.agentHost.compactLater'));
     void this.pump(lane);
   }
 
@@ -614,7 +615,7 @@ export class AgentHost {
   stopAgent(): void {
     const lanes = [...this.lanes.values()];
     if (!lanes.some((l) => l.current || l.waiting.length)) {
-      this.toast('Your agent is not running anything');
+      this.toast(t('toasts.agentHost.notRunning'));
       return;
     }
     for (const id of [...this.toolApprovals.keys()]) this.answerApproval('no', id);
@@ -625,7 +626,7 @@ export class AgentHost {
       lane.current?.abort();
       for (const { from, body, compact } of cancelled) if (!compact) this.emitAgent(body.requestId, from, 'error', 'Cancelled by owner', body.channel);
     }
-    this.toast('Stopping your agent everywhere (queued requests cancelled)', 'warn');
+    this.toast(t('toasts.agentHost.stoppingEverywhere'), 'warn');
   }
 
   /**
@@ -662,10 +663,10 @@ export class AgentHost {
   stopRun(channel: string, opts: { readonly quiet?: boolean; readonly threads?: number } = {}): { stopped: boolean; returned: string[] } {
     const lane = this.lanes.get(channel);
     const mine = lane?.waiting.filter((w) => w.from === this.selfId) ?? [];
-    const threads = opts.threads ? `${opts.threads} thread${opts.threads === 1 ? '' : 's'}` : '';
+    const threads = opts.threads ? t('toasts.agentHost.threads', { count: opts.threads }) : '';
     if (!lane || (!lane.current && !mine.length)) {
-      if (threads) this.toast(`Stopped ${threads}`, 'success');
-      else if (!opts.quiet) this.toast([...this.lanes.values()].some((l) => l.current || l.waiting.length) ? "Your agent isn't working here" : 'Your agent is not running anything');
+      if (threads) this.toast(t('toasts.agentHost.stoppedThreads', { threads }), 'success');
+      else if (!opts.quiet) this.toast([...this.lanes.values()].some((l) => l.current || l.waiting.length) ? t('toasts.agentHost.notWorkingHere') : t('toasts.agentHost.notRunning'));
       return { stopped: Boolean(threads), returned: [] };
     }
     for (const [id, at] of [...this.toolApprovals]) if (at === channel) this.answerApproval('no', id);
@@ -677,8 +678,8 @@ export class AgentHost {
       lane.current.abort();
     }
     const n = mine.filter((w) => !w.compact).length;
-    const back = n ? ` · ${n} queued message${n === 1 ? '' : 's'} back in the box` : '';
-    if (!opts.quiet) this.toast(`Stopped your agent here${threads ? ` and ${threads}` : ''}${back}`, 'success');
+    const back = n ? ` · ${t('toasts.agentHost.backInBox', { count: n })}` : '';
+    if (!opts.quiet) this.toast(`${threads ? t('toasts.agentHost.stoppedHereAnd', { threads }) : t('toasts.agentHost.stoppedHere')}${back}`, 'success');
     return { stopped: true, returned: mine.filter((w) => !w.compact).map((w) => w.body.prompt) };
   }
 
@@ -692,7 +693,7 @@ export class AgentHost {
       const i = lane.waiting.findIndex((w) => w.body.requestId === requestId);
       if (i < 0) continue;
       if (lane.waiting[i]!.from !== this.selfId) {
-        this.toast("Only the person who sent a message can steer it", 'warn');
+        this.toast(t('toasts.agentHost.onlySenderSteer'), 'warn');
         return false;
       }
       const [item] = lane.waiting.splice(i, 1);
@@ -701,7 +702,7 @@ export class AgentHost {
       this.rush(lane, item!, interrupt);
       return true;
     }
-    this.toast('That message isn’t waiting any more', 'warn');
+    this.toast(t('toasts.agentHost.notWaiting'), 'warn');
     return false;
   }
 
@@ -717,7 +718,7 @@ export class AgentHost {
       if (i < 0) continue;
       const item = lane.waiting[i]!;
       if (item.from !== this.selfId) {
-        this.toast('Only the person who sent a message can send it now', 'warn');
+        this.toast(t('toasts.agentHost.onlySenderNow'), 'warn');
         return false;
       }
       lane.waiting.splice(i, 1);
@@ -733,7 +734,7 @@ export class AgentHost {
       void this.pump(lane);
       return true;
     }
-    this.toast('That message isn’t waiting any more', 'warn');
+    this.toast(t('toasts.agentHost.notWaiting'), 'warn');
     return false;
   }
 
@@ -776,7 +777,7 @@ export class AgentHost {
           // Claude answered meanwhile and waits between turns: the message starts its turn now.
           if (lane.current === run && steer.status?.().between && steer(followUp)) return;
           // Still mid-turn: stopped for it (and said so). Ended already: it just goes first.
-          this.jump(lane, item, run && lane.current === run && !run.signal.aborted ? STOPPED_FOR_YOU : undefined, run);
+          this.jump(lane, item, run && lane.current === run && !run.signal.aborted ? STOPPED_FOR_YOU() : undefined, run);
         });
       lane.interrupting = interrupting;
       return;
@@ -1153,7 +1154,7 @@ export class AgentHost {
         settled();
         // The run ended before Claude read it (and you didn't stop it): it goes back in line, first.
         if (read || lane.stopping) return emit('error', reason);
-        this.jump(lane, item, 'The agent’s run ended before it read your message: it runs next', undefined);
+        this.jump(lane, item, t('toasts.agentHost.endedBeforeRead'), undefined);
       },
     };
   }
@@ -1181,7 +1182,7 @@ export class AgentHost {
     const lane = [...this.lanes.values()].find((l) => l.steered?.has(requestId));
     const followUp = lane?.steered?.get(requestId)?.followUp;
     if (!lane || !followUp) {
-      this.toast('Your agent has read that message already', 'info');
+      this.toast(t('toasts.agentHost.alreadyRead'), 'info');
       return false;
     }
     const steer = lane.steer;
@@ -1196,13 +1197,13 @@ export class AgentHost {
     // Claude couldn't be interrupted: its run stops, and your message (never read) runs next, first in line.
     if (run && lane.current === run && !run.signal.aborted) {
       lane.interruptedBy = requestId;
-      lane.interruptNote = STOPPED_FOR_YOU;
+      lane.interruptNote = STOPPED_FOR_YOU();
       run.abort();
       return true;
     }
     // No run to stop: it still waits for Claude's next step.
     this.emitAgent(requestId, this.selfId, 'text', READS_AFTER_STEP, lane.channel);
-    this.toast('Your agent couldn’t be stopped: it reads your message at its next step', 'warn');
+    this.toast(t('toasts.agentHost.couldntStop'), 'warn');
     return false;
   }
 
@@ -1217,20 +1218,20 @@ export class AgentHost {
     const entry = lane?.steered?.get(requestId);
     const cancel = lane?.steer?.cancel;
     if (!lane || !entry) {
-      this.toast('Your agent has read that message already', 'info');
+      this.toast(t('toasts.agentHost.alreadyRead'), 'info');
       return { cancelled: false };
     }
     if (!cancel) {
-      this.toast('This agent can’t take a message back once it’s sent', 'warn');
+      this.toast(t('toasts.agentHost.cantTakeBack'), 'warn');
       return { cancelled: false };
     }
     const taken = await cancel(entry.followUp).catch((err: unknown) => {
-      this.toast(`Couldn’t take it back: ${errorText(err)}`, 'warn');
+      this.toast(t('toasts.agentHost.takeBackFailed', { error: errorText(err) }), 'warn');
       return undefined;
     });
     if (taken === undefined) return { cancelled: false };
     if (!taken || !lane.steered?.has(requestId)) {
-      this.toast('Your agent is reading that message already', 'info');
+      this.toast(t('toasts.agentHost.reading'), 'info');
       return { cancelled: false };
     }
     lane.steered.delete(requestId);
@@ -1355,7 +1356,7 @@ export class AgentHost {
     return new Promise((resolve) => {
       // Nobody should be stuck waiting forever on an approval you didn't see.
       const expiry = setTimeout(() => {
-        if (this.answerApproval('no', id)) this.toast(`An approval expired after ${Math.round(this.approvalTimeoutMs / 60_000)} min without an answer`, 'warn');
+        if (this.answerApproval('no', id)) this.toast(t('toasts.agentHost.approvalExpired', { minutes: Math.round(this.approvalTimeoutMs / 60_000) }), 'warn');
       }, this.approvalTimeoutMs);
       expiry.unref();
       meta.signal?.addEventListener('abort', () => this.answerApproval('no', id), { once: true });

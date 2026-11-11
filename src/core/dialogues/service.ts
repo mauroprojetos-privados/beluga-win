@@ -8,6 +8,7 @@ import type { TaskView } from '../gateway/model.js';
 import { speakerName } from './prompt.js';
 import { type DialogueGateway, mirrorFrom, remoteTurn } from './remote.js';
 import { type FriendAgent, parseDialogueStart } from './start.js';
+import { t } from '../../shared/i18n/index.js';
 
 export interface DialoguesDeps {
   readonly store: Store;
@@ -77,7 +78,7 @@ export class Dialogues {
     const live = liveDialogueIn(this.deps.store.getState(), channel);
     if (/^[/:]dialogue\s+stop$/i.test(text)) {
       if (live) this.stop(live.id);
-      else this.deps.toast('No dialogue is going on here', 'info');
+      else this.deps.toast(t('toasts.dialogues.none'), 'info');
       return true;
     }
     const start = parseDialogueStart(text, this.deps.myAgents(), this.deps.friendAgent);

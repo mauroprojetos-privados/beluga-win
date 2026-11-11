@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { Mesh } from '../../net/mesh/mesh.js';
 import { dmConversation, groupConversation } from '../../net/mesh/views.js';
 import { type CallPersonView, type CallView, type CallsView, GONE_MS, HEARTBEAT_MS, type MissedCallView, RING_MS, SIGNAL_MAX, keeps } from '../../shared/calls.js';
+import { t } from '../../shared/i18n/index.js';
 
 /**
  * Calls in your conversations with friends (BLG-706). The daemon doesn't carry any media: it rings,
@@ -317,7 +318,7 @@ export class CallService {
         if (!call?.me) return;
         // In a direct conversation that's the only other person: the call is over.
         if (conversation.startsWith('dm:') && !call.people.size) {
-          this.host.toast(`${this.host.links.nameFor(from)} can’t talk right now`);
+          this.host.toast(t('toasts.calls.busy', { name: this.host.links.nameFor(from) }));
           this.leave(conversation);
           return;
         }
@@ -347,7 +348,7 @@ export class CallService {
         continue;
       }
       if (call.me && !call.met && !call.people.size && call.startedBy === this.host.links.peerId && now - call.startedAt > RING_MS) {
-        this.host.toast(call.conversation.startsWith('dm:') ? `${this.host.links.nameFor(call.conversation.slice(3))} didn’t answer` : 'Nobody picked up');
+        this.host.toast(call.conversation.startsWith('dm:') ? t('toasts.calls.noAnswer', { name: this.host.links.nameFor(call.conversation.slice(3)) }) : t('toasts.calls.nobody'));
         call.me = undefined;
         this.broadcast(call, { k: 'bye', call: call.id });
         changed = true;
@@ -418,7 +419,7 @@ export class CallService {
     call.me = undefined;
     this.broadcast(call, { k: 'bye', call: call.id });
     this.calls.delete(call.conversation);
-    this.host.toast('The call ended');
+    this.host.toast(t('toasts.calls.ended'));
     this.publish();
     return true;
   }

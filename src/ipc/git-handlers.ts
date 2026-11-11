@@ -2,6 +2,7 @@ import type { Session } from '../core/session.js';
 import type { WorkspaceController } from '../core/workspace-controller.js';
 import { commitDetail, historyFilters, log } from '../workspaces/history.js';
 import type { Args, Method } from './api.js';
+import { t } from '../shared/i18n/index.js';
 
 /** What each `git.*` method does (see git-api.ts). */
 
@@ -51,7 +52,7 @@ export const GIT_HANDLERS = {
     const ws = await c.manager.createWorktreeAt(projectId, name?.trim() || `from-${hash.slice(0, 7)}`, hash);
     await c.refresh();
     c.open(ws.id);
-    s.toast(`Worktree ${ws.name} is ready on ${ws.branch}, starting at ${hash.slice(0, 7)}`, 'success');
+    s.toast(t('toasts.ipc.worktreeAt', { name: ws.name, branch: String(ws.branch), hash: hash.slice(0, 7) }), 'success');
     return ws.id;
   },
 } satisfies GitHandlers;

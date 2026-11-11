@@ -7,6 +7,7 @@ import type { WorkspaceManager } from '../workspaces/manager.js';
 import { type OriginInfo, type WorktreeSource, describeOrigin, sourceFromPath } from '../workspaces/origin.js';
 import { type StaleReason, type WorktreeFacts, bornAt, removeWorktreeKeepingBranch, staleReason, staleText, touchedAt, worktreeFacts } from '../workspaces/others.js';
 import type { Project, Workspace } from '../workspaces/types.js';
+import { t } from '../shared/i18n/index.js';
 
 /**
  * Worktrees Beluga didn't make (Conductor's, Claude Code's, a script's): who made them, what's
@@ -152,20 +153,20 @@ export class OtherWorktrees {
   async remove(id: string, force = false): Promise<boolean> {
     const at = this.located(id);
     if (!at) {
-      this.deps.toast('Only worktrees made outside Beluga can be removed here', 'warn');
+      this.deps.toast(t('toasts.otherWorktrees.onlyOutside'), 'warn');
       return false;
     }
     const { ws, project } = at;
     try {
       const facts = await worktreeFacts(ws, ws.base ?? project.base);
-      if (facts.changed > 0 && !force) throw new Error(`${ws.name} has ${facts.changed} uncommitted file${facts.changed === 1 ? '' : 's'}. Remove it anyway to lose them.`);
+      if (facts.changed > 0 && !force) throw new Error(t('toasts.otherWorktrees.uncommitted', { name: ws.name, count: facts.changed }));
       await removeWorktreeKeepingBranch(project.root, ws.path, force);
       rmSync(this.deps.manager.store.historyFile(ws.id), { force: true });
       await this.deps.refresh();
-      this.deps.toast(`Removed ${ws.name}${ws.branch ? `. Its branch ${ws.branch} is kept` : ''}`, 'success');
+      this.deps.toast(ws.branch ? t('toasts.otherWorktrees.removedKept', { name: ws.name, branch: ws.branch }) : t('toasts.otherWorktrees.removed', { name: ws.name }), 'success');
       return true;
     } catch (err) {
-      this.deps.toast(`Couldn't remove ${ws.name}: ${errorText(err)}`, 'error');
+      this.deps.toast(t('toasts.otherWorktrees.removeFailed', { name: ws.name, error: errorText(err) }), 'error');
       return false;
     }
   }
@@ -209,7 +210,7 @@ export class OtherWorktrees {
       }
     }
     await this.deps.refresh();
-    this.deps.toast(`Removed ${removed} worktree${removed === 1 ? '' : 's'}${kept ? ` · kept ${kept} that changed or couldn’t be removed` : ''}. Branches are kept.`, removed ? 'success' : 'info');
+    this.deps.toast(`${t('toasts.otherWorktrees.removedMany', { count: removed })}${kept ? ` · ${t('toasts.otherWorktrees.keptMany', { count: kept })}` : ''}. ${t('toasts.otherWorktrees.branchesKept')}`, removed ? 'success' : 'info');
     return { removed, kept };
   }
 }

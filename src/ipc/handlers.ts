@@ -58,6 +58,7 @@ import { AGENT_TERM_HANDLERS } from './agent-term-handlers.js';
 import { worktreePorts } from '../workspaces/ports.js';
 import { waitingNeeds } from '../companion/needs-you.js';
 import { saveDismissedNeeds, withDismissed } from '../core/dismissed-needs.js';
+import { t } from '../shared/i18n/index.js';
 
 /**
  * What each API method does (see api.ts for the list and its arguments). Runs in the core:
@@ -120,7 +121,7 @@ export const HANDLERS = {
   'session.localLocation': (s, abs, dir) => s.localLocation(abs, dir),
   'session.testNotification': (s) => {
     s.notifier.test();
-    s.toast('Sent a test notification', 'success');
+    s.toast(t('toasts.ipc.testNotification'), 'success');
   },
 
   'host.answerApproval': (s, answer, id) => s.answerApproval(answer, id),
@@ -404,7 +405,7 @@ export const HANDLERS = {
     if (isMainCheckout(abs)) return (await ctl(s)?.addProject(abs)) ?? {};
     if (findProjects([abs]).length) return (await ctl(s)?.addFolder(abs)) ?? {};
     const plain = existsSync(abs);
-    const error = plain ? `${path.basename(abs)} isn't a git project yet` : `${abs} isn't there`;
+    const error = plain ? t('toasts.ipc.notGitYet', { name: path.basename(abs) }) : t('toasts.ipc.notThere', { path: abs });
     s.toast(error, 'warn');
     // A plain folder: the Add projects sheet offers to set up git there (projects.initGit).
     return plain ? { error, canInit: true } : { error };

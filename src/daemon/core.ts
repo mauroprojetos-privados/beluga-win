@@ -57,6 +57,7 @@ import { loadDismissedNeeds } from '../core/dismissed-needs.js';
 import { claudeCodeReady } from '../agent/claude-code.js';
 import { updateClaudeCode } from '../agent/claude-code-updates.js';
 import { claudeCodeWorks } from '../agent/runtime/claude/probe.js';
+import { t } from '../shared/i18n/index.js';
 
 /**
  * Everything Beluga is apart from its screens: your identity, the room (hosted or joined),
@@ -221,7 +222,7 @@ async function publish(config: Config, room: Room, session: Session, isClosing: 
       onDied: (reason) => {
         if (isClosing()) return;
         store.dispatch({ type: 'hosting', hosting: { phase: 'failed', detail: `${reason}. Restart Beluga to get a new invite.` } });
-        session.toast('Remote access stopped: the tunnel closed', 'error');
+        session.toast(t('toasts.daemon.tunnelClosed'), 'error');
       },
     });
     if (!tunnel || isClosing()) return;
