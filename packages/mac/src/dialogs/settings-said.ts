@@ -1,5 +1,5 @@
-import { type Key, t } from '@beluga/shared/i18n/index.js';
-import { keyOfEnglish } from '../lib/i18n.js';
+import { type Key, t } from '../../../../src/shared/i18n/index.js';
+import { keyOfEnglish } from '../../../../src/shared/i18n/english.js';
 import { trayName } from '../lib/os-words.js';
 import type { PaneInfo, Said, SettingEntry, SettingsPane } from '../lib/settings-search.js';
 

@@ -1,6 +1,6 @@
 import type { GhIssue, GhIssueState } from '../../../../src/core/issues/model.js';
 import type { LogItem } from '../../../../src/core/store.js';
-import { t } from '@beluga/shared/i18n/index.js';
+import { t } from '../../../../src/shared/i18n/index.js';
 import { ago } from '../tasks/tasks-model.js';
 
 /**

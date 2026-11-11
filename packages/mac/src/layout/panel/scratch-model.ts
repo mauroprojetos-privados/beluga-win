@@ -4,8 +4,8 @@
  */
 
 import { isImageFile, isVideoFile } from '../../components/markdown/md-paths.js';
-import { t } from '@beluga/shared/i18n/index.js';
-import { formatNumber } from '@beluga/shared/i18n/format.js';
+import { t } from '../../../../../src/shared/i18n/index.js';
+import { formatNumber } from '../../../../../src/shared/i18n/format.js';
 
 export interface ScratchEntry {
   readonly path: string;

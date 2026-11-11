@@ -9,7 +9,7 @@ import { remindLabel } from '../../../../src/shared/remind.js';
 import { threadNesting } from '../../../../src/ui/thread-tree.js';
 import { activityOf } from '../../../../src/ui/workspace-models.js';
 import type { Project, Workspace } from '../../../../src/workspaces/types.js';
-import { wordRecord } from '@beluga/shared/i18n/words.js';
+import { wordRecord } from '../../../../src/shared/i18n/words.js';
 
 /**
  * What each conversation in the sidebar is waiting on, Slack-style: it needs you (an approval,

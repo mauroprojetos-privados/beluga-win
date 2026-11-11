@@ -4,7 +4,7 @@
  * approve it; see core/plans).
  */
 
-import { wordTable } from '@beluga/shared/i18n/words.js';
+import { wordTable } from '../../../../src/shared/i18n/words.js';
 
 export type ComposeMode = 'act' | 'plan' | 'tasks';
 

@@ -4,7 +4,7 @@ import { Icon } from '../components/Icon.js';
 import { Button, cx } from '../components/ui.js';
 import { useApi } from '../lib/beluga.js';
 import { useT } from '../lib/i18n.js';
-import { t as tt } from '@beluga/shared/i18n/index.js';
+import { t as tt } from '../../../../src/shared/i18n/index.js';
 import s from './sheet.module.css';
 import f from './folder-browser.module.css';
 

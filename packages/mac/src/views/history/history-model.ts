@@ -1,5 +1,5 @@
 import type { CommitRef } from '../../../../../src/workspaces/history.js';
-import { t } from '@beluga/shared/i18n/index.js';
+import { t } from '../../../../../src/shared/i18n/index.js';
 
 /**
  * History's words and pieces, without React: avatars (initials and a color per person; no

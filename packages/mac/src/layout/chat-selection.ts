@@ -1,4 +1,4 @@
-import { t } from '@beluga/shared/i18n/index.js';
+import { t } from '../../../../src/shared/i18n/index.js';
 
 export interface ChatSelection {
   readonly anchor?: string;
