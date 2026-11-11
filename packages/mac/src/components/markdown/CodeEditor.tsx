@@ -3,6 +3,7 @@ import { cx } from '../ui.js';
 import { useTokens } from './CodeLines.js';
 import { canTidy, tidy } from './tidy.js';
 import c from './code-editor.module.css';
+import { useT } from '../../lib/i18n.js';
 
 export interface CodeEditorProps {
   readonly value: string;
@@ -27,6 +28,7 @@ export interface CodeEditorProps {
  */
 export function CodeEditor({ value, onChange, onBlur, lang, single = false, minRows = single ? 1 : 3, placeholder, invalid, className, ...rest }: CodeEditorProps) {
   const tokens = useTokens(value, lang);
+  const t = useT();
   const [failed, setFailed] = useState(false);
   const tidyable = !single && canTidy(lang);
   const keyDown = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
@@ -55,13 +57,13 @@ export function CodeEditor({ value, onChange, onBlur, lang, single = false, minR
         <pre className={cx(c.layer, c.colors, tokens && c.colored)} aria-hidden="true">
           {shown.map((line, i) => (
             <span key={i}>
-              {line.map((t, j) =>
-                'style' in t && t.style ? (
-                  <span key={j} style={t.style}>
-                    {t.content}
+              {line.map((tok, j) =>
+                'style' in tok && tok.style ? (
+                  <span key={j} style={tok.style}>
+                    {tok.content}
                   </span>
                 ) : (
-                  t.content
+                  tok.content
                 ),
               )}
               {i < shown.length - 1 ? '\n' : ' '}
@@ -87,8 +89,8 @@ export function CodeEditor({ value, onChange, onBlur, lang, single = false, minR
         />
       </div>
       {tidyable && value.trim() ? (
-        <button type="button" className={c.tidy} onClick={lay} title={failed ? 'It doesn’t read as valid, so it was left as is' : 'Lay it out on lines, indented'}>
-          {failed ? 'Can’t tidy' : 'Tidy'}
+        <button type="button" className={c.tidy} onClick={lay} title={failed ? t('components.markdown.tidyFailed') : t('components.markdown.tidyHint')}>
+          {failed ? t('components.markdown.cantTidy') : t('components.markdown.tidy')}
         </button>
       ) : null}
     </div>

@@ -25,6 +25,7 @@ import { NODE_TYPES, type FlowNode, drawingOf } from './nodes.js';
 import { EDGE_TYPES, EdgeMarkers, type FlowEdge } from './edges.js';
 import { Inspector } from './Inspector.js';
 import { Walkthrough } from './Walkthrough.js';
+import { useT } from '../../lib/i18n.js';
 import g from './graph.module.css';
 
 /**
@@ -126,6 +127,7 @@ const sameNode = (a: GraphNode, b: GraphNode): boolean => a === b || JSON.string
 const MIN_ZOOM = 0.15;
 
 function Canvas({ graph, mode, localImages, onExpand, onCopy, startStep, onLaidOut, cacheKey, onOpen, openLabel, live, pack, startAt }: FlowGraphProps) {
+  const t = useT();
   const uid = useId().replace(/[^\w-]/g, '');
   const theme = useDocTheme();
   const motion = !reducedMotion();
@@ -257,11 +259,11 @@ function Canvas({ graph, mode, localImages, onExpand, onCopy, startStep, onLaidO
       const ways = choose && room && (packed || graph.edges.length <= SIMPLEX_MAX_EDGES) ? [start, turned(start)] : [start];
       const tries = ways.flatMap((dir) => (packed ? [undefined] : [undefined, ...(aspect ? [aspect] : [])]).map((shape) => ({ dir, shape })));
       // A layout that fails (or takes too long) just isn't a choice.
-      const done = await Promise.allSettled(tries.map((t) => (packed ? packedLayout(graph, sizes.current, t.dir, aspect ?? 1.6, layout) : layout(elkGraph(graph, sizes.current, t.dir, t.shape)))));
+      const done = await Promise.allSettled(tries.map((way) => (packed ? packedLayout(graph, sizes.current, way.dir, aspect ?? 1.6, layout) : layout(elkGraph(graph, sizes.current, way.dir, way.shape)))));
       if (mine !== run.current) return;
-      const laid = tries.flatMap((t, i) => {
+      const laid = tries.flatMap((way, i) => {
         const r = done[i]!;
-        return r.status === 'fulfilled' ? [{ direction: t.dir, wrapped: t.shape !== undefined, size: { width: r.value.width ?? 0, height: r.value.height ?? 0 }, out: r.value }] : [];
+        return r.status === 'fulfilled' ? [{ direction: way.dir, wrapped: way.shape !== undefined, size: { width: r.value.width ?? 0, height: r.value.height ?? 0 }, out: r.value }] : [];
       });
       const pick = room ? bestLayout(laid, room, start) : laid[0];
       // A live graph that can't be laid out again keeps the drawing it has (its new nodes show where they are).
@@ -493,22 +495,22 @@ function Canvas({ graph, mode, localImages, onExpand, onCopy, startStep, onLaidO
         <Background variant={BackgroundVariant.Dots} gap={16} size={1.2} className={g.dots} />
         {!inline ? <MiniMap pannable zoomable className={g.minimap} nodeClassName={(n) => (n.type === 'group' ? g.miniGroup! : g.miniNode!)} /> : null}
         <Panel position="top-right" className={g.tools}>
-          {steps.length ? <IconButton icon="play" label={step >= 0 ? 'Leave the Walkthrough' : 'Walk Me Through It'} active={step >= 0} onClick={() => goStep(step >= 0 ? -1 : 0)} /> : null}
-          <IconButton icon={across ? 'chevronDown' : 'chevronRight'} label={across ? 'Lay Out Top to Bottom' : 'Lay Out Left to Right'} onClick={turn} />
-          <IconButton icon="outline" label="Fit to View" onClick={() => frameAll(duration)} />
-          {onCopy ? <IconButton icon="copy" label="Copy as JSON" onClick={onCopy} /> : null}
-          {onExpand ? <IconButton icon="expand" label="Open in Full Window" onClick={onExpand} /> : null}
+          {steps.length ? <IconButton icon="play" label={step >= 0 ? t('components.graph.leaveWalkthrough') : t('components.graph.walkMe')} active={step >= 0} onClick={() => goStep(step >= 0 ? -1 : 0)} /> : null}
+          <IconButton icon={across ? 'chevronDown' : 'chevronRight'} label={across ? t('components.graph.topToBottom') : t('components.graph.leftToRight')} onClick={turn} />
+          <IconButton icon="outline" label={t('components.graph.fit')} onClick={() => frameAll(duration)} />
+          {onCopy ? <IconButton icon="copy" label={t('components.graph.copyAsJson')} onClick={onCopy} /> : null}
+          {onExpand ? <IconButton icon="expand" label={t('components.graph.openFull')} onClick={onExpand} /> : null}
         </Panel>
         {!inline ? (
           <Panel position="bottom-left" className={g.zoom}>
-            <IconButton icon="minus" label="Zoom Out" onClick={() => void flow.zoomOut({ duration })} />
-            <IconButton icon="plus" label="Zoom In" onClick={() => void flow.zoomIn({ duration })} />
+            <IconButton icon="minus" label={t('components.graph.zoomOut')} onClick={() => void flow.zoomOut({ duration })} />
+            <IconButton icon="plus" label={t('components.graph.zoomIn')} onClick={() => void flow.zoomIn({ duration })} />
           </Panel>
         ) : null}
       </ReactFlow>
-      {phase === 'failed' ? <div className={g.overlayNote}>Couldn’t lay this graph out.</div> : phase !== 'ready' ? <div className={g.overlayNote}>Laying out…</div> : null}
+      {phase === 'failed' ? <div className={g.overlayNote}>{t('components.graph.cantLayOut')}</div> : phase !== 'ready' ? <div className={g.overlayNote}>{t('components.graph.layingOut')}</div> : null}
       {current ? <Walkthrough steps={steps} index={step} onGo={goStep} /> : null}
-      {picked ? <Inspector graph={graph} node={picked} onPick={focusNode} onClose={() => setSelected(undefined)} wide={!inline} {...(onOpen ? { onOpen: () => onOpen(picked.id), openLabel: openLabel ?? 'Open' } : {})} /> : null}
+      {picked ? <Inspector graph={graph} node={picked} onPick={focusNode} onClose={() => setSelected(undefined)} wide={!inline} {...(onOpen ? { onOpen: () => onOpen(picked.id), openLabel: openLabel ?? t('common.open') } : {})} /> : null}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { motion } from 'motion/react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import type { SocketClient } from '@beluga/ipc/socket-client.js';
 import { BelugaProvider } from '../lib/beluga.js';
+import { useT } from '../lib/i18n.js';
 import { apply } from '../lib/prefs.js';
 import { EASE_OUT, Rise, Words } from '../onboarding/fx.js';
 import { Mark } from '../onboarding/Mark.js';
@@ -30,17 +31,18 @@ import '../styles/base.css';
 
 /** The welcome's mark, name and promise, without its button: the README's banner (a still). */
 function Hello() {
+  const t = useT();
   return (
     <div className={o.hello}>
       <Mark size={104} />
       <Rise delay={1} className={o.wordmark}>
-        Beluga
+        Beluga{/* i18n-ignore */}
       </Rise>
       <h1 className={o.heroTitle} style={{ fontSize: 52 }}>
-        <Words text="Every project. Every agent." delay={1.25} />
+        <Words text={t('components.onboarding.steps.hero')} delay={1.25} />
         <br />
         <motion.span className={o.heroSoft} initial={{ opacity: 0, y: '0.25em', filter: 'blur(10px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }} transition={{ duration: 0.9, ease: EASE_OUT, delay: 1.55 }}>
-          All at once.
+          {t('components.onboarding.steps.allAtOnce')}
         </motion.span>
       </h1>
     </div>

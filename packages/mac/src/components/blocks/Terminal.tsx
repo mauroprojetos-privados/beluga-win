@@ -6,6 +6,7 @@ import { cx } from '../ui.js';
 import { copyText } from '../../lib/copy.js';
 import { toast, useBeluga } from '../../lib/beluga.js';
 import { useCopied } from '../markdown/CodeBlock.js';
+import { useT } from '../../lib/i18n.js';
 import b from './blocks.module.css';
 
 /**
@@ -50,21 +51,22 @@ function Spans({ spans }: { spans: readonly Span[] }) {
 }
 
 export const Terminal = memo(function Terminal({ code, lang, onQuote }: { code: string; lang?: string | undefined; onQuote?: ((fence: string) => void) | undefined }) {
+  const t = useT();
   const { client } = useBeluga();
   const term = useMemo(() => readTerminal(code), [code]);
   const [wrap, setWrap] = useState(false);
   const [all, setAll] = useState(false);
   const [copied, copyNow] = useCopied();
-  const copy = (text: string, what: string): void => void copyText(text).then(() => toast(client, `Copied ${what}`, 'success'));
+  const copy = (text: string, said: string): void => void copyText(text).then(() => toast(client, said, 'success'));
   const hidden = all ? 0 : Math.max(0, term.lines.length - TERMINAL_FOLD);
   const shown = hidden ? term.lines.slice(hidden) : term.lines;
   const name = (lang ?? '').toLowerCase();
   const items: ActionItem[] = [
-    { label: 'Copy Output', icon: 'copy', onSelect: () => copy(term.copy, 'the output') },
-    ...(term.commands.length ? [{ label: term.commands.length === 1 ? 'Copy Command' : 'Copy Commands', icon: 'terminal' as const, onSelect: () => copy(term.commands.join('\n'), term.commands.length === 1 ? 'the command' : 'the commands') }] : []),
-    { label: 'Wrap Long Lines', icon: 'wrap', separate: true, checked: wrap, onSelect: () => setWrap(!wrap) },
-    ...(hidden ? [{ label: `Show All ${term.lines.length} Lines`, onSelect: () => setAll(true) }] : []),
-    ...(onQuote ? [{ label: 'Quote in Reply', icon: 'chat' as const, separate: true, onSelect: () => onQuote(`\`\`\`${lang ?? 'console'}\n${term.plain}\n\`\`\``) }] : []),
+    { label: t('components.blocks.terminal.copyOutput'), icon: 'copy', onSelect: () => copy(term.copy, t('components.blocks.terminal.copiedOutput')) },
+    ...(term.commands.length ? [{ label: t('components.blocks.terminal.copyCommands', { count: term.commands.length }), icon: 'terminal' as const, onSelect: () => copy(term.commands.join('\n'), t('components.blocks.terminal.copiedCommands', { count: term.commands.length })) }] : []),
+    { label: t('components.blocks.terminal.wrap'), icon: 'wrap', separate: true, checked: wrap, onSelect: () => setWrap(!wrap) },
+    ...(hidden ? [{ label: t('components.blocks.terminal.showAll', { n: term.lines.length }), onSelect: () => setAll(true) }] : []),
+    ...(onQuote ? [{ label: t('components.blocks.quoteInReply'), icon: 'chat' as const, separate: true, onSelect: () => onQuote(`\`\`\`${lang ?? 'console'}\n${term.plain}\n\`\`\``) }] : []),
   ];
   return (
     <ActionsContext items={items}>
@@ -72,20 +74,20 @@ export const Terminal = memo(function Terminal({ code, lang, onQuote }: { code: 
         <div className={b.termHead}>
           <span className={b.termChip}>
             <Icon name="terminal" size={12} />
-            {GENERIC.test(name) ? 'Terminal' : name}
+            {GENERIC.test(name) ? t('components.blocks.terminal.label') : name}
           </span>
-          {term.commands.length > 1 ? <span>{term.commands.length} commands</span> : null}
+          {term.commands.length > 1 ? <span>{t('components.blocks.terminal.commands', { n: term.commands.length })}</span> : null}
         </div>
         <div className={b.tools}>
-          <button type="button" className={b.tool} aria-label="Copy the output" onClick={() => copyNow(term.copy)}>
+          <button type="button" className={b.tool} aria-label={t('components.blocks.terminal.copyTheOutput')} onClick={() => copyNow(term.copy)}>
             <Icon name={copied ? 'check' : 'copy'} size={12} />
-            {copied ? 'Copied' : 'Copy'}
+            {copied ? t('components.blocks.copied') : t('components.blocks.copy')}
           </button>
         </div>
         {hidden ? (
           <button type="button" className={cx(b.moreRow, b.termMore)} onClick={() => setAll(true)}>
             <Icon name="chevronUp" size={11} />
-            Show {hidden} earlier {hidden === 1 ? 'line' : 'lines'}
+            {t('components.blocks.terminal.showEarlier', { count: hidden })}
           </button>
         ) : null}
         <pre className={b.termBody}>

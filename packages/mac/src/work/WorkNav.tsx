@@ -2,6 +2,7 @@ import { Icon } from '../components/Icon.js';
 import { Segmented } from '../components/ui.js';
 import { useActions } from '../lib/actions.js';
 import { useApp } from '../lib/beluga.js';
+import { useT } from '../lib/i18n.js';
 import type { View } from '@beluga/core/store.js';
 import { Row } from '../layout/sidebar-parts.js';
 import { PlanSideRows } from '../plans/PlansNav.js';
@@ -50,6 +51,7 @@ function useOpenWork(): (page: WorkPage) => void {
 }
 
 export function WorkNav() {
+  const t = useT();
   const open = useOpenWork();
   const board = useApp((s) => s.board.enabled);
   const plans = useApp((s) => s.plans.enabled);
@@ -64,8 +66,8 @@ export function WorkNav() {
     <>
       <Row
         icon={<Icon name="task" size={14} />}
-        label="Work"
-        detail={running ? `Tasks, issues, pull requests, actions and plans · ${running} plan${running === 1 ? '' : 's'} running` : 'Tasks, issues, pull requests, actions and plans'}
+        label={t('components.work.work')}
+        detail={running ? t('components.work.detailRunning', { count: running }) : t('components.work.detail')}
         selected={page !== undefined}
         onClick={() => open(pick())}
       />
@@ -76,17 +78,18 @@ export function WorkNav() {
 
 /** The switch over Tasks, Issues, Pull Requests, Actions and Plans: the lists of Work. */
 export function WorkSwitch({ page }: { page: WorkPage }) {
+  const t = useT();
   const open = useOpenWork();
   const board = useApp((s) => s.board.enabled);
   const plans = useApp((s) => s.plans.enabled);
   const options = [
-    ...(board ? [{ value: 'tasks' as const, label: 'Tasks', icon: 'task' as const }, { value: 'issues' as const, label: 'Issues', icon: 'issue' as const }, { value: 'pulls' as const, label: 'Pull Requests', icon: 'pr' as const }, { value: 'actions' as const, label: 'Actions', icon: 'pulse' as const }] : []),
-    ...(plans ? [{ value: 'plans' as const, label: 'Plans', icon: 'flag' as const }] : []),
+    ...(board ? [{ value: 'tasks' as const, label: t('components.work.tasks'), icon: 'task' as const }, { value: 'issues' as const, label: t('components.work.issues'), icon: 'issue' as const }, { value: 'pulls' as const, label: t('components.work.pulls'), icon: 'pr' as const }, { value: 'actions' as const, label: t('components.work.actions'), icon: 'pulse' as const }] : []),
+    ...(plans ? [{ value: 'plans' as const, label: t('components.work.plans'), icon: 'flag' as const }] : []),
   ];
   if (options.length < 2) return null;
   return (
     <div className={w.switch}>
-      <Segmented<WorkPage> label="Work" value={page} onChange={open} options={options} />
+      <Segmented<WorkPage> label={t('components.work.work')} value={page} onChange={open} options={options} />
     </div>
   );
 }

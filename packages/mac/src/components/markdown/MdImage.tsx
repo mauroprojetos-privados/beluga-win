@@ -6,6 +6,7 @@ import { useBeluga } from '../../lib/beluga.js';
 import { sourceTag } from '../../machines/pane-model.js';
 import { resolveImage } from './md-paths.js';
 import m from './markdown.module.css';
+import { useT } from '../../lib/i18n.js';
 
 /**
  * Images in a document. Next to the file (`![](assets/flow.svg)`): read through Beluga, with the
@@ -86,22 +87,24 @@ function useFileVersion(at: Location | undefined): string | undefined {
 }
 
 function Missing({ alt, why }: { alt: string; why: string }) {
+  const t = useT();
   return (
     <span className={m.imageMissing} title={why}>
       <Icon name="image" size={12} />
-      {alt || 'Image'}
+      {alt || t('components.markdown.image')}
     </span>
   );
 }
 
 export function MdImage({ src, alt = '', title, doc }: { src: string; alt?: string; title?: string; doc: Location }) {
+  const t = useT();
   const target = resolveImage(src, doc.path);
   const local = target.kind === 'local' ? { ...doc, path: target.path } : undefined;
   const version = useFileVersion(local);
   const { url, error } = useImageUrl(version === undefined ? undefined : local, version || undefined);
   if (target.kind === 'remote') return <img className={m.image} src={target.url} alt={alt} title={title} loading="lazy" decoding="async" referrerPolicy="no-referrer" />;
-  if (target.kind === 'blocked') return <Missing alt={alt} why="Only images next to this file, or on the web over https, are shown" />;
-  if (error) return <Missing alt={alt} why={`Can’t show ${target.path}: ${error}`} />;
-  if (!url) return <span className={m.imageLoading} role="img" aria-label={alt || 'Loading image'} />;
+  if (target.kind === 'blocked') return <Missing alt={alt} why={t('components.markdown.imageBlocked')} />;
+  if (error) return <Missing alt={alt} why={t('components.markdown.cantShowImage', { path: target.path, error })} />;
+  if (!url) return <span className={m.imageLoading} role="img" aria-label={alt || t('components.markdown.loadingImage')} />;
   return <img className={m.image} src={url} alt={alt} title={title ?? target.path} decoding="async" />;
 }

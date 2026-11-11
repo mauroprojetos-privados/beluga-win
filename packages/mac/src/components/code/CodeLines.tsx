@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { type Token, loadHighlighter } from '../../lib/highlight.js';
 import { cx } from '../ui.js';
 import s from './code.module.css';
+import { useT } from '../../lib/i18n.js';
 
 /** One line to show: its number (and the old one, for a diff), whether it was added or removed, and whether it's marked. */
 export interface CodeRow {
@@ -37,9 +38,10 @@ function useTokens(rows: readonly CodeRow[], lang: string | undefined): Token[][
  * number picks it (Shift-click picks a range) for `onPick`.
  */
 export function CodeLines({ rows, lang, diff = false, picked, onPick }: { rows: readonly CodeRow[]; lang?: string; diff?: boolean; picked?: ReadonlySet<number>; onPick?: (n: number, range: boolean) => void }) {
+  const t = useT();
   const tokens = useTokens(rows, lang);
   return (
-    <div className={cx(s.lines, diff && s.diff)} role="table" aria-label="Code">
+    <div className={cx(s.lines, diff && s.diff)} role="table" aria-label={t('components.code.code')}>
       {rows.map((r, i) => {
         const n = r.n ?? r.old;
         const isPicked = n !== undefined && picked?.has(n);
@@ -47,7 +49,7 @@ export function CodeLines({ rows, lang, diff = false, picked, onPick }: { rows: 
           <div key={i} role="row" className={cx(s.row, r.kind && s[r.kind], r.marked && s.marked, isPicked && s.picked)} data-line={n}>
             {diff ? <span className={s.num}>{r.old ?? ''}</span> : null}
             {onPick && r.n !== undefined ? (
-              <button type="button" className={cx(s.num, s.numButton)} aria-label={`Line ${r.n}`} onClick={(e) => onPick(r.n!, e.shiftKey)}>
+              <button type="button" className={cx(s.num, s.numButton)} aria-label={t('components.code.line', { n: r.n })} onClick={(e) => onPick(r.n!, e.shiftKey)}>
                 {r.n}
               </button>
             ) : (
@@ -56,9 +58,9 @@ export function CodeLines({ rows, lang, diff = false, picked, onPick }: { rows: 
             {diff ? <span className={s.sign}>{r.kind === 'add' ? '+' : r.kind === 'del' ? '−' : ''}</span> : null}
             <code className={s.text}>
               {tokens?.[i]
-                ? tokens[i]!.map((t, j) => (
-                    <span key={j} style={t.style}>
-                      {t.content}
+                ? tokens[i]!.map((tok, j) => (
+                    <span key={j} style={tok.style}>
+                      {tok.content}
                     </span>
                   ))
                 : r.text || ' '}

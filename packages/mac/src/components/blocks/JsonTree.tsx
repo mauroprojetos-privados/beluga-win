@@ -7,6 +7,7 @@ import { copyText } from '../../lib/copy.js';
 import { toast, useBeluga } from '../../lib/beluga.js';
 import { CodeLines } from '../markdown/CodeLines.js';
 import { useCopied } from '../markdown/CodeBlock.js';
+import { useT } from '../../lib/i18n.js';
 import b from './blocks.module.css';
 
 /**
@@ -26,29 +27,30 @@ type Fold = { readonly depth: number; readonly over: ReadonlyMap<string, boolean
 const pathText = (steps: readonly (string | number)[]): string => steps.map(pathStep).join('').replace(/^\./, '');
 
 export const JsonTree = memo(function JsonTree({ doc, code, onQuote }: { doc: JsonDoc; code: string; onQuote?: ((fence: string) => void) | undefined }) {
+  const t = useT();
   const { client } = useBeluga();
   const [raw, setRaw] = useState(false);
   const [fold, setFold] = useState<Fold>(() => ({ depth: openDepth(doc), over: new Map() }));
   const [copied, copyNow] = useCopied();
   const picked = useRef<readonly (string | number)[] | undefined>(undefined);
-  const copy = (text: string, what: string): void => void copyText(text).then(() => toast(client, `Copied ${what}`, 'success'));
+  const copy = (text: string, said: string): void => void copyText(text).then(() => toast(client, said, 'success'));
   const isOpen = (key: string, depth: number): boolean => fold.over.get(key) ?? depth < fold.depth;
   const toggle = (key: string, depth: number): void => setFold((f) => ({ ...f, over: new Map(f.over).set(key, !(f.over.get(key) ?? depth < f.depth)) }));
 
   const items = (): ActionItem[] => {
     const at = picked.current;
     return [
-      { label: 'Copy', icon: 'copy', onSelect: () => copy(code, 'the JSON') },
-      { label: 'Copy Beautified', onSelect: () => copy(doc.pretty, 'beautified') },
-      { label: 'Copy Minified', onSelect: () => copy(JSON.stringify(doc.value), 'minified') },
-      ...(at?.length ? [{ label: 'Copy Path', icon: 'link' as const, hint: pathText(at), onSelect: () => copy(pathText(at), pathText(at)) }] : []),
+      { label: t('components.blocks.copy'), icon: 'copy', onSelect: () => copy(code, t('components.blocks.json.copiedJson')) },
+      { label: t('components.blocks.json.copyBeautified'), onSelect: () => copy(doc.pretty, t('components.blocks.json.copiedBeautified')) },
+      { label: t('components.blocks.json.copyMinified'), onSelect: () => copy(JSON.stringify(doc.value), t('components.blocks.json.copiedMinified')) },
+      ...(at?.length ? [{ label: t('components.blocks.copyPath'), icon: 'link' as const, hint: pathText(at), onSelect: () => copy(pathText(at), t('components.blocks.copiedWhat', { what: pathText(at) })) }] : []),
       ...(!raw
         ? [
-            { label: 'Expand All', icon: 'chevronDown' as const, separate: true, onSelect: () => setFold({ depth: 999, over: new Map() }) },
-            { label: 'Collapse All', icon: 'chevronRight' as const, onSelect: () => setFold({ depth: 1, over: new Map() }) },
+            { label: t('components.blocks.expandAll'), icon: 'chevronDown' as const, separate: true, onSelect: () => setFold({ depth: 999, over: new Map() }) },
+            { label: t('components.blocks.collapseAll'), icon: 'chevronRight' as const, onSelect: () => setFold({ depth: 1, over: new Map() }) },
           ]
         : []),
-      ...(onQuote ? [{ label: 'Quote in Reply', icon: 'chat' as const, separate: true, onSelect: () => onQuote(`\`\`\`json\n${code}\n\`\`\``) }] : []),
+      ...(onQuote ? [{ label: t('components.blocks.quoteInReply'), icon: 'chat' as const, separate: true, onSelect: () => onQuote(`\`\`\`json\n${code}\n\`\`\``) }] : []),
     ];
   };
 
@@ -56,17 +58,17 @@ export const JsonTree = memo(function JsonTree({ doc, code, onQuote }: { doc: Js
     <ActionsContext items={items}>
       <div className={cx(b.block, b.json)} data-block="json" onContextMenuCapture={() => (picked.current = undefined)}>
         <div className={b.tools}>
-          <span className={b.segment} role="radiogroup" aria-label="Show as">
+          <span className={b.segment} role="radiogroup" aria-label={t('components.blocks.json.showAs')}>
             <button type="button" role="radio" aria-checked={!raw} className={cx(b.segmentItem, !raw && b.segmentOn)} onClick={() => setRaw(false)}>
-              Tree
+              {t('components.blocks.json.tree')}
             </button>
             <button type="button" role="radio" aria-checked={raw} className={cx(b.segmentItem, raw && b.segmentOn)} onClick={() => setRaw(true)}>
-              Raw
+              {t('components.blocks.json.raw')}
             </button>
           </span>
-          <button type="button" className={b.tool} aria-label="Copy the JSON" onClick={() => copyNow(code)}>
+          <button type="button" className={b.tool} aria-label={t('components.blocks.json.copyJson')} onClick={() => copyNow(code)}>
             <Icon name={copied ? 'check' : 'copy'} size={12} />
-            {copied ? 'Copied' : 'Copy'}
+            {copied ? t('components.blocks.copied') : t('components.blocks.copy')}
           </button>
         </div>
         {raw ? (
@@ -74,7 +76,7 @@ export const JsonTree = memo(function JsonTree({ doc, code, onQuote }: { doc: Js
             <CodeLines text={doc.pretty} lang="json" />
           </div>
         ) : (
-          <div className={b.jsonRows} role="tree" aria-label="JSON">
+          <div className={b.jsonRows} role="tree" aria-label={/* i18n-ignore: a format name */ 'JSON'}>
             <Node value={doc.value} depth={0} steps={[]} last isOpen={isOpen} toggle={toggle} onPick={(s) => (picked.current = s)} />
           </div>
         )}
@@ -173,6 +175,7 @@ function Node({ name, value, depth, steps, last, isOpen, toggle, onPick }: NodeP
 }
 
 function Children({ entries, array, depth, steps, isOpen, toggle, onPick }: { entries: readonly [string | number, Json][]; array: boolean; depth: number; steps: readonly (string | number)[] } & Pick<NodeProps, 'isOpen' | 'toggle' | 'onPick'>) {
+  const t = useT();
   const [shown, setShown] = useState(FIRST);
   const cut = array && entries.length > shown;
   const list = cut ? entries.slice(0, shown) : entries;
@@ -185,7 +188,7 @@ function Children({ entries, array, depth, steps, isOpen, toggle, onPick }: { en
         <div className={b.jsonRow}>
           <Indent depth={depth + 1} />
           <button type="button" className={b.jMore} onClick={() => setShown(entries.length)}>
-            Show {entries.length - shown} more
+            {t('components.blocks.json.showMore', { n: entries.length - shown })}
           </button>
         </div>
       ) : null}
@@ -194,6 +197,7 @@ function Children({ entries, array, depth, steps, isOpen, toggle, onPick }: { en
 }
 
 function Leaf({ value }: { value: null | boolean | number | string }) {
+  const t = useT();
   const [whole, setWhole] = useState(false);
   if (value === null) return <span className={b.jNull}>null</span>;
   if (typeof value === 'boolean') return <span className={b.jBool}>{String(value)}</span>;
@@ -203,8 +207,8 @@ function Leaf({ value }: { value: null | boolean | number | string }) {
   return (
     <span className={b.jString}>
       {text.slice(0, LONG)}…
-      <button type="button" className={b.jClip} onClick={(e) => (e.stopPropagation(), setWhole(true))} aria-label="Show the whole string">
-        +{(text.length - LONG).toLocaleString()} chars
+      <button type="button" className={b.jClip} onClick={(e) => (e.stopPropagation(), setWhole(true))} aria-label={t('components.blocks.json.showWhole')}>
+        {t('components.blocks.json.moreChars', { n: (text.length - LONG).toLocaleString() })}
       </button>
     </span>
   );

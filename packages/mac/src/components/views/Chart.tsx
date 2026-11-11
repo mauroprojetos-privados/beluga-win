@@ -6,6 +6,7 @@ import { reducedMotion } from '../../lib/reduced-motion.js';
 import type { ViewData } from './use-view-data.js';
 import { type ChartPlan, planChart } from './chart-model.js';
 import { SERIES_DARK, SERIES_LIGHT, formatCell, formatNumber, toDate } from './format.js';
+import { useT } from '../../lib/i18n.js';
 import v from './views.module.css';
 
 /**
@@ -25,14 +26,15 @@ const monthF = new Intl.DateTimeFormat(undefined, { month: 'short', year: '2-dig
  * number over time, like subscribers, that moves a little on a big base).
  */
 export default function Chart({ view, data, kind, full, onPoint, fit }: { view: View; data: ViewData; kind: ChartKind; full: boolean; onPoint?: (row: Readonly<Record<string, unknown>>) => void; fit?: boolean }) {
+  const t = useT();
   const theme = useDocTheme();
   const plan = useMemo(() => planChart(view, data.columns, data.rows), [view, data.columns, data.rows]);
   const [off, setOff] = useState<ReadonlySet<string>>(new Set());
   const palette = view.colors?.length ? view.colors : theme === 'dark' ? SERIES_DARK : SERIES_LIGHT;
   const colorOf = (i: number, s?: { color?: string | undefined }): string => s?.color ?? palette[i % palette.length]!;
   const height = full ? Math.max(view.height ?? 0, 460) : (view.height ?? (kind === 'pie' || kind === 'donut' ? 240 : 260));
-  if (!plan.rows.length) return <div className={v.empty} style={{ height }}>{data.loading ? 'Loading…' : 'No data to chart'}</div>;
-  if (!plan.series.length) return <div className={v.empty} style={{ height }}>Nothing numeric to chart</div>;
+  if (!plan.rows.length) return <div className={v.empty} style={{ height }}>{data.loading ? t('common.loading') : t('components.views.chart.noData')}</div>;
+  if (!plan.series.length) return <div className={v.empty} style={{ height }}>{t('components.views.chart.noNumbers')}</div>;
   const legend = view.legend ?? (plan.series.length > 1 || kind === 'pie' || kind === 'donut');
   const toggle = (key: string): void => setOff((now) => {
     const next = new Set(now);
@@ -179,6 +181,7 @@ function Dots({ plan, colorOf, view, off }: { plan: ChartPlan; colorOf: (i: numb
 }
 
 function Donut({ plan, kind, colorOf, legend }: { plan: ChartPlan; kind: 'pie' | 'donut'; colorOf: (i: number) => string; legend: boolean }) {
+  const t = useT();
   const key = plan.series[0]!.key;
   // Slices past the eighth fold into "Other", largest first.
   const all = plan.rows.map((r) => ({ name: String(r[plan.x] ?? '—'), value: Math.max(0, Number(r[key]) || 0) })).sort((a, b) => b.value - a.value);
@@ -200,7 +203,7 @@ function Donut({ plan, kind, colorOf, legend }: { plan: ChartPlan; kind: 'pie' |
         {kind === 'donut' ? (
           <div className={v.donutCenter}>
             <span className={v.donutValue}>{plan.yColumn ? formatCell(sum, plan.yColumn) : formatNumber(sum, { compact: true })}</span>
-            <span className={v.donutLabel}>Total</span>
+            <span className={v.donutLabel}>{t('components.views.chart.total')}</span>
           </div>
         ) : null}
       </div>

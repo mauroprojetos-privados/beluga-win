@@ -20,7 +20,7 @@ export function Mark({ size = 132, delay = 0 }: { readonly size?: number; readon
       height={size}
       viewBox="0 0 1024 1024"
       role="img"
-      aria-label="Beluga"
+      aria-label="Beluga" // i18n-ignore
       initial={still ? false : { opacity: 0, scale: 0.86, y: 14, filter: 'blur(10px)' }}
       animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
       transition={{ duration: 1.1, ease: EASE, delay: at(0) }}

@@ -1,6 +1,7 @@
 import { Component, type ComponentType, type LazyExoticComponent, type ReactNode, lazy, useEffect } from 'react';
 import type { View } from '@beluga/core/store.js';
 import { Button, Empty } from '../components/ui.js';
+import { t } from '@beluga/shared/i18n/index.js';
 import { useActions } from './actions.js';
 import { useBeluga } from './beluga.js';
 import { pageAlive } from './nav-pages.js';
@@ -37,11 +38,11 @@ export class ViewBoundary extends Component<{ children: ReactNode; at: string },
       return (
         <Empty
           icon="alert"
-          title="This view didn’t finish loading"
-          detail="Reloading the window brings it back. Your agents and terminals keep running."
+          title={t('components.lazyView.notLoaded')}
+          detail={t('components.lazyView.notLoadedDetail')}
           action={
             <Button size="small" onClick={reloadWindow}>
-              Reload
+              {t('components.lazyView.reload')}
             </Button>
           }
         />
@@ -50,11 +51,11 @@ export class ViewBoundary extends Component<{ children: ReactNode; at: string },
     return (
       <Empty
         icon="alert"
-        title="This view ran into a problem"
+        title={t('components.lazyView.problem')}
         detail={error.message}
         action={
           <Button size="small" onClick={() => this.setState({ error: undefined })}>
-            Try Again
+            {t('common.retry')}
           </Button>
         }
       />

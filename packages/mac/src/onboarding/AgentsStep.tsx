@@ -7,6 +7,7 @@ import { Icon } from '../components/Icon.js';
 import { cx } from '../components/ui.js';
 import { useApi, useApp, useBeluga } from '../lib/beluga.js';
 import { copyText } from '../lib/copy.js';
+import { useT } from '../lib/i18n.js';
 import { openExternal } from '../lib/system.js';
 import { everyWhileShown } from '../lib/window-active.js';
 import { AGENT_RECHECK_MS, type AgentRow, INSTALLS, agentRows, awaitingAgent, fixLabel, pickDefault } from './agent-setup.js';
@@ -69,6 +70,7 @@ export function useAgents(): { rows: AgentRow[]; checking: boolean; checked: boo
 
 /** An agent's install command (Codex's, OpenCode's npm one), a tap to copy. */
 export function CopyCommand({ className, runtime = 'codex' }: { readonly className?: string; readonly runtime?: string }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   const command = INSTALLS[runtime]?.command;
   if (!command) return null;
@@ -76,7 +78,7 @@ export function CopyCommand({ className, runtime = 'codex' }: { readonly classNa
     <button
       type="button"
       className={className}
-      aria-label={`Copy ${command}`}
+      aria-label={t('components.onboarding.agents.copy', { command })}
       onClick={() => {
         void copyText(command);
         setCopied(true);
@@ -96,6 +98,7 @@ export function CopyCommand({ className, runtime = 'codex' }: { readonly classNa
  * says so and lets you go on.
  */
 export function AgentsStep() {
+  const t = useT();
   const api = useApi();
   const prefs = useApp((st) => st.prefs);
   const mine = myRuntime(prefs);
@@ -120,13 +123,13 @@ export function AgentsStep() {
   return (
     <div className={s.setup}>
       <h2 className={s.title}>
-        <Words text="Which agent is yours?" />
+        <Words text={t('components.onboarding.agents.title')} />
       </h2>
       <Rise delay={0.2} className={s.body}>
-        Beluga runs the coding agents you already use. Yours starts every new conversation and answers friends; any conversation can pick another.
+        {t('components.onboarding.agents.body')}
       </Rise>
       <Glass radius={16} width="100%" className={s.rows}>
-        <div role="radiogroup" aria-label="Your agent">
+        <div role="radiogroup" aria-label={t('components.onboarding.agents.yourAgent')}>
           {rows.map((row, i) => {
             const ready = row.state === 'ready';
             const on = ready && row.id === mine;
@@ -160,10 +163,10 @@ export function AgentsStep() {
         </div>
       </Glass>
       <Rise delay={0.5} className={s.agentsBar}>
-        <span>{!asked ? 'Looking for your agents…' : anyReady ? 'Change it any time in Settings › Agent.' : 'None of your agents is ready yet. Sign in to one now, or go on and set one up later in Settings › Agent.'}</span>
+        <span>{!asked ? t('components.onboarding.agents.looking') : anyReady ? t('components.onboarding.agents.changeAnyTime') : t('components.onboarding.agents.noneReady')}</span>
         <button type="button" className={s.agentsCheck} disabled={checking} onClick={() => void check()}>
           <Icon name="refresh" size={12} />
-          {checking ? 'Checking…' : 'Check Again'}
+          {checking ? t('components.onboarding.agentSetup.checking') : t('components.onboarding.agents.checkAgain')}
         </button>
       </Rise>
     </div>

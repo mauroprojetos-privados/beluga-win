@@ -4,6 +4,7 @@ import { webServed } from '../../lib/boot.js';
 import { useApp, useBeluga } from '../../lib/beluga.js';
 import { Icon } from '../Icon.js';
 import { Button, cx } from '../ui.js';
+import { useT } from '../../lib/i18n.js';
 import s from './preview.module.css';
 
 /**
@@ -39,14 +40,15 @@ export function usePreviewHere(local: boolean): { readonly draws: boolean; reado
 
 /** The card for a block that can't draw here, saying why (and Turn On… when it's only off). */
 export function PreviewNotice({ code, local }: { code: string; local: boolean }) {
+  const t = useT();
   const { ui } = useBeluga();
   const { wsId, on } = usePreviewHere(local);
   const ref = parsePreviewRef(code);
-  if (!ref) return <Notice icon="info" title="This preview can’t be read" detail="Its first line should be a component file, an .html file, or a page on this computer." />;
-  const title = previewTitle(ref);
-  if (!local) return <Notice icon="lock" title={`A preview of ${title}`} detail="Previews run only for your own agent’s answers, on your own computer." />;
-  if (webServed()) return <Notice title={`A preview of ${title}`} detail="Live previews show in the Beluga app on the computer that runs them." />;
-  if (!wsId) return <Notice title={`A preview of ${title}`} detail="It shows in its worktree’s conversation." />;
-  if (!on) return <Notice title={`A preview of ${title}`} detail="Live previews are an experimental feature, off until you turn them on." action={{ label: 'Turn On…', run: () => ui.patch({ settings: 'experimental' }) }} />;
+  if (!ref) return <Notice icon="info" title={t('components.preview.cantRead')} detail={t('components.preview.cantReadDetail')} />;
+  const named = t('components.preview.aPreviewOf', { title: previewTitle(ref) });
+  if (!local) return <Notice icon="lock" title={named} detail={t('components.preview.onlyYours')} />;
+  if (webServed()) return <Notice title={named} detail={t('components.preview.onlyInApp')} />;
+  if (!wsId) return <Notice title={named} detail={t('components.preview.inWorktree')} />;
+  if (!on) return <Notice title={named} detail={t('components.preview.experimental')} action={{ label: t('components.preview.turnOn'), run: () => ui.patch({ settings: 'experimental' }) }} />;
   return null;
 }
