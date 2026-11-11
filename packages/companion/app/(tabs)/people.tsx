@@ -5,23 +5,25 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Header, Screen, useScrolled } from '../../components/Screen';
 import { Avatar, Card, Hairline, Press, T } from '../../components/ui';
 import { useView } from '../../lib/hooks';
+import { useT } from '../../lib/language';
 import type { PeopleView } from '../../lib/link/protocol';
 import { color, TAB_BAR_H } from '../../lib/theme';
 import { ChevronRight } from 'lucide-react-native';
 
 const ORDER = { online: 0, away: 1, dnd: 2, offline: 3 } as const;
-const WORD = { online: 'Online', away: 'Away', dnd: 'Busy', offline: 'Offline' } as const;
-const UPDATE_WORD = { them: 'Needs a Beluga update', you: 'Update Beluga to reach them' } as const;
+const WORD = { online: 'phone.people.online', away: 'phone.people.away', dnd: 'phone.people.busy', offline: 'phone.people.offline' } as const;
+const UPDATE_WORD = { them: 'phone.people.theyNeedUpdate', you: 'phone.people.youNeedUpdate' } as const;
 
 /** People: your friends, their presence and allowance. */
 export default function People() {
+  const t = useT();
   const { scrolled, onScroll } = useScrolled();
   const insets = useSafeAreaInsets();
   const view = useView<PeopleView>('people');
   const people = [...(view?.data.people ?? [])].sort((a, b) => ORDER[a.presence] - ORDER[b.presence]);
   return (
     <Screen>
-      <Header scrolled={scrolled} title="People" at={view?.at} />
+      <Header scrolled={scrolled} title={t('phone.tabs.people')} at={view?.at} />
       <ScrollView onScroll={onScroll} scrollEventThrottle={32} contentContainerStyle={{ paddingTop: 8, paddingBottom: TAB_BAR_H + insets.bottom + 40 }}>
         <Card style={{ marginHorizontal: 16 }}>
           {people.map((p, i) => {
@@ -37,7 +39,7 @@ export default function People() {
                       {p.emoji && !p.update && p.presence !== 'offline' ? ` ${p.emoji}` : ''}
                     </T>
                     <T v="caption" numberOfLines={1}>
-                      {p.update ? UPDATE_WORD[p.update] : WORD[p.presence]}
+                      {t(p.update ? UPDATE_WORD[p.update] : WORD[p.presence])}
                       {p.note && !p.update ? ` · ${p.note}` : ''}
                     </T>
                   </View>

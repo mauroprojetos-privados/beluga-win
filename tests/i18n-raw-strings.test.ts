@@ -7,11 +7,21 @@ import { rawStrings } from '../scripts/i18n-raw-strings.mjs';
  * file's raw strings with `node scripts/i18n-raw-strings.mjs <file>`; mark what is never translated
  * with `// i18n-ignore`.
  */
-const MIGRATED: readonly string[] = [];
+const MIGRATED: readonly string[] = [
+  // The phone's main screens
+  'packages/companion/app/(tabs)/_layout.tsx',
+  'packages/companion/app/(tabs)/index.tsx',
+  'packages/companion/app/(tabs)/chats.tsx',
+  'packages/companion/app/(tabs)/work.tsx',
+  'packages/companion/app/(tabs)/people.tsx',
+  'packages/companion/app/needs.tsx',
+  'packages/companion/app/need/[id].tsx',
+  'packages/companion/components/Needs.tsx',
+];
 
 describe('migrated screens say every word through t()', () => {
   it('lists real files', () => {
-    expect(MIGRATED.length).toBeGreaterThanOrEqual(0);
+    expect(MIGRATED.length).toBeGreaterThan(0);
   });
   for (const file of MIGRATED) {
     it(file, () => {

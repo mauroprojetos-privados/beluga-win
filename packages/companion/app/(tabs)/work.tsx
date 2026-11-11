@@ -13,6 +13,7 @@ import { Header, Screen, useScrolled } from '../../components/Screen';
 import { Segments } from '../../components/Segments';
 import { Card, FoldHead, Row, T, haptic } from '../../components/ui';
 import { ago, useFolded, useSupports, useView } from '../../lib/hooks';
+import { t, useT } from '../../lib/language';
 import { type Call, calls } from '../../lib/link/calls';
 import type { ConvSummary, PlansView, TasksView, WorkView } from '../../lib/link/protocol';
 import { store } from '../../lib/store';
@@ -29,13 +30,14 @@ const CHILD_INDENT = 18;
 
 /** The folded lists under the Inbox, in order. */
 const FOLDED_SECTIONS = [
-  { key: 'working', label: 'Working' },
-  { key: 'snoozed', label: 'Later' },
-  { key: 'settled', label: 'Settled' },
+  { key: 'working', label: 'phone.work.working' },
+  { key: 'snoozed', label: 'phone.work.later' },
+  { key: 'settled', label: 'phone.work.settled' },
 ] as const;
 
 /** Work: projects and their conversations (each project folds, remembered); plans and tasks beside them. */
 export default function Work() {
+  const t = useT();
   const { scrolled, onScroll } = useScrolled();
   const fold = useFolded('work');
   // Listed here is open, as these start folded.
@@ -66,7 +68,7 @@ export default function Work() {
               Icon={st.Icon}
               tone={st.tone}
               label={c.title}
-              sub={[...triageWords(c), c.notOnPr ? notOnPrWords(c.notOnPr) : undefined, flat ? c.project : undefined, c.needsYou ? 'Needs you' : c.status === 'working' ? c.last : undefined, c.fresh ? `${c.fresh} new ${c.fresh === 1 ? 'output' : 'outputs'}` : undefined, ago(c.lastAt)].filter(Boolean).join(' · ') || c.last}
+              sub={[...triageWords(c), c.notOnPr ? notOnPrWords(c.notOnPr) : undefined, flat ? c.project : undefined, c.needsYou ? t('phone.work.needsYou') : c.status === 'working' ? c.last : undefined, c.fresh ? t('phone.work.newOutputs', { count: c.fresh }) : undefined, ago(c.lastAt)].filter(Boolean).join(' · ') || c.last}
               right={
                 c.harness ? (
                   <View accessible accessibilityLabel={c.harness.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -99,7 +101,7 @@ export default function Work() {
       ) : (
         <Card style={{ marginHorizontal: 16, marginTop: 6 }}>
           {/* A project with nothing in it yet (just added): one tap to start its first worktree. */}
-          <Row first Icon={Plus} label="No conversations yet" sub="Start the first one here" onPress={() => router.push({ pathname: '/ask', params: { text: '', to: `project:${p.id}`, how: 'worktree' } })} />
+          <Row first Icon={Plus} label={t('phone.work.noConversations')} sub={t('phone.work.startFirst')} onPress={() => router.push({ pathname: '/ask', params: { text: '', to: `project:${p.id}`, how: 'worktree' } })} />
         </Card>
       )}
     </View>
@@ -107,15 +109,15 @@ export default function Work() {
 
   return (
     <Screen>
-      <Header scrolled={scrolled} title="Work" at={work?.at} />
+      <Header scrolled={scrolled} title={t('phone.tabs.work')} at={work?.at} />
       <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
         <Segments
           value={tab}
           onChange={setTab}
           options={[
-            { key: 'convs', label: 'Conversations' },
-            { key: 'plans', label: 'Plans', badge: runningPlans },
-            { key: 'tasks', label: 'Tasks', badge: inReview },
+            { key: 'convs', label: t('phone.work.conversations') },
+            { key: 'plans', label: t('phone.work.plans'), badge: runningPlans },
+            { key: 'tasks', label: t('phone.work.tasks'), badge: inReview },
           ]}
         />
       </View>
@@ -133,13 +135,13 @@ export default function Work() {
             {sections ? (
               <>
                 <T v="eyebrow" style={{ paddingHorizontal: 20 }}>
-                  Inbox
+                  {t('phone.work.inbox')}
                 </T>
                 {sections.active.map(project)}
                 {FOLDED_SECTIONS.map(({ key, label }) =>
                   sections[key].length ? (
                     <View key={key}>
-                      <FoldHead folded={!opened.folded(key)} onToggle={() => opened.toggle(key)} label={label} count={sections[key].length} />
+                      <FoldHead folded={!opened.folded(key)} onToggle={() => opened.toggle(key)} label={t(label)} count={sections[key].length} />
                       {opened.folded(key) ? rows(sections[key], true) : null}
                     </View>
                   ) : null,
@@ -153,24 +155,24 @@ export default function Work() {
         )}
       </ScrollView>
       <Options window visible={Boolean(sheet)} onClose={() => setSheet(undefined)} {...(sheet ? { title: sheet.title } : {})} options={sheet ? sheetOptions(sheet, () => setSnoozing(sheet)) : []} />
-      <Options window visible={Boolean(snoozing)} onClose={() => setSnoozing(undefined)} title="Remind me" options={snoozing ? presetOptions(snoozing) : []} />
+      <Options window visible={Boolean(snoozing)} onClose={() => setSnoozing(undefined)} title={t('phone.work.remindMe')} options={snoozing ? presetOptions(snoozing) : []} />
     </Screen>
   );
 }
 
 /** What a row says of its category (nothing without one). */
 function triageWords(c: ConvSummary): readonly (string | undefined)[] {
-  if (c.category === 'snoozed') return [c.snoozedUntil ? `Reminds you ${whenWords(c.snoozedUntil)}` : undefined];
+  if (c.category === 'snoozed') return [c.snoozedUntil ? t('phone.work.remindsYou', { when: whenWords(c.snoozedUntil) }) : undefined];
   if (c.category === 'settled') return [settledWords(c.settledWhy)];
-  return [c.back ? 'Back' : undefined];
+  return [c.back ? t('phone.work.back') : undefined];
 }
 
 function sheetOptions(c: ConvSummary, snooze: () => void): readonly Option[] {
   const all: Record<ReturnType<typeof triageOptions>[number], Option> = {
-    settle: { Icon: Check, label: 'Settle', sub: 'Out of your inbox until something new happens', onPress: () => change(calls.settle(c.topic)) },
-    snooze: { Icon: AlarmClock, label: 'Remind Me Later', sub: 'Quiet until a time you pick, then a reminder', onPress: snooze },
-    wake: { Icon: Sun, label: 'Show Again Now', sub: 'Back to your inbox now, no reminder', onPress: () => change(calls.wake(c.topic)) },
-    unsettle: { Icon: Inbox, label: 'Un-settle', sub: 'Back to your inbox', onPress: () => change(calls.unsettle(c.topic)) },
+    settle: { Icon: Check, label: t('phone.work.settle'), sub: t('phone.work.settleSub'), onPress: () => change(calls.settle(c.topic)) },
+    snooze: { Icon: AlarmClock, label: t('phone.work.remindLater'), sub: t('phone.work.remindLaterSub'), onPress: snooze },
+    wake: { Icon: Sun, label: t('phone.work.showAgain'), sub: t('phone.work.showAgainSub'), onPress: () => change(calls.wake(c.topic)) },
+    unsettle: { Icon: Inbox, label: t('phone.work.unsettle'), sub: t('phone.work.unsettleSub'), onPress: () => change(calls.unsettle(c.topic)) },
   };
   return triageOptions(c).map((o) => all[o]);
 }

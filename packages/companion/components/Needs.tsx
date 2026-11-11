@@ -6,6 +6,7 @@ import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, { FadeIn, interpolate, type SharedValue, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { ago } from '../lib/hooks';
+import { t, useT } from '../lib/language';
 import { calls } from '../lib/link/calls';
 import type { NeedsYou } from '../lib/link/protocol';
 import { store } from '../lib/store';
@@ -25,23 +26,23 @@ export const KNOWN = new Set(['approval', 'question', 'request', 'decision', 'co
 export const kindOf = (kind: string): { label: string; tone: Tone; Icon: typeof Monitor } => {
   switch (kind) {
     case 'approval':
-      return { label: 'Approval', tone: 'peach', Icon: SquareTerminal };
+      return { label: t('phone.needs.kindApproval'), tone: 'peach', Icon: SquareTerminal };
     case 'question':
-      return { label: 'Question', tone: 'sky', Icon: MessageCircleQuestion };
+      return { label: t('phone.needs.kindQuestion'), tone: 'sky', Icon: MessageCircleQuestion };
     case 'request':
-      return { label: 'Request', tone: 'lavender', Icon: Hand };
+      return { label: t('phone.needs.kindRequest'), tone: 'lavender', Icon: Hand };
     case 'decision':
-      return { label: 'Decision', tone: 'butter', Icon: Flag };
+      return { label: t('phone.needs.kindDecision'), tone: 'butter', Icon: Flag };
     case 'confirm':
-      return { label: 'Confirm', tone: 'mint', Icon: CircleCheck };
+      return { label: t('phone.needs.kindConfirm'), tone: 'mint', Icon: CircleCheck };
     // Someone rings you (BLG-706): swipe right answers on your Mac, left declines.
     case 'call':
-      return { label: 'Call', tone: 'mint', Icon: PhoneIncoming };
+      return { label: t('phone.needs.kindCall'), tone: 'mint', Icon: PhoneIncoming };
     // A combo used up (docs/routing.md): Try Again goes on with the first agent that can run.
     case 'combo':
-      return { label: 'Usage limit', tone: 'butter', Icon: Gauge };
+      return { label: t('phone.needs.kindCombo'), tone: 'butter', Icon: Gauge };
     default:
-      return { label: 'On your Mac', tone: 'plain', Icon: Monitor };
+      return { label: t('phone.needs.kindOther'), tone: 'plain', Icon: Monitor };
   }
 };
 
@@ -71,7 +72,7 @@ export function sendOwn(n: NeedsYou, value: string | readonly string[]): boolean
   const c = calls.answer(n, value);
   if (!c) return false;
   haptic.success();
-  void store.answer(n, c, `${n.answer?.label ?? 'Sent'} · ${n.title}`);
+  void store.answer(n, c, `${n.answer?.label ?? t('phone.needs.sent')} · ${n.title}`);
   return true;
 }
 
@@ -92,6 +93,7 @@ const openDetail = (n: NeedsYou) => router.push(`/need/${encodeURIComponent(n.id
 
 /** The card's face (also used whole on the need/[id] sheet). */
 export function NeedFace({ item, full = false, onAnswered, more }: { readonly item: NeedsYou; readonly full?: boolean; /** After a choice was sent (the card can leave). */ readonly onAnswered?: () => void; readonly more?: boolean }) {
+  const t = useT();
   const k = kindOf(item.kind);
   // Known kinds, and anything the Mac gave buttons or an answer template for, can be answered here.
   const known = KNOWN.has(item.kind) || item.actions.length > 0 || !!item.answer;
@@ -121,10 +123,10 @@ export function NeedFace({ item, full = false, onAnswered, more }: { readonly it
         {more ? (
           <>
             {/* Dismiss: off the list (here and on the Mac) without answering it. */}
-            <Press onPress={() => store.dismiss(item)} accessibilityLabel="Dismiss" hitSlop={8} style={{ width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' }}>
+            <Press onPress={() => store.dismiss(item)} accessibilityLabel={t('phone.needs.dismiss')} hitSlop={8} style={{ width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' }}>
               <X color={color.text3} size={18} />
             </Press>
-            <More onPress={() => openDetail(item)} label="More options" />
+            <More onPress={() => openDetail(item)} label={t('phone.needs.moreOptions')} />
           </>
         ) : null}
       </View>
@@ -139,14 +141,14 @@ export function NeedFace({ item, full = false, onAnswered, more }: { readonly it
       {!full && (item.title.length > 110 || (item.detail?.length ?? 0) > 120) ? (
         <Press onPress={() => openDetail(item)} hitSlop={8} style={{ alignSelf: 'flex-start', marginTop: -4 }}>
           <T v="caption" c={color.info} style={{ fontWeight: '700' }}>
-            Read all
+            {t('phone.needs.readAll')}
           </T>
         </Press>
       ) : null}
-      {!known ? <Pill label="Open on your Mac" Icon={Monitor} style={{ alignSelf: 'flex-start' }} /> : null}
+      {!known ? <Pill label={t('phone.needs.openOnMac')} Icon={Monitor} style={{ alignSelf: 'flex-start' }} /> : null}
       {known && item.choices?.length ? (
         <View style={{ gap: 8, marginTop: 2 }}>
-          {multi ? <T v="caption">Pick any</T> : null}
+          {multi ? <T v="caption">{t('phone.needs.pickAny')}</T> : null}
           {item.choices.slice(0, full ? 12 : 3).map((c) => {
             const on = picked.includes(c.label);
             return (
@@ -172,11 +174,11 @@ export function NeedFace({ item, full = false, onAnswered, more }: { readonly it
           {!full && item.choices.length > 3 ? (
             <Press onPress={() => openDetail(item)} style={{ alignSelf: 'flex-start', paddingVertical: 4 }}>
               <T v="caption" c={color.info} style={{ fontWeight: '600' }}>
-                +{item.choices.length - 3} more
+                {t('phone.needs.more', { count: item.choices.length - 3 })}
               </T>
             </Press>
           ) : null}
-          {multi ? <Button label={`${item.answer?.label ?? 'Send'}${picked.length ? ` · ${picked.length}` : ''}`} Icon={Check} disabled={!picked.length} onPress={() => sendOwn(item, picked) && onAnswered?.()} /> : null}
+          {multi ? <Button label={`${item.answer?.label ?? t('common.send')}${picked.length ? ` · ${picked.length}` : ''}`} Icon={Check} disabled={!picked.length} onPress={() => sendOwn(item, picked) && onAnswered?.()} /> : null}
         </View>
       ) : null}
     </View>
@@ -185,6 +187,7 @@ export function NeedFace({ item, full = false, onAnswered, more }: { readonly it
 
 /** Approve and Decline: the only buttons on the surface. */
 export function NeedButtons({ item, onAnswer }: { readonly item: NeedsYou; readonly onAnswer: (tone: 'main' | 'danger') => void }) {
+  const t = useT();
   const known = KNOWN.has(item.kind) || item.actions.length > 0;
   // With choices on the card, only the way out (Skip) stays as a button.
   const main = item.choices?.length ? undefined : mainOf(item);
@@ -196,7 +199,7 @@ export function NeedButtons({ item, onAnswer }: { readonly item: NeedsYou; reado
     <View style={{ flexDirection: 'row', gap: 10 }}>
       {danger ? <Button quiet flex={1} Icon={X} label={danger.label} onPress={() => onAnswer('danger')} /> : null}
       {main ? <Button flex={1} Icon={Check} label={main.label} onPress={() => onAnswer('main')} /> : null}
-      {reply ? <Button flex={1} Icon={PenLine} label="Reply" onPress={() => openDetail(item)} /> : null}
+      {reply ? <Button flex={1} Icon={PenLine} label={t('phone.needs.reply')} onPress={() => openDetail(item)} /> : null}
     </View>
   );
 }
@@ -211,6 +214,7 @@ const SHRINK = 0.04;
  * clean edge and never their own, different, size. Their content fades out; the front's in.
  */
 function SwipeCard({ item, depth, frontH, onMeasure, onGone }: { readonly item: NeedsYou; readonly depth: number; readonly frontH: SharedValue<number>; readonly onMeasure: (id: string, h: number) => void; readonly onGone: (item: NeedsYou, dir: 1 | -1, answered: boolean) => void }) {
+  const t = useT();
   const { width } = useWindowDimensions();
   const W = Math.min(width, 520);
   const tx = useSharedValue(0);
@@ -314,14 +318,14 @@ function SwipeCard({ item, depth, frontH, onMeasure, onGone }: { readonly item: 
           <Animated.View style={[{ position: 'absolute', left: 0, right: 0, top: 0 }, content]} onLayout={(e) => onMeasure(item.id, e.nativeEvent.layout.height)}>
             <Pressable onPress={() => openDetail(item)} onLongPress={() => (haptic.commit(), openDetail(item))} delayLongPress={400} style={{ padding: 18, gap: 14 }}>
               <NeedFace item={item} more onAnswered={() => fling(1)} />
-              <NeedButtons item={item} onAnswer={(t) => (answer(item, t), fling(t === 'main' ? 1 : -1))} />
+              <NeedButtons item={item} onAnswer={(tone) => (answer(item, tone), fling(tone === 'main' ? 1 : -1))} />
             </Pressable>
           </Animated.View>
           <Animated.View pointerEvents="none" style={[styles.stamp, yesWash]}>
-            <Pill label={yes ? (main?.label ?? 'Yes') : 'Later'} tone={yes ? 'mint' : 'plain'} Icon={yes ? Check : undefined} style={{ ...styles.stampPill, backgroundColor: elevation.card.surface, borderColor: yes ? ink.mint : color.hairlineStrong }} />
+            <Pill label={yes ? (main?.label ?? t('common.yes')) : t('phone.needs.later')} tone={yes ? 'mint' : 'plain'} Icon={yes ? Check : undefined} style={{ ...styles.stampPill, backgroundColor: elevation.card.surface, borderColor: yes ? ink.mint : color.hairlineStrong }} />
           </Animated.View>
           <Animated.View pointerEvents="none" style={[styles.stamp, noWash]}>
-            <Pill label={no ? (danger?.label ?? 'No') : 'Later'} tone={no ? 'rose' : 'plain'} Icon={no ? X : undefined} style={{ ...styles.stampPill, backgroundColor: elevation.card.surface, borderColor: no ? ink.rose : color.hairlineStrong }} />
+            <Pill label={no ? (danger?.label ?? t('common.no')) : t('phone.needs.later')} tone={no ? 'rose' : 'plain'} Icon={no ? X : undefined} style={{ ...styles.stampPill, backgroundColor: elevation.card.surface, borderColor: no ? ink.rose : color.hairlineStrong }} />
           </Animated.View>
         </Card>
       </Animated.View>
@@ -334,6 +338,7 @@ function SwipeCard({ item, depth, frontH, onMeasure, onGone }: { readonly item: 
  * leaves), with two cards peeking out below it by a fixed edge.
  */
 export function NeedsStack({ items }: { readonly items: readonly NeedsYou[] }) {
+  const t = useT();
   const [order, setOrder] = useState<string[]>([]);
   const [heights, setHeights] = useState<Record<string, number>>({});
   // New items join at the back of the deck; answered ones leave it.
@@ -376,8 +381,8 @@ export function NeedsStack({ items }: { readonly items: readonly NeedsYou[] }) {
         <Card style={{ padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <IconBadge Icon={CircleCheck} tone="mint" />
           <View style={{ flex: 1 }}>
-            <T v="heading">All clear</T>
-            <T v="callout">Nothing needs you.</T>
+            <T v="heading">{t('phone.needs.allClear')}</T>
+            <T v="callout">{t('phone.needs.nothingNeedsYou')}</T>
           </View>
         </Card>
       </Animated.View>
@@ -393,7 +398,7 @@ export function NeedsStack({ items }: { readonly items: readonly NeedsYou[] }) {
       </Animated.View>
       {deck.length > 1 ? (
         <T v="caption" style={{ textAlign: 'center', marginTop: 8 }}>
-          1 of {deck.length}
+          {t('phone.needs.oneOf', { count: deck.length })}
         </T>
       ) : null}
     </View>
