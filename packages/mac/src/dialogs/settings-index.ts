@@ -22,7 +22,7 @@ export const PANES: ReadonlyArray<PaneInfo<SettingsPane> & { icon: IconName; key
   { id: 'computers', label: 'Your Computers', icon: 'server', keywords: 'machines servers mac mini aws cloud ssh remote linux pair' },
   { id: 'voice', label: 'Voice', icon: 'mic', keywords: 'dictation speech microphone talk transcribe' },
   { id: 'keyboard', label: 'Keyboard', icon: 'command', keywords: 'shortcuts keys hotkeys bindings' },
-  { id: 'advanced', label: 'Advanced', icon: 'wrench', keywords: 'web access browser agent threads' },
+  { id: 'advanced', label: 'Advanced', icon: 'wrench', keywords: 'engine wsl linux web access browser agent threads' },
   { id: 'experimental', label: 'Experimental', icon: 'flask', keywords: 'labs beta early preview features try' },
   { id: 'about', label: 'About', icon: 'globe', keywords: 'version logs support' },
 ];
@@ -311,6 +311,7 @@ export const SETTINGS: readonly Entry[] = [
   ]),
 
   // Advanced
+  ...rows('advanced', 'Engine', [['Where Beluga runs', 'On Windows, or in a WSL distro.', 'engine wsl linux ubuntu distro windows subsystem remote daemon']]),
   ...rows('advanced', 'Web access', [
     ['Open Beluga in a browser', 'Use Beluga from a browser.', 'web browser remote access'],
     ['Reached from', 'This computer, your network, or anywhere.', 'local network tunnel internet'],

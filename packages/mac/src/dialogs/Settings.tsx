@@ -26,6 +26,7 @@ import { ContextSettings } from './ContextSettings.js';
 import { UsageLimitSettings } from './UsageLimitSettings.js';
 import { ParallelSettings } from './ParallelSettings.js';
 import { AgentThreadsSettings, ThreadLimitsSettings } from './AgentThreadsSettings.js';
+import { EngineLocationSettings } from './EngineLocationSettings.js';
 import { ChatLimitSettings } from './ChatLimitSettings.js';
 import { McpSettings } from './McpSettings.js';
 import { ExternalAgentsSettings } from './ExternalAgentsSettings.js';
@@ -682,6 +683,7 @@ const BODY: Record<SettingsPane, () => ReactNode> = {
 function Advanced() {
   return (
     <>
+      <EngineLocationSettings />
       <WebAccessSettings />
       <AgentThreadsSettings />
     </>
