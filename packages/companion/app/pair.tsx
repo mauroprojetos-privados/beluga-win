@@ -17,6 +17,7 @@ import { DEVICE_LINK } from '../lib/link/protocol';
 import type { PairStep } from '../lib/link/transport';
 import { type Mode, store } from '../lib/store';
 import { color, ink } from '../lib/theme';
+import { t, useT } from '../lib/language';
 
 /**
  * Pairing, staged like the Mac's onboarding (packages/mac/src/onboarding) in the phone's pastel
@@ -28,14 +29,16 @@ import { color, ink } from '../lib/theme';
 type Stage = 'intro' | 'connect' | 'scan' | 'code' | 'dialing' | 'waiting' | 'paired' | 'failed';
 
 const EASE = Easing.bezier(0.22, 1, 0.36, 1);
-const PAGES = [
-  { eyebrow: 'Beluga for your phone', title: 'Your Mac,\nin your pocket', body: 'What your agent is doing on your Mac, wherever you are.' },
-  { eyebrow: 'Needs you', title: 'Answer in\na swipe', body: 'Approvals, questions and requests come to you. Right to approve, left to decline.' },
-  { eyebrow: 'Ask', title: 'Ask your Mac\nanything', body: 'Start work from the couch. The answer, pictures and files come back here.' },
-] as const;
+const pages = () =>
+  [
+    { eyebrow: t('phoneApp.pair.page1Eyebrow'), title: t('phoneApp.pair.page1Title'), body: t('phoneApp.pair.page1Body') },
+    { eyebrow: t('phoneApp.pair.page2Eyebrow'), title: t('phoneApp.pair.page2Title'), body: t('phoneApp.pair.page2Body') },
+    { eyebrow: t('phoneApp.pair.page3Eyebrow'), title: t('phoneApp.pair.page3Title'), body: t('phoneApp.pair.page3Body') },
+  ] as const;
 
 export default function Pair() {
   const insets = useSafeAreaInsets();
+  const t = useT();
   const [stage, setStage] = useState<Stage>('intro');
   const [fingerprint, setFingerprint] = useState('');
   const [reason, setReason] = useState('');
@@ -62,7 +65,7 @@ export default function Pair() {
     run.current?.cancel();
     last.current = { mode, input };
     haptic.commit();
-    const name = Device.deviceName ?? Device.modelName ?? (Platform.OS === 'web' ? 'This browser' : 'Phone');
+    const name = Device.deviceName ?? Device.modelName ?? (Platform.OS === 'web' ? t('phoneApp.pair.thisBrowser') : t('phoneApp.pair.phone'));
     run.current = store.pair(mode, { ...input, name }, (s: PairStep) => {
       if (s.step === 'dialing') setStage('dialing');
       else if (s.step === 'waiting') {
@@ -110,24 +113,24 @@ export default function Pair() {
             <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', gap: 22, paddingVertical: 12 }} showsVerticalScrollIndicator={false}>
               <Animated.View entering={FadeInDown.delay(60).duration(500).easing(EASE)}>
                 <T v="eyebrow" c={ink.lavender}>
-                  On your Mac
+                  {t('phoneApp.pair.onYourMac')}
                 </T>
                 <T v="hero" style={{ marginTop: 6 }}>
-                  Connect your Mac
+                  {t('phoneApp.pair.connect')}
                 </T>
               </Animated.View>
               <Animated.View entering={FadeInDown.delay(160).duration(560).easing(EASE)} style={{ alignItems: 'center' }}>
                 <MacPairing />
               </Animated.View>
               <View style={{ gap: 14 }}>
-                <Step n={1} text="Open Beluga on your Mac" delay={260} />
-                <Step n={2} text="Settings › Phone › Pair a Phone (on a server: beluga pair)" delay={340} />
-                <Step n={3} text="Scan the code, or type it here" delay={420} />
+                <Step n={1} text={t('phoneApp.pair.step1')} delay={260} />
+                <Step n={2} text={t('phoneApp.pair.step2')} delay={340} />
+                <Step n={3} text={t('phoneApp.pair.step3')} delay={420} />
               </View>
             </ScrollView>
             <Animated.View entering={FadeInUp.delay(480).duration(500).easing(EASE)} style={{ gap: 10 }}>
-              <Button label="Scan the code" Icon={ScanLine} onPress={() => setStage('scan')} />
-              <Button label="Type the code" Icon={Keyboard} quiet onPress={() => setStage('code')} />
+              <Button label={t('phoneApp.pair.scan')} Icon={ScanLine} onPress={() => setStage('scan')} />
+              <Button label={t('phoneApp.pair.type')} Icon={Keyboard} quiet onPress={() => setStage('code')} />
             </Animated.View>
           </View>
         </Animated.View>
@@ -153,26 +156,26 @@ export default function Pair() {
               <Animated.View entering={FadeInDown.delay(40).duration(420).easing(EASE)} style={{ gap: 8 }}>
                 <IconBadge Icon={Keyboard} tone="sky" size={48} square />
                 <T v="title" style={{ marginTop: 6 }}>
-                  Type the code
+                  {t('phoneApp.pair.type')}
                 </T>
-                <T v="callout">It's under the QR on your Mac, in Settings › Phone. It works for ten minutes.</T>
+                <T v="callout">{t('phoneApp.pair.typeHint')}</T>
               </Animated.View>
               <Animated.View entering={FadeInDown.delay(120).duration(420).easing(EASE)} style={{ gap: 12 }}>
                 <CodeBoxes value={code} onChange={(v) => (setCode(v), setCodeError(false))} onDone={sendCode} error={codeError} />
                 {codeError ? (
                   <Animated.View entering={FadeIn}>
                     <T v="callout" c={color.error} style={{ textAlign: 'center' }}>
-                      {reason || "That code didn't work. Check it, or make a new one on your Mac."}
+                      {reason || t('phoneApp.pair.wrongCode')}
                     </T>
                   </Animated.View>
                 ) : (
                   <T v="caption" style={{ textAlign: 'center' }}>
-                    Pasting the whole code works too
+                    {t('phoneApp.pair.paste')}
                   </T>
                 )}
               </Animated.View>
             </ScrollView>
-            <Button label="Continue" Icon={ArrowRight} disabled={code.length !== CODE_LENGTH} onPress={() => sendCode(code)} />
+            <Button label={t('phoneApp.conv.continue')} Icon={ArrowRight} disabled={code.length !== CODE_LENGTH} onPress={() => sendCode(code)} />
           </Animated.View>
         </KeyboardLift>
       ) : null}
@@ -181,24 +184,24 @@ export default function Pair() {
         <Animated.View key="wait" entering={FadeIn.duration(300)} style={{ flex: 1 }}>
           <Wash tones={['sky', 'mint']} height={420} />
           <View style={{ flex: 1, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 24, paddingHorizontal: 24 }}>
-            <Back label="Cancel" onPress={() => back('connect')} />
+            <Back label={t('common.cancel')} onPress={() => back('connect')} />
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 26 }}>
               {stage === 'dialing' ? (
                 <>
                   <Finding />
                   <View style={{ alignItems: 'center', gap: 6 }}>
-                    <T v="title">Finding your Mac</T>
-                    <T v="callout">Encrypted end to end, whichever way it gets there.</T>
+                    <T v="title">{t('phoneApp.pair.finding')}</T>
+                    <T v="callout">{t('phoneApp.pair.encrypted')}</T>
                   </View>
                 </>
               ) : (
                 <>
                   <View style={{ alignItems: 'center', gap: 6 }}>
                     <T v="eyebrow" c={ink.sky}>
-                      Check your Mac
+                      {t('phoneApp.pair.checkMac')}
                     </T>
                     <T v="title" style={{ textAlign: 'center' }}>
-                      Same four on both?
+                      {t('phoneApp.pair.sameFour')}
                     </T>
                   </View>
                   <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -216,7 +219,7 @@ export default function Pair() {
                   </View>
                   <Animated.View entering={FadeIn.delay(700)} style={{ alignItems: 'center', gap: 6 }}>
                     <T v="callout" style={{ textAlign: 'center', maxWidth: 280 }}>
-                      If they match, click Pair on your Mac.
+                      {t('phoneApp.pair.ifMatch')}
                     </T>
                     <Finding />
                   </Animated.View>
@@ -233,9 +236,9 @@ export default function Pair() {
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 24 }}>
             <Burst />
             <Animated.View entering={FadeInDown.delay(350).duration(520).easing(EASE)} style={{ alignItems: 'center', gap: 6 }}>
-              <T v="hero">You're paired</T>
+              <T v="hero">{t('phoneApp.pair.paired')}</T>
               <T v="body" c={color.text2}>
-                with {macName}
+                {t('phoneApp.pair.with', { name: macName })}
               </T>
             </Animated.View>
           </View>
@@ -247,7 +250,7 @@ export default function Pair() {
           <Back onPress={() => back('connect')} />
           <View style={{ flex: 1, justifyContent: 'center', gap: 10 }}>
             <IconBadge Icon={ScanLine} tone="peach" size={52} square />
-            <T v="title">{diagnosis?.title ?? "That didn't work"}</T>
+            <T v="title">{diagnosis?.title ?? t('phoneApp.pair.didntWork')}</T>
             <T v="callout">{diagnosis ? diagnosis.body : reason}</T>
             {diagnosis?.tryThis ? (
               <T v="callout" c={color.text}>
@@ -257,12 +260,12 @@ export default function Pair() {
             {diagnosis ? (
               <Press onPress={() => setWhy(true)} hitSlop={8} style={{ alignSelf: 'flex-start', paddingVertical: 6 }}>
                 <T v="callout" c={ink.sky} style={{ fontWeight: '600' }}>
-                  Why?
+                  {t('phoneApp.pair.why')}
                 </T>
               </Press>
             ) : null}
           </View>
-          <Button label="Try again" onPress={() => (diagnosis?.retry && last.current ? start(last.current.mode, last.current.input) : back('connect'))} />
+          <Button label={t('phoneApp.pair.tryAgain')} onPress={() => (diagnosis?.retry && last.current ? start(last.current.mode, last.current.input) : back('connect'))} />
           <WhySheet diagnosis={diagnosis} visible={why} onDismiss={() => setWhy(false)} onRetry={() => last.current && start(last.current.mode, last.current.input)} />
         </Animated.View>
       ) : null}
@@ -273,6 +276,8 @@ export default function Pair() {
 /** The intro: three pages you swipe (or tap through), each a picture, a title and a line. */
 function Intro({ onDone, onDemo }: { onDone: () => void; onDemo: () => void }) {
   const insets = useSafeAreaInsets();
+  const t = useT();
+  const PAGES = pages();
   const { width } = useWindowDimensions();
   const W = Math.min(width, 520);
   const progress = useSharedValue(0);
@@ -288,13 +293,13 @@ function Intro({ onDone, onDemo }: { onDone: () => void; onDemo: () => void }) {
       <Animated.View entering={FadeIn.delay(200).duration(500)} style={{ paddingTop: insets.top + 14, paddingHorizontal: 24, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
         <Mark size={28} intro={false} />
         <T v="eyebrow" c={color.text} style={{ letterSpacing: 2.5, fontWeight: '700' }}>
-          BELUGA
+          BELUGA{/* i18n-ignore */}
         </T>
         <View style={{ flex: 1 }} />
         {!last ? (
           <Press onPress={onDone} hitSlop={10}>
             <T v="callout" c={color.text2} style={{ fontWeight: '600' }}>
-              Skip
+              {t('phoneApp.pair.skip')}
             </T>
           </Press>
         ) : null}
@@ -333,7 +338,7 @@ function Intro({ onDone, onDemo }: { onDone: () => void; onDemo: () => void }) {
       <Animated.View entering={FadeInUp.delay(1200).duration(600).easing(EASE)} style={{ paddingHorizontal: 24, paddingBottom: insets.bottom + 16, gap: 14 }}>
         <Dots progress={progress} count={PAGES.length} />
         <Button
-          label={last ? 'Connect your Mac' : 'Next'}
+          label={last ? t('phoneApp.pair.connect') : t('phoneApp.pair.next')}
           Icon={last ? undefined : ArrowRight}
           onPress={() => {
             if (last) return onDone();
@@ -343,7 +348,7 @@ function Intro({ onDone, onDemo }: { onDone: () => void; onDemo: () => void }) {
         />
         <Press onPress={onDemo} style={{ alignSelf: 'center', paddingVertical: 6, paddingHorizontal: 16 }}>
           <T v="callout" c={color.info} style={{ fontWeight: '600' }}>
-            Try the demo first
+            {t('phoneApp.pair.demo')}
           </T>
         </Press>
       </Animated.View>
@@ -351,7 +356,9 @@ function Intro({ onDone, onDemo }: { onDone: () => void; onDemo: () => void }) {
   );
 }
 
-function Back({ onPress, label = 'Back' }: { onPress: () => void; label?: string }) {
+function Back({ onPress, label }: { onPress: () => void; label?: string }) {
+  const t = useT();
+  label ??= t('common.back');
   return (
     <View style={{ flexDirection: 'row' }}>
       <Press onPress={onPress} accessibilityLabel={label} style={{ height: 38, paddingLeft: 8, paddingRight: 14, borderRadius: 19, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: color.card }}>
@@ -367,6 +374,7 @@ function Back({ onPress, label = 'Back' }: { onPress: () => void; label?: string
 function Scan({ onBack, onCode, onLink }: { onBack: () => void; onCode: () => void; onLink: (link: string) => void }) {
   const insets = useSafeAreaInsets();
   const [perm, ask] = useCameraPermissions();
+  const t = useT();
   const web = Platform.OS === 'web';
   useEffect(() => {
     if (!web && perm && !perm.granted && perm.canAskAgain) void ask();
@@ -377,10 +385,10 @@ function Scan({ onBack, onCode, onLink }: { onBack: () => void; onCode: () => vo
       <Back onPress={onBack} />
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
         <T v="title" style={{ textAlign: 'center' }}>
-          Scan your Mac's code
+          {t('phoneApp.pair.scanTitle')}
         </T>
         <T v="callout" style={{ textAlign: 'center' }}>
-          Settings › Phone › Pair a Phone
+          {t('phoneApp.pair.scanWhere')}
         </T>
         <View style={{ width: 276, height: 276, marginTop: 22, borderRadius: 32, overflow: 'hidden', backgroundColor: color.sunken }}>
           {live ? (
@@ -396,9 +404,9 @@ function Scan({ onBack, onCode, onLink }: { onBack: () => void; onCode: () => vo
             <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 }]}>
               <IconBadge Icon={ScanLine} tone="sky" size={56} square />
               <T v="callout" style={{ textAlign: 'center' }}>
-                {web ? 'Scanning works in the phone app.' : 'Beluga needs the camera for this, and only for this.'}
+                {web ? t('phoneApp.pair.scanWeb') : t('phoneApp.pair.camera')}
               </T>
-              {!web ? <Button label="Allow camera" quiet onPress={() => void ask()} style={{ height: 40 }} /> : null}
+              {!web ? <Button label={t('phoneApp.pair.allowCamera')} quiet onPress={() => void ask()} style={{ height: 40 }} /> : null}
             </View>
           )}
           {live
@@ -408,7 +416,7 @@ function Scan({ onBack, onCode, onLink }: { onBack: () => void; onCode: () => vo
             : null}
         </View>
       </View>
-      <Button label="Type the code instead" Icon={Keyboard} quiet onPress={onCode} />
+      <Button label={t('phoneApp.pair.typeInstead')} Icon={Keyboard} quiet onPress={onCode} />
     </Animated.View>
   );
 }

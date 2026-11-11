@@ -13,6 +13,7 @@ import { cacheSize, cleanupOn, clearCache, folderName, keepsTrack, pickFolder, p
 import { groups, totalBytes } from '../lib/saved-list';
 import { store } from '../lib/store';
 import { color, ink } from '../lib/theme';
+import { useT } from '../lib/language';
 
 /**
  * Settings › Storage (BLG-125): what Beluga keeps on the phone. The files you saved, by the
@@ -23,6 +24,7 @@ import { color, ink } from '../lib/theme';
 export default function Storage() {
   const { scrolled, onScroll } = useScrolled();
   const insets = useSafeAreaInsets();
+  const t = useT();
   const saved = useSaved();
   const work = useView<WorkView>('work');
   const [cache, setCache] = useState(0);
@@ -36,13 +38,13 @@ export default function Storage() {
   }, []);
 
   const titles = new Map((work?.data.projects ?? []).flatMap((p) => p.conversations.map((c) => [c.topic as string, c.title] as const)));
-  const titleOf = (topic: string | undefined): string => (!topic ? 'Elsewhere' : isMacTopic(topic) ? 'Your Mac' : (titles.get(topic) ?? 'A conversation'));
+  const titleOf = (topic: string | undefined): string => (!topic ? t('phoneApp.storage.elsewhere') : isMacTopic(topic) ? t('phone.home.yourMac') : (titles.get(topic) ?? t('phoneApp.storage.aConversation')));
   const byConv = groups(saved, titleOf);
 
   const remove = (which: readonly SavedFile[]) => {
     haptic.warn();
     const n = removeSaved(which);
-    store.toast({ text: n === 1 ? 'Deleted from the phone' : `Deleted ${n} files from the phone`, tone: 'ok' });
+    store.toast({ text: n === 1 ? t('phoneApp.storage.deletedOne') : t('phoneApp.storage.deletedMany', { count: n }), tone: 'ok' });
   };
   const toggle = (on: boolean) => (
     <View pointerEvents="none">
@@ -52,29 +54,29 @@ export default function Storage() {
 
   return (
     <Screen>
-      <Header scrolled={scrolled} back title="Storage" />
+      <Header scrolled={scrolled} back title={t('phoneApp.settings.storage')} />
       <ScrollView onScroll={onScroll} scrollEventThrottle={32} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 40, gap: 20 }}>
         <Animated.View entering={FadeIn.duration(300)} style={{ gap: 20 }}>
           <Card>
-            <Row first Icon={HardDrive} tone="sky" label="Saved on this phone" sub={saved.length ? `${saved.length} ${saved.length === 1 ? 'file' : 'files'} · ${sizeOf(totalBytes(saved))}` : 'Nothing yet'} chevron={false} />
+            <Row first Icon={HardDrive} tone="sky" label={t('phoneApp.storage.savedHere')} sub={saved.length ? t('phoneApp.storage.files', { count: saved.length, size: sizeOf(totalBytes(saved)) }) : t('phoneApp.conv.nothingYet')} chevron={false} />
             <Row
               Icon={Eraser}
               tone="butter"
-              label="Cache"
-              sub={`${sizeOf(cache)} · pictures you opened`}
+              label={t('phoneApp.storage.cache')}
+              sub={t('phoneApp.storage.cacheSub', { size: sizeOf(cache) })}
               onPress={() =>
                 setSheet({
-                  title: 'Cache',
+                  title: t('phoneApp.storage.cache'),
                   options: [
                     {
                       Icon: Eraser,
-                      label: 'Clear the cache',
-                      sub: 'Saved files stay',
+                      label: t('phoneApp.storage.clear'),
+                      sub: t('phoneApp.storage.clearSub'),
                       tone: 'butter',
                       onPress: () =>
                         void clearCache().then(() => {
                           setCache(cacheSize());
-                          store.toast({ text: 'Cache cleared', tone: 'ok' });
+                          store.toast({ text: t('phoneApp.storage.cleared'), tone: 'ok' });
                         }),
                     },
                   ],
@@ -89,8 +91,8 @@ export default function Storage() {
                 first
                 Icon={Archive}
                 tone="mint"
-                label="Remove when archived"
-                sub="Saved files go with their conversation"
+                label={t('phoneApp.storage.removeArchived')}
+                sub={t('phoneApp.storage.removeArchivedSub')}
                 right={toggle(cleanup)}
                 chevron={false}
                 onPress={() => {
@@ -99,11 +101,11 @@ export default function Storage() {
                   setCleanup(!cleanup);
                 }}
               />
-              <Row Icon={FolderOpen} tone="lavender" label="Save to" sub={folder ?? 'Asked the first time you save'} onPress={() => void pickFolder().then(() => setFolder(folderName()))} />
+              <Row Icon={FolderOpen} tone="lavender" label={t('phoneApp.storage.saveTo')} sub={folder ?? t('phoneApp.storage.saveToSub')} onPress={() => void pickFolder().then(() => setFolder(folderName()))} />
             </Card>
           ) : (
             <T v="caption" style={{ paddingHorizontal: 6 }}>
-              On iPhone, Save opens the share sheet: what you save there is yours to keep or delete.
+              {t('phoneApp.storage.iphone')}
             </T>
           )}
 
@@ -129,8 +131,8 @@ export default function Storage() {
                       setSheet({
                         title: f.name,
                         options: [
-                          { Icon: Trash2, label: 'Delete from the phone', tone: 'rose', onPress: () => remove([f]) },
-                          { Icon: Trash2, label: `Delete all ${g.files.length} from this conversation`, sub: `${g.title} · ${sizeOf(g.bytes)}`, tone: 'rose', hidden: g.files.length < 2, onPress: () => remove(g.files) },
+                          { Icon: Trash2, label: t('phoneApp.storage.delete'), tone: 'rose', onPress: () => remove([f]) },
+                          { Icon: Trash2, label: t('phoneApp.storage.deleteAll', { count: g.files.length }), sub: `${g.title} · ${sizeOf(g.bytes)}`, tone: 'rose', hidden: g.files.length < 2, onPress: () => remove(g.files) },
                         ],
                       })
                     }
@@ -141,7 +143,7 @@ export default function Storage() {
           ))}
           {!saved.length ? (
             <T v="caption" style={{ paddingHorizontal: 6 }}>
-              Open a picture, video or file full screen and tap Save to keep it on the phone.
+              {t('phoneApp.storage.empty')}
             </T>
           ) : null}
         </Animated.View>

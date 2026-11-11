@@ -18,16 +18,17 @@ import { openOnMac } from '../../lib/mac';
 import { store } from '../../lib/store';
 import { color } from '../../lib/theme';
 import { KeptData } from '../../components/KeptData';
+import { t, useT } from '../../lib/language';
 
 /** "2 min 12 s", "48 s". */
 const took = (r: SentinelRunView): string | undefined => {
   if (r.endedAt === undefined) return undefined;
   const s = Math.max(0, Math.round((r.endedAt - r.startedAt) / 1000));
-  return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min${s % 60 ? ` ${s % 60} s` : ''}`;
+  return s < 60 ? t('phoneApp.sentinel.secs', { s }) : s % 60 ? t('phoneApp.sentinel.minsSecs', { m: Math.floor(s / 60), s: s % 60 }) : t('phoneApp.sentinel.mins', { m: Math.floor(s / 60) });
 };
 
 /** A report shown here as text (no ref to open in the reader): code blocks folded, as Claude's answers are. */
-const words = (md: string): string => md.replace(/```[\s\S]*?(```|$)/g, '(code)').trim();
+const words = (md: string): string => md.replace(/```[\s\S]*?(```|$)/g, t('phoneApp.sentinel.code')).trim();
 
 /**
  * One sentinel (BLG-237): when it runs, what it does (its steps by name), its run waiting for your
@@ -43,6 +44,7 @@ export default function SentinelPage() {
   const view = useView<SentinelPageView>(on ? topic : undefined);
   const s = view?.data;
   const insets = useSafeAreaInsets();
+  const t = useT();
   const needs = useVisibleNeeds(s?.needsYou);
   const [menu, setMenu] = useState(false);
   const [running, setRunning] = useState(false);
@@ -61,7 +63,7 @@ export default function SentinelPage() {
     haptic.commit();
     setRunning(true);
     await store.call(calls.sentinelRun(s.id, s.name), { queue: false }).then(
-      () => store.toast({ text: `${s.name} is running`, tone: 'ok' }),
+      () => store.toast({ text: t('phoneApp.sentinel.isRunning', { name: s.name }), tone: 'ok' }),
       (e: Error) => store.toast({ text: e.message, tone: 'error' }),
     );
     setRunning(false);
@@ -69,7 +71,7 @@ export default function SentinelPage() {
   const pause = (paused: boolean) => {
     if (!s) return;
     void store.call(calls.sentinelPause(s.id, paused, s.name)).then(
-      () => store.toast({ text: paused ? `${s.name} is paused` : `${s.name} is on`, tone: 'ok' }),
+      () => store.toast({ text: paused ? t('phoneApp.sentinel.isPaused', { name: s.name }) : t('phoneApp.sentinel.isOn', { name: s.name }), tone: 'ok' }),
       (e: Error) => store.toast({ text: e.message, tone: 'error' }),
     );
   };
@@ -97,22 +99,22 @@ export default function SentinelPage() {
       <Header
         scrolled={scrolled}
         back
-        eyebrow={s ? (s.project ?? 'Your Mac') : 'Sentinel'}
-        title={s?.name ?? 'Sentinel'}
+        eyebrow={s ? (s.project ?? t('phone.home.yourMac')) : t('phoneApp.sentinel.sentinel')}
+        title={s?.name ?? t('phoneApp.sentinel.sentinel')}
         subtitle={s?.sentence}
         at={view?.at}
         lead={Icon ? <IconBadge Icon={s?.paused ? CirclePause : Icon} tone={s?.paused ? 'plain' : 'sky'} size={32} /> : undefined}
         right={
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            {s?.paused ? <Pill label="Paused" /> : null}
-            <More onPress={() => setMenu(true)} label="Sentinel options" />
+            {s?.paused ? <Pill label={t('phoneApp.sentinel.paused')} /> : null}
+            <More onPress={() => setMenu(true)} label={t('phoneApp.sentinel.options')} />
           </View>
         }
       />
       <ScrollView onScroll={onScroll} scrollEventThrottle={32} contentContainerStyle={{ paddingTop: 6, paddingBottom: insets.bottom + 40, gap: 14 }}>
         {!s ? (
           <T v="callout" style={{ textAlign: 'center', marginTop: 40, paddingHorizontal: 24 }}>
-            {on ? 'Opening the sentinel…' : 'Update Beluga on your Mac to see your sentinels here.'}
+            {on ? t('phoneApp.sentinel.opening') : t('phoneApp.sentinel.update')}
           </T>
         ) : (
           <Animated.View entering={FadeIn.duration(220)} style={{ gap: 14 }}>
@@ -120,7 +122,7 @@ export default function SentinelPage() {
               <Card tone="rose" style={{ marginHorizontal: 16, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 <CirclePause color={toneInk('rose')} size={18} />
                 <T v="callout" c={toneInk('rose')} style={{ flex: 1 }}>
-                  {s.pausedWhy}. Turn it on again from •••.
+                  {t('phoneApp.sentinel.pausedWhy', { why: s.pausedWhy })}
                 </T>
               </Card>
             ) : s.trouble ? (
@@ -133,16 +135,16 @@ export default function SentinelPage() {
             ) : null}
 
             <View style={{ paddingHorizontal: 16, gap: 8 }}>
-              <Button label={running ? 'Starting…' : 'Run Now'} Icon={Play} disabled={running || s.live} onPress={() => void runNow()} />
+              <Button label={running ? t('phoneApp.task.starting') : t('phoneApp.sentinel.runNow')} Icon={Play} disabled={running || s.live} onPress={() => void runNow()} />
               <T v="caption" style={{ textAlign: 'center' }}>
-                {s.live ? 'A run is going now' : s.paused ? 'Paused: it runs only when you press Run' : s.nextAt ? `Next at ${nextText(s.nextAt)}` : last && s.last ? `Last ran ${ago(s.last.at)} ago` : 'It hasn’t run yet'}
+                {s.live ? t('phoneApp.sentinel.live') : s.paused ? t('phoneApp.sentinel.pausedHint') : s.nextAt ? t('phoneApp.sentinel.nextAt', { when: nextText(s.nextAt) ?? '' }) : last && s.last ? t('phoneApp.sentinel.lastRan', { when: ago(s.last.at) }) : t('phoneApp.sentinel.notYet')}
               </T>
             </View>
 
             {needs.length ? (
               <View style={{ gap: 8 }}>
                 <T v="eyebrow" style={{ paddingHorizontal: 20 }}>
-                  Waiting for you
+                  {t('phoneApp.sentinel.waiting')}
                 </T>
                 <NeedsStack items={needs} />
               </View>
@@ -151,7 +153,7 @@ export default function SentinelPage() {
             {s.steps.length ? (
               <View style={{ gap: 8 }}>
                 <T v="eyebrow" style={{ paddingHorizontal: 20 }}>
-                  What it does
+                  {t('phoneApp.sentinel.whatItDoes')}
                 </T>
                 {graph ? (
                   // 1.25 (BLG-352): its workflow, as the Mac's Steps › Graph draws it.
@@ -170,12 +172,12 @@ export default function SentinelPage() {
 
             <View style={{ gap: 8 }}>
               <T v="eyebrow" style={{ paddingHorizontal: 20 }}>
-                Runs
+                {t('phoneApp.sentinel.runs')}
               </T>
               <Card style={{ marginHorizontal: 16 }}>
                 {!s.runs.length ? (
                   <T v="callout" style={{ padding: 16 }}>
-                    No runs yet.
+                    {t('phoneApp.sentinel.noRuns')}
                   </T>
                 ) : null}
                 {s.runs.map((r, i) => {
@@ -186,7 +188,7 @@ export default function SentinelPage() {
                   return (
                     <Animated.View key={r.id} entering={FadeIn.duration(200)} layout={LinearTransition.duration(180)}>
                       {i ? <Hairline style={{ marginLeft: 58 }} /> : null}
-                      <Press scaleTo={0.985} disabled={!canOpen} onPress={() => openRun(r)} accessibilityLabel={`${st.label}: ${r.headline || 'a run'}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 14 }}>
+                      <Press scaleTo={0.985} disabled={!canOpen} onPress={() => openRun(r)} accessibilityLabel={t('phoneApp.sentinel.runA11y', { state: st.label, what: r.headline || t('phoneApp.sentinel.aRun') })} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 14 }}>
                         <View style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: toneBg(st.tone) }}>
                           <st.Icon color={toneInk(st.tone)} size={16} strokeWidth={1.9} />
                         </View>
@@ -195,7 +197,7 @@ export default function SentinelPage() {
                             {r.headline || (r.step ? r.step : st.label)}
                           </T>
                           <T v="caption" numberOfLines={2}>
-                            {[r.step && r.headline ? r.step : undefined, `by ${r.by}`, ago(r.endedAt ?? r.startedAt), took(r), r.pr ? `PR #${r.pr.number}` : undefined, r.why].filter(Boolean).join('  ·  ')}
+                            {[r.step && r.headline ? r.step : undefined, t('phoneApp.sentinel.by', { who: r.by }), ago(r.endedAt ?? r.startedAt), took(r), r.pr ? t('phoneApp.sentinel.pr', { number: r.pr.number }) : undefined, r.why].filter(Boolean).join('  ·  ')}
                           </T>
                         </View>
                         {r.report ? <FileText color={color.text3} size={17} /> : canOpen ? shown ? <ChevronDown color={color.text3} size={18} /> : <ChevronRight color={color.text3} size={18} /> : null}
@@ -206,13 +208,13 @@ export default function SentinelPage() {
                             <ActivityIndicator color={color.text3} style={{ alignSelf: 'flex-start' }} />
                           ) : (
                             <T v="callout" c={text ? color.text : color.text2} selectable>
-                              {text || 'This run left no report.'}
+                              {text || t('phoneApp.sentinel.noReport')}
                             </T>
                           )}
                           {r.chat ? (
-                            <Press onPress={() => router.push(`/conv/${encodeURIComponent(r.chat!)}`)} accessibilityLabel="The agent’s session" style={{ marginTop: 10, alignSelf: 'flex-start' }}>
+                            <Press onPress={() => router.push(`/conv/${encodeURIComponent(r.chat!)}`)} accessibilityLabel={t('phoneApp.sentinel.session')} style={{ marginTop: 10, alignSelf: 'flex-start' }}>
                               <T v="callout" c={color.info} style={{ fontWeight: '600' }}>
-                                The agent’s session
+                                {t('phoneApp.sentinel.session')}
                               </T>
                             </Press>
                           ) : null}
@@ -233,9 +235,9 @@ export default function SentinelPage() {
         onClose={() => setMenu(false)}
         title={s?.name}
         options={[
-          { Icon: Power, label: 'Turn On', sub: s?.sentence, tone: 'mint', hidden: !s?.paused, onPress: () => pause(false) },
-          { Icon: CirclePause, label: 'Pause', sub: 'Nothing runs until you turn it on', tone: 'butter', hidden: !s || s.paused, onPress: () => pause(true) },
-          { Icon: Monitor, label: 'Open on your Mac', sub: 'Its steps, properties and history', tone: 'plain', onPress: () => void openOnMac({ topic }) },
+          { Icon: Power, label: t('phoneApp.sentinel.turnOn'), sub: s?.sentence, tone: 'mint', hidden: !s?.paused, onPress: () => pause(false) },
+          { Icon: CirclePause, label: t('phoneApp.sentinel.pause'), sub: t('phoneApp.sentinel.pauseSub'), tone: 'butter', hidden: !s || s.paused, onPress: () => pause(true) },
+          { Icon: Monitor, label: t('phone.needs.openOnMac'), sub: t('phoneApp.sentinel.openOnMacSub'), tone: 'plain', onPress: () => void openOnMac({ topic }) },
         ]}
       />
     </Screen>

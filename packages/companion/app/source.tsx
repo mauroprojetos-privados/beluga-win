@@ -14,6 +14,7 @@ import type { FilePageView, Topic } from '../lib/link/protocol';
 import { store } from '../lib/store';
 import { color, ink, tint, type } from '../lib/theme';
 import { fileIcon } from '../components/fileIcon';
+import { useT } from '../lib/language';
 
 /**
  * A worktree's file, read-only (BLG-42): monospace with line numbers, colours by language, wrap
@@ -29,7 +30,8 @@ export default function Source() {
   const { topic, path } = useLocalSearchParams<{ topic: string; path: string }>();
   const insets = useSafeAreaInsets();
   const linked = useLink().phase;
-  const name = (path ?? '').split('/').pop() ?? 'File';
+  const t = useT();
+  const name = (path ?? '').split('/').pop() ?? t('phoneApp.source.file');
   const [page, setPage] = useState<FilePageView | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
@@ -59,7 +61,7 @@ export default function Source() {
   // Read once the link is open (a cold start dials first); the Mac away says so.
   useEffect(() => {
     if (linked === 'open' && !page) load(0);
-    else if (linked === 'asleep' && !page) setError('Your Mac is away. The file comes back when it answers.');
+    else if (linked === 'asleep' && !page) setError(t('phoneApp.source.away'));
   }, [topic, path, linked]);
 
   const lines = useMemo(() => (page?.text ?? '').replace(/\n$/, '').split('\n'), [page?.text]);
@@ -150,7 +152,7 @@ export default function Source() {
         more ? (
           <Press onPress={() => !busy && load(page.next)} style={{ alignSelf: wrap ? 'center' : 'flex-start', marginLeft: wrap ? 0 : 16, marginTop: 14, height: 34, paddingHorizontal: 16, borderRadius: 17, justifyContent: 'center', backgroundColor: color.sunken }}>
             <T v="caption" c={color.text}>
-              {busy ? 'Loading…' : `Load more · ${sizeOf(page.size - page.next)} left`}
+              {busy ? t('common.loading') : t('phoneApp.source.loadMore', { size: sizeOf(page.size - page.next) })}
             </T>
           </Press>
         ) : undefined
@@ -160,7 +162,7 @@ export default function Source() {
 
   return (
     <Screen>
-      <Header scrolled={scrolled} back title={name} lead={<IconBadge Icon={Icon} tone={tone} size={30} />} eyebrow={['Read only', page?.lang ? LANG_NAMES[page.lang] : undefined, page ? sizeOf(page.size) : undefined].filter(Boolean).join(' · ')} />
+      <Header scrolled={scrolled} back title={name} lead={<IconBadge Icon={Icon} tone={tone} size={30} />} eyebrow={[t('phoneApp.source.readOnly'), page?.lang ? LANG_NAMES[page.lang] : undefined, page ? sizeOf(page.size) : undefined].filter(Boolean).join(' · ')} />
       <Animated.View entering={FadeIn.duration(180)} style={{ paddingHorizontal: 16, paddingBottom: 10 }}>
         {searching ? (
           <Card r={18} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, height: 42, gap: 8 }}>
@@ -172,7 +174,7 @@ export default function Source() {
                 setQuery(q);
                 setHit(0);
               }}
-              placeholder="Find in file"
+              placeholder={t('phoneApp.source.find')}
               placeholderTextColor={color.text3}
               autoCapitalize="none"
               autoCorrect={false}
@@ -183,10 +185,10 @@ export default function Source() {
             <T v="caption" style={{ fontVariant: ['tabular-nums'] }}>
               {query ? `${hits.length ? hit + 1 : 0}/${hits.length}` : ''}
             </T>
-            <Press onPress={() => jump(-1)} hitSlop={6} accessibilityLabel="Previous">
+            <Press onPress={() => jump(-1)} hitSlop={6} accessibilityLabel={t('phoneApp.source.previous')}>
               <ChevronUp color={color.text2} size={20} />
             </Press>
-            <Press onPress={() => jump(1)} hitSlop={6} accessibilityLabel="Next">
+            <Press onPress={() => jump(1)} hitSlop={6} accessibilityLabel={t('phoneApp.pair.next')}>
               <ChevronDown color={color.text2} size={20} />
             </Press>
             <Press
@@ -195,15 +197,15 @@ export default function Source() {
                 setQuery('');
               }}
               hitSlop={6}
-              accessibilityLabel="Close find"
+              accessibilityLabel={t('phoneApp.source.closeFind')}
             >
               <X color={color.text2} size={18} />
             </Press>
           </Card>
         ) : (
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            {tool(false, Search, 'Find', () => setSearching(true))}
-            {tool(wrap, WrapText, 'Wrap', () => setWrap((w) => !w))}
+            {tool(false, Search, t('phoneApp.source.findTool'), () => setSearching(true))}
+            {tool(wrap, WrapText, t('phoneApp.source.wrap'), () => setWrap((w) => !w))}
           </View>
         )}
       </Animated.View>
@@ -216,7 +218,7 @@ export default function Source() {
             </T>
             <Press onPress={() => router.back()}>
               <T v="callout" c={color.info}>
-                Back
+                {t('common.back')}
               </T>
             </Press>
           </Animated.View>
@@ -227,7 +229,7 @@ export default function Source() {
         ) : page.binary ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 30 }}>
             <T v="callout" style={{ textAlign: 'center' }}>
-              This isn’t a text file, so it can’t be shown here. Open it on your Mac.
+              {t('phoneApp.source.binary')}
             </T>
           </View>
         ) : wrap ? (

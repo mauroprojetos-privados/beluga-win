@@ -6,6 +6,8 @@
  * PIECE_TIMEOUT_MS fails the fetch with words and a Retry. Pure: the store does the asking.
  */
 
+import { t } from '../../../src/shared/i18n/index';
+
 /** A piece that hasn't come by then fails the fetch (the viewer offers Retry). */
 export const PIECE_TIMEOUT_MS = 20_000;
 /** A full picture bigger than this stays the preview (its thumbnail): open it on your Mac. */
@@ -43,14 +45,14 @@ export class Assembly {
 
   /** A piece came: what now. */
   add(c: ChunkIn): Step {
-    if (c.off !== this.got) return { t: 'fail', error: 'The pieces came out of order. Try again.' };
-    if (c.size > this.max) return { t: 'fail', error: `Too big for the phone (${Math.round(c.size / 1024 / 1024)} MB). Open it on your Mac.` };
+    if (c.off !== this.got) return { t: 'fail', error: t('phoneApp.pieces.order') };
+    if (c.size > this.max) return { t: 'fail', error: t('phoneApp.pieces.tooBig', { mb: Math.round(c.size / 1024 / 1024) }) };
     this.size = c.size;
     const n = b64Bytes(c.b64);
     this.got += n;
     if (c.eof || this.got >= c.size) return { t: 'done', got: this.got, size: c.size };
     // A piece with nothing in it, before the end: the file shrank under us.
-    if (!n) return { t: 'fail', error: 'The file changed while it came. Try again.' };
+    if (!n) return { t: 'fail', error: t('phoneApp.pieces.changed') };
     return { t: 'next', off: this.got, got: this.got, size: c.size };
   }
 
@@ -62,12 +64,12 @@ export class Assembly {
 
 /** "Getting the full picture · 2.1 of 8.4 MB" */
 export function progressText(got: number, size: number | undefined): string {
-  return progressOf('Getting the full picture', got, size);
+  return progressOf(t('phoneApp.pieces.fullPicture'), got, size);
 }
 
 /** "Saving · 2.1 of 8.4 MB", and the like. */
 export function progressOf(what: string, got: number, size: number | undefined): string {
   if (!size) return what;
   const mb = (n: number): string => (n / 1024 / 1024).toFixed(n < 10 * 1024 * 1024 ? 1 : 0);
-  return size < 1024 * 1024 ? `${what} · ${Math.round((got / size) * 100)}%` : `${what} · ${mb(got)} of ${mb(size)} MB`;
+  return size < 1024 * 1024 ? t('phoneApp.pieces.percent', { what, percent: Math.round((got / size) * 100) }) : t('phoneApp.pieces.mb', { what, got: mb(got), size: mb(size) });
 }

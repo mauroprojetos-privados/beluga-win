@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Header, Screen, useScrolled } from '../components/Screen';
 import { Button, Card, Pill, Row, T } from '../components/ui';
 import { accessibilityOn, addonInstalled, downloadLink, onAccessibilityChange, openAccessibilitySettings } from '../lib/phone';
+import { useT } from '../lib/language';
 
 /**
  * Settings › Get Beluga Link (BLG-390): what Beluga Link is, why it's an app of its own, that
@@ -17,6 +18,7 @@ import { accessibilityOn, addonInstalled, downloadLink, onAccessibilityChange, o
 export default function Link() {
   const { scrolled, onScroll } = useScrolled();
   const insets = useSafeAreaInsets();
+  const t = useT();
   const [installed, setInstalled] = useState(addonInstalled());
   const [on, setOn] = useState(accessibilityOn());
   const refresh = useCallback(() => {
@@ -40,59 +42,57 @@ export default function Link() {
 
   return (
     <Screen>
-      <Header scrolled={scrolled} back title="Beluga Link" />
+      <Header scrolled={scrolled} back title="Beluga Link" /> {/* i18n-ignore */}
       <ScrollView onScroll={onScroll} scrollEventThrottle={32} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 40, gap: 12 }}>
         <Animated.View entering={FadeIn.duration(300)} style={{ gap: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 6 }}>
-            {on ? <Pill label="On" tone="mint" Icon={CircleCheck} /> : installed ? <Pill label="Installed, not on yet" tone="butter" /> : <Pill label="Not installed" tone="plain" />}
+            {on ? <Pill label={t('phoneApp.link.on')} tone="mint" Icon={CircleCheck} /> : installed ? <Pill label={t('phoneApp.link.installedOff')} tone="butter" /> : <Pill label={t('phoneApp.link.notInstalled')} tone="plain" />}
           </View>
           <T v="body" style={{ paddingHorizontal: 6 }}>
-            Beluga Link lets your agent on your Mac look at this phone and tap, type and open apps when you ask it to. You only need it for that: everything else in Beluga works without it.
+            {t('phoneApp.link.intro')}
           </T>
 
-          {section('Why it’s a separate app')}
-          {note(
-            'To act on the screen, Link needs Android’s Accessibility access. Android’s Play Protect blocks apps with that access when they’re downloaded instead of coming from the Play Store, so if it were part of Beluga, Beluga itself couldn’t be installed. Kept apart, Beluga always installs, and only Link needs the extra step.',
-          )}
+          {section(t('phoneApp.link.whySeparate'))}
+          {note(t('phoneApp.link.whySeparateNote'))}
 
           {on ? (
             <Card>
-              <Row first Icon={CircleCheck} tone="mint" label="Beluga Link is on" sub="Your Mac can use this phone when you allow it" chevron={false} />
+              <Row first Icon={CircleCheck} tone="mint" label={t('phoneApp.link.isOn')} sub={t('phoneApp.link.isOnSub')} chevron={false} />
             </Card>
           ) : installed ? (
             <>
-              {section('Turn it on')}
+              {section(t('phoneApp.link.turnOn'))}
               <Card>
-                <Row first Icon={ShieldCheck} tone="peach" label="Turn on Beluga Link" sub="Android › Accessibility › Beluga Link" onPress={openAccessibilitySettings} />
+                <Row first Icon={ShieldCheck} tone="peach" label={t('phoneApp.settings.turnOnLink')} sub={t('phoneApp.link.turnOnSub')} onPress={openAccessibilitySettings} />
               </Card>
-              {note('If Android says the setting is restricted, open Settings › Apps › Beluga Link, tap ⋮ and Allow restricted settings, then turn it on. Installed from your Mac, Link is turned on for you and this doesn’t come up.')}
+              {note(t('phoneApp.link.restricted'))}
             </>
           ) : (
             <>
-              {section('Android may block it')}
+              {section(t('phoneApp.link.mayBlock'))}
               <Card>
                 <Row
                   first
                   Icon={ShieldAlert}
                   tone="butter"
-                  label="App blocked to protect your device"
-                  sub="What Android may show for a downloaded Link"
+                  label={t('phoneApp.link.blocked')}
+                  sub={t('phoneApp.link.blockedSub')}
                   chevron={false}
                 />
               </Card>
-              {note('That’s Play Protect being careful with every downloaded app that asks for Accessibility, not a problem with Link. Installing it from your Mac goes around it.')}
+              {note(t('phoneApp.link.playProtect'))}
 
-              {section('Install it from your Mac (easiest)')}
+              {section(t('phoneApp.link.fromMac'))}
               <Card>
-                <Row first Icon={Cable} tone="sky" label="1. Connect it to your Mac" sub="With a USB cable" chevron={false} />
-                <Row Icon={Monitor} tone="sky" label="2. Set up Beluga Link on the Mac" sub="Settings › Phone" chevron={false} />
-                <Row Icon={Hand} tone="sky" label="3. Tap Allow if the phone asks" sub="“Allow USB debugging?”" chevron={false} />
+                <Row first Icon={Cable} tone="sky" label={t('phoneApp.link.step1')} sub={t('phoneApp.link.step1Sub')} chevron={false} />
+                <Row Icon={Monitor} tone="sky" label={t('phoneApp.link.step2')} sub={t('phoneApp.link.step2Sub')} chevron={false} />
+                <Row Icon={Hand} tone="sky" label={t('phoneApp.link.step3')} sub={t('phoneApp.link.step3Sub')} chevron={false} />
               </Card>
-              {note('Or ask your agent on your Mac: “set up Beluga Link on my phone”. Your Mac installs Link and turns it on, with nothing else to do here. It needs USB debugging on; Settings › Phone on your Mac shows how if it’s off.')}
+              {note(t('phoneApp.link.askAgent'))}
 
-              {section('Or download it yourself')}
-              {note('Download it, open it from your notifications and tap Install. If Android blocks it, use your Mac instead. Then come back here to turn it on.')}
-              <Button label="Download Beluga Link" Icon={Download} quiet onPress={downloadLink} />
+              {section(t('phoneApp.link.download'))}
+              {note(t('phoneApp.link.downloadNote'))}
+              <Button label={t('phoneApp.link.downloadButton')} Icon={Download} quiet onPress={downloadLink} />
             </>
           )}
         </Animated.View>

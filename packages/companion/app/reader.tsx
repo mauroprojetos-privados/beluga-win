@@ -11,6 +11,7 @@ import { Card, haptic, Press, T } from '../components/ui';
 import { useFile, useOutput } from '../lib/hooks';
 import { store } from '../lib/store';
 import { color, tint, type } from '../lib/theme';
+import { useT } from '../lib/language';
 
 /**
  * Text an agent wrote or a test produced (logs, txt, json, md, csv): never blocked. Search with
@@ -21,6 +22,7 @@ export default function Reader() {
   const { scrolled, onScroll } = useScrolled();
   const { ref, name } = useLocalSearchParams<{ ref: string; name?: string }>();
   const insets = useSafeAreaInsets();
+  const say = useT();
   const file = useFile(ref, 'text');
   const latest = useOutput(ref);
   const isLog = /\.(log|out)$/i.test(name ?? '') || latest?.name.endsWith('.log');
@@ -136,7 +138,7 @@ export default function Reader() {
           more && !follow ? (
             <Press onPress={() => ref && store.fetch(ref, 'text', true)} style={{ alignSelf: 'center', marginTop: 14, height: 34, paddingHorizontal: 16, borderRadius: 17, justifyContent: 'center', backgroundColor: color.sunken }}>
               <T v="caption" c={color.text}>
-                Load more · {sizeOf(size - got)} left
+                {say('phoneApp.source.loadMore', { size: sizeOf(size - got) })}
               </T>
             </Press>
           ) : undefined
@@ -146,7 +148,7 @@ export default function Reader() {
 
   return (
     <Screen>
-      <Header scrolled={scrolled} back title={name ?? 'File'} eyebrow={`${isMd ? 'Markdown' : isJson ? 'JSON' : 'Text'} · ${sizeOf(size)}${more ? ` · ${sizeOf(got)} shown` : ''}`} />
+      <Header scrolled={scrolled} back title={name ?? say('phoneApp.source.file')} eyebrow={`${isMd ? 'Markdown' : isJson ? 'JSON' : say('phoneApp.viewer.text')} · ${sizeOf(size)}${more ? ` · ${say('phoneApp.reader.shown', { size: sizeOf(got) })}` : ''}`} />
       <Animated.View entering={FadeIn.duration(180)} style={{ paddingHorizontal: 16, paddingBottom: 10, gap: 10 }}>
         {searching ? (
           <Card r={18} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, height: 42, gap: 8 }}>
@@ -158,7 +160,7 @@ export default function Reader() {
                 setQuery(q);
                 setHit(0);
               }}
-              placeholder="Find in file"
+              placeholder={say('phoneApp.source.find')}
               placeholderTextColor={color.text3}
               returnKeyType="search"
               onSubmitEditing={() => jump(1)}
@@ -185,10 +187,10 @@ export default function Reader() {
           </Card>
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-            {tool(false, Search, 'Find', () => setSearching(true))}
-            {isMd || isJson ? tool(formatted, WrapText, isMd ? 'Formatted' : 'Pretty', () => setFormatted((f) => !f)) : null}
-            {tool(wrap, WrapText, 'Wrap', () => setWrap((w) => !w))}
-            {tool(follow, ArrowDownToLine, follow ? 'Following' : 'Follow', () => setFollow((f) => !f))}
+            {tool(false, Search, say('phoneApp.source.findTool'), () => setSearching(true))}
+            {isMd || isJson ? tool(formatted, WrapText, isMd ? say('phoneApp.reader.formatted') : say('phoneApp.reader.pretty'), () => setFormatted((f) => !f)) : null}
+            {tool(wrap, WrapText, say('phoneApp.source.wrap'), () => setWrap((w) => !w))}
+            {tool(follow, ArrowDownToLine, follow ? say('phoneApp.reader.following') : say('phoneApp.reader.follow'), () => setFollow((f) => !f))}
           </ScrollView>
         )}
       </Animated.View>
@@ -200,11 +202,11 @@ export default function Reader() {
         ) : file.status === 'error' && !file.text ? (
           <Animated.View entering={FadeIn} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 30 }}>
             <T v="callout" style={{ textAlign: 'center' }}>
-              {file.error ?? "Couldn't get it."}
+              {file.error ?? say('phoneApp.viewer.couldnt')}
             </T>
             <Press onPress={() => router.back()} style={{ marginTop: 12 }}>
               <T v="callout" c={color.info}>
-                Back
+                {say('common.back')}
               </T>
             </Press>
           </Animated.View>

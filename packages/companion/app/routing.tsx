@@ -10,6 +10,7 @@ import type { ComboReportView } from '../lib/link/protocol';
 import { store } from '../lib/store';
 import { CATEGORY_INFO, shortCost, shortTokens } from '../../../src/core/routing/model';
 import { type SavingsBaseline, savingsWords, successWords } from '../../../src/core/routing/outcomes';
+import { useT } from '../lib/language';
 
 const pct = (n: number): string => `${Math.round(n * 100)}%`;
 const kindLabel = (k: string): string => (k in CATEGORY_INFO ? CATEGORY_INFO[k as keyof typeof CATEGORY_INFO].label : k);
@@ -23,6 +24,7 @@ const kindLabel = (k: string): string => (k in CATEGORY_INFO ? CATEGORY_INFO[k a
 export default function Routing() {
   const { scrolled, onScroll } = useScrolled();
   const insets = useSafeAreaInsets();
+  const say = useT();
   const [report, setReport] = useState<readonly ComboReportView[]>();
 
   useFocusEffect(
@@ -43,12 +45,12 @@ export default function Routing() {
 
   return (
     <Screen>
-      <Header scrolled={scrolled} back title="Routing" />
+      <Header scrolled={scrolled} back title={say('phoneApp.settings.routing')} />
       <ScrollView onScroll={onScroll} scrollEventThrottle={32} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: insets.bottom + 40, gap: 12 }}>
-        {report && !list.length ? <T v="caption">No run has gone through a combo yet.</T> : null}
+        {report && !list.length ? <T v="caption">{say('phoneApp.routing.none')}</T> : null}
         {list.length ? (
           <Card>
-            <Row first Icon={Route} tone="mint" label={savingsWords(saved, baseline)} sub={`Tasks: ${successWords(judged, good)}`} chevron={false} />
+            <Row first Icon={Route} tone="mint" label={savingsWords(saved, baseline)} sub={say('phoneApp.routing.tasks', { words: successWords(judged, good) })} chevron={false} />
           </Card>
         ) : null}
         {list.map((u) => (
@@ -58,7 +60,7 @@ export default function Routing() {
                 {u.name}
               </T>
               <T v="caption" style={{ fontVariant: ['tabular-nums'] }}>
-                {[`${u.runs} run${u.runs === 1 ? '' : 's'}`, u.tokens ? shortTokens(u.tokens) : '', shortCost(u.cost ?? 0)].filter(Boolean).join(' · ')}
+                {[say('phoneApp.routing.runs', { count: u.runs }), u.tokens ? shortTokens(u.tokens) : '', shortCost(u.cost ?? 0)].filter(Boolean).join(' · ')}
               </T>
             </View>
             {u.targets.map((t) => (
@@ -66,7 +68,7 @@ export default function Routing() {
                 {t.target}: {t.runs}
                 {t.tokens ? ` · ${shortTokens(t.tokens)}` : ''}
                 {u.runs ? ` (${pct(t.runs / u.runs)})` : ''}
-                {t.limited ? ` · ${t.limited} at a limit` : ''}
+                {t.limited ? ` · ${say('phoneApp.routing.atLimit', { count: t.limited })}` : ''}
               </T>
             ))}
             {u.judged ? (
@@ -85,7 +87,7 @@ export default function Routing() {
             ))}
           </Card>
         ) : null}
-        {suggestions.length ? <T v="caption">Only suggestions: change a combo on your Mac, in Settings › Agent › Combos, if you agree.</T> : null}
+        {suggestions.length ? <T v="caption">{say('phoneApp.routing.onlySuggestions')}</T> : null}
       </ScrollView>
     </Screen>
   );

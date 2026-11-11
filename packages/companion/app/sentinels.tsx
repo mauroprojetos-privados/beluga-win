@@ -4,6 +4,7 @@ import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DashboardRows, SentinelChatRow } from '../components/Dashboard';
 import { Header, Screen, useScrolled } from '../components/Screen';
+import { useT } from '../lib/language';
 import { SENTINEL_SEEN, SentinelsList } from '../components/Sentinels';
 import { kv } from '../lib/kv';
 
@@ -14,6 +15,7 @@ import { kv } from '../lib/kv';
 export default function Sentinels() {
   const { scrolled, onScroll } = useScrolled();
   const insets = useSafeAreaInsets();
+  const t = useT();
   useFocusEffect(
     useCallback(() => {
       kv.set(SENTINEL_SEEN, Date.now());
@@ -21,7 +23,7 @@ export default function Sentinels() {
   );
   return (
     <Screen>
-      <Header scrolled={scrolled} back title="Sentinel" />
+      <Header scrolled={scrolled} back title={t('phoneApp.sentinel.sentinel')} />
       <ScrollView onScroll={onScroll} scrollEventThrottle={32} contentContainerStyle={{ paddingTop: 8, paddingBottom: insets.bottom + 40 }}>
         <View style={{ gap: 22 }}>
           <DashboardRows />

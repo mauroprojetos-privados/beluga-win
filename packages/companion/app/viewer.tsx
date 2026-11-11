@@ -17,6 +17,7 @@ import { saveOutput } from '../lib/saved';
 import type { OutputView } from '../lib/link/protocol';
 import { store } from '../lib/store';
 import { color, type } from '../lib/theme';
+import { useT } from '../lib/language';
 
 /**
  * Outputs, full screen, one page each: everything in the list you opened it from (Home's strip,
@@ -38,6 +39,7 @@ const NEAR = 1;
 const MAX_DOTS = 9;
 
 export default function Viewer() {
+  const t = useT();
   const { width: W, height: H } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { items, index: start, origin, topic } = store.gallery;
@@ -263,7 +265,7 @@ export default function Viewer() {
       <View style={{ flex: 1, backgroundColor: color.stage, alignItems: 'center', justifyContent: 'center' }}>
         <Press onPress={() => router.back()}>
           <T v="callout" c={color.onStage}>
-            Nothing to show
+            {t('phoneApp.viewer.nothing')}
           </T>
         </Press>
       </View>
@@ -289,7 +291,7 @@ export default function Viewer() {
       </GestureDetector>
       {chrome ? (
         <Animated.View pointerEvents="box-none" style={[{ position: 'absolute', top: 0, left: 0, right: 0, paddingTop: insets.top + 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }, top]}>
-          <Press onPress={close} accessibilityLabel="Close" style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: color.onStageChip }}>
+          <Press onPress={close} accessibilityLabel={t('common.close')} style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: color.onStageChip }}>
             <X color={color.onStage} size={20} />
           </Press>
           <View style={{ flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 14, backgroundColor: color.onStageChip }}>
@@ -303,7 +305,7 @@ export default function Viewer() {
             ) : null}
           </View>
           <View style={{ flex: 1 }} />
-          <Press onPress={save} disabled={busy} accessibilityLabel={`Save ${shown?.name ?? ''} to the phone`} style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: color.onStageChip }}>
+          <Press onPress={save} disabled={busy} accessibilityLabel={t('phoneApp.viewer.save', { name: shown?.name ?? '' })} style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: color.onStageChip }}>
             {busy ? <ActivityIndicator color={color.onStage} size="small" /> : <Download color={color.onStage} size={19} />}
           </Press>
         </Animated.View>
@@ -311,7 +313,7 @@ export default function Viewer() {
       {busy && (saving?.size ?? 0) > 1024 * 1024 ? (
         <View pointerEvents="none" style={{ position: 'absolute', top: insets.top + 60, alignSelf: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, backgroundColor: color.onStageChip }}>
           <T v="caption" c={color.onStage} style={{ fontVariant: ['tabular-nums'] }}>
-            {progressOf('Saving', saving?.got ?? 0, saving?.size)}
+            {progressOf(t('phoneApp.viewer.saving'), saving?.got ?? 0, saving?.size)}
           </T>
         </View>
       ) : null}
@@ -351,6 +353,7 @@ type PageProps = {
 function Page({ o, onEngage, active, near, first, W, H, top, bottom, origin, open, dragY, scale, panX, panY, fitW: shownW, fitH: shownH }: PageProps) {
   const image = o.kind === 'image';
   const video = o.kind === 'video';
+  const t = useT();
   const thumb = useFile(image ? o.ref : undefined, 'thumb');
   // The full picture, in pieces (BLG-106); a GIF animates once it's all here.
   const full = useFile(image && near ? o.ref : undefined, 'full');
@@ -416,13 +419,12 @@ function Page({ o, onEngage, active, near, first, W, H, top, bottom, origin, ope
         // Never an endless spinner (BLG-106): why, and Retry.
         <View style={{ position: 'absolute', bottom: bottom + 4, alignSelf: 'center', flexDirection: 'row', gap: 10, alignItems: 'center', paddingLeft: 14, paddingRight: 6, paddingVertical: 6, borderRadius: 20, backgroundColor: color.onStageChip }}>
           <T v="caption" c={color.onStage} numberOfLines={2} style={{ flexShrink: 1, maxWidth: W - 140 }}>
-            {thumb?.uri ? 'This is the preview. ' : ''}
-            {full.error ?? 'Couldn’t get the full picture.'}
+            {thumb?.uri ? t('phoneApp.viewer.preview', { why: full.error ?? t('phoneApp.viewer.couldntFull') }) : (full.error ?? t('phoneApp.viewer.couldntFull'))}
           </T>
-          <Press onPress={() => store.fetch(o.ref, 'full')} accessibilityLabel="Retry" style={{ height: 30, paddingHorizontal: 12, borderRadius: 15, flexDirection: 'row', gap: 6, alignItems: 'center', backgroundColor: color.onStage }}>
+          <Press onPress={() => store.fetch(o.ref, 'full')} accessibilityLabel={t('phoneApp.viewer.retry')} style={{ height: 30, paddingHorizontal: 12, borderRadius: 15, flexDirection: 'row', gap: 6, alignItems: 'center', backgroundColor: color.onStage }}>
             <RotateCw color={color.stage} size={14} />
             <T v="caption" c={color.stage} style={{ fontWeight: '700' }}>
-              Retry
+              {t('phoneApp.viewer.retry')}
             </T>
           </Press>
         </View>
@@ -450,6 +452,7 @@ function FileCard({ o, active }: { o: OutputView; active: boolean }) {
   const shown = lines.slice(0, PREVIEW_LINES);
   const rest = lines.length - shown.length;
   const Icon = iconOf(o);
+  const t = useT();
   const openIt = () => {
     haptic.tap();
     router.push({ pathname: '/reader', params: { ref: o.ref, name: o.name } });
@@ -465,7 +468,7 @@ function FileCard({ o, active }: { o: OutputView; active: boolean }) {
             {o.name}
           </T>
           <T v="caption" c={color.onStageDim}>
-            {[o.kind === 'markdown' ? 'Markdown' : o.kind === 'json' ? 'JSON' : text ? 'Text' : o.kind, sizeOf(o.size)].filter(Boolean).join(' · ')}
+            {[o.kind === 'markdown' ? 'Markdown' : o.kind === 'json' ? 'JSON' : text ? t('phoneApp.viewer.text') : o.kind, sizeOf(o.size)].filter(Boolean).join(' · ')}
           </T>
         </View>
       </View>
@@ -474,13 +477,13 @@ function FileCard({ o, active }: { o: OutputView; active: boolean }) {
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
             <Monitor color={color.onStageDim} size={28} />
             <T v="callout" c={color.onStageDim} style={{ textAlign: 'center' }}>
-              Open this one on your Mac.
+              {t('phoneApp.viewer.openOnMac')}
             </T>
           </View>
         ) : !file?.text ? (
           active && file?.status === 'error' ? (
             <T v="callout" c={color.onStageDim}>
-              {file.error ?? "Couldn't get it."}
+              {file.error ?? t('phoneApp.viewer.couldnt')}
             </T>
           ) : (
             <ActivityIndicator color={color.onStageDim} style={{ marginTop: 24 }} />
@@ -494,16 +497,16 @@ function FileCard({ o, active }: { o: OutputView; active: boolean }) {
             ))}
             {rest > 0 ? (
               <T v="caption" c={color.onStageDim} style={{ marginTop: 8 }}>
-                {rest} more {rest === 1 ? 'line' : 'lines'}
+                {t('phoneApp.viewer.moreLines', { count: rest })}
               </T>
             ) : null}
           </>
         )}
       </View>
       {text ? (
-        <Press onPress={openIt} accessibilityLabel={`Open ${o.name}`} style={{ height: 46, borderRadius: 23, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: color.onStage }}>
+        <Press onPress={openIt} accessibilityLabel={t('phoneApp.viewer.openName', { name: o.name })} style={{ height: 46, borderRadius: 23, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: color.onStage }}>
           <T v="callout" c={color.stage} style={{ fontWeight: '700' }}>
-            Open
+            {t('common.open')}
           </T>
           <ArrowUpRight color={color.stage} size={18} />
         </Press>

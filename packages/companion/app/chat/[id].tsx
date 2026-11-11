@@ -27,6 +27,7 @@ import { unreadLine } from '../../../../src/shared/unread';
 import { sends, useSends } from '../../lib/sends';
 import { store } from '../../lib/store';
 import { color, ink, tint } from '../../lib/theme';
+import { useT } from '../../lib/language';
 
 /**
  * A chat with friends, as a messaging app (BLG-210): your words on the right in your pastel, a
@@ -41,6 +42,7 @@ export default function Chat() {
   const view = useView<ChatView>(topic);
   const c = view?.data;
   const insets = useSafeAreaInsets();
+  const t = useT();
   const scroll = useRef<React.ComponentRef<typeof ScrollView>>(null);
   /** Where each task's card sits in the list (for the waiting band to scroll to it). */
   const cards = useRef<Record<string, number>>({});
@@ -78,10 +80,10 @@ export default function Chat() {
       <Header
         scrolled={scrolled}
         back
-        title={c?.name ?? 'Chat'}
-        eyebrow={c?.kind === 'group' ? 'Channel' : c?.live.length ? 'Here now' : 'Direct message'}
+        title={c?.name ?? t('phoneApp.chat.title')}
+        eyebrow={c?.kind === 'group' ? t('phoneApp.chat.channel') : c?.live.length ? t('phoneApp.chat.hereNow') : t('phoneApp.chat.direct')}
         at={view?.at}
-        right={changes ? <More onPress={() => setMenu(true)} label="Chat options" /> : undefined}
+        right={changes ? <More onPress={() => setMenu(true)} label={t('phoneApp.chat.options')} /> : undefined}
       />
       {c?.members?.some((m) => m.claude) ? <People members={c.members} /> : null}
       {c?.waiting?.length ? <Waiting items={c.waiting} onPick={(task) => task && cards.current[task] !== undefined && scroll.current?.scrollTo({ y: Math.max(0, cards.current[task]! - 24), animated: true })} /> : null}
@@ -119,7 +121,7 @@ export default function Chat() {
             <Animated.View key={p.id} entering={FadeIn.duration(180)} style={{ alignItems: 'flex-end', marginTop: 6 }}>
               <View style={{ maxWidth: '78%', paddingVertical: 9, paddingHorizontal: 13, borderRadius: 19, borderBottomRightRadius: 6, backgroundColor: color.sunken, opacity: p.state === 'failed' ? 1 : 0.6, borderWidth: p.state === 'failed' ? 1 : 0, borderColor: color.error }}>
                 <T v="body" c={color.text} style={{ fontSize: 15.5 }}>
-                  {p.text || 'Photo'}
+                  {p.text || t('phoneApp.conv.photo')}
                 </T>
               </View>
               <SendStatus s={p} />
@@ -128,12 +130,12 @@ export default function Chat() {
         </ScrollView>
         {ask ? (
           <Animated.View entering={FadeIn.duration(180)} style={{ flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 2 }}>
-            <Press onPress={() => setPicking(true)} accessibilityLabel={`Ask: ${ask.label}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 30, paddingLeft: 10, paddingRight: 4, borderRadius: 15, backgroundColor: tint.peach }}>
+            <Press onPress={() => setPicking(true)} accessibilityLabel={t('phoneApp.chat.askPill', { label: ask.label })} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 30, paddingLeft: 10, paddingRight: 4, borderRadius: 15, backgroundColor: tint.peach }}>
               <SquareTerminal color={ink.peach} size={14} />
               <T v="caption" c={ink.peach} style={{ fontWeight: '700' }}>
-                Ask: {ask.label}
+                {t('phoneApp.chat.askPill', { label: ask.label })}
               </T>
-              <Press onPress={() => setAsk(undefined)} accessibilityLabel="Don't ask an agent" hitSlop={8} style={{ width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' }}>
+              <Press onPress={() => setAsk(undefined)} accessibilityLabel={t('phoneApp.chat.dontAsk')} hitSlop={8} style={{ width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' }}>
                 <X color={ink.peach} size={14} />
               </Press>
             </Press>
@@ -145,7 +147,7 @@ export default function Chat() {
           </T>
         ) : null}
         <Composer
-          placeholder={ask ? `Ask ${ask.label}…` : `Message ${c?.name ?? ''}`}
+          placeholder={ask ? t('phoneApp.chat.askPlaceholder', { label: ask.label }) : t('phoneApp.chat.messagePlaceholder', { name: c?.name ?? '' })}
           bottom={insets.bottom}
           photos
           onSend={(text, photos) => {
@@ -156,7 +158,7 @@ export default function Chat() {
             setAsk(undefined);
           }}
           // Behind the + with the photo; who's asked shows in the pill above. The Claude mark, as on the Mac.
-          more={[{ Icon: SquareTerminal, label: 'Ask: your agent', sub: 'An agent here answers in the chat', tone: 'peach', onPress: () => setPicking(true) }]}
+          more={[{ Icon: SquareTerminal, label: t('phoneApp.chat.askAgent'), sub: t('phoneApp.chat.askAgentSub'), tone: 'peach', onPress: () => setPicking(true) }]}
         />
       </KeyboardLift>
       <Options
@@ -176,18 +178,18 @@ export default function Chat() {
           ) : undefined
         }
         options={[
-          { Icon: Pencil, label: 'Edit', sub: `${c?.name ?? 'They'} sees it marked edited`, tone: 'sky', hidden: !changes || !acting?.editable, onPress: () => setEditing(acting) },
-          { Icon: Trash2, label: 'Delete for everyone', sub: `From your Mac and ${c?.name ?? 'theirs'}’s`, tone: 'rose', hidden: !changes || !acting?.mine, onPress: () => acting && act(calls.deleteMessage(topic, acting.id, true)) },
-          { Icon: Trash2, label: 'Delete for you', sub: acting?.mine ? 'From your Mac only' : `${c?.name ?? 'They'} still has it`, tone: 'rose', hidden: !changes, onPress: () => acting && act(calls.deleteMessage(topic, acting.id, false)) },
+          { Icon: Pencil, label: t('phoneApp.chat.edit'), sub: t('phoneApp.chat.editSub', { name: c?.name ?? t('phoneApp.chat.they') }), tone: 'sky', hidden: !changes || !acting?.editable, onPress: () => setEditing(acting) },
+          { Icon: Trash2, label: t('phoneApp.chat.deleteAll'), sub: t('phoneApp.chat.deleteAllSub', { name: c?.name ?? t('phoneApp.chat.theirs') }), tone: 'rose', hidden: !changes || !acting?.mine, onPress: () => acting && act(calls.deleteMessage(topic, acting.id, true)) },
+          { Icon: Trash2, label: t('phoneApp.chat.deleteMine'), sub: acting?.mine ? t('phoneApp.chat.deleteMineSub') : t('phoneApp.chat.stillHas', { name: c?.name ?? t('phoneApp.chat.they') }), tone: 'rose', hidden: !changes, onPress: () => acting && act(calls.deleteMessage(topic, acting.id, false)) },
         ]}
       />
       <EditMessage m={editing} topic={topic} onClose={() => setEditing(undefined)} />
-      <Options visible={menu} onClose={() => setMenu(false)} title={c?.name} options={[{ Icon: Eraser, label: 'Clear chat', sub: 'Every message goes from your Mac', tone: 'rose', onPress: () => setClearing(true) }]} />
+      <Options visible={menu} onClose={() => setMenu(false)} title={c?.name} options={[{ Icon: Eraser, label: t('phoneApp.chat.clear'), sub: t('phoneApp.chat.clearSub'), tone: 'rose', onPress: () => setClearing(true) }]} />
       <Options
         visible={clearing}
         onClose={() => setClearing(false)}
-        title="This can’t be undone"
-        options={[{ Icon: Eraser, label: 'Clear chat', sub: `${c?.name ?? 'Your friend'} keeps their copy`, tone: 'rose', onPress: () => act(calls.clearChat(topic)) }]}
+        title={t('phoneApp.chat.cantUndo')}
+        options={[{ Icon: Eraser, label: t('phoneApp.chat.clear'), sub: t('phoneApp.chat.keepsCopy', { name: c?.name ?? t('phoneApp.chat.yourFriend') }), tone: 'rose', onPress: () => act(calls.clearChat(topic)) }]}
       />
       <AskClaudePicker visible={picking} onClose={() => setPicking(false)} targets={targets} chosen={ask} onPick={setAsk} members={c?.members} />
     </Screen>
@@ -198,6 +200,7 @@ export default function Chat() {
 function EditMessage({ m, topic, onClose }: { m: ChatMessageView | undefined; topic: Topic; onClose: () => void }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  const t = useT();
   useEffect(() => {
     if (m) setText(m.text);
   }, [m?.id]);
@@ -222,7 +225,7 @@ function EditMessage({ m, topic, onClose }: { m: ChatMessageView | undefined; to
       header={
         <View style={{ paddingHorizontal: 20, paddingBottom: 10 }}>
           <T v="title" style={{ fontSize: 20 }}>
-            Edit your message
+            {t('phoneApp.chat.editTitle')}
           </T>
         </View>
       }
@@ -234,11 +237,11 @@ function EditMessage({ m, topic, onClose }: { m: ChatMessageView | undefined; to
           onChangeText={setText}
           multiline
           editable={!busy}
-          accessibilityLabel="Edit your message"
+          accessibilityLabel={t('phoneApp.chat.editTitle')}
           placeholderTextColor={color.text3}
           style={{ color: color.text, fontSize: 17, lineHeight: 24, minHeight: 72, maxHeight: 220, textAlignVertical: 'top', padding: 12, borderRadius: 14, backgroundColor: color.sunken, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : {}) }}
         />
-        <Button label={busy ? 'Saving…' : 'Save'} Icon={Pencil} disabled={busy || !text.trim()} onPress={() => void save()} />
+        <Button label={busy ? t('phoneApp.chat.saving') : t('common.save')} Icon={Pencil} disabled={busy || !text.trim()} onPress={() => void save()} />
       </View>
     </Sheet>
   );
@@ -246,13 +249,14 @@ function EditMessage({ m, topic, onClose }: { m: ChatMessageView | undefined; to
 
 /** Each person here and what their Claude is doing: "You · working", "ata · offline · 1.1". */
 function People({ members }: { members: readonly ChatMemberView[] }) {
+  const t = useT();
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0, backgroundColor: color.bg }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 8, gap: 6 }}>
       {members.slice(0, 12).map((m) => (
-        <View key={m.peerId} accessibilityLabel={`${m.me ? 'You' : m.name}: ${m.presence ?? ''}, agent ${m.claude ?? ''}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 28, paddingLeft: 3, paddingRight: 10, borderRadius: 14, backgroundColor: color.card, borderWidth: 0.5, borderColor: color.hairline }}>
+        <View key={m.peerId} accessibilityLabel={t('phoneApp.chat.memberA11y', { name: m.me ? t('phoneApp.chat.you') : m.name, presence: m.presence ?? '', agent: m.claude ?? '' })} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 28, paddingLeft: 3, paddingRight: 10, borderRadius: 14, backgroundColor: color.card, borderWidth: 0.5, borderColor: color.hairline }}>
           <Avatar name={m.name} size={22} {...(m.presence ? { presence: m.presence } : {})} />
           <T v="caption" c={color.text} style={{ fontWeight: '700' }}>
-            {m.me ? 'You' : m.name}
+            {m.me ? t('phoneApp.chat.you') : m.name}
           </T>
           {m.claude === 'working' || m.claude === 'idle' ? <SquareTerminal color={toneInk(hueOf(m.name))} size={12} /> : m.claude && /update/.test(m.claude) ? <TriangleAlert color={color.warn} size={12} /> : null}
           {m.claude ? (
@@ -290,13 +294,14 @@ const TONE = { claude: 'claude', ok: 'ok', warn: 'warn', error: 'error', info: '
 /** A task between two people's Claudes (BLG-208): who asks whom, where it is, and what came back. A secret's card is soft red. */
 function TaskCard({ task }: { task: NonNullable<ChatMessageView['task']> }) {
   const tone = TONE[task.tone as keyof typeof TONE] ?? 'info';
+  const t = useT();
   return (
     <View style={{ padding: 12, gap: 6, borderRadius: 18, backgroundColor: task.secret ? tint.rose : color.card, borderWidth: task.secret ? 1 : 0.5, borderColor: task.secret ? color.error : color.hairline }}>
       {task.secret ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Lock color={color.error} size={13} />
           <T v="caption" c={color.error}>
-            A secret · approved on its own, each time
+            {t('phoneApp.chat.secret')}
           </T>
         </View>
       ) : null}
@@ -379,6 +384,7 @@ const unreadBand = (first: boolean, last: boolean) => ({ backgroundColor: `${col
 function Bubble({ m, first, last, group, pics, me, chips }: { m: ChatMessageView; first: boolean; last: boolean; group: boolean; pics: OutputView[]; me?: string | undefined; chips?: React.ReactNode }) {
   const mine = m.mine;
   const files = m.files ?? [];
+  const t = useT();
   if (m.task) {
     return (
       <ClaudeRow owner={m.from} label={m.task.who ?? m.from} first>
@@ -439,7 +445,7 @@ function Bubble({ m, first, last, group, pics, me, chips }: { m: ChatMessageView
         {chips}
         {last || m.edited || m.sentBy ? (
           <T v="caption" style={{ marginHorizontal: 4, fontSize: 11 }}>
-            {[m.sentBy ? `Sent by ${m.sentBy}` : '', m.edited ? 'Edited' : '', last ? ago(m.ts) : '', last && m.delivery ? (m.delivery === 'seen' ? 'Seen' : 'Delivered') : ''].filter(Boolean).join(' · ')}
+            {[m.sentBy ? t('phoneApp.conv.sentBy', { who: m.sentBy }) : '', m.edited ? t('phoneApp.chat.edited') : '', last ? ago(m.ts) : '', last && m.delivery ? (m.delivery === 'seen' ? t('phoneApp.chat.seen') : t('phoneApp.chat.delivered')) : ''].filter(Boolean).join(' · ')}
           </T>
         ) : null}
       </View>
@@ -453,6 +459,7 @@ function Bubble({ m, first, last, group, pics, me, chips }: { m: ChatMessageView
  */
 function Offer({ offer, name }: { offer: NonNullable<ChatMessageView['offer']>; name: string }) {
   const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
+  const t = useT();
   const send = (): void => {
     setState('sending');
     store
@@ -467,12 +474,12 @@ function Offer({ offer, name }: { offer: NonNullable<ChatMessageView['offer']>; 
       </T>
       {state === 'sent' ? (
         <T v="caption" c={ink.peach} style={{ fontWeight: '700' }}>
-          Sent to {name}’s Mac
+          {t('phoneApp.chat.sentTo', { name })}
         </T>
       ) : (
         <Press onPress={send} disabled={state === 'sending'} style={{ alignSelf: 'flex-start', paddingVertical: 7, paddingHorizontal: 12, borderRadius: 12, backgroundColor: color.card }}>
           <T v="caption" c={color.text} style={{ fontWeight: '700' }}>
-            {state === 'sending' ? 'Sending…' : state === 'failed' ? 'Couldn’t send. Try again' : `Ask on ${name}’s Mac`}
+            {state === 'sending' ? t('phoneApp.chat.sending') : state === 'failed' ? t('phoneApp.chat.couldntSend') : t('phoneApp.chat.askOnMac', { name })}
           </T>
         </Press>
       )}

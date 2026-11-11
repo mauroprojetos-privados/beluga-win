@@ -8,6 +8,7 @@ import { Segments } from '../components/Segments';
 import { Button, Card, haptic, Row, T } from '../components/ui';
 import { calls } from '../lib/link/calls';
 import { store } from '../lib/store';
+import { t, useT } from '../lib/language';
 
 interface Agent {
   readonly id: string;
@@ -27,19 +28,22 @@ interface Activity {
   readonly kind: Kind;
 }
 
-const LEVEL_WORDS: Readonly<Record<string, string>> = { ask: 'Asks you each time', trusted: 'Trusted', full: 'Full trust' };
-const KIND_WORDS: Readonly<Record<Kind, string>> = { allowed: 'Allowed', asked: 'Asked', refused: 'Refused' };
-const SHOWN: ReadonlyArray<{ key: Kind | 'all'; label: string }> = [
-  { key: 'all', label: 'All' },
-  { key: 'allowed', label: 'Allowed' },
-  { key: 'asked', label: 'Asked' },
-  { key: 'refused', label: 'Refused' },
+const levelWords = (): Readonly<Record<string, string>> => ({ ask: t('phoneApp.agents.ask'), trusted: t('phoneApp.agents.trusted'), full: t('phoneApp.agents.full') });
+const kindWords = (): Readonly<Record<Kind, string>> => ({ allowed: t('phoneApp.agents.allowed'), asked: t('phoneApp.agents.asked'), refused: t('phoneApp.agents.refused') });
+const shownOptions = (): ReadonlyArray<{ key: Kind | 'all'; label: string }> => [
+  { key: 'all', label: t('phoneApp.agents.all') },
+  { key: 'allowed', label: t('phoneApp.agents.allowed') },
+  { key: 'asked', label: t('phoneApp.agents.asked') },
+  { key: 'refused', label: t('phoneApp.agents.refused') },
 ];
 
 /** Settings › External agents (BLG-122): who holds a grant, stopping or revoking them, and what they did with who decided. */
 export default function Agents() {
   const { scrolled, onScroll } = useScrolled();
   const insets = useSafeAreaInsets();
+  const say = useT();
+  const LEVEL_WORDS = levelWords();
+  const KIND_WORDS = kindWords();
   const [agents, setAgents] = useState<readonly Agent[]>([]);
   const [activity, setActivity] = useState<readonly Activity[]>([]);
   const [shown, setShown] = useState<Kind | 'all'>('all');
@@ -57,36 +61,36 @@ export default function Agents() {
         store.toast({ text: done, tone: 'ok' });
         look(shown);
       },
-      (err: unknown) => store.toast({ text: err instanceof Error ? err.message : 'It did not reach your Mac.', tone: 'error' }),
+      (err: unknown) => store.toast({ text: err instanceof Error ? err.message : say('phoneApp.agents.didntReach'), tone: 'error' }),
     );
   };
 
   return (
     <Screen>
-      <Header scrolled={scrolled} back title="External agents" />
+      <Header scrolled={scrolled} back title={say('phoneApp.settings.agents')} />
       <ScrollView onScroll={onScroll} scrollEventThrottle={32} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: insets.bottom + 40, gap: 12 }}>
-        {agents.length ? <Button label="Stop all agents" onPress={() => act(calls.externalStopAll(), 'Stopped')} /> : <T v="caption">No external agent holds a grant.</T>}
+        {agents.length ? <Button label={say('phoneApp.agents.stopAll')} onPress={() => act(calls.externalStopAll(), say('phoneApp.agents.stopped'))} /> : <T v="caption">{say('phoneApp.agents.none')}</T>}
         {agents.map((a) => (
           <Card key={a.id} style={{ gap: 10 }}>
-            <Row first Icon={Cable} tone="lavender" label={a.name} sub={`${a.suspendedAt === undefined ? '' : 'Suspended · '}${a.route === 'remote' && a.level === 'full' ? '⚠ Full trust from outside this Mac' : (LEVEL_WORDS[a.level] ?? a.level)}`} chevron={false} />
+            <Row first Icon={Cable} tone="lavender" label={a.name} sub={((level) => (a.suspendedAt === undefined ? level : say('phoneApp.agents.suspended', { level })))(a.route === 'remote' && a.level === 'full' ? say('phoneApp.agents.remoteFull') : (LEVEL_WORDS[a.level] ?? a.level))} chevron={false} />
             <View style={{ flexDirection: 'row', gap: 8, padding: 12, paddingTop: 0 }}>
-              <Button flex={1} quiet label="Stop" onPress={() => act(calls.externalStop(a.id, a.name), `Stopped ${a.name}`)} />
-              <Button flex={1} quiet label="Revoke" onPress={() => act(calls.externalRevoke(a.id, a.name), `Revoked ${a.name}`)} />
+              <Button flex={1} quiet label={say('common.stop')} onPress={() => act(calls.externalStop(a.id, a.name), say('phoneApp.agents.stoppedName', { name: a.name }))} />
+              <Button flex={1} quiet label={say('phoneApp.agents.revoke')} onPress={() => act(calls.externalRevoke(a.id, a.name), say('phoneApp.agents.revokedName', { name: a.name }))} />
             </View>
           </Card>
         ))}
         <T v="callout" style={{ fontWeight: '700', marginTop: 8 }}>
-          Activity
+          {say('phoneApp.task.activity')}
         </T>
-        <Segments value={shown} options={SHOWN} onChange={setShown} />
+        <Segments value={shown} options={shownOptions()} onChange={setShown} />
         {activity.length ? (
           <Card>
             {activity.map((a, i) => (
-              <Row key={`${a.ts} ${a.tool} ${a.argsHash}`} first={i === 0} label={`${a.agent}: ${a.tool}`} sub={`${KIND_WORDS[a.kind]} · decided by ${a.decidedBy === 'person' ? 'you' : 'its level'}${a.target ? ` · ${a.target}` : ''}`} chevron={false} />
+              <Row key={`${a.ts} ${a.tool} ${a.argsHash}`} first={i === 0} label={`${a.agent}: ${a.tool}`} sub={`${say(a.decidedBy === 'person' ? 'phoneApp.agents.decidedYou' : 'phoneApp.agents.decidedLevel', { kind: KIND_WORDS[a.kind] })}${a.target ? ` · ${a.target}` : ''}`} chevron={false} />
             ))}
           </Card>
         ) : (
-          <T v="caption">Nothing here yet.</T>
+          <T v="caption">{say('phoneApp.agents.nothing')}</T>
         )}
       </ScrollView>
     </Screen>

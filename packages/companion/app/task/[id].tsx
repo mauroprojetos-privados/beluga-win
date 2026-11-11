@@ -23,9 +23,10 @@ import { openOnMac } from '../../lib/mac';
 import { store } from '../../lib/store';
 import { color } from '../../lib/theme';
 import { agentName } from '../../../../src/shared/agent-label';
+import { t as say0, useT } from '../../lib/language';
 
 /** How hard its drafter judged it (docs/routing.md). */
-const DIFFICULTY_WORDS = { simple: 'Simple', normal: 'Normal', hard: 'Hard' } as const;
+const difficultyWords = () => ({ simple: say0('phoneApp.task.simple'), normal: say0('phoneApp.task.normal'), hard: say0('phoneApp.task.hard') }) as const;
 
 /**
  * One task (BLG-48): its goal (code folded), the acceptance criteria with their ticks, the
@@ -39,6 +40,7 @@ export default function Task() {
   const tasksOn = useSupports('tasks');
   const view = useView<TaskPageView>(tasksOn ? topic : undefined);
   const t = view?.data;
+  const say = useT();
   const insets = useSafeAreaInsets();
   const [menu, setMenu] = useState(false);
   const [moving, setMoving] = useState(false);
@@ -57,7 +59,7 @@ export default function Task() {
     const ws = await store.call<string>(calls.start(t.key, agent), { queue: false }).catch((e: Error) => (store.toast({ text: e.message, tone: 'error' }), undefined));
     setStarting(false);
     if (typeof ws === 'string') {
-      store.toast({ text: `${t.key} started: ${agent ? agent.label : t.agent ? agentName(t.agent) : 'your agent'} is on it`, tone: 'ok' });
+      store.toast({ text: say('phoneApp.task.started', { key: t.key, who: agent ? agent.label : t.agent ? agentName(t.agent) : say('phoneApp.task.yourAgentLower') }), tone: 'ok' });
       router.push(convHref(`conv:ws:${ws}`));
     }
   };
@@ -65,10 +67,10 @@ export default function Task() {
   // Who works it (BLG-498), shown only (BLG-569): with a worktree on it (conv), what runs there (changed
   // in its conversation); else its own agent, or your default.
   const defaultLabel = t?.agents?.groups.find((g) => g.isDefault)?.label;
-  const agentWords = t?.agent ? agentName(t.agent, { model: true }) : defaultLabel ? `Your agent (${defaultLabel})` : 'Your agent';
+  const agentWords = t?.agent ? agentName(t.agent, { model: true }) : defaultLabel ? say('phoneApp.plan.yourAgentIs', { label: defaultLabel }) : say('phoneApp.plan.yourAgent');
   const agentRuntime = t?.agent?.runtime ?? t?.agents?.groups.find((g) => g.isDefault)?.runtime;
   // The main Start is its own agent's (else yours); Start with… lists every agent, from ⋯.
-  const startLabel = t?.agent ? `Start with ${agentName(t.agent)}` : 'Start with your agent';
+  const startLabel = t?.agent ? say('phoneApp.task.startWithAgent', { agent: agentName(t.agent) }) : say('phoneApp.task.startWithYours');
   const canStartWith = Boolean(canStart && t?.agents && agentPicksSupported());
 
   return (
@@ -76,51 +78,51 @@ export default function Task() {
       <Header
         scrolled={scrolled}
         back
-        eyebrow={t ? `${t.key} · ${t.project}` : 'Task'}
-        title={t?.title ?? 'Task'}
+        eyebrow={t ? `${t.key} · ${t.project}` : say('phoneApp.task.task')}
+        title={t?.title ?? say('phoneApp.task.task')}
         at={view?.at}
         lead={t ? <ProjectMark name={t.project} icon={t.icon} size={30} /> : undefined}
         right={
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             {st ? <Pill label={st.label} tone={st.tone} Icon={st.Icon} /> : null}
-            <More onPress={() => setMenu(true)} label="Task options" />
+            <More onPress={() => setMenu(true)} label={say('phoneApp.task.options')} />
           </View>
         }
       />
       <KeyboardLift>
         <ScrollView onScroll={onScroll} scrollEventThrottle={32} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 20, gap: 14 }} keyboardDismissMode="interactive">
-          {!t ? <T v="callout" style={{ textAlign: 'center', marginTop: 40 }}>{tasksOn ? 'Opening the task…' : 'Update Beluga on your Mac to see tasks here.'}</T> : null}
+          {!t ? <T v="callout" style={{ textAlign: 'center', marginTop: 40 }}>{tasksOn ? say('phoneApp.task.opening') : say('phoneApp.task.update')}</T> : null}
           {t ? (
             <Animated.View entering={FadeIn.duration(220)} style={{ gap: 14 }}>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                 {pr && t.priority !== 'none' ? <Pill label={pr.label} tone={pr.tone} /> : null}
-                <Pill label={t.assignee ?? 'No one'} Icon={User} tone={t.assignee ? 'lavender' : 'plain'} />
+                <Pill label={t.assignee ?? say('phoneApp.task.noOne')} Icon={User} tone={t.assignee ? 'lavender' : 'plain'} />
                 {/* On a combo (docs/routing.md): the combo, and the target its newest run went to ("Economy · Codex"). */}
-                {t.difficulty ? <Pill label={DIFFICULTY_WORDS[t.difficulty]} tone="plain" /> : null}
+                {t.difficulty ? <Pill label={difficultyWords()[t.difficulty]} tone="plain" /> : null}
                 {/* 1.52 (docs/routing.md): its kind of work and what it starts on ("Visual · Strong"); changed on the Mac. */}
                 {t.kind?.category ? <Pill label={t.kind.words} Icon={Route} tone="plain" /> : null}
-                {t.kind?.ok !== undefined ? <Pill label={t.kind.ok ? 'Went well' : 'Didn’t go well'} Icon={t.kind.ok ? Check : CircleSlash} tone={t.kind.ok ? 'mint' : 'butter'} /> : null}
+                {t.kind?.ok !== undefined ? <Pill label={t.kind.ok ? say('phoneApp.task.wentWell') : say('phoneApp.task.didntGoWell')} Icon={t.kind.ok ? Check : CircleSlash} tone={t.kind.ok ? 'mint' : 'butter'} /> : null}
                 {t.agent || t.agents ? <Pill label={agentWords} Icon={t.agent?.comboName ? Route : markIcon(runtimeMark(agentRuntime))} tone="plain" /> : null}
                 {t.working ? <Pill label={t.working} Icon={User} tone="mint" /> : null}
                 {t.waiting ? <Pill label={t.waiting} Icon={Clock} tone="butter" /> : null}
-                {t.checks ? <Pill label={`${t.checks.done} of ${t.checks.total} checked`} Icon={Check} tone={t.checks.done === t.checks.total ? 'mint' : 'plain'} /> : null}
+                {t.checks ? <Pill label={say('phoneApp.task.checked', { done: t.checks.done, total: t.checks.total })} Icon={Check} tone={t.checks.done === t.checks.total ? 'mint' : 'plain'} /> : null}
               </View>
 
               {t.kind?.why || t.kind?.outcome ? <T v="caption">{[t.kind.why, t.kind.outcome].filter(Boolean).join(' · ')}</T> : null}
 
-              {canStart ? <Button label={starting ? 'Starting…' : startLabel} Icon={Play} disabled={starting} onPress={() => void start()} /> : null}
-              {t.conv ? <Button label="Open its conversation" Icon={MessageSquare} quiet onPress={() => router.push(convHref(t.conv!))} /> : null}
+              {canStart ? <Button label={starting ? say('phoneApp.task.starting') : startLabel} Icon={Play} disabled={starting} onPress={() => void start()} /> : null}
+              {t.conv ? <Button label={say('phoneApp.task.openConv')} Icon={MessageSquare} quiet onPress={() => router.push(convHref(t.conv!))} /> : null}
 
               {t.goal?.text.trim() ? (
                 <Card style={{ padding: 16, gap: 8 }}>
-                  <T v="eyebrow">Goal</T>
+                  <T v="eyebrow">{say('phoneApp.task.goal')}</T>
                   <Prose prose={t.goal} size={15} tasks />
                 </Card>
               ) : null}
 
               {t.acceptance.length ? (
                 <Card style={{ padding: 16, gap: 10 }}>
-                  <T v="eyebrow">Acceptance</T>
+                  <T v="eyebrow">{say('phoneApp.task.acceptance')}</T>
                   {t.acceptance.map((a, i) => {
                     const done = a.state === 'done';
                     const why = a.state === 'deferred' || a.state === 'not_done';
@@ -135,7 +137,7 @@ export default function Task() {
                           </T>
                           {a.reason ? (
                             <T v="caption" style={{ marginTop: 2 }}>
-                              {a.state === 'deferred' ? 'Deferred' : 'Not done'}: {a.reason}
+                              {a.state === 'deferred' ? say('phoneApp.task.deferred', { reason: a.reason }) : say('phoneApp.task.notDone', { reason: a.reason })}
                             </T>
                           ) : null}
                         </View>
@@ -154,7 +156,7 @@ export default function Task() {
                         <T v="body" style={{ fontWeight: '500' }} numberOfLines={1}>
                           {t.worktree}
                         </T>
-                        <T v="caption">The worktree doing it</T>
+                        <T v="caption">{say('phoneApp.task.worktree')}</T>
                       </View>
                     </Press>
                   ) : null}
@@ -167,7 +169,7 @@ export default function Task() {
                         </T>
                         <T v="caption">
                           {t.pr.state.toLowerCase()}
-                          {t.pr.checks && t.pr.checks !== 'none' ? ` · checks ${t.pr.checks}` : ''}
+                          {t.pr.checks && t.pr.checks !== 'none' ? ` · ${say('phoneApp.task.prChecks', { checks: t.pr.checks })}` : ''}
                         </T>
                       </View>
                     </View>
@@ -178,7 +180,7 @@ export default function Task() {
               {t.activity.length ? (
                 <View style={{ gap: 10 }}>
                   <T v="eyebrow" style={{ paddingHorizontal: 4 }}>
-                    Activity
+                    {say('phoneApp.task.activity')}
                   </T>
                   {t.activity.map((a) => (
                     <Animated.View key={a.id} entering={FadeIn.duration(220)} layout={LinearTransition.duration(180)} style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
@@ -207,8 +209,8 @@ export default function Task() {
         </ScrollView>
         {t ? (
           <Composer
-            placeholder={`Comment on ${t.key}…`}
-            onSend={(text) => void store.call(calls.comment(t.key, text)).then(() => store.toast({ text: 'Commented', tone: 'ok' }), (e: Error) => store.toast({ text: e.message, tone: 'error' }))}
+            placeholder={say('phoneApp.task.comment', { key: t.key })}
+            onSend={(text) => void store.call(calls.comment(t.key, text)).then(() => store.toast({ text: say('phoneApp.task.commented'), tone: 'ok' }), (e: Error) => store.toast({ text: e.message, tone: 'error' }))}
             bottom={insets.bottom}
           />
         ) : null}
@@ -218,24 +220,24 @@ export default function Task() {
         onClose={() => setMenu(false)}
         title={t ? `${t.key} ${t.title}` : undefined}
         options={[
-          { Icon: Play, label: startLabel, sub: `A new worktree, ${t?.agent ? agentName(t.agent) : 'your agent'} working on it`, tone: 'peach', hidden: !canStart, onPress: () => void start() },
-          { Icon: markIcon(runtimeMark(agentRuntime)), label: 'Start with…', sub: 'Another agent or model, for this start only', tone: 'mint', hidden: !canStartWith, onPress: () => setStartWith(true) },
-          { Icon: ArrowRightLeft, label: 'Move to…', sub: st ? `Now ${st.label}` : undefined, tone: 'sky', hidden: !t?.moves.length, onPress: () => setMoving(true) },
-          { Icon: Monitor, label: 'Open on your Mac', sub: 'Its brief, proof and history', tone: 'plain', onPress: () => void openOnMac({ topic }) },
+          { Icon: Play, label: startLabel, sub: say('phoneApp.task.startSub', { who: t?.agent ? agentName(t.agent) : say('phoneApp.task.yourAgentLower') }), tone: 'peach', hidden: !canStart, onPress: () => void start() },
+          { Icon: markIcon(runtimeMark(agentRuntime)), label: say('phoneApp.task.startWithMenu'), sub: say('phoneApp.task.startWithMenuSub'), tone: 'mint', hidden: !canStartWith, onPress: () => setStartWith(true) },
+          { Icon: ArrowRightLeft, label: say('phoneApp.task.moveTo'), sub: st ? say('phoneApp.task.now', { status: st.label }) : undefined, tone: 'sky', hidden: !t?.moves.length, onPress: () => setMoving(true) },
+          { Icon: Monitor, label: say('phone.needs.openOnMac'), sub: say('phoneApp.task.openOnMacSub'), tone: 'plain', onPress: () => void openOnMac({ topic }) },
         ]}
       />
       <Options
         visible={moving}
         onClose={() => setMoving(false)}
-        title={t ? `Move ${t.key} to` : undefined}
+        title={t ? say('phoneApp.task.moveTitle', { key: t.key }) : undefined}
         options={(t?.moves ?? []).map((m) => {
           const s = statusOf(m.status);
-          return { Icon: s.Icon, label: m.label, tone: s.tone, onPress: () => void store.call(calls.move(t!.key, m.status, m.label)).then(() => store.toast({ text: `${t!.key} is ${m.label}`, tone: 'ok' }), (e: Error) => store.toast({ text: e.message, tone: 'error' })) };
+          return { Icon: s.Icon, label: m.label, tone: s.tone, onPress: () => void store.call(calls.move(t!.key, m.status, m.label)).then(() => store.toast({ text: say('phoneApp.task.isNow', { key: t!.key, status: m.label }), tone: 'ok' }), (e: Error) => store.toast({ text: e.message, tone: 'error' })) };
         })}
       />
       <AgentChoiceSheet
-        title="Start with"
-        caption={`A new worktree for ${t?.key ?? 'it'}, worked by the agent you pick. Its own agent stays ${agentWords}.`}
+        title={say('phoneApp.task.startWithTitle')}
+        caption={say('phoneApp.task.startWithCaption', { key: t?.key ?? say('phoneApp.task.it'), agent: agentWords })}
         picker={t?.agents}
         visible={startWith}
         onClose={() => setStartWith(false)}

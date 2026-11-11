@@ -23,6 +23,7 @@ import { appendSpoken } from '../lib/dictate';
 import { color, spring } from '../lib/theme';
 import { useVoice, voiceAvailable } from '../lib/voice';
 import { VoiceButton, VoiceNote, VoiceStage, voiceActive } from '../components/Voice';
+import { t, useT } from '../lib/language';
 
 /**
  * The Ask button's sheet: write, (attach a photo), send. Where it goes is one pill: tap it to
@@ -47,10 +48,10 @@ const ASSISTANT: Topic = 'conv:mac:assistant';
 
 /** How a project takes your words (BLG-69). */
 type Mode = 'worktree' | 'plan' | 'question';
-const MODES: ReadonlyArray<{ mode: Mode; label: string; Icon: typeof Folder; tone: Tone; hint: string }> = [
-  { mode: 'worktree', label: 'Worktree', Icon: GitBranch, tone: 'mint', hint: 'Fix the login redirect and add a test' },
-  { mode: 'plan', label: 'Advanced plan', Icon: Workflow, tone: 'butter', hint: 'Add sign-in with passkeys: milestones and tasks to approve' },
-  { mode: 'question', label: 'Question', Icon: MessageCircleQuestion, tone: 'sky', hint: 'How does the payment flow work?' },
+const modeList = (): ReadonlyArray<{ mode: Mode; label: string; Icon: typeof Folder; tone: Tone; hint: string }> => [
+  { mode: 'worktree', label: t('phoneApp.ask.worktree'), Icon: GitBranch, tone: 'mint', hint: t('phoneApp.ask.worktreeHint') },
+  { mode: 'plan', label: t('phoneApp.ask.plan'), Icon: Workflow, tone: 'butter', hint: t('phoneApp.ask.planHint') },
+  { mode: 'question', label: t('phoneApp.ask.question'), Icon: MessageCircleQuestion, tone: 'sky', hint: t('phoneApp.ask.questionHint') },
 ];
 
 export default function Ask() {
@@ -58,6 +59,8 @@ export default function Ask() {
   // A start that didn't go gives its words back (and where they were going): from its screen, or left for here.
   const [back] = useState(() => (params.text !== undefined ? { text: params.text, target: params.to, how: params.how } : sends.draft));
   const [visible, setVisible] = useState(true);
+  const say = useT();
+  const MODES = modeList();
   // Runs on (BLG-810): This Mac (none) or one of your computers, the last pick kept while it's still yours.
   const computers = useComputers();
   const [runsOn, setRunsOn] = useState<string | undefined>(() => kv.get<string>('runs-on') || undefined);
@@ -89,13 +92,13 @@ export default function Ask() {
     const t: Target[] = [];
     // Your Mac: the chat open on the Mac (it has tabs since BLG-102); its other chats working now are below, by their names.
     const mac = home?.data.assistant?.topic && isMacTopic(home.data.assistant.topic) ? home.data.assistant.topic : ASSISTANT;
-    if (can('assistant')) t.push({ kind: 'mac', topic: mac, label: home?.data.assistant?.title?.split(' · ')[0] || (onComputer?.computer.name ?? 'Your Mac') });
+    if (can('assistant')) t.push({ kind: 'mac', topic: mac, label: home?.data.assistant?.title?.split(' · ')[0] || (onComputer?.computer.name ?? say('phone.home.yourMac')) });
     // Only your own projects take a new chat: not the room, a friend's shared project or "Asked of
     // friends" (views.ts groups those under 'room', 'shared:…' and 'asked').
     for (const p of work?.data.projects ?? []) if (p.id !== 'room' && p.id !== 'asked' && !p.id.startsWith('shared:')) t.push({ kind: 'project', id: p.id, label: p.name, ...(p.icon ? { icon: p.icon } : {}), ...(p.conversations.length ? {} : { empty: true }) });
     for (const c of home?.data.running ?? []) if (c.topic !== mac) t.push({ kind: 'conv', topic: c.topic, label: c.title, ...(c.project ? { project: c.project } : {}), ...(c.icon ? { icon: c.icon } : {}) });
     // Friends are asked from your Mac (with it closed, from your Always On: BLG-850).
-    if (!on) for (const p of people?.data.people ?? []) if (p.presence !== 'offline') t.push({ kind: 'friend', id: p.peerId, name: p.name, label: `${p.name}'s agent` });
+    if (!on) for (const p of people?.data.people ?? []) if (p.presence !== 'offline') t.push({ kind: 'friend', id: p.peerId, name: p.name, label: say('phoneApp.ask.friendAgent', { name: p.name }) });
     return t;
   }, [work, home, people, on]);
   const [sel, setSel] = useState<string | undefined>();
@@ -164,9 +167,9 @@ export default function Ask() {
   const groups: { title: string; kind: Target['kind'] }[] = [
     // Your Mac is its own row, first: no heading over it.
     { title: '', kind: 'mac' },
-    { title: 'New in a project', kind: 'project' },
-    { title: 'Add to a conversation', kind: 'conv' },
-    { title: "A friend's agent", kind: 'friend' },
+    { title: say('phoneApp.ask.newInProject'), kind: 'project' },
+    { title: say('phoneApp.ask.addToConv'), kind: 'conv' },
+    { title: say('phoneApp.ask.friendsAgent'), kind: 'friend' },
   ];
 
   return (
@@ -174,9 +177,9 @@ export default function Ask() {
       <Sheet visible={visible} onDismiss={close}>
         <View style={{ paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <T v="title" numberOfLines={1} style={{ flex: 1, fontSize: 22 }}>
-            {onComputer ? `Ask ${onComputer.computer.name}` : 'Ask your Mac'}
+            {onComputer ? say('phoneApp.ask.askComputer', { name: onComputer.computer.name }) : say('phone.home.askYourMac')}
           </T>
-          <Press onPress={close} accessibilityLabel="Close" hitSlop={10} style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: color.sunken }}>
+          <Press onPress={close} accessibilityLabel={say('common.close')} hitSlop={10} style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: color.sunken }}>
             <X color={color.text2} size={17} />
           </Press>
         </View>
@@ -211,7 +214,7 @@ export default function Ask() {
                           </T>
                           {t.kind === 'project' && t.empty ? (
                             <T v="caption" numberOfLines={1}>
-                              No conversations yet
+                              {say('phone.work.noConversations')}
                             </T>
                           ) : null}
                         </View>
@@ -234,7 +237,7 @@ export default function Ask() {
                   value={text}
                   onChangeText={setText}
                   multiline
-                  placeholder={target?.kind === 'friend' ? `What should ${target.name}'s agent do?` : target?.kind === 'project' && modes ? MODES.find((m) => m.mode === how)!.hint : target?.kind === 'mac' ? 'Take a screenshot and send it to me' : 'Run the tests and send me a screenshot'}
+                  placeholder={target?.kind === 'friend' ? say('phoneApp.ask.friendHint', { name: target.name }) : target?.kind === 'project' && modes ? MODES.find((m) => m.mode === how)!.hint : target?.kind === 'mac' ? say('phoneApp.ask.macHint') : say('phoneApp.ask.convHint')}
                   placeholderTextColor={color.text3}
                   style={{ color: color.text, fontSize: 19, lineHeight: 26, minHeight: 92, maxHeight: 200, textAlignVertical: 'top', ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : {}) }}
                 />
@@ -242,7 +245,7 @@ export default function Ask() {
               {photo ? (
                 <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(150)} style={{ width: 80, height: 80, borderRadius: 16, overflow: 'hidden', marginTop: 6 }}>
                   <Image source={{ uri: photo.uri }} style={{ flex: 1 }} contentFit="cover" />
-                  <Press onPress={() => setPhoto(undefined)} accessibilityLabel="Remove photo" style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: color.card }}>
+                  <Press onPress={() => setPhoto(undefined)} accessibilityLabel={say('phoneApp.ask.removePhoto')} style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: color.card }}>
                     <X color={color.text2} size={13} />
                   </Press>
                 </Animated.View>
@@ -252,15 +255,15 @@ export default function Ask() {
             {target?.kind === 'project' && modes ? <ModeChips mode={mode} onMode={setMode} planFirst={planFirst} onPlanFirst={setPlanFirst} agent={agent} onAgent={setAgent} /> : null}
             {computers.length ? <RunsOnRow on={onComputer} onPress={() => setChoosing(true)} /> : null}
             <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4, gap: 10 }}>
-              <Press onPress={() => setPicking(true)} accessibilityLabel="Where it goes" style={{ flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: 8, height: 44, paddingLeft: 6, paddingRight: 12, borderRadius: 22, backgroundColor: color.sunken }}>
+              <Press onPress={() => setPicking(true)} accessibilityLabel={say('phoneApp.ask.whereItGoes')} style={{ flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: 8, height: 44, paddingLeft: 6, paddingRight: 12, borderRadius: 22, backgroundColor: color.sunken }}>
                 {target ? mark(target, 32) : null}
                 <T v="callout" c={color.text} numberOfLines={1} style={{ fontWeight: '600', flexShrink: 1 }}>
-                  {target?.label ?? 'Where'}
+                  {target?.label ?? say('phoneApp.voice.where')}
                 </T>
                 <ChevronDown color={color.text2} size={16} />
               </Press>
               {!photos ? null : (
-              <Press onPress={async () => setPhoto((await pickPhoto().catch(() => undefined)) ?? photo)} accessibilityLabel="Add a photo" style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: color.sunken }}>
+              <Press onPress={async () => setPhoto((await pickPhoto().catch(() => undefined)) ?? photo)} accessibilityLabel={say('phoneApp.ask.addPhoto')} style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: color.sunken }}>
                 <ImagePlus color={color.text2} size={20} />
               </Press>
               )}
@@ -280,7 +283,7 @@ export default function Ask() {
               <Press
                 disabled={!text.trim() && !speaking}
                 onPress={() => (speaking ? (haptic.commit(), voice.finish('send')) : send())}
-                accessibilityLabel={speaking ? 'Send it as you said it' : 'Send'}
+                accessibilityLabel={speaking ? say('phoneApp.ask.sendSaid') : say('common.send')}
                 style={{ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: text.trim() || speaking ? color.primary : color.sunken }}
               >
                 <ArrowUp color={text.trim() || speaking ? color.onPrimary : color.text3} size={22} strokeWidth={2} />
@@ -293,7 +296,7 @@ export default function Ask() {
         window
         visible={choosing}
         onClose={() => setChoosing(false)}
-        title="Runs on"
+        title={say('phoneApp.ask.runsOn')}
         options={runsOnOptions(computers, (id) => {
           setRunsOn(id);
           kv.set('runs-on', id ?? '');
@@ -317,9 +320,10 @@ function planCall(project: string, goal: string, agent: PickedAgent | undefined)
  * Who works a new worktree (BLG-506) or an advanced plan (BLG-498) sits beside them the same way: Your agent unless you pick another.
  */
 function ModeChips({ mode, onMode, planFirst, onPlanFirst, agent, onAgent }: { readonly mode: Mode; readonly onMode: (m: Mode) => void; readonly planFirst: boolean; readonly onPlanFirst: (on: boolean) => void; readonly agent: PickedAgent | undefined; readonly onAgent: (a: PickedAgent | undefined) => void }) {
+  useT();
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingTop: 10 }}>
-      {MODES.map((m) => {
+      {modeList().map((m) => {
         const on = m.mode === mode;
         return (
           <Press
@@ -345,17 +349,18 @@ function ModeChips({ mode, onMode, planFirst, onPlanFirst, agent, onAgent }: { r
 
 /** Plan mode for a new worktree: its Claude plans first and asks you to approve (the Mac's Plan chip). */
 function PlanFirst({ on, onChange }: { readonly on: boolean; readonly onChange: (on: boolean) => void }) {
+  const say = useT();
   return (
     <Press
       onPress={() => (haptic.tap(), onChange(!on))}
       accessibilityRole="switch"
       accessibilityState={{ checked: on }}
-      accessibilityLabel="Plan mode: the agent plans first"
+      accessibilityLabel={say('phoneApp.ask.planModeA11y')}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, paddingHorizontal: 10, borderRadius: 17, backgroundColor: on ? toneBg('lavender') : color.sunken }}
     >
       <ListChecks color={on ? toneInk('lavender') : color.text2} size={15} strokeWidth={1.9} />
       <T v="caption" c={on ? toneInk('lavender') : color.text2} style={{ fontWeight: '700' }}>
-        Plan first
+        {say('phoneApp.ask.planFirst')}
       </T>
     </Press>
   );

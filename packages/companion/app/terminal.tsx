@@ -19,6 +19,7 @@ import { store, type TermFrame } from '../lib/store';
 import { terminalPage } from '../lib/terminal/page';
 import { readFont, stepFont, TERM_FONT_KEY, type TermFont, FONT_MAX, FONT_MIN } from '../lib/terminal/zoom';
 import { color, ink, scheme, tint } from '../lib/theme';
+import { useT } from '../lib/language';
 
 /**
  * A worktree's terminal on the phone (BLG-42): the very session the Mac's terminal dock shows.
@@ -51,6 +52,7 @@ function SizeStep({ Icon, label, on, disabled, onPress }: { readonly Icon: Lucid
 export default function Terminal() {
   const { topic, key: wanted, title } = useLocalSearchParams<{ topic: string; key?: string; title?: string }>();
   const t = topic as Topic;
+  const say = useT();
   const insets = useSafeAreaInsets();
   const link = useLink();
   const opened = useRef(false);
@@ -117,7 +119,7 @@ export default function Terminal() {
       return;
     }
     if (m.t === 'input' && term) {
-      if (!store.termInput(term.key, m.data)) store.toast({ text: 'Your Mac is away, so that wasn’t sent.', tone: 'warn' });
+      if (!store.termInput(term.key, m.data)) store.toast({ text: say('phoneApp.terminal.awayNotSent'), tone: 'warn' });
       return;
     }
     if (m.t === 'ctrlUsed') return setCtrl(false);
@@ -135,7 +137,7 @@ export default function Terminal() {
   const paste = async () => {
     const text = await Clipboard.getStringAsync().catch(() => '');
     if (text) send({ t: 'paste', text });
-    else store.toast({ text: 'Nothing to paste', tone: 'info' });
+    else store.toast({ text: say('phoneApp.terminal.nothingToPaste'), tone: 'info' });
   };
 
   const showMenu = () => {
@@ -152,10 +154,10 @@ export default function Terminal() {
     <Screen>
       <Header
         back
-        title={term?.label ?? 'Terminal'}
-        eyebrow={['Shared with your Mac', status ? `${status.cols}×${status.rows}` : undefined].filter(Boolean).join(' · ')}
+        title={term?.label ?? say('phoneApp.conv.terminal')}
+        eyebrow={[say('phoneApp.terminal.shared'), status ? `${status.cols}×${status.rows}` : undefined].filter(Boolean).join(' · ')}
         lead={<IconBadge Icon={SquareTerminal} tone="lavender" size={30} />}
-        right={<More onPress={showMenu} label="Terminal options" />}
+        right={<More onPress={showMenu} label={say('phoneApp.terminal.options')} />}
       />
       <KeyboardLift>
         <View style={{ flex: 1, marginHorizontal: 10, borderRadius: 16, overflow: 'hidden', backgroundColor: scheme === 'dark' ? '#17171A' : '#FBFBFC', borderWidth: 0.5, borderColor: color.hairline }}>
@@ -167,7 +169,7 @@ export default function Terminal() {
               </T>
               <Press onPress={() => open(wanted ? { key: wanted } : {})}>
                 <T v="callout" c={color.info}>
-                  Try again
+                  {say('phoneApp.pair.tryAgain')}
                 </T>
               </Press>
             </Animated.View>
@@ -176,18 +178,18 @@ export default function Terminal() {
           ) : (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
               <ActivityIndicator color={color.text2} />
-              <T v="caption">Opening the terminal on your Mac…</T>
+              <T v="caption">{say('phoneApp.terminal.opening')}</T>
             </View>
           )}
         </View>
         {ended || away ? (
           <Animated.View entering={FadeIn} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 14, marginTop: 8 }}>
-            <Pill label={away ? 'Your Mac is away' : status?.gone ? 'This terminal closed' : `Ended${status?.exit !== undefined && status.exit !== null ? ` · exit ${status.exit}` : ''}`} tone={away ? 'butter' : 'plain'} />
+            <Pill label={away ? say('phoneApp.voice.macAway') : status?.gone ? say('phoneApp.terminal.closed') : status?.exit !== undefined && status.exit !== null ? say('phoneApp.terminal.endedExit', { code: status.exit }) : say('phoneApp.terminal.ended')} tone={away ? 'butter' : 'plain'} />
             {!away && term ? (
               <Press onPress={() => open(status?.gone ? {} : { key: term.key })} style={{ height: 30, paddingHorizontal: 12, borderRadius: 15, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: tint.mint }}>
                 <RotateCcw color={color.ok} size={14} />
                 <T v="caption" c={color.ok} style={{ fontWeight: '700' }}>
-                  {status?.gone ? 'Open its shell' : 'Start again'}
+                  {status?.gone ? say('phoneApp.terminal.openShell') : say('phoneApp.terminal.startAgain')}
                 </T>
               </Press>
             ) : null}
@@ -205,37 +207,37 @@ export default function Terminal() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 10 }}>
               <View style={{ flex: 1 }}>
                 <T v="body" style={{ fontWeight: '500' }}>
-                  Text size
+                  {say('phoneApp.terminal.textSize')}
                 </T>
-                <T v="caption">{font.fit ? `Fits the width · ${Math.round(font.size * 10) / 10} px` : `${font.size} px · pinch to zoom`}</T>
+                <T v="caption">{font.fit ? say('phoneApp.terminal.fits', { size: Math.round(font.size * 10) / 10 }) : say('phoneApp.terminal.pinch', { size: font.size })}</T>
               </View>
-              <SizeStep Icon={AArrowDown} label="Smaller text" disabled={font.size <= FONT_MIN} onPress={() => setSize(stepFont(font.size, -1))} />
-              <SizeStep Icon={AArrowUp} label="Larger text" disabled={!font.fit && font.size >= FONT_MAX} onPress={() => setSize(stepFont(font.size, 1))} />
-              <SizeStep Icon={Maximize2} label="Fit to the width" on={font.fit} onPress={() => setSize('fit')} />
+              <SizeStep Icon={AArrowDown} label={say('phoneApp.terminal.smaller')} disabled={font.size <= FONT_MIN} onPress={() => setSize(stepFont(font.size, -1))} />
+              <SizeStep Icon={AArrowUp} label={say('phoneApp.terminal.larger')} disabled={!font.fit && font.size >= FONT_MAX} onPress={() => setSize(stepFont(font.size, 1))} />
+              <SizeStep Icon={Maximize2} label={say('phoneApp.terminal.fit')} on={font.fit} onPress={() => setSize('fit')} />
             </View>
           ) : undefined
         }
         options={[
           ...others
             .filter((o) => o.key !== term?.key)
-            .map((o) => ({ Icon: SquareTerminal, label: o.label, sub: o.running ? undefined : 'Ended', tone: 'lavender' as const, onPress: () => open({ key: o.key }) })),
-          { Icon: Plus, label: 'New terminal', tone: 'mint', onPress: () => open({ fresh: true }) },
-          { Icon: Trash2, label: 'Close terminal…', tone: 'rose', hidden: !term || !status?.running, onPress: () => setConfirm(true) },
+            .map((o) => ({ Icon: SquareTerminal, label: o.label, sub: o.running ? undefined : say('phoneApp.terminal.ended'), tone: 'lavender' as const, onPress: () => open({ key: o.key }) })),
+          { Icon: Plus, label: say('phoneApp.terminal.new'), tone: 'mint', onPress: () => open({ fresh: true }) },
+          { Icon: Trash2, label: say('phoneApp.terminal.close'), tone: 'rose', hidden: !term || !status?.running, onPress: () => setConfirm(true) },
         ]}
       />
       <Options
         visible={confirm}
         onClose={() => setConfirm(false)}
-        title={`End ${term?.label ?? 'this terminal'} on your Mac? What runs in it stops.`}
+        title={say('phoneApp.terminal.endTitle', { label: term?.label ?? say('phoneApp.terminal.thisTerminal') })}
         options={[
           {
             Icon: Trash2,
-            label: 'Close for both',
+            label: say('phoneApp.terminal.closeBoth'),
             tone: 'rose',
             onPress: () => {
               if (!term) return;
               store.call(calls.termClose(term.key), { queue: false }).then(
-                () => store.toast({ text: `${term.label} closed`, tone: 'ok' }),
+                () => store.toast({ text: say('phoneApp.terminal.closedToast', { label: term.label }), tone: 'ok' }),
                 (e: Error) => store.toast({ text: e.message, tone: 'error' }),
               );
             },

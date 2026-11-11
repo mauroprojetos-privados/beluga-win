@@ -12,25 +12,28 @@ import { calls } from '../../lib/link/calls';
 import type { PeopleView, Topic } from '../../lib/link/protocol';
 import { store } from '../../lib/store';
 import { color } from '../../lib/theme';
+import { t, useT } from '../../lib/language';
 
-const WORD = { online: 'Online', away: 'Away', dnd: 'Busy', offline: 'Offline' } as const;
-const UPDATE_WORD = { them: 'Needs a Beluga update', you: 'Update Beluga to reach them' } as const;
-const OFFER: Record<string, { label: string; Icon: typeof Eye }> = { screen: { label: 'Screen', Icon: Eye }, commands: { label: 'Commands', Icon: SquareTerminal }, files: { label: 'Files', Icon: FolderOpen } };
+const word = () => ({ online: t('phone.people.online'), away: t('phone.people.away'), dnd: t('phone.people.busy'), offline: t('phone.people.offline') }) as const;
+const updateWord = () => ({ them: t('phone.people.theyNeedUpdate'), you: t('phone.people.youNeedUpdate') }) as const;
+const offer = (): Record<string, { label: string; Icon: typeof Eye }> => ({ screen: { label: t('phoneApp.person.screen'), Icon: Eye }, commands: { label: t('phoneApp.person.commands'), Icon: SquareTerminal }, files: { label: t('phoneApp.conv.files'), Icon: FolderOpen } });
 
 /** A friend: Message, Ask their Claude, Screenshot of their desktop. */
 export default function Person() {
   const { scrolled, onScroll } = useScrolled();
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
+  const say = useT();
   const view = useView<PeopleView>('people');
   const p = view?.data.people.find((x) => x.peerId === decodeURIComponent(id ?? ''));
   if (!p) {
     return (
       <Screen>
-        <Header back title="Friend" />
+        <Header back title={say('phoneApp.person.friend')} />
       </Screen>
     );
   }
+  const OFFER = offer();
   const canScreen = p.offers.includes('screen');
   const reachable = p.presence !== 'offline';
 
@@ -38,7 +41,7 @@ export default function Person() {
     haptic.commit();
     const r = await store.call<{ topic?: Topic }>(calls.screenshot(p.peerId, p.name)).catch((e: Error) => (store.toast({ text: e.message, tone: 'error' }), undefined));
     if (r?.topic) router.push(convHref(r.topic));
-    else store.toast({ text: `Asked ${p.name}'s agent for a screenshot.`, tone: 'ok' });
+    else store.toast({ text: say('phoneApp.person.askedShot', { name: p.name }), tone: 'ok' });
   };
 
   const action = (Icon: typeof Sparkles, label: string, tone: Tone, onPress: () => void, disabled: boolean, delay: number) => (
@@ -67,40 +70,40 @@ export default function Person() {
             {p.emoji && !p.update && p.presence !== 'offline' ? ` ${p.emoji}` : ''}
           </T>
           <T v="callout" style={{ marginTop: 2 }}>
-            {p.update ? UPDATE_WORD[p.update] : WORD[p.presence]}
+            {p.update ? updateWord()[p.update] : word()[p.presence]}
             {p.note && !p.update ? ` · ${p.note}` : ''}
           </T>
           {p.beluga ? (
             <T v="caption" style={{ marginTop: 2 }}>
-              Beluga {p.beluga}
+              {say('phoneApp.settings.belugaVersion', { version: p.beluga })}
             </T>
           ) : null}
         </View>
 
         <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginTop: 24 }}>
-          {action(MessageCircle, 'Message', 'sky', () => p.chat && router.push(chatHref(p.chat)), !p.chat, 40)}
-          {action(Sparkles, 'Ask their agent', 'peach', () => router.push({ pathname: '/ask', params: { friend: p.peerId } }), !reachable, 80)}
-          {action(Monitor, 'Screenshot', 'lavender', () => void screenshot(), !canScreen || !reachable, 120)}
+          {action(MessageCircle, say('phoneApp.person.message'), 'sky', () => p.chat && router.push(chatHref(p.chat)), !p.chat, 40)}
+          {action(Sparkles, say('phoneApp.person.askAgent'), 'peach', () => router.push({ pathname: '/ask', params: { friend: p.peerId } }), !reachable, 80)}
+          {action(Monitor, say('phoneApp.person.screenshot'), 'lavender', () => void screenshot(), !canScreen || !reachable, 120)}
         </View>
         {!canScreen ? (
           <T v="caption" style={{ textAlign: 'center', marginTop: 8 }}>
-            {p.name} hasn't shared their screen with your agent.
+            {say('phoneApp.person.notShared', { name: p.name })}
           </T>
         ) : null}
 
         {p.usage ? (
           <Animated.View entering={FadeIn.duration(180)} style={{ marginTop: 24, marginHorizontal: 16 }}>
             <Card style={{ padding: 16, gap: 14 }}>
-              <T v="heading">Usage</T>
+              <T v="heading">{say('phone.home.usage')}</T>
               <UsageBars usage={p.usage} />
             </Card>
           </Animated.View>
         ) : null}
 
         <Animated.View entering={FadeIn.duration(180)} style={{ marginTop: 24, paddingHorizontal: 20, gap: 10 }}>
-          <T v="eyebrow">Your agent can use</T>
+          <T v="eyebrow">{say('phoneApp.person.canUse')}</T>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {p.offers.length ? p.offers.map((o) => <Pill key={o} label={OFFER[o]?.label ?? o} Icon={OFFER[o]?.Icon} tone="mint" />) : <T v="callout">Only chat</T>}
+            {p.offers.length ? p.offers.map((o) => <Pill key={o} label={OFFER[o]?.label ?? o} Icon={OFFER[o]?.Icon} tone="mint" />) : <T v="callout">{say('phoneApp.person.onlyChat')}</T>}
           </View>
         </Animated.View>
       </ScrollView>
