@@ -22,7 +22,7 @@ export const PANES: ReadonlyArray<PaneInfo<SettingsPane> & { icon: IconName; key
   { id: 'computers', label: 'Your Computers', icon: 'server', keywords: 'machines servers mac mini aws cloud ssh remote linux pair' },
   { id: 'voice', label: 'Voice', icon: 'mic', keywords: 'dictation speech microphone talk transcribe' },
   { id: 'keyboard', label: 'Keyboard', icon: 'command', keywords: 'shortcuts keys hotkeys bindings' },
-  { id: 'advanced', label: 'Advanced', icon: 'wrench', keywords: 'web access browser agent threads' },
+  { id: 'advanced', label: 'Advanced', icon: 'wrench', keywords: 'engine wsl linux web access browser agent threads' },
   { id: 'experimental', label: 'Experimental', icon: 'flask', keywords: 'labs beta early preview features try' },
   { id: 'about', label: 'About', icon: 'globe', keywords: 'version logs support' },
 ];
@@ -94,6 +94,12 @@ export const SETTINGS: readonly Entry[] = [
   ]),
   group('claude', 'Your agents', 'Each agent Beluga can run, and how to set it up.', 'sign in install login claude code codex'),
   ...rows('claude', 'Your agents', [['Signed in or installed one just now?', 'Check Again looks for your agents now.', 'check again refresh']]),
+  group('claude', 'Combos', 'Agents and models in order: each run goes to the first that can run.', 'combo routing fallback chain economy strong local first cheap tokens failover'),
+  ...rows('claude', 'Combos', [
+    ['Agents in order', 'Each run goes to the first that can run then.', 'combo routing fallback order'],
+    ['By how hard a task is', 'A task that names no agent starts on the combo for its difficulty.', 'difficulty simple normal hard classify task combo'],
+    ['By role', 'The combo a plan head, milestones, the checker and the PR reviewer run on.', 'role plan head milestone checker cross vendor reviewer pull request combo'],
+  ]),
   group('claude', 'Launch flags', 'Your own flags for claude and codex.', 'args arguments cli flags dangerously skip permissions'),
   ...rows('claude', 'Launch flags', [
     ['Claude Code', 'Your own flags for claude.', 'flags arguments cli'],
@@ -311,6 +317,7 @@ export const SETTINGS: readonly Entry[] = [
   ]),
 
   // Advanced
+  ...rows('advanced', 'Engine', [['Where Beluga runs', 'On Windows, or in a WSL distro.', 'engine wsl linux ubuntu distro windows subsystem remote daemon']]),
   ...rows('advanced', 'Web access', [
     ['Open Beluga in a browser', 'Use Beluga from a browser.', 'web browser remote access'],
     ['Reached from', 'This computer, your network, or anywhere.', 'local network tunnel internet'],

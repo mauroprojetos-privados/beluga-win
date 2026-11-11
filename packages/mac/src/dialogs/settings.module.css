@@ -444,3 +444,11 @@
 .fullWarning {
   color: var(--error, #b3261e);
 }
+
+/* Settings › Advanced › Engine: why the engine couldn't move, and how to install what's missing. */
+.engineError {
+  padding: 6px 14px;
+  color: var(--error);
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+}

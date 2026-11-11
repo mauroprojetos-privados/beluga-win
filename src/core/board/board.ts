@@ -4,6 +4,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import { readJson, writeJson } from '../../net/mesh/files.js';
 import { AgentRef } from '../../protocol.js';
+import { DIFFICULTIES, type Difficulty } from '../routing/model.js';
 import { agentName } from '../../shared/agent-label.js';
 import type { Store } from '../store.js';
 import { unexplained } from './criteria.js';
@@ -80,6 +81,7 @@ export interface NewIssue {
   readonly title: string;
   readonly status?: IssueStatus;
   readonly priority?: Priority;
+  readonly difficulty?: Difficulty;
   readonly assignee?: Assignee;
   readonly labels?: readonly string[];
   readonly estimate?: number;
@@ -107,6 +109,7 @@ export interface IssueDraft {
   readonly acceptance: readonly string[];
   readonly labels: readonly string[];
   readonly priority?: Priority;
+  readonly difficulty?: Difficulty;
 }
 
 export interface IssuePatch {
@@ -191,6 +194,8 @@ const SavedIssue = z
     origin: z.enum(['manual', 'worktree', 'claude', 'plan', 'sync', 'github']).default('manual'),
     // The agent that works it (BLG-497): one that doesn't read is let go (your default works it).
     agent: AgentRef.optional().catch(undefined),
+    // How hard it is (docs/routing.md): one that doesn't read is let go.
+    difficulty: z.enum(DIFFICULTIES).optional().catch(undefined),
   })
   .passthrough();
 
@@ -337,6 +342,7 @@ export class Board {
       ...(input.drafting ? { drafting: true } : {}),
       status,
       priority: input.priority ?? 'none',
+      ...(input.difficulty ? { difficulty: input.difficulty } : {}),
       labels: this.allowedLabels(boardId, input.labels ?? [], [], by, origin),
       ...(input.estimate ? { estimate: input.estimate } : {}),
       ...(input.due && DAY.test(input.due) ? { due: input.due } : {}),
@@ -508,6 +514,7 @@ export class Board {
         brief,
         labels: cleanLabels([...issue.labels, ...inSet(labelsFor(this.state(), boardOf(issue)), draft.labels).known]),
         ...(draft.priority && issue.priority === 'none' ? { priority: draft.priority } : {}),
+        ...(draft.difficulty && !issue.difficulty ? { difficulty: draft.difficulty } : {}),
       },
       [this.entry(by, 'brief', 'wrote the title and goal')],
     );

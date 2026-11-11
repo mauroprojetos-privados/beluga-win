@@ -26,10 +26,12 @@ import { ContextSettings } from './ContextSettings.js';
 import { UsageLimitSettings } from './UsageLimitSettings.js';
 import { ParallelSettings } from './ParallelSettings.js';
 import { AgentThreadsSettings, ThreadLimitsSettings } from './AgentThreadsSettings.js';
+import { EngineLocationSettings } from './EngineLocationSettings.js';
 import { ChatLimitSettings } from './ChatLimitSettings.js';
 import { McpSettings } from './McpSettings.js';
 import { ExternalAgentsSettings } from './ExternalAgentsSettings.js';
 import { LaunchFlagsSettings } from './LaunchFlagsSettings.js';
+import { CombosSettings } from './CombosSettings.js';
 import { LocalModelsSettings } from './LocalModelsSettings.js';
 import { EarningsSettings } from './EarningsSettings.js';
 import { NotificationSettings } from './NotificationSettings.js';
@@ -411,6 +413,7 @@ function AgentPane() {
         </Row>
       </Group>
       <AgentsGroup mine={runtime} />
+      <CombosSettings />
       <LaunchFlagsSettings />
       <McpSettings />
       <div id={LOCAL_MODELS_ID}>
@@ -682,6 +685,7 @@ const BODY: Record<SettingsPane, () => ReactNode> = {
 function Advanced() {
   return (
     <>
+      <EngineLocationSettings />
       <WebAccessSettings />
       <AgentThreadsSettings />
     </>

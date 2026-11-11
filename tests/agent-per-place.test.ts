@@ -12,6 +12,7 @@ import { WorkspaceController } from '../src/core/workspace-controller.js';
 import type { AgentRef } from '../src/protocol.js';
 import { WorkspaceManager } from '../src/workspaces/manager.js';
 import { WorkspaceStore } from '../src/workspaces/store.js';
+import { encodeFailure } from '../src/shared/run-failure.js';
 import { screenOver } from './helpers.js';
 
 /** BLG-445: each place carries its agent, and a session id only ever goes back to the runtime that made it. */
@@ -73,6 +74,26 @@ describe('a place and its agent', () => {
     expect(again.find(ws.id)).toMatchObject({ agent: { runtime: 'codex', label: 'Codex' }, model: 'gpt-5-codex' });
     const plain = (await ctl.newWorktree(projectId(), 'plain', { quiet: true }))!;
     expect(ctl.place(`ws:${plain.id}`)?.agent).toBeUndefined();
+  });
+
+  it('a combo runs on its first target that can run, in that runtime’s own session (docs/routing.md)', async () => {
+    store.dispatch({ type: 'runtimes', runtimes: [{ id: 'claude', label: 'Claude', available: true }, { id: 'codex', label: 'Codex', available: true }] } as never);
+    const ECONOMY: AgentRef = { runtime: 'claude', label: 'Economy', combo: 'economy', comboName: 'Economy' };
+    const ws = (await ctl.newWorktree(projectId(), 'cheap', { quiet: true, agent: ECONOMY }))!;
+    const ch = `ws:${ws.id}`;
+    expect(ctl.place(ch)).toMatchObject({ agent: { runtime: 'claude', label: 'Claude', model: 'sonnet', combo: 'economy', comboName: 'Economy' }, model: 'sonnet', route: { combo: 'economy', index: 0 } });
+    ctl.place(ch)!.onSession('claude-session');
+    // Claude stops on its usage limit: the next run goes to Codex, which doesn't get Claude's session.
+    const me = store.getState().selfId;
+    store.dispatch({ type: 'agent_event', owner: me, requestId: 'r1', requester: me, event: 'error', text: encodeFailure({ kind: 'usage_limit', resetsAt: Date.now() + 3_600_000, detail: 'limit' }), ts: Date.now(), channel: ch, agent: ctl.place(ch)!.agent });
+    expect(ctl.place(ch)).toMatchObject({ agent: { runtime: 'codex', label: 'Codex', combo: 'economy' }, resume: undefined, route: { combo: 'economy', index: 1 } });
+    expect(ctl.place(ch)?.model).toBeUndefined();
+    // Nothing left: the run doesn't start, and says why. (Codex gone, the defaults leave it out.)
+    store.dispatch({ type: 'runtimes', runtimes: [{ id: 'claude', label: 'Claude', available: true }, { id: 'codex', label: 'Codex', available: false, why: "Codex isn't set up on this Mac yet" }] } as never);
+    expect(ctl.place(ch)?.route?.problem).toMatch(/^Nothing in Economy can run now: Claude · Sonnet: At its usage limit until \d\d:\d\d\.$/);
+    // Saved combos keep a target this Mac can't run now, and say why it was skipped.
+    store.dispatch({ type: 'prefs', prefs: { combos: [{ id: 'economy', name: 'Economy', targets: [{ runtime: 'claude', model: 'sonnet' }, { runtime: 'codex' }] }] } });
+    expect(ctl.place(ch)?.route?.problem).toMatch(/; Codex: Codex isn't set up on this Mac yet\.$/);
   });
 
   it("never gives one runtime's session id to another", async () => {

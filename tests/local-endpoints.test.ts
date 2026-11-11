@@ -83,7 +83,7 @@ describe('local endpoints: alive', () => {
     up = true;
     await local.look();
     expect(onChange).toHaveBeenCalledTimes(2);
-    expect(local.choices()).toEqual([{ id: 'ollama', label: 'Ollama', models: [], reachable: true, found: ['qwen3-coder'], builtIn: true }]);
+    expect(local.choices()).toEqual([{ id: 'ollama', label: 'Ollama', models: [], reachable: true, found: ['qwen3-coder'], builtIn: true, onThisMac: true }]);
     expect(local.resolve('ollama/qwen3-coder')).toEqual({ id: 'ollama', label: 'Ollama', baseUrl: OLLAMA_URL, model: 'qwen3-coder' });
     // Nothing changed: not told again.
     await local.look();

@@ -35,6 +35,8 @@ const ENTRIES = [
   'src/companion/open-on-mac.ts',
   // Its rules also run in the Mac and in the phone's views.
   'src/core/triage/model.ts',
+  // Combos (docs/routing.md): the pickers and Settings resolve them as the daemon does.
+  'src/core/routing/model.ts',
   'src/core/triage/facts.ts',
   // How a computer of yours is said and drawn, on the Mac and in the phone's bundle.
   'src/machines/words.ts',

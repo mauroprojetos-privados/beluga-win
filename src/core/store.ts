@@ -6,6 +6,7 @@ import type { ConnectionStatus } from '../net/peer-client.js';
 import type { Effort, NotifySettings, Settings, ThemeName, TrustLevel } from './settings.js';
 import { BRANCH_PREFIX_DEFAULT, NotifySettings as NotifySchema, SETTLE_IDLE_DAYS_DEFAULT } from '../shared/settings-schema.js';
 import type { Review } from '../workspaces/git.js';
+import type { Combo, DifficultyCombos, RoleCombos } from './routing/model.js';
 import type { Project, ProjectGroup } from '../workspaces/types.js';
 import type { EnvChange } from '../workspaces/env.js';
 import type { EnvSendAsk } from '../shared/env-send.js';
@@ -130,8 +131,16 @@ export type LogItem =
       readonly betweenAt?: number;
       /** What it said before a later step: drawn quietly among its steps, not as its answer (see agentRemarks). */
       readonly remarks?: readonly Remark[];
+      /** What the run spent, as its usage reports added up (tokens: input, output and cache writes; cost in USD). Usage by combo reads it (docs/routing.md). */
+      readonly usage?: RunUsage;
     }
   | ShellItem;
+
+/** A run's tokens (input, output, cache writes) and cost (USD; 0 on your own endpoint). */
+export interface RunUsage {
+  readonly tokens: number;
+  readonly cost: number;
+}
 
 /** Words Claude said between its steps, and when (a step came after them, so they aren't its answer). */
 export interface Remark {
@@ -322,6 +331,12 @@ export interface Prefs {
   readonly defaultAgent?: AgentRef;
   /** Per-project defaults over `defaultAgent`, by project name. */
   readonly projectAgents?: Readonly<Record<string, AgentRef>>;
+  /** Your combos (core/routing/model.ts); undefined: the defaults as this computer has them. */
+  readonly combos?: readonly Combo[];
+  /** Which combo a task of each difficulty starts on (core/routing/model.ts); unset: your agent. */
+  readonly difficultyCombos?: DifficultyCombos;
+  /** Which combo each role runs on (core/routing/model.ts); unset: as before. */
+  readonly roleCombos?: RoleCombos;
   readonly autoSetup: boolean;
   /** What new worktrees' branches start with (`beluga/`; empty: none). */
   readonly branchPrefix: string;
@@ -793,7 +808,7 @@ export const DEFAULT_PREFS: Prefs = {
 
 /** The preference fields out of saved settings. */
 export function prefsFrom(settings: Partial<Settings>): Prefs {
-  const picked = Object.fromEntries(Object.keys(DEFAULT_PREFS).concat(['model', 'effort', 'defaultAgent', 'projectAgents', 'shell', 'earningsCurrency']).filter((k) => settings[k as keyof Settings] !== undefined).map((k) => [k, settings[k as keyof Settings]]));
+  const picked = Object.fromEntries(Object.keys(DEFAULT_PREFS).concat(['model', 'effort', 'defaultAgent', 'projectAgents', 'combos', 'difficultyCombos', 'roleCombos', 'shell', 'earningsCurrency']).filter((k) => settings[k as keyof Settings] !== undefined).map((k) => [k, settings[k as keyof Settings]]));
   return { ...DEFAULT_PREFS, ...picked };
 }
 
@@ -956,6 +971,26 @@ export function orderQueued(log: readonly LogItem[], owner: string, ids: readonl
   const byId = new Map(slots.map((i) => [(log[i] as Extract<LogItem, { type: 'agent' }>).requestId, log[i]!]));
   const placed = new Map(slots.map((slot, k) => [slot, byId.get(ids[k]!)!]));
   return slots.every((slot) => placed.get(slot) === log[slot]) ? log : log.map((l, i) => placed.get(i) ?? l);
+}
+
+/**
+ * A run's usage, added to its card: `text` is what this report added ({ tokens, cost }, the session's
+ * Workbench.onUsage works out the growth from running totals). No card for it: nothing.
+ */
+function reduceRunUsage(state: DomainState, a: Extract<Action, { type: 'agent_event' }>): DomainState {
+  const idx = state.log.findIndex((l) => l.type === 'agent' && l.requestId === a.requestId && l.owner === a.owner);
+  if (idx < 0) return state;
+  let add: { tokens?: unknown; cost?: unknown };
+  try {
+    add = JSON.parse(a.text) as { tokens?: unknown; cost?: unknown };
+  } catch {
+    return state;
+  }
+  const num = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : 0);
+  if (!num(add.tokens) && !num(add.cost)) return state;
+  const card = state.log[idx] as Extract<LogItem, { type: 'agent' }>;
+  const usage = { tokens: (card.usage?.tokens ?? 0) + num(add.tokens), cost: (card.usage?.cost ?? 0) + num(add.cost) };
+  return { ...state, log: state.log.map((l, i) => (i === idx ? { ...card, usage } : l)) };
 }
 
 function reduceAgent(state: DomainState, raw: Extract<Action, { type: 'agent_event' }>): DomainState {
@@ -1196,7 +1231,7 @@ export function reduceDomain(state: DomainState, action: Action): DomainState {
       return bumpUnread({ ...state, log: appendLog(state.log, item) }, item.channel, true);
     }
     case 'agent_event':
-      if (action.event === 'usage') return state;
+      if (action.event === 'usage') return reduceRunUsage(state, action);
       if (action.event === 'context' || action.event === 'compact') return reduceContext(state, action);
       return reduceAgent(state, action);
     case 'approval_add':

@@ -4,7 +4,7 @@
  * so the picker can grey one that isn't answering. Ollama on this Mac counts without being added
  * while you have none of your own there. A run asks `resolve` for the endpoint a model value names.
  */
-import { type EndpointChoice, type EndpointView, OLLAMA_ID, OLLAMA_URL, parseLocalModel } from '../shared/local-endpoints.js';
+import { type EndpointChoice, type EndpointView, OLLAMA_ID, OLLAMA_URL, onThisComputer, parseLocalModel } from '../shared/local-endpoints.js';
 import type { Endpoint } from './env-vars.js';
 
 /** What a run on an endpoint needs: where, the key (if any) and the model's own name. */
@@ -68,7 +68,7 @@ export class LocalEndpoints {
     return this.all().flatMap((e) => {
       const seen = this.seenOf(e);
       if (e.builtIn && !seen?.reachable) return [];
-      return [{ id: e.id, label: e.label, models: e.models, ...(seen ? { reachable: seen.reachable, found: seen.found } : {}), ...(e.builtIn ? { builtIn: true } : {}) }];
+      return [{ id: e.id, label: e.label, models: e.models, ...(seen ? { reachable: seen.reachable, found: seen.found } : {}), ...(e.builtIn ? { builtIn: true } : {}), ...(onThisComputer(e.baseUrl) ? { onThisMac: true } : {}) }];
     });
   }
 
