@@ -25,6 +25,7 @@ import { SUPPORT_HANDLERS } from './support-handlers.js';
 import { STATS_HANDLERS } from './stats-handlers.js';
 import { maybeStatsOf } from '../core/stats/counter.js';
 import { WEB_HANDLERS } from './web-handlers.js';
+import { ROUTING_HANDLERS } from './routing-handlers.js';
 import { DIAGNOSTICS_HANDLERS } from './diagnostics-handlers.js';
 import { CLAUDE_CODE_HANDLERS } from './claude-code-handlers.js';
 import { STEPS_HANDLERS } from './steps-handlers.js';
@@ -448,6 +449,7 @@ export const HANDLERS = {
   ...SUPPORT_HANDLERS,
   ...STATS_HANDLERS,
   ...WEB_HANDLERS,
+  ...ROUTING_HANDLERS,
   ...DIAGNOSTICS_HANDLERS,
   ...CLAUDE_CODE_HANDLERS,
   ...STEPS_HANDLERS,

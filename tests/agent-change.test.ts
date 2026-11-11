@@ -182,3 +182,40 @@ describe('the phone changes them too (BLG-498)', () => {
     expect(pv.agents).toBeDefined();
   });
 });
+
+describe('a task on a combo (docs/routing.md)', () => {
+  const ECONOMY: AgentRef = { runtime: 'claude', label: 'Economy', combo: 'economy', comboName: 'Economy' };
+
+  it('its worktree gets the combo, and the phone’s task page says the target its newest run went to', async () => {
+    const t = setup();
+    const task = t.board.create({ projectId: 'api', title: 'Cheap work', agent: ECONOMY }, t.work.me());
+    expect(t.board.need(task.id).agent).toEqual(ECONOMY);
+    await t.work.start(task.id, { claude: true });
+    expect(t.made[0]!.agent).toEqual(ECONOMY);
+    // The worktree picked the combo; its run went to Codex.
+    const st = t.store.getState();
+    t.store.dispatch({ type: 'projects', projects: st.projects.map((p) => ({ ...p, workspaces: p.workspaces.map((w) => (w.id === 'w1' ? { ...w, agent: ECONOMY } : w)) })) });
+    expect(taskPageView(t.store.getState(), task.id)!.agent).toMatchObject({ label: 'Economy', comboName: 'Economy' });
+    t.store.dispatch({ type: 'agent_event', owner: t.store.getState().selfId, requestId: 'r1', requester: t.store.getState().selfId, event: 'done', text: 'ok', ts: 5, channel: 'ws:w1', agent: { runtime: 'codex', label: 'Codex', combo: 'economy', comboName: 'Economy' } });
+    expect(taskPageView(t.store.getState(), task.id)!.agent).toEqual({ runtime: 'codex', label: 'Codex', comboName: 'Economy' });
+  });
+});
+
+describe('a task by how hard it is (docs/routing.md, Phase 3)', () => {
+  it('a task that names no agent starts on the combo Settings maps for its difficulty; one that names one keeps it', async () => {
+    const t = setup();
+    t.store.dispatch({ type: 'runtimes', runtimes: [{ id: 'claude', label: 'Claude', available: true }, { id: 'codex', label: 'Codex', available: true }] } as never);
+    t.store.dispatch({ type: 'prefs', prefs: { difficultyCombos: { hard: 'strong' } } });
+    const hard = t.board.create({ projectId: 'api', title: 'Rework the sync', difficulty: 'hard' }, t.work.me());
+    expect(t.board.need(hard.id).difficulty).toBe('hard');
+    await t.work.start(hard.id, { claude: true });
+    expect(t.made[0]!.agent).toMatchObject({ combo: 'strong', comboName: 'Strong' });
+    const simple = t.board.create({ projectId: 'api', title: 'Fix a typo', difficulty: 'simple' }, t.work.me());
+    await t.work.start(simple.id, { claude: true });
+    expect(t.made[1]!.agent).toBeUndefined();
+    const named = t.board.create({ projectId: 'api', title: 'Port it', difficulty: 'hard', agent: CODEX }, t.work.me());
+    await t.work.start(named.id, { claude: true });
+    expect(t.made[2]!.agent).toEqual(CODEX);
+    expect(taskPageView(t.store.getState(), hard.id)!.difficulty).toBe('hard');
+  });
+});

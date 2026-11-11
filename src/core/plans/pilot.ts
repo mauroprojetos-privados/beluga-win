@@ -1,4 +1,5 @@
 import { outsideActingAgent } from '../acting-agent.js';
+import { comboForRole } from '../routing/model.js';
 import type { AgentRef } from '../../protocol.js';
 import type { CombineResult } from '../../workspaces/git.js';
 import type { Actor, BoardState, Issue } from '../board/model.js';
@@ -867,7 +868,8 @@ export class PlanPilot {
       const resume = plan.runs[milestoneId]?.resumeFrom;
       const base = resume ?? (first.bases?.length ? plan.branch : first.base);
       // The agent you started it with (BLG-506), else the plan's (BLG-497); none: your default.
-      const agent = pick ?? plan.agent;
+      // Settings' combo for milestones (docs/routing.md) when the plan names none.
+      const agent = pick ?? plan.agent ?? comboForRole(this.deps.store.getState(), 'milestone');
       const ws = await this.deps.work.startShared(ids, `${first.issue.key} ${m.milestone.title}`, { quiet: true, ...(base ? { base } : {}), ...(agent ? { agent } : {}) });
       this.deps.plans.setAgent(plan.id, milestoneId, { worktree: ws.id, ...(ws.branch ? { branch: ws.branch } : {}), at: Date.now(), tasks: ordered.map((t) => t.task.id) });
       const fresh = this.deps.plans.resumed(plan.id, milestoneId);
@@ -1155,7 +1157,7 @@ export class PlanPilot {
       const base = t.bases?.length ? await this.combinedBase(plan, t, issue) : t.base;
       if (t.bases?.length && !base) return `${issue.key} builds on several tasks: combining their branches hit a conflict, and the agent is fixing it`;
       // The agent you started it with (BLG-506), else the task's own, else the plan's (BLG-497), else your default.
-      const agent = pick ?? issue.agent ?? plan.agent;
+      const agent = pick ?? issue.agent ?? plan.agent ?? comboForRole(this.deps.store.getState(), 'milestone');
       await this.deps.work.start(issue.id, { claude: true, quiet: true, ...(base ? { base } : {}), ...(agent ? { agent } : {}) });
       if (t.bases?.length) this.deps.plans.setCombining(plan.id, t.task.id, undefined);
       this.deps.plans.note(plan.id, 'started', `started ${issue.key} “${t.task.title}”${base ? ` from ${base}` : ''}`, by);

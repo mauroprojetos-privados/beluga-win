@@ -23,7 +23,8 @@ import { isImportedItem } from '../agent/transcript.js';
 import { PHONE_LOOK_TOOLS } from '../agent/phone-tools.js';
 import type { StepPage, StepRecord } from '../shared/steps.js';
 import { READS_AFTER_STEP, STEERED_IN, STOPPING_FOR, TAKEN_BACK } from '../shared/claude-notices.js';
-import { span } from '../shared/clock.js';
+import { hhmm, span } from '../shared/clock.js';
+import { routeOf } from './routing/model.js';
 import { TERM_BUSY } from '../shared/terminal-keys.js';
 import { RunFailedError, decodeFailure } from '../shared/run-failure.js';
 import { e2eLockedIn, keepsRunning, mayLeaveProcesses } from '../workspaces/test-procs.js';
@@ -310,6 +311,8 @@ export class AgentHost {
    * and, until the first event has said it, why it isn't the one named.
    */
   private readonly named = new Map<string, { readonly agent: AgentRef; fallback?: string }>();
+  /** A run on a combo: the target it runs on, with the combo (its card's agent, until the run ends). */
+  private readonly routed = new Map<string, AgentRef>();
   /** The agent behind a friend's request (`<from>:<request id>`), until its final event: every event of it says so. */
   private readonly requestVia = new Map<string, MessageVia>();
   /** Turns in friends' chats waiting for their answer (runChat), by request id. */
@@ -856,10 +859,12 @@ export class AgentHost {
     const fallback = named?.fallback;
     if (named) named.fallback = undefined;
     if (named && final) this.named.delete(requestId);
+    const routed = this.routed.get(requestId);
+    if (routed && final) this.routed.delete(requestId);
     const asked = `${requester}:${requestId}`;
     const via = this.requestVia.get(asked) ?? this.viaOf(requester);
     if (final) this.requestVia.delete(asked);
-    const body: BodyInput = { kind: 'agent_event', requestId, requester, event, text: text.slice(0, 60_000), channel, ...(slotWait ? { slotWait } : {}), agent: named?.agent ?? this.deps.agentRef?.(channel) ?? CLAUDE_AGENT, ...(fallback ? { fallback } : {}), ...(via ? { via } : {}) };
+    const body: BodyInput = { kind: 'agent_event', requestId, requester, event, text: text.slice(0, 60_000), channel, ...(slotWait ? { slotWait } : {}), agent: routed ?? named?.agent ?? this.deps.agentRef?.(channel) ?? CLAUDE_AGENT, ...(fallback ? { fallback } : {}), ...(via ? { via } : {}) };
     // Workspace conversations are private: events go to you and the people you invited, never to the room.
     const targets = channel === 'room' ? [{ keep: final }] : [this.selfId, ...this.deps.sharing.recipients(channel)].map((to) => ({ to }));
     for (const opts of targets) if (!this.send(body, opts) && final) this.outbox = [...this.outbox, { body, opts }].slice(-50);
@@ -1383,7 +1388,9 @@ export class AgentHost {
     const mac = root ? undefined : this.deps.assistant?.(body.channel, from);
     // The Sentinel chat: its own folder and session (your runs only).
     const sentinelChat = root || mac ? undefined : this.deps.sentinelChat?.(body.channel, from);
-    const place = root ? { cwd: root, additionalDirectories: [], autoEdit: false, onSession: () => undefined, askOnly: { project: body.project ?? '' } } : (mac?.place ?? sentinelChat ?? this.deps.workspaces?.place(body.channel));
+    const picked = root ? { cwd: root, additionalDirectories: [], autoEdit: false, onSession: () => undefined, askOnly: { project: body.project ?? '' } } : (mac?.place ?? sentinelChat ?? this.deps.workspaces?.place(body.channel));
+    // A combo (core/routing): the run goes to its first target that can run now (a worktree's place is resolved already).
+    const place = picked && this.routePlace(picked);
     let markFinished: () => void = () => undefined;
     /** Claude Code's process for this run (see gone), and whether the run is over. */
     let proc: RunProcess | undefined;
@@ -1406,6 +1413,17 @@ export class AgentHost {
       }
       return;
     }
+    // A combo none of whose targets can run now: why, instead of a run (docs/routing.md).
+    if (place?.route?.problem) {
+      this.emitAgent(body.requestId, from, 'error', place.route.problem, body.channel);
+      if (lane.current === controller) {
+        lane.current = undefined;
+        lane.runAgent = undefined;
+      }
+      return;
+    }
+    // The run's card says the combo and the target it ran on ("Economy · Codex"): Usage splits by it, and a usage limit is kept against that target.
+    if (place?.agent?.combo) this.routed.set(body.requestId, place.agent);
     // A worktree's run: what it starts carries BELUGA_WORKTREE (and the old KLAUD_WORKTREE), so test runs it leaves behind can be stopped.
     const worktree = place && place.autoEdit && !place.askOnly ? place.cwd : undefined;
     // Asked from your app on another computer (BLG-803): the run hears so (run-instructions.ts), and what it starts.
@@ -1673,6 +1691,21 @@ export class AgentHost {
       ...(opts.defaultModel ? this.modelFor(opts.place?.model, opts.place?.agent, opts.place?.effort) : {}),
     });
     return { text, tokens };
+  }
+
+  /**
+   * A place whose agent is a combo, on the target that can run now (core/routing): its agent, model
+   * and effort that target's. One resolved already (a worktree's, workspace-controller.ts) stays as
+   * it is. None can run: `route.problem` says why.
+   */
+  private routePlace(place: AgentPlace): AgentPlace {
+    if (!place.agent?.combo || place.route) return place;
+    const routed = routeOf(this.store.getState(), place.agent, Date.now(), hhmm);
+    if (!routed) return place;
+    if (!routed.ok) return { ...place, route: { combo: routed.combo.id, index: -1, problem: routed.why } };
+    const { model: _m, effort: _e, ...rest } = place;
+    const { ready } = routed;
+    return { ...rest, agent: ready.agent, ...(ready.model ? { model: ready.model } : {}), ...((ready.effort ?? place.effort) ? { effort: ready.effort ?? place.effort } : {}), route: { combo: routed.combo.id, index: routed.index } };
   }
 
   /** Your launch flags per runtime (Settings › Agents › Launch flags), when you set any. */

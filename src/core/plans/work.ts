@@ -1,4 +1,5 @@
 import type { PlanTools } from '../../agent/types.js';
+import { comboForRole } from '../routing/model.js';
 import type { AgentRef } from '../../protocol.js';
 import { agentName } from '../../shared/agent-label.js';
 import type { Actor, ExternalActor, Issue } from '../board/model.js';
@@ -81,11 +82,14 @@ export class PlansWork {
         ? {
             reviewChat: async (plan: Plan) => {
               const ws = await deps.controller!.newChat(plan.projectId, `Review: ${planTitle(plan)}`.slice(0, 40), undefined, { quiet: true });
-              if (ws && plan.agent) deps.controller!.manager.setAgent(ws.id, plan.agent);
+              // Settings' checker combo (docs/routing.md: a cross-vendor check) over the plan's agent.
+              const agent = comboForRole(deps.store.getState(), 'checker') ?? plan.agent;
+              if (ws && agent) deps.controller!.manager.setAgent(ws.id, agent);
               return ws?.id;
             },
             chatAgent: (chat: string, plan: Plan) => {
-              if (plan.agent) deps.controller!.manager.setAgent(chat, plan.agent);
+              const agent = comboForRole(deps.store.getState(), 'checker') ?? plan.agent;
+              if (agent) deps.controller!.manager.setAgent(chat, agent);
             },
           }
         : {}),
@@ -112,7 +116,8 @@ export class PlansWork {
             // On the plan's agent (BLG-503), like its workers; none picked: the project's.
             checkerChat: async (plan, milestone) => {
               const ws = await deps.controller!.newChat(plan.projectId, `Check: ${milestone.title}`.slice(0, 40), undefined, { quiet: true });
-              if (ws && plan.agent) deps.controller!.manager.setAgent(ws.id, plan.agent);
+              const agent = comboForRole(deps.store.getState(), 'checker') ?? plan.agent;
+              if (ws && agent) deps.controller!.manager.setAgent(ws.id, agent);
               return ws?.id;
             },
             retireChat: (id) => void deps.controller!.archive(id, false, { quiet: true }).catch(() => undefined),
@@ -172,6 +177,9 @@ export class PlansWork {
     if (!goal) throw new Error('Say what the plan is for');
     const chat = await controller.newChat(input.projectId, UNTITLED, undefined, { quiet: true });
     if (!chat) throw new Error('Couldn’t start the plan’s conversation');
+    // Its head runs on Settings' combo for plan heads (docs/routing.md), when there is one.
+    const head = comboForRole(this.deps.store.getState(), 'planHead');
+    if (head) controller.manager.setAgent(chat.id, head);
     const home = `${WS}${chat.id}`;
     const plan = this.plans.create({ projectId: input.projectId, home, goal, ...(input.autonomy ? { autonomy: input.autonomy } : {}), ...(input.testsAt ? { testsAt: input.testsAt } : {}), ...(input.agent ? { agent: input.agent } : {}) }, this.me());
     if (!opts.quiet) this.deps.intend({ type: 'navigate', view: { kind: 'plan', id: plan.id } });

@@ -3,6 +3,7 @@ import { STILLS_DIR, STILL_SCHEME } from '../shared/preview/ref.js';
 import { SCRATCH_DIR } from '../shared/scratch-dir.js';
 import { dialogueHeader } from '../core/dialogues/view.js';
 import { agentPicker, pickedAgent } from '../shared/agent-picker.js';
+import { runRouteOf } from '../core/routing/model.js';
 import { roomAgentTags } from '../shared/agent-tags.js';
 import { type Approval, type DomainState, type LogItem, type SubAgent, isRunning } from '../core/store.js';
 import { agentLabel, agentName } from '../shared/agent-label.js';
@@ -1086,7 +1087,9 @@ export function taskPageView(state: DomainState, id: string, ctx?: ViewContext):
   const ws = i.worktrees.at(-1);
   const worktree = ws ? state.projects.flatMap((p) => p.workspaces).find((w) => w.id === ws)?.name : undefined;
   const { pr: _pr, ...rest } = summary;
-  const live = summary.conv ? pickedAgent(agentPicker(state, summary.conv.slice('conv:'.length), defaultAgentOf(state.self).runtime)) : undefined;
+  const picked = summary.conv ? pickedAgent(agentPicker(state, summary.conv.slice('conv:'.length), defaultAgentOf(state.self).runtime)) : undefined;
+  // On a combo (docs/routing.md): the target its newest run went to ("Economy · Codex"), once one has run.
+  const live = picked?.combo && summary.conv ? (routedAgent(state.log, summary.conv.slice('conv:'.length)) ?? picked) : picked;
   return {
     ...rest,
     project: clip(project?.name ?? '', 200),
@@ -1113,6 +1116,7 @@ export function taskPageView(state: DomainState, id: string, ctx?: ViewContext):
     // there (changed in its conversation); else its own (none: your default). The list is for Start with….
     ...(live ? { agent: agentRefView(live) } : i.agent ? { agent: agentRefView(i.agent) } : {}),
     ...(isStartable(i) ? { agents: workPicker(state, i.agent) } : {}),
+    ...(i.difficulty ? { difficulty: i.difficulty } : {}),
   };
 }
 
@@ -1609,4 +1613,10 @@ export function viewOf(state: DomainState, ctx: ViewContext, topic: Topic): unkn
   if (topic.startsWith('dashboard:')) return dashboardView(state, topic.slice('dashboard:'.length), ctx);
   if (topic === 'widgets') return widgetsView(state, ctx);
   return undefined;
+}
+
+/** The agent a conversation's newest run on a combo ran on, with the combo's name (docs/routing.md). */
+function routedAgent(log: DomainState['log'], channel: string): AgentRef | undefined {
+  const r = runRouteOf(log, channel);
+  return r ? { runtime: r.runtime, label: clip(r.target, 64), ...(r.model ? { model: clip(r.model, 64) } : {}), combo: r.combo, comboName: clip(r.name, 64) } : undefined;
 }

@@ -31,6 +31,7 @@ import { ChatLimitSettings } from './ChatLimitSettings.js';
 import { McpSettings } from './McpSettings.js';
 import { ExternalAgentsSettings } from './ExternalAgentsSettings.js';
 import { LaunchFlagsSettings } from './LaunchFlagsSettings.js';
+import { CombosSettings } from './CombosSettings.js';
 import { LocalModelsSettings } from './LocalModelsSettings.js';
 import { EarningsSettings } from './EarningsSettings.js';
 import { NotificationSettings } from './NotificationSettings.js';
@@ -412,6 +413,7 @@ function AgentPane() {
         </Row>
       </Group>
       <AgentsGroup mine={runtime} />
+      <CombosSettings />
       <LaunchFlagsSettings />
       <McpSettings />
       <div id={LOCAL_MODELS_ID}>

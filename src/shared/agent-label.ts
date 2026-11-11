@@ -19,7 +19,10 @@ export interface AgentLabelOptions {
 
 /** Model ids as people say them: "opus" → "Opus", "gpt-5" → "GPT-5", "claude-sonnet-4-5" → "Sonnet 4.5", OpenCode's "anthropic/claude-sonnet-4-5" the same (its provider isn't said). */
 export function modelName(model: string): string {
-  const m = model.trim().replace(/^[\w.@-]+\//, '').replace(/^claude-/i, '');
+  // A 1M-context pick ("fable-5[1m]") says so after the name.
+  const long = /\[1m\]$/i.test(model.trim());
+  const m = model.trim().replace(/\[1m\]$/i, '').replace(/^[\w.@-]+\//, '').replace(/^claude-/i, '');
+  if (long) return `${modelName(m)} (1M)`;
   if (/^gpt/i.test(m)) return m.replace(/^gpt/i, 'GPT');
   // A dated id's date ("-20250929") isn't said.
   const [first = '', ...rest] = m.split('-').filter((p) => !/^\d{8}$/.test(p));
@@ -31,6 +34,7 @@ export function modelName(model: string): string {
 /** Just the agent: "Claude", or "Codex (GPT-5)" with `model`. */
 export function agentName(ref: AgentRef | undefined, opts: Pick<AgentLabelOptions, 'model'> = {}): string {
   const r = ref ?? CLAUDE_AGENT;
+  if (opts.model && r.comboName) return comboWords(r);
   return opts.model && r.model ? `${r.label} (${modelName(r.model)})` : r.label;
 }
 
@@ -44,6 +48,16 @@ export function agentLabel(ref: AgentRef | undefined, owner: string | undefined,
   return opts.capital ? phrase.charAt(0).toUpperCase() + phrase.slice(1) : phrase;
 }
 
+/**
+ * A combo's run (docs/routing.md): the combo, then the target it ran on ("Economy · Codex",
+ * "Strong · Claude · Opus"). Picked and not run yet (its label is the combo's name): the name alone.
+ */
+export function comboWords(ref: Pick<AgentRef, 'label' | 'model' | 'comboName'>): string {
+  const name = ref.comboName ?? ref.label;
+  if (name === ref.label) return name;
+  return [name, ref.label, ref.model ? modelName(ref.model) : ''].filter(Boolean).join(' · ');
+}
+
 /** What each runtime is called. */
 export const RUNTIME_NAMES: Readonly<Record<string, string>> = { claude: 'Claude', codex: 'Codex', opencode: 'OpenCode', copilot: 'Copilot', local: 'Local model' };
 
@@ -53,6 +67,7 @@ export const RUNTIME_NAMES: Readonly<Record<string, string>> = { claude: 'Claude
  */
 export function agentBadge(ref: AgentRef | undefined): string | undefined {
   if (!ref) return undefined;
+  if (ref.comboName) return comboWords(ref);
   const runtime = RUNTIME_NAMES[ref.runtime] ?? ref.runtime;
   const parts = [runtime.toLowerCase() === ref.label.toLowerCase() ? '' : runtime, ref.model ? modelName(ref.model) : ''].filter(Boolean);
   return parts.length ? parts.join(' · ') : undefined;
