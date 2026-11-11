@@ -11,6 +11,7 @@ import { useSentinelActions, useSentinelState } from './use-sentinel.js';
 import n from './numbers.module.css';
 import x from './add-tile.module.css';
 import { ASSISTANT_TITLE } from '@beluga/shared/assistant.js';
+import { useT } from '../lib/i18n.js';
 
 /**
  * Add to the board (BLG-308). One box on top: say what you want to see and your Claude puts it
@@ -29,6 +30,7 @@ type Pick =
   | { readonly kind: 'new'; readonly source: NewSourceId };
 
 export function AddTileSheet({ dashboardId, close }: { dashboardId: string; close: () => void }) {
+  const t = useT();
   const api = useApi();
   const a = useSentinelActions();
   const state = useSentinelState();
@@ -51,12 +53,12 @@ export function AddTileSheet({ dashboardId, close }: { dashboardId: string; clos
       g.items.push(item);
       out.set(head, g);
     };
-    for (const c of metrics) add(`${c.project} · ${c.sentinel}`, { pick: { kind: 'metric', ref: c.ref }, label: c.label, ...(c.value ? { value: c.value } : {}), icon: c.kind === 'rows' ? 'table' : c.kind === 'output' ? 'file' : 'chartLine', ...(c.onIt ? { on: true, hint: 'on this board' } : {}) });
-    for (const c of steps) add(`${c.project} · ${c.sentinel}`, { pick: { kind: 'step', ref: c.ref, label: c.label }, label: c.label, hint: c.kind === 'claude' ? 'what the agent wrote' : c.kind === 'http' ? 'the service’s answer' : 'what it printed', icon: c.kind === 'claude' ? 'claude' : c.kind === 'http' ? 'globe' : 'terminal' });
+    for (const c of metrics) add(`${c.project} · ${c.sentinel}`, { pick: { kind: 'metric', ref: c.ref }, label: c.label, ...(c.value ? { value: c.value } : {}), icon: c.kind === 'rows' ? 'table' : c.kind === 'output' ? 'file' : 'chartLine', ...(c.onIt ? { on: true, hint: t('sentinel.addTile.onBoard') } : {}) });
+    for (const c of steps) add(`${c.project} · ${c.sentinel}`, { pick: { kind: 'step', ref: c.ref, label: c.label }, label: c.label, hint: c.kind === 'claude' ? t('sentinel.addTile.agentWrote') : c.kind === 'http' ? t('sentinel.addTile.serviceAnswer') : t('sentinel.addTile.printed'), icon: c.kind === 'claude' ? 'claude' : c.kind === 'http' ? 'globe' : 'terminal' });
     // What each sentinel said last, together at the end (one line each, not under every sentinel).
     type Item = { pick: Pick; label: string; hint?: string; value?: string; icon: IconName; on?: boolean };
-    const said: Item[] = state.items.map((i) => ({ pick: { kind: 'report', sentinelId: i.id, label: i.name }, label: i.name, hint: `${projectName(i.projectId)} · its latest report`, icon: 'file' }));
-    return [...out.values(), ...(said.length ? [{ head: 'What a sentinel said last', items: said }] : [])];
+    const said: Item[] = state.items.map((i) => ({ pick: { kind: 'report', sentinelId: i.id, label: i.name }, label: i.name, hint: t('sentinel.addTile.latestReport', { project: projectName(i.projectId) }), icon: 'file' }));
+    return [...out.values(), ...(said.length ? [{ head: t('sentinel.addTile.saidLast'), items: said }] : [])];
   }, [metrics, steps, state.items, projects]);
 
   const keyOf = (p: Pick | undefined): string => (!p ? '' : p.kind === 'metric' ? `m:${p.ref.sentinelId}/${p.ref.metric}` : p.kind === 'step' ? `s:${p.ref.sentinelId}/${p.ref.stepId}` : p.kind === 'report' ? `r:${p.sentinelId}` : p.kind === 'new' ? `n:${p.source}` : 'h');
@@ -69,7 +71,7 @@ export function AddTileSheet({ dashboardId, close }: { dashboardId: string; clos
     setLook(first);
     setSize(sizeFor(first));
   };
-  const shape = TILE_SIZES.find((t) => t.id === size)!;
+  const shape = TILE_SIZES.find((z) => z.id === size)!;
   const own = { ...(title.trim() ? { title: title.trim() } : {}), width: shape.w, ...(shape.h === 2 ? { height: 2 as const } : {}) };
 
   const describing = Boolean(words.trim()) || pick?.kind === 'new';
@@ -79,7 +81,7 @@ export function AddTileSheet({ dashboardId, close }: { dashboardId: string; clos
     if (describing) {
       const said = pick?.kind === 'new' && !words.trim() ? newSourceAsk(pick.source, what) : words.trim();
       const went = await a.act(() => api.dashboard.ask(dashboardId, said));
-      if (!went) return 'Couldn’t ask your agent: see the message above';
+      if (!went) return t('sentinel.addTile.couldntAsk');
       return close();
     }
     if (!pick) return;
@@ -100,26 +102,26 @@ export function AddTileSheet({ dashboardId, close }: { dashboardId: string; clos
                     : { kind: 'series', ...(metric?.kind === 'series' ? { metric: pick.ref } : { metrics: [pick.ref] }), chart: look === 'bars' ? 'bar' : 'line', ...own }
               : { kind: 'divider', title: title.trim() };
     const done = await a.act(() => api.dashboard.addTile(dashboardId, tile));
-    if (!done) return 'Couldn’t add it: see the message above';
+    if (!done) return t('sentinel.addTile.couldntAdd');
     close();
   };
 
   const newSource = pick?.kind === 'new' ? NEW_SOURCES.find((s) => s.id === pick.source) : undefined;
   return (
-    <FormSheet title={`Add to ${d?.name ?? 'the board'}`} icon="gauge" submitLabel={describing ? 'Ask Your Agent' : `Add to ${d?.name ?? 'the Board'}`} canSubmit={ready} width={880} onCancel={close} onSubmit={submit}>
+    <FormSheet title={d ? t('sentinel.addTile.addTo', { name: d.name }) : t('sentinel.dash.addToBoard')} icon="gauge" submitLabel={describing ? t('sentinel.home.askAgent') : d ? t('sentinel.addTile.addTo', { name: d.name }) : t('sentinel.addTile.addToBoardTitle')} canSubmit={ready} width={880} onCancel={close} onSubmit={submit}>
       <div className={x.sheet}>
         <textarea
           className={x.describe}
           value={words}
           rows={1}
-          placeholder="Say what you want to see, or pick it below: “revenue per day”, “open pull requests”, “this morning’s brief”…"
-          aria-label="What should it show?"
+          placeholder={t('sentinel.addTile.placeholder')}
+          aria-label={t('sentinel.addTile.whatShow')}
           data-autofocus
           onChange={(e) => setWords(e.target.value)}
         />
         <div className={x.panes} data-dim={words.trim() ? '' : undefined}>
-          <div className={x.list} role="listbox" aria-label="What to show">
-            <div className={x.group}>Already kept</div>
+          <div className={x.list} role="listbox" aria-label={t('sentinel.addTile.whatToShow')}>
+            <div className={x.group}>{t('sentinel.addTile.kept')}</div>
             {groups.length ? (
               groups.map((g) => (
                 <div key={g.head} role="group" aria-label={g.head}>
@@ -137,9 +139,9 @@ export function AddTileSheet({ dashboardId, close }: { dashboardId: string; clos
                 </div>
               ))
             ) : (
-              <p className={x.quiet}>Nothing is kept yet. Pick somewhere new, or say what you want above.</p>
+              <p className={x.quiet}>{t('sentinel.addTile.nothingKept')}</p>
             )}
-            <div className={x.group}>From somewhere new</div>
+            <div className={x.group}>{t('sentinel.addTile.somewhereNew')}</div>
             {NEW_SOURCES.map((src) => (
               <button key={src.id} type="button" role="option" aria-selected={keyOf(pick) === `n:${src.id}`} className={x.item} onClick={() => (setPick({ kind: 'new', source: src.id }), setWhat(''))} data-source={src.id}>
                 <span className={x.mark} data-source={src.id}>
@@ -149,22 +151,22 @@ export function AddTileSheet({ dashboardId, close }: { dashboardId: string; clos
                 <span className={x.value}>{src.hint}</span>
               </button>
             ))}
-            <div className={x.group}>Other</div>
+            <div className={x.group}>{t('sentinel.addTile.other')}</div>
             <button type="button" role="option" aria-selected={pick?.kind === 'heading'} className={x.item} onClick={() => (setPick({ kind: 'heading' }), setWords(''))}>
               <Icon name="minus" size={13} />
-              <span className={x.itemText}>A heading across the board</span>
+              <span className={x.itemText}>{t('sentinel.addTile.headingAcross')}</span>
             </button>
           </div>
 
           <div className={x.right}>
             {words.trim() ? (
-              <p className={x.quiet}>Your agent puts it together from what your sentinels keep. When nothing fetches it yet, it sets up a sentinel that does: a draft you look over and turn on first.</p>
+              <p className={x.quiet}>{t('sentinel.addTile.agentPuts')}</p>
             ) : !pick ? (
-              <p className={x.quiet}>Pick something on the left to see how it can look.</p>
+              <p className={x.quiet}>{t('sentinel.addTile.pickLeft')}</p>
             ) : newSource ? (
               <>
-                <div className={x.k}>What from {newSource.label}?</div>
-                <div className={x.field}><TextInput value={what} onChange={setWhat} maxLength={400} placeholder={newSource.ideas[0]} aria-label={`What from ${newSource.label}?`} /></div>
+                <div className={x.k}>{t('sentinel.addTile.whatFrom', { source: newSource.label })}</div>
+                <div className={x.field}><TextInput value={what} onChange={setWhat} maxLength={400} placeholder={newSource.ideas[0]} aria-label={t('sentinel.addTile.whatFrom', { source: newSource.label })} /></div>
                 <div className={x.ideas}>
                   {newSource.ideas.map((idea) => (
                     <button key={idea} type="button" className={x.idea} onClick={() => setWhat(idea)}>
@@ -172,17 +174,17 @@ export function AddTileSheet({ dashboardId, close }: { dashboardId: string; clos
                     </button>
                   ))}
                 </div>
-                <p className={x.quiet}>Your agent sets up the sentinel that fetches it (paused, for you to turn on) with your project’s own keys, and adds its tile here.</p>
+                <p className={x.quiet}>{t('sentinel.addTile.setsUp')}</p>
               </>
             ) : pick.kind === 'heading' ? (
               <>
-                <div className={x.k}>Heading</div>
-                <div className={x.field}><TextInput value={title} onChange={setTitle} maxLength={80} placeholder="Money" aria-label="Heading" /></div>
+                <div className={x.k}>{t('sentinel.addTile.heading')}</div>
+                <div className={x.field}><TextInput value={title} onChange={setTitle} maxLength={80} placeholder={t('sentinel.addTile.headingPlaceholder')} aria-label={t('sentinel.addTile.heading')} /></div>
               </>
             ) : (
               <>
-                <div className={x.k}>Show it as</div>
-                <div className={x.looks} role="radiogroup" aria-label="Show it as">
+                <div className={x.k}>{t('sentinel.addTile.showItAs')}</div>
+                <div className={x.looks} role="radiogroup" aria-label={t('sentinel.addTile.showItAs')}>
                   {looks.map((l) => (
                     <button key={l} type="button" role="radio" aria-checked={look === l} className={x.look} onClick={() => (setLook(l), setSize(sizeFor(l)))}>
                       <LookPicture look={l} />
@@ -190,20 +192,20 @@ export function AddTileSheet({ dashboardId, close }: { dashboardId: string; clos
                     </button>
                   ))}
                 </div>
-                <div className={x.k}>Size</div>
-                <div className={x.sizes} role="radiogroup" aria-label="Size">
-                  {TILE_SIZES.map((t) => (
-                    <button key={t.id} type="button" role="radio" aria-checked={size === t.id} className={x.size} onClick={() => setSize(t.id)}>
-                      <span className={x.shape} style={{ width: t.w * 18 + (t.w - 1) * 3, height: t.h * 18 + (t.h - 1) * 3 }} />
-                      <span>{t.label}</span>
+                <div className={x.k}>{t('sentinel.addTile.size')}</div>
+                <div className={x.sizes} role="radiogroup" aria-label={t('sentinel.addTile.size')}>
+                  {TILE_SIZES.map((z) => (
+                    <button key={z.id} type="button" role="radio" aria-checked={size === z.id} className={x.size} onClick={() => setSize(z.id)}>
+                      <span className={x.shape} style={{ width: z.w * 18 + (z.w - 1) * 3, height: z.h * 18 + (z.h - 1) * 3 }} />
+                      <span>{z.label}</span>
                     </button>
                   ))}
                 </div>
-                <div className={x.k}>Title</div>
-                <div className={x.field}><TextInput value={title} onChange={setTitle} maxLength={80} placeholder={pick.kind === 'metric' ? (metric?.label ?? 'Its label') : pick.kind === 'step' || pick.kind === 'report' ? pick.label : ''} aria-label="Title" /></div>
-                <div className={x.k}>Preview</div>
+                <div className={x.k}>{t('sentinel.cards.title')}</div>
+                <div className={x.field}><TextInput value={title} onChange={setTitle} maxLength={80} placeholder={pick.kind === 'metric' ? (metric?.label ?? t('sentinel.addTile.itsLabel')) : pick.kind === 'step' || pick.kind === 'report' ? pick.label : ''} aria-label={t('sentinel.cards.title')} /></div>
+                <div className={x.k}>{t('sentinel.addTile.preview')}</div>
                 <Preview pick={pick} look={look} title={title} wide={shape.w > 1} />
-                <p className={x.quiet}>Drag it into place on the board afterwards; drag its corner to resize.</p>
+                <p className={x.quiet}>{t('sentinel.addTile.dragHint')}</p>
               </>
             )}
           </div>
@@ -219,6 +221,7 @@ function LookPicture({ look }: { look: TileLook }) {
     return (
       <svg width="56" height="26" aria-hidden="true">
         <text x="0" y="19" fontSize="15" fontWeight="600" fill="currentColor">
+          {/* i18n-ignore: a sample number in a picture */}
           3.4k
         </text>
         <polyline fill="none" stroke="var(--ok)" strokeWidth="1.5" points="38,20 44,14 50,16 56,7" />
@@ -265,8 +268,9 @@ function LookPicture({ look }: { look: TileLook }) {
 }
 
 function Preview({ pick, look, title, wide }: { pick: Pick; look: TileLook; title: string; wide: boolean }) {
+  const t = useT();
   const state = useSentinelState();
-  if (pick.kind !== 'metric') return <div className={cx(n.previewTile, x.previewText)}>{pick.kind === 'step' || pick.kind === 'report' ? 'Shows what it said last, and updates each time it runs.' : null}</div>;
+  if (pick.kind !== 'metric') return <div className={cx(n.previewTile, x.previewText)}>{pick.kind === 'step' || pick.kind === 'report' ? t('sentinel.addTile.previewText') : null}</div>;
   const m = metricOf(state, pick.ref);
   if (!m) return null;
   return (

@@ -472,6 +472,24 @@ const MIGRATED: readonly string[] = [
   'packages/mac/src/tasks/parts.tsx',
   'packages/mac/src/tasks/pickers.tsx',
   'packages/mac/src/tasks/use-task-drop.tsx',
+  // Sentinel's screens
+  'packages/mac/src/sentinel/AddTileSheet.tsx',
+  'packages/mac/src/sentinel/DashboardPage.tsx',
+  'packages/mac/src/sentinel/DataCard.tsx',
+  'packages/mac/src/sentinel/DataSheet.tsx',
+  'packages/mac/src/sentinel/DocumentSheet.tsx',
+  'packages/mac/src/sentinel/EventControls.tsx',
+  'packages/mac/src/sentinel/MeasureFields.tsx',
+  'packages/mac/src/sentinel/NewSentinelSheet.tsx',
+  'packages/mac/src/sentinel/NumbersCard.tsx',
+  'packages/mac/src/sentinel/RunPage.tsx',
+  'packages/mac/src/sentinel/SentinelCards.tsx',
+  'packages/mac/src/sentinel/SentinelChat.tsx',
+  'packages/mac/src/sentinel/SentinelHome.tsx',
+  'packages/mac/src/sentinel/SentinelNav.tsx',
+  'packages/mac/src/sentinel/SentinelPage.tsx',
+  'packages/mac/src/sentinel/Showcase.tsx',
+  'packages/mac/src/sentinel/marks.tsx',
 ];
 
 describe('migrated screens say every word through t()', () => {

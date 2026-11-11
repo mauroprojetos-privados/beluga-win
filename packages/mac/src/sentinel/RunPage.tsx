@@ -17,12 +17,13 @@ import { STEP_ICON, chatPlaceOf, durationText, headlineOf, isRunning, runLine } 
 import { useClock } from '../lib/window-active.js';
 import { useSentinelActions, useSentinelState } from './use-sentinel.js';
 import v from '../views/views.module.css';
-import t from '../tasks/tasks.module.css';
+import tk from '../tasks/tasks.module.css';
 import s from './sentinel.module.css';
 import { shortcutKeys } from '../lib/shortcuts.js';
 import { chordLabel, primaryKey } from '../lib/shortcuts-model.js';
 import { ASSISTANT_TITLE } from '@beluga/shared/assistant.js';
 import { revealLabel } from '../lib/os-words.js';
+import { useT } from '../lib/i18n.js';
 
 /**
  * One run: its headline, who started it and how long it took, each step with how it went (its
@@ -31,6 +32,7 @@ import { revealLabel } from '../lib/os-words.js';
  * Now at the top; a running one has Stop under ⋯. Read with sentinel.runGet, again as it changes.
  */
 export function RunPage({ runId }: { runId: string }) {
+  const t = useT();
   const state = useSentinelState();
   const summary = state.runs.find((r) => r.id === runId);
   const a = useSentinelActions();
@@ -48,13 +50,14 @@ export function RunPage({ runId }: { runId: string }) {
       alive = false;
     };
   }, [runId, stamp, a]);
-  if (!state.enabled) return <Empty icon="sentinel" title="Sentinel needs the Beluga app" />;
-  if (error && !detail) return <Empty icon="sentinel" title="This run isn’t here anymore" detail={error} />;
-  if (!detail) return <Empty icon="sentinel" title="Reading the run…" />;
+  if (!state.enabled) return <Empty icon="sentinel" title={t('sentinel.page.needsApp')} />;
+  if (error && !detail) return <Empty icon="sentinel" title={t('sentinel.run.gone')} detail={error} />;
+  if (!detail) return <Empty icon="sentinel" title={t('sentinel.run.reading')} />;
   return <Run detail={detail} summary={summary} />;
 }
 
 function Run({ detail, summary }: { detail: RunDetail; summary: RunSummary | undefined }) {
+  const t = useT();
   const wrap = useRef<HTMLDivElement>(null);
   const a = useSentinelActions();
   const actions = useActions();
@@ -68,21 +71,21 @@ function Run({ detail, summary }: { detail: RunDetail; summary: RunSummary | und
   const swipe = useSwipeBack(wrap, back);
   // Put away as its sentinel keeps chats (BLG-566): the report and outputs stay, the chat doesn't.
   const chat = run.putAway ? undefined : (run.channel ?? run.steps.find((x) => x.channel)?.channel);
-  const keptNote = run.chatDeleted ? 'You deleted its chat. The report and outputs stay here.' : run.putAway ? `Its chat was put away: ${sentinel ? `${sentinel.name} ${KEEP_CHATS_INFO[sentinel.keepChats ?? DEFAULT_KEEP_CHATS].keeps}` : 'its sentinel keeps fewer chats'}. The report and outputs stay here.` : undefined;
+  const keptNote = run.chatDeleted ? t('sentinel.run.chatDeleted') : run.putAway ? t('sentinel.run.putAway', { why: sentinel ? `${sentinel.name} ${KEEP_CHATS_INFO[sentinel.keepChats ?? DEFAULT_KEEP_CHATS].keeps}` : t('sentinel.run.keepsFewer') }) : undefined;
   const waiting = run.state === 'needs-you';
   const ended = run.state !== 'queued' && run.state !== 'running' && !waiting;
   // Its own chats (a project or Your Mac chat), not its worktree's: what Delete Chat deletes.
   const ownChat = !run.chatDeleted && !run.putAway && [run.channel, ...run.steps.map((x) => x.channel)].some((c) => c && c !== (run.worktreeId ? `ws:${run.worktreeId}` : undefined));
   const why = run.steps.find((x) => x.why && x.state === 'running')?.why;
   const more: ActionItem[] = [
-    ...(isRunning(run.state) ? [{ label: 'Stop', icon: 'stop' as const, danger: true, onSelect: () => void a.act(() => a.api.stop(run.id), 'Stopped') }] : []),
-    ...(chat && chatPlaceOf(chat) ? [{ label: 'Open Chat', icon: 'chat' as const, keys: chordLabel('Cmd+Enter'), onSelect: () => a.openChannel(chat) }] : []),
-    ...(sentinel ? [{ label: `Open ${sentinel.name}`, icon: 'sentinel' as const, onSelect: () => a.open(sentinel.id) }] : []),
+    ...(isRunning(run.state) ? [{ label: t('common.stop'), icon: 'stop' as const, danger: true, onSelect: () => void a.act(() => a.api.stop(run.id), t('sentinel.run.stopped')) }] : []),
+    ...(chat && chatPlaceOf(chat) ? [{ label: t('sentinel.dash.openChat'), icon: 'chat' as const, keys: chordLabel('Cmd+Enter'), onSelect: () => a.openChannel(chat) }] : []),
+    ...(sentinel ? [{ label: t('sentinel.run.openName', { name: sentinel.name }), icon: 'sentinel' as const, onSelect: () => a.open(sentinel.id) }] : []),
     // Its folder: trigger.json, each step's output, report.md, its documents (BLG-578).
     { label: revealLabel(), icon: 'folder' as const, separate: true, onSelect: () => void a.act(() => a.api.dataReveal(run.sentinelId, run.id)) },
     // What it left, deleted as you ask (BLG-577); a run still going is stopped first.
-    ...(ended && ownChat ? [{ label: 'Delete Chat…', icon: 'trash' as const, danger: true, separate: true, onSelect: () => a.deleteRun(run, 'chat') }] : []),
-    ...(ended ? [{ label: 'Delete Run…', icon: 'trash' as const, danger: true, ...(ownChat ? {} : { separate: true }), onSelect: () => a.deleteRun(run, 'run', back) }] : []),
+    ...(ended && ownChat ? [{ label: t('sentinel.run.deleteChatMenu'), icon: 'trash' as const, danger: true, separate: true, onSelect: () => a.deleteRun(run, 'chat') }] : []),
+    ...(ended ? [{ label: t('sentinel.run.deleteRunMenu'), icon: 'trash' as const, danger: true, ...(ownChat ? {} : { separate: true }), onSelect: () => a.deleteRun(run, 'run', back) }] : []),
   ];
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -95,28 +98,29 @@ function Run({ detail, summary }: { detail: RunDetail; summary: RunSummary | und
     return () => window.removeEventListener('keydown', onKey);
   }, [chat, a]);
   return (
-    <div ref={wrap} className={t.pageWrap}>
+    <div ref={wrap} className={tk.pageWrap}>
       <SwipeBackEdge progress={swipe} />
-      <div className={t.page}>
-        <div className={t.pageMain} data-run-page={run.id}>
-          <nav className={t.crumbs} aria-label="Where this run is">
-            <IconButton icon="back" label="Back" keys={shortcutKeys('page-back')} className={t.crumbBack} onClick={back} />
-            <button type="button" className={t.crumb} onClick={() => a.openList()}>
+      <div className={tk.page}>
+        <div className={tk.pageMain} data-run-page={run.id}>
+          <nav className={tk.crumbs} aria-label={t('sentinel.run.whereIs')}>
+            <IconButton icon="back" label={t('common.back')} keys={shortcutKeys('page-back')} className={tk.crumbBack} onClick={back} />
+            <button type="button" className={tk.crumb} onClick={() => a.openList()}>
+              {/* i18n-ignore: the product's name */}
               Sentinel
             </button>
             <Icon name="chevronRight" size={10} />
             {sentinel ? (
-              <button type="button" className={t.crumb} onClick={() => a.open(sentinel.id)}>
+              <button type="button" className={tk.crumb} onClick={() => a.open(sentinel.id)}>
                 {sentinel.name}
               </button>
             ) : (
-              <span className={t.crumbPlain}>{name ?? 'A sentinel'}</span>
+              <span className={tk.crumbPlain}>{name ?? t('sentinel.model.aSentinel')}</span>
             )}
-            <span className={t.grow} />
+            <span className={tk.grow} />
             <RunPill state={run.state} />
             {more.length ? (
               <ActionsDropdown items={more}>
-                <IconButton icon="more" label="More for this run" />
+                <IconButton icon="more" label={t('sentinel.run.moreForRun')} />
               </ActionsDropdown>
             ) : null}
           </nav>
@@ -126,13 +130,13 @@ function Run({ detail, summary }: { detail: RunDetail; summary: RunSummary | und
             <div className={s.decide} role="status" data-testid="sentinel-decide">
               <Icon name="merge" size={15} />
               <span className={s.bannerText}>
-                <strong>{run.pr ? `Pull request #${run.pr.number} waits for you.` : 'This run waits for you.'}</strong> {why ?? 'Merge it, or leave it open for now.'}
+                <strong>{run.pr ? t('sentinel.run.prWaits', { number: run.pr.number }) : t('sentinel.run.runWaits')}</strong> {why ?? t('sentinel.run.mergeOrLeave')}
               </span>
-              <Button size="small" variant="quiet" onClick={() => void a.act(() => a.api.decide(run.id, 'skip'), run.pr ? `#${run.pr.number} stays open` : 'Not now')}>
-                Not Now
+              <Button size="small" variant="quiet" onClick={() => void a.act(() => a.api.decide(run.id, 'skip'), run.pr ? t('sentinel.home.staysOpen', { number: run.pr.number }) : t('sentinel.home.notNowToast'))}>
+                {t('common.notNow')}
               </Button>
-              <Button size="small" variant="merge" icon="merge" onClick={() => void a.act(() => a.api.decide(run.id, 'merge'), run.pr ? `Merged #${run.pr.number}` : 'Merged')}>
-                Merge
+              <Button size="small" variant="merge" icon="merge" onClick={() => void a.act(() => a.api.decide(run.id, 'merge'), run.pr ? t('sentinel.home.mergedPr', { number: run.pr.number }) : t('sentinel.home.merged'))}>
+                {t('sentinel.home.merge')}
               </Button>
             </div>
           ) : null}
@@ -143,9 +147,9 @@ function Run({ detail, summary }: { detail: RunDetail; summary: RunSummary | und
             </div>
           ) : null}
 
-          <section className={s.card} aria-label="Steps">
+          <section className={s.card} aria-label={t('sentinel.cards.steps')}>
             <header className={s.cardHead}>
-              <h3 className={s.cardTitle}>Steps</h3>
+              <h3 className={s.cardTitle}>{t('sentinel.cards.steps')}</h3>
             </header>
             <div className={s.timeline} role="list">
               {run.steps.map((st, i) => (
@@ -155,9 +159,9 @@ function Run({ detail, summary }: { detail: RunDetail; summary: RunSummary | und
           </section>
 
           {detail.report ? (
-            <section className={s.card} aria-label="Report">
+            <section className={s.card} aria-label={t('sentinel.run.report')}>
               <header className={s.cardHead}>
-                <h3 className={s.cardTitle}>Report</h3>
+                <h3 className={s.cardTitle}>{t('sentinel.run.report')}</h3>
               </header>
               <div className={cx(s.report, 'selectable')}>
                 <Markdown text={detail.report} tasks />
@@ -166,14 +170,14 @@ function Run({ detail, summary }: { detail: RunDetail; summary: RunSummary | und
           ) : null}
 
           {run.pr || run.worktreeId || run.tasks.length ? (
-            <section className={s.card} aria-label="What it left">
+            <section className={s.card} aria-label={t('sentinel.run.left')}>
               <header className={s.cardHead}>
-                <h3 className={s.cardTitle}>What it left</h3>
+                <h3 className={s.cardTitle}>{t('sentinel.run.left')}</h3>
               </header>
               <div className={s.proof}>
                 {run.pr ? (
                   <Button size="small" icon="pr" onClick={() => actions.openLink({ kind: 'url', url: run.pr!.url })}>
-                    Pull request #{run.pr.number}
+                    {t('sentinel.run.pr', { number: run.pr.number })}
                   </Button>
                 ) : null}
                 {run.worktreeId ? <WorktreeChip id={run.worktreeId} /> : null}
@@ -190,6 +194,7 @@ function Run({ detail, summary }: { detail: RunDetail; summary: RunSummary | und
 }
 
 function TimelineStep({ run, step, index, now, worktree, gone, open }: { run: StepRun; step: Step | undefined; index: number; now: number; worktree?: string | undefined; gone?: string | undefined; open: (channel: string) => void }) {
+  const t = useT();
   const [shown, setShown] = useState(false);
   // Claude's session, watched right here: open while it works (and when it needs you), folded after.
   const live = run.state === 'running';
@@ -204,13 +209,13 @@ function TimelineStep({ run, step, index, now, worktree, gone, open }: { run: St
       </span>
       <div className={s.tBody}>
         <div className={s.tTop}>
-          <span className={s.tName}>{step?.name ?? `Step ${index + 1}`}</span>
+          <span className={s.tName}>{step?.name ?? t('sentinel.run.stepN', { n: index + 1 })}</span>
           {kind ? <span className={s.tTook}>{STEP_INFO[kind].label}</span> : null}
-          {took ? <span className={s.tTook}>· {took}{run.state === 'running' ? ' so far' : ''}</span> : null}
-          <span className={t.grow} />
+          {took ? <span className={s.tTook}>· {run.state === 'running' ? t('sentinel.model.soFar', { took }) : took}</span> : null}
+          <span className={tk.grow} />
           {run.channel && chatPlaceOf(run.channel) && kind !== 'claude' && !gone ? (
             <Button size="small" variant="quiet" icon="chat" onClick={() => open(run.channel!)}>
-              Open Chat
+              {t('sentinel.dash.openChat')}
             </Button>
           ) : null}
         </div>
@@ -219,17 +224,17 @@ function TimelineStep({ run, step, index, now, worktree, gone, open }: { run: St
           <>
             <button type="button" className={s.disclosure} aria-expanded={watch} onClick={() => setWatching(!watch)}>
               <Icon name={watch ? 'chevronDown' : 'chevronRight'} size={10} />
-              {watch ? 'Hide the agent’s session' : live ? 'Watch the agent work' : 'The agent’s session'}
+              {watch ? t('sentinel.run.hideSession') : live ? t('sentinel.run.watchWork') : t('sentinel.run.session')}
             </button>
             {watch ? <Session channel={run.channel} live={live} where={step?.kind === 'claude' ? step.where : undefined} worktree={worktree} open={() => open(run.channel!)} /> : null}
           </>
         ) : null}
-        {run.why ? <span className={run.state === 'failed' ? s.tWhy : s.tNote}>{run.why}</span> : run.state === 'waiting' ? <span className={s.tNote}>Waiting for the steps before it</span> : null}
+        {run.why ? <span className={run.state === 'failed' ? s.tWhy : s.tNote}>{run.why}</span> : run.state === 'waiting' ? <span className={s.tNote}>{t('sentinel.run.waitingSteps')}</span> : null}
         {run.output ? (
           <>
             <button type="button" className={s.disclosure} aria-expanded={shown} onClick={() => setShown(!shown)}>
               <Icon name={shown ? 'chevronDown' : 'chevronRight'} size={10} />
-              {shown ? 'Hide output' : 'Show output'}
+              {shown ? t('sentinel.run.hideOutput') : t('sentinel.run.showOutput')}
             </button>
             {shown ? <pre className={cx(s.output, 'selectable')}>{run.output}</pre> : null}
           </>
@@ -246,21 +251,22 @@ function TimelineStep({ run, step, index, now, worktree, gone, open }: { run: St
  * away, is where you write to it. A step in a worktree names it.
  */
 function Session({ channel, live, where, worktree, open }: { channel: string; live: boolean; where: 'project' | 'worktree' | 'mac' | undefined; worktree: string | undefined; open: () => void }) {
+  const t = useT();
   return (
     <div className={s.session} data-run-session={channel} data-live={live || undefined}>
       <div className={s.sessionBar}>
         {live ? <LiveDot /> : <Icon name="claude" size={12} />}
-        <span className={s.sessionWhere}>{where === 'worktree' ? 'In its own worktree' : where === 'mac' ? `On ${ASSISTANT_TITLE}` : 'In the project, reading only'}</span>
+        <span className={s.sessionWhere}>{where === 'worktree' ? t('sentinel.run.inWorktree') : where === 'mac' ? t('sentinel.cards.whereMac', { assistant: ASSISTANT_TITLE }) : t('sentinel.run.inProject')}</span>
         {where === 'worktree' && worktree ? <WorktreeChip id={worktree} /> : null}
-        <span className={t.grow} />
+        <span className={tk.grow} />
         {chatPlaceOf(channel) ? (
           <Button size="small" variant="quiet" icon="chat" onClick={open}>
-            Open the Chat
+            {t('sentinel.run.openTheChat')}
           </Button>
         ) : null}
       </div>
       <div className={cx(v.chat, s.sessionLog)}>
-        <ChatLog channel={channel} empty={<div className={s.sessionEmpty}>{live ? 'The agent is starting…' : 'This session has nothing to show'}</div>} />
+        <ChatLog channel={channel} empty={<div className={s.sessionEmpty}>{live ? t('sentinel.run.starting') : t('sentinel.run.nothingToShow')}</div>} />
         <Attention channel={channel} />
       </div>
     </div>

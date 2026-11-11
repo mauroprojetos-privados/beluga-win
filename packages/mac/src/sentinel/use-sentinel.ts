@@ -9,6 +9,7 @@ import { copyText } from '../lib/copy.js';
 import { openSheet } from '../lib/sheets.js';
 import { type ChatPlace, chatPlaceOf, runsFolderOf } from './sentinel-model.js';
 import { openFolderThere } from '../lib/remote-open.js';
+import { t as tx } from '@beluga/shared/i18n/index.js';
 
 /** What Sentinel's screens share: the slice, and acting on sentinels with errors as toasts. */
 
@@ -47,35 +48,32 @@ export function useSentinelActions() {
       open: (id: string): void => go({ kind: 'sentinel_page', id }),
       openRun: (runId: string): void => go({ kind: 'sentinel_run', runId }),
       openChannel: (channel: string | undefined): void => openChat(chatPlaceOf(channel)),
-      runNow: (s: Pick<Sentinel, 'id' | 'name'>): Promise<RunSummary | undefined> => act(() => api.sentinel.run(s.id), `${s.name} is running`),
-      setPaused: (s: Pick<Sentinel, 'id' | 'name'>, paused: boolean): Promise<Sentinel | undefined> => act(() => api.sentinel.pause(s.id, paused), paused ? `${s.name} is paused` : `${s.name} is on`),
+      runNow: (s: Pick<Sentinel, 'id' | 'name'>): Promise<RunSummary | undefined> => act(() => api.sentinel.run(s.id), tx('sentinel.nav.running', { name: s.name })),
+      setPaused: (s: Pick<Sentinel, 'id' | 'name'>, paused: boolean): Promise<Sentinel | undefined> => act(() => api.sentinel.pause(s.id, paused), paused ? tx('sentinel.use.paused', { name: s.name }) : tx('sentinel.use.on', { name: s.name })),
       duplicate: async (s: Pick<Sentinel, 'id' | 'name'>): Promise<void> => {
-        const copy = await act(() => api.sentinel.duplicate(s.id), `Made a copy of ${s.name} (paused)`);
+        const copy = await act(() => api.sentinel.duplicate(s.id), tx('sentinel.use.copied', { name: s.name }));
         if (copy) go({ kind: 'sentinel_page', id: copy.id });
       },
       remove: (s: Pick<Sentinel, 'id' | 'name'>, after?: () => void): void =>
         openSheet({
           kind: 'confirm',
-          title: `Delete “${s.name}”?`,
-          message: 'It stops watching, and a run going now stops. Its past runs’ reports go with the next clean-up. This can’t be undone.',
-          confirm: 'Delete Sentinel',
+          title: tx('sentinel.dash.deleteTitle', { name: s.name }),
+          message: tx('sentinel.use.deleteMessage'),
+          confirm: tx('sentinel.use.deleteSentinel'),
           destructive: true,
-          run: () => void act(() => api.sentinel.remove(s.id), `Deleted ${s.name}`).then(() => after?.()),
+          run: () => void act(() => api.sentinel.remove(s.id), tx('sentinel.dash.deleted', { name: s.name })).then(() => after?.()),
         }),
       /** Delete a run's chat, or the whole run (BLG-577), after asking. `after`: where to go once the run is gone. */
       deleteRun: (run: Pick<RunSummary, 'id' | 'headline'>, what: 'chat' | 'run', after?: () => void): void =>
         openSheet({
           kind: 'confirm',
-          title: what === 'chat' ? 'Delete this run’s chat?' : 'Delete this run?',
-          message:
-            what === 'chat'
-              ? 'Its agent’s conversation goes for good. The run, its report and its steps’ outputs stay here.'
-              : 'Its agent’s conversation, its report, its steps’ outputs and its folder go for good. A worktree it made and numbers it kept stay.',
-          confirm: what === 'chat' ? 'Delete Chat' : 'Delete Run',
+          title: what === 'chat' ? tx('sentinel.use.deleteChatTitle') : tx('sentinel.use.deleteRunTitle'),
+          message: what === 'chat' ? tx('sentinel.use.deleteChatMessage') : tx('sentinel.use.deleteRunMessage'),
+          confirm: what === 'chat' ? tx('sentinel.chat.deleteChat') : tx('sentinel.use.deleteRun'),
           destructive: true,
-          run: () => void act(async () => (await api.sentinel.runDelete(run.id, what), true), what === 'chat' ? 'Deleted the run’s chat' : 'Deleted the run').then((done) => done && what === 'run' && after?.()),
+          run: () => void act(async () => (await api.sentinel.runDelete(run.id, what), true), what === 'chat' ? tx('sentinel.use.deletedChat') : tx('sentinel.use.deletedRun')).then((done) => done && what === 'run' && after?.()),
         }),
-      copyJson: (s: Sentinel): void => void copyText(JSON.stringify(s, null, 2)).then(() => toast(client, `Copied ${s.name} as JSON`, 'success')),
+      copyJson: (s: Sentinel): void => void copyText(JSON.stringify(s, null, 2)).then(() => toast(client, tx('sentinel.use.copiedJson', { name: s.name }), 'success')),
       // A sentinel on a computer: its runs folder over Remote-SSH, else its path copied; never opened over there (BLG-852).
       openFolder: (path: string): void => void act(() => openFolderThere(client, path)),
     };
@@ -91,12 +89,12 @@ export const useRunsFolder = (): string | undefined => useApp((s) => runsFolderO
 /** A sentinel's menu (right-click and ⋯ on its row): Run Now, Pause or Turn On, Open Last Run, Duplicate, Delete…. */
 export function sentinelMenu(s: Sentinel, last: RunSummary | undefined, a: SentinelActions): ActionItem[] {
   return [
-    { label: 'Run Now', icon: 'play', hint: s.paused ? 'Once, even though it’s paused' : undefined, onSelect: () => void a.runNow(s) },
+    { label: tx('sentinel.page.runNow'), icon: 'play', hint: s.paused ? tx('sentinel.use.onceEvenPaused') : undefined, onSelect: () => void a.runNow(s) },
     s.paused
-      ? { label: s.pausedWhy && s.pausedWhy !== CLAUDE_CHANGED ? 'Resume' : 'Turn On', icon: 'play', hint: s.trigger.kind === 'schedule' ? 'It runs on its schedule from now' : undefined, onSelect: () => void a.setPaused(s, false) }
-      : { label: 'Pause', icon: 'pause', hint: 'Nothing runs until you turn it on again', onSelect: () => void a.setPaused(s, true) },
-    { label: 'Open Last Run', icon: 'arrowRight', disabled: !last, separate: true, onSelect: () => last && a.openRun(last.id) },
-    { label: 'Duplicate', icon: 'copy', onSelect: () => void a.duplicate(s) },
-    { label: 'Delete…', danger: true, separate: true, onSelect: () => a.remove(s) },
+      ? { label: s.pausedWhy && s.pausedWhy !== CLAUDE_CHANGED ? tx('sentinel.page.resume') : tx('sentinel.dash.turnOn'), icon: 'play', hint: s.trigger.kind === 'schedule' ? tx('sentinel.use.onSchedule') : undefined, onSelect: () => void a.setPaused(s, false) }
+      : { label: tx('sentinel.page.pause'), icon: 'pause', hint: tx('sentinel.use.pauseHint'), onSelect: () => void a.setPaused(s, true) },
+    { label: tx('sentinel.page.openLastRun'), icon: 'arrowRight', disabled: !last, separate: true, onSelect: () => last && a.openRun(last.id) },
+    { label: tx('sentinel.cards.duplicate'), icon: 'copy', onSelect: () => void a.duplicate(s) },
+    { label: tx('sentinel.page.deleteMenu'), danger: true, separate: true, onSelect: () => a.remove(s) },
   ];
 }

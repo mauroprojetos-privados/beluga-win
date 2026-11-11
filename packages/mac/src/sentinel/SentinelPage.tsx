@@ -44,12 +44,13 @@ import {
 import { useDraft } from './use-draft.js';
 import { useClock } from '../lib/window-active.js';
 import { useRunsFolder, useSentinelActions, useSentinelState } from './use-sentinel.js';
-import t from '../tasks/tasks.module.css';
+import tk from '../tasks/tasks.module.css';
 import s from './sentinel.module.css';
 import { shortcutKeys } from '../lib/shortcuts.js';
 import { primaryKey } from '../lib/shortcuts-model.js';
 import { ASSISTANT_TITLE } from '@beluga/shared/assistant.js';
 import { useOpenFolderLabel } from '../lib/remote-open.js';
+import { useT } from '../lib/i18n.js';
 
 /**
  * A sentinel's page: the editor and its history in one. The name is renamed in place, When and
@@ -57,10 +58,11 @@ import { useOpenFolderLabel } from '../lib/remote-open.js';
  * the history shows the last 30 runs as dots, then as rows that open the run. ⌘[ or Esc go back.
  */
 export function SentinelPage({ id }: { id: string }) {
+  const t = useT();
   const state = useSentinelState();
   const item = state.items.find((x) => x.id === id);
-  if (!state.enabled) return <Empty icon="sentinel" title="Sentinel needs the Beluga app" />;
-  if (!item) return <Empty icon="sentinel" title="This sentinel isn’t here anymore" detail="It may have been deleted." />;
+  if (!state.enabled) return <Empty icon="sentinel" title={t('sentinel.page.needsApp')} />;
+  if (!item) return <Empty icon="sentinel" title={t('sentinel.page.gone')} detail={t('sentinel.page.goneDetail')} />;
   return <Page item={item} />;
 }
 
@@ -74,10 +76,10 @@ function Page({ item }: { item: Sentinel }) {
   const asking = useApp((st) => st.view.kind === 'sentinel_chat' && st.view.about === item.id);
   return (
     <div className={home.home}>
-      <div ref={wrap} className={cx(t.pageWrap, home.grow)}>
+      <div ref={wrap} className={cx(tk.pageWrap, home.grow)}>
         <SwipeBackEdge progress={swipe} />
-        <div className={t.page}>
-          <div className={t.pageMain} data-sentinel-page={item.id}>
+        <div className={tk.page}>
+          <div className={tk.pageMain} data-sentinel-page={item.id}>
             <Crumbs item={item} back={back} />
             <Header item={item} save={save} />
             <AskBox item={item} />
@@ -101,24 +103,27 @@ function Page({ item }: { item: Sentinel }) {
 }
 
 function Crumbs({ item, back }: { item: Sentinel; back: () => void }) {
+  const t = useT();
   const a = useSentinelActions();
   const project = useApp((st) => st.projects.find((p) => p.id === item.projectId));
   return (
-    <nav className={t.crumbs} aria-label="Where this sentinel is">
-      <IconButton icon="back" label="Back" keys={shortcutKeys('page-back')} className={t.crumbBack} onClick={back} />
-      <button type="button" className={t.crumb} onClick={() => a.openList()}>
+    <nav className={tk.crumbs} aria-label={t('sentinel.page.whereIs')}>
+      <IconButton icon="back" label={t('common.back')} keys={shortcutKeys('page-back')} className={tk.crumbBack} onClick={back} />
+      <button type="button" className={tk.crumb} onClick={() => a.openList()}>
+        {/* i18n-ignore: the product's name */}
         Sentinel
       </button>
       <Icon name="chevronRight" size={10} />
-      <button type="button" className={t.crumb} onClick={() => a.openList(item.projectId ?? MAC_SCOPE)}>
+      <button type="button" className={tk.crumb} onClick={() => a.openList(item.projectId ?? MAC_SCOPE)}>
         {project?.name ?? ASSISTANT_TITLE}
       </button>
-      <span className={t.grow} />
+      <span className={tk.grow} />
     </nav>
   );
 }
 
 function Header({ item, save }: { item: Sentinel; save: (patch: SentinelPatch) => void }) {
+  const t = useT();
   const a = useSentinelActions();
   const folder = useRunsFolder();
   const items = useApp((st) => st.sentinel.items);
@@ -127,15 +132,15 @@ function Header({ item, save }: { item: Sentinel; save: (patch: SentinelPatch) =
     if (next && next !== item.name) save({ name: next });
   });
   // A sentinel on a computer: its runs folder in your editor over Remote-SSH, else its path copied (BLG-852).
-  const runsFolder = useOpenFolderLabel('Open the Runs Folder', 'Copy the Runs Folder’s Path');
+  const runsFolder = useOpenFolderLabel(t('sentinel.page.openRunsFolder'), t('sentinel.page.copyRunsFolder'));
   // Move To ▸ another computer of yours (BLG-807): Pause and Move To while it runs.
   const moveTo = useSentinelMoveTo(item);
   const more: ActionItem[] = [
-    { label: 'Duplicate', icon: 'copy', onSelect: () => void a.duplicate(item) },
-    { label: 'Copy as JSON', icon: 'copy', onSelect: () => a.copyJson(item) },
+    { label: t('sentinel.cards.duplicate'), icon: 'copy', onSelect: () => void a.duplicate(item) },
+    { label: t('sentinel.page.copyJson'), icon: 'copy', onSelect: () => a.copyJson(item) },
     ...(folder ? [{ label: runsFolder, icon: 'folder' as const, onSelect: () => a.openFolder(folder) }] : []),
     ...(moveTo ? [moveTo] : []),
-    { label: 'Delete…', danger: true, separate: true, onSelect: () => a.remove(item, () => a.openList()) },
+    { label: t('sentinel.page.deleteMenu'), danger: true, separate: true, onSelect: () => a.remove(item, () => a.openList()) },
   ];
   return (
     <header className={s.head}>
@@ -144,7 +149,7 @@ function Header({ item, save }: { item: Sentinel; save: (patch: SentinelPatch) =
         <input
           className={s.name}
           value={name.text}
-          aria-label="Name"
+          aria-label={t('sentinel.page.name')}
           spellCheck={false}
           onChange={(e) => name.change(e.target.value)}
           onBlur={name.flush}
@@ -156,23 +161,23 @@ function Header({ item, save }: { item: Sentinel; save: (patch: SentinelPatch) =
       </div>
       <div className={s.headActions}>
         {/* Where it runs (BLG-786): the computer it was made on. Only with a computer paired. */}
-        <RunsOnLabel tip="It runs on the computer it was made on until you move it." />
-        <Tip label={item.paused ? 'Once now, even though it’s paused' : 'Once now, whatever its schedule'}>
+        <RunsOnLabel tip={t('sentinel.page.runsOn')} />
+        <Tip label={item.paused ? t('sentinel.page.runNowPaused') : t('sentinel.page.runNowTip')}>
           <Button size="small" icon="play" variant={item.paused ? 'plain' : 'primary'} onClick={() => void a.runNow(item)}>
-            Run Now
+            {t('sentinel.page.runNow')}
           </Button>
         </Tip>
         {item.paused ? (
           <Button size="small" variant="primary" icon="check" onClick={() => void a.setPaused(item, false)}>
-            {item.pausedWhy && item.pausedWhy !== CLAUDE_CHANGED ? 'Resume' : 'Turn On'}
+            {item.pausedWhy && item.pausedWhy !== CLAUDE_CHANGED ? t('sentinel.page.resume') : t('sentinel.dash.turnOn')}
           </Button>
         ) : (
           <Button size="small" icon="pause" onClick={() => void a.setPaused(item, true)}>
-            Pause
+            {t('sentinel.page.pause')}
           </Button>
         )}
         <ActionsDropdown items={more}>
-          <IconButton icon="more" label={`More for ${item.name}`} />
+          <IconButton icon="more" label={t('sentinel.dash.moreFor', { name: item.name })} />
         </ActionsDropdown>
       </div>
     </header>
@@ -185,6 +190,7 @@ function Header({ item, save }: { item: Sentinel; save: (patch: SentinelPatch) =
  * change things there, and answer its approvals there.
  */
 function AskBox({ item }: { item: Sentinel }) {
+  const t = useT();
   const api = useApi();
   const actions = useActions();
   const active = useApp((st) => st.sentinel.chats?.active ?? FIRST_SENTINEL_CHAT);
@@ -197,19 +203,19 @@ function AskBox({ item }: { item: Sentinel }) {
   const send = (): void => {
     const words = text.trim();
     if (!words) return;
-    void api.session.submit(`About “${item.name}”: ${words}`, { channel: sentinelChatChannel(active) });
+    void api.session.submit(t('sentinel.page.about', { name: item.name, words }), { channel: sentinelChatChannel(active) });
     actions.run({ type: 'view', view: { kind: 'sentinel_chat', chat: active, about: item.id } });
     setText('');
   };
   return (
-    <section className={s.ask} aria-label="Ask your agent" data-testid="sentinel-ask">
+    <section className={s.ask} aria-label={t('sentinel.page.askAgent')} data-testid="sentinel-ask">
       <div className={s.askRow}>
         <ClaudeMark />
         <input
           className={s.askInput}
           value={text}
-          placeholder="Ask your agent about this sentinel: “make it weekly”, “why did it fail?”…"
-          aria-label="Ask your agent about this sentinel"
+          placeholder={t('sentinel.page.askPlaceholder')}
+          aria-label={t('sentinel.page.askAria')}
           spellCheck
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -219,9 +225,9 @@ function AskBox({ item }: { item: Sentinel }) {
             }
           }}
         />
-        <Tip label="The Sentinel chat opens beside this page; your agent changes it there" keys="↩">
+        <Tip label={t('sentinel.page.askTip')} keys="↩">
           <Button size="small" icon="arrowRight" disabled={!text.trim()} onClick={send}>
-            Ask
+            {t('sentinel.page.ask')}
           </Button>
         </Tip>
       </div>
@@ -231,7 +237,7 @@ function AskBox({ item }: { item: Sentinel }) {
           {line.who === 'claude' ? <span className={s.askDot} aria-hidden="true" /> : <Icon name={line.who === 'done' ? 'check' : 'alert'} size={12} />}
           <span className={s.askText}>{line.text}</span>
           <Button size="small" variant="quiet" onClick={() => a.openChannel(ask.channel)}>
-            Open Chat
+            {t('sentinel.dash.openChat')}
           </Button>
         </div>
       ) : null}
@@ -240,6 +246,7 @@ function AskBox({ item }: { item: Sentinel }) {
 }
 
 function Banners({ item }: { item: Sentinel }) {
+  const t = useT();
   const a = useSentinelActions();
   const last = useApp((st) => runsOf(st.sentinel, item.id)[0]);
   if (item.paused && item.pausedWhy === CLAUDE_CHANGED) {
@@ -248,7 +255,7 @@ function Banners({ item }: { item: Sentinel }) {
         <ClaudeMark />
         <span className={s.bannerText}>{CLAUDE_CHANGED_BANNER}</span>
         <Button size="small" variant="primary" onClick={() => void a.setPaused(item, false)}>
-          Turn On
+          {t('sentinel.dash.turnOn')}
         </Button>
       </div>
     );
@@ -258,15 +265,15 @@ function Banners({ item }: { item: Sentinel }) {
       <div className={s.banner} data-tone="error" role="status">
         <Icon name="alert" size={14} />
         <span className={s.bannerText}>
-          <strong>{item.pausedWhy}.</strong> {last?.why ? `The last one: ${last.why.split('\n')[0]}` : 'Look at the last run, fix what it needs, then resume.'}
+          <strong>{item.pausedWhy}.</strong> {last?.why ? t('sentinel.page.lastOne', { why: last.why.split('\n')[0] ?? '' }) : t('sentinel.page.lookAtLast')}
         </span>
         {last ? (
           <Button size="small" variant="quiet" onClick={() => a.openRun(last.id)}>
-            Open Last Run
+            {t('sentinel.page.openLastRun')}
           </Button>
         ) : null}
         <Button size="small" onClick={() => void a.setPaused(item, false)}>
-          Resume
+          {t('sentinel.page.resume')}
         </Button>
       </div>
     );
@@ -275,7 +282,7 @@ function Banners({ item }: { item: Sentinel }) {
     return (
       <div className={s.banner} data-tone="info" role="status">
         <Icon name="pause" size={14} />
-        <span className={s.bannerText}>This sentinel is paused. Turn On to let it run{item.trigger.kind === 'schedule' ? ' on its schedule' : item.trigger.kind === 'manual' || item.trigger.kind === 'after' ? '' : ' when it happens'}; Run Now tries it once first.</span>
+        <span className={s.bannerText}>{item.trigger.kind === 'schedule' ? t('sentinel.page.pausedSchedule') : item.trigger.kind === 'manual' || item.trigger.kind === 'after' ? t('sentinel.page.pausedManual') : t('sentinel.page.pausedEvent')}</span>
       </div>
     );
   }
@@ -284,6 +291,7 @@ function Banners({ item }: { item: Sentinel }) {
 
 /** The runs: a dot strip of the last 30, then each as a row (when, by what, how it went, how long). */
 function History({ item }: { item: Sentinel }) {
+  const t = useT();
   const state = useSentinelState();
   const a = useSentinelActions();
   const now = useClock(true, 15_000);
@@ -294,17 +302,17 @@ function History({ item }: { item: Sentinel }) {
     return step ? item.steps.find((x) => x.id === step)?.name : undefined;
   };
   return (
-    <section className={s.card} aria-label="History">
+    <section className={s.card} aria-label={t('sentinel.page.history')}>
       <header className={s.cardHead}>
-        <h3 className={s.cardTitle}>History</h3>
-        <span className={t.grow} />
-        {runs.length ? <span className={s.hint}>{runs.length === 1 ? '1 run' : `the last ${runs.length} runs`}</span> : null}
+        <h3 className={s.cardTitle}>{t('sentinel.page.history')}</h3>
+        <span className={tk.grow} />
+        {runs.length ? <span className={s.hint}>{t('sentinel.page.runsCount', { count: runs.length })}</span> : null}
       </header>
       {!runs.length ? (
-        <p className={s.empty}>No runs yet. Run Now tries it once.</p>
+        <p className={s.empty}>{t('sentinel.page.noRuns')}</p>
       ) : (
         <>
-          <div className={s.strip} role="list" aria-label="The last runs, oldest first">
+          <div className={s.strip} role="list" aria-label={t('sentinel.page.lastRuns')}>
             {dots.map((d) => (
               <Tip key={d.id} label={d.label}>
                 <button type="button" role="listitem" className={s.stripDot} data-tone={d.tone} aria-label={d.label} onClick={() => a.openRun(d.id)} />
@@ -346,6 +354,7 @@ function History({ item }: { item: Sentinel }) {
 }
 
 function Properties({ item, save }: { item: Sentinel; save: (patch: SentinelPatch) => void }) {
+  const t = useT();
   const a = useSentinelActions();
   const all = useApp((st) => st.projects);
   const agents = useAgentEntries();
@@ -356,19 +365,19 @@ function Properties({ item, save }: { item: Sentinel; save: (patch: SentinelPatc
   const perDay: number[] = PER_DAY_CHOICES.includes(item.limits.perDay ?? 0) ? [...PER_DAY_CHOICES] : [...PER_DAY_CHOICES, item.limits.perDay!].sort((x, y) => x - y);
   const pauseAfter: number[] = PAUSE_AFTER_CHOICES.includes(item.limits.pauseAfter) ? [...PAUSE_AFTER_CHOICES] : [...PAUSE_AFTER_CHOICES, item.limits.pauseAfter].sort((x, y) => x - y);
   return (
-    <aside className={t.props} aria-label="Properties">
-      <Prop label="Project">
+    <aside className={tk.props} aria-label={t('sentinel.page.properties')}>
+      <Prop label={t('sentinel.page.project')}>
         <Select
-          label="Project"
+          label={t('sentinel.page.project')}
           size="small"
           value={item.projectId ?? MAC_SCOPE}
           options={[{ value: MAC_SCOPE, label: ASSISTANT_TITLE }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
           onChange={(v) => save({ projectId: v === MAC_SCOPE ? null : v })}
         />
       </Prop>
-      <Prop label="Access">
+      <Prop label={t('sentinel.page.access')}>
         <Select<Access>
-          label="Access"
+          label={t('sentinel.page.access')}
           size="small"
           value={item.access}
           options={ACCESS.map((x) => ({ value: x, label: ACCESS_INFO[x].label, description: accessSentence(x, item.steps) }))}
@@ -376,7 +385,7 @@ function Properties({ item, save }: { item: Sentinel; save: (patch: SentinelPatc
             // Less access than its steps need: say which step, before it's refused.
             if (accessRank(access) < accessRank(item.access)) {
               const needs = item.steps.find((st) => (st.kind === 'merge' && access !== 'ship') || ((st.kind === 'pr' || (st.kind === 'claude' && st.where === 'worktree')) && access === 'look'));
-              if (needs) return void a.act(() => Promise.reject(new Error(`“${needs.name}” needs more than ${ACCESS_INFO[access].label}: remove it first`)));
+              if (needs) return void a.act(() => Promise.reject(new Error(t('sentinel.page.needsMore', { name: needs.name, access: ACCESS_INFO[access].label }))));
             }
             save({ access });
           }}
@@ -386,23 +395,23 @@ function Properties({ item, save }: { item: Sentinel; save: (patch: SentinelPatc
         {accessSentence(item.access, item.steps)}.
       </p>
       {claudeSteps ? (
-        <Prop label="Agent">
-          <Select label="Agent and model for every agent step" size="small" value={agent ?? 'mixed'} placeholder="Mixed" options={agents} onChange={(v) => save({ steps: withAgent(item.steps, v) })} />
+        <Prop label={t('sentinel.cards.agent')}>
+          <Select label={t('sentinel.page.agentEvery')} size="small" value={agent ?? 'mixed'} placeholder={t('sentinel.page.mixed')} options={agents} onChange={(v) => save({ steps: withAgent(item.steps, v) })} />
         </Prop>
       ) : null}
-      <Prop label="Time limit">
-        <Select label="Time limit" size="small" value={String(item.limits.minutes)} options={limits.map((n) => ({ value: String(n), label: n < 60 ? `${n} minutes` : n === 60 ? '1 hour' : `${n / 60} hours`, description: 'Per run; the agent is stopped and the run fails as timed out' }))} onChange={(v) => save({ limits: { minutes: Number(v) } })} />
+      <Prop label={t('sentinel.page.timeLimit')}>
+        <Select label={t('sentinel.page.timeLimit')} size="small" value={String(item.limits.minutes)} options={limits.map((n) => ({ value: String(n), label: n < 60 ? t('sentinel.cards.minutes', { count: n }) : n === 60 ? t('sentinel.cards.oneHour') : t('sentinel.cards.hours', { count: n / 60 }), description: t('sentinel.page.timeLimitLine') }))} onChange={(v) => save({ limits: { minutes: Number(v) } })} />
       </Prop>
-      <Prop label="Runs per day">
-        <Select label="Runs per day" size="small" value={String(item.limits.perDay ?? 0)} options={perDay.map((n) => ({ value: String(n), label: perDayLabel(n) }))} onChange={(v) => save({ limits: { perDay: Number(v) } })} />
+      <Prop label={t('sentinel.page.perDay')}>
+        <Select label={t('sentinel.page.perDay')} size="small" value={String(item.limits.perDay ?? 0)} options={perDay.map((n) => ({ value: String(n), label: perDayLabel(n) }))} onChange={(v) => save({ limits: { perDay: Number(v) } })} />
       </Prop>
-      <Prop label="Pause after">
-        <Select label="Pause after" size="small" value={String(item.limits.pauseAfter)} options={pauseAfter.map((n) => ({ value: String(n), label: pauseAfterLabel(n) }))} onChange={(v) => save({ limits: { pauseAfter: Number(v) } })} />
+      <Prop label={t('sentinel.page.pauseAfter')}>
+        <Select label={t('sentinel.page.pauseAfter')} size="small" value={String(item.limits.pauseAfter)} options={pauseAfter.map((n) => ({ value: String(n), label: pauseAfterLabel(n) }))} onChange={(v) => save({ limits: { pauseAfter: Number(v) } })} />
       </Prop>
       {claudeSteps ? (
-        <Prop label="Keep chats">
+        <Prop label={t('sentinel.page.keepChats')}>
           <Select<KeepChats>
-            label="Which runs’ chats to keep"
+            label={t('sentinel.page.keepChatsAria')}
             size="small"
             value={item.keepChats ?? DEFAULT_KEEP_CHATS}
             options={KEEP_CHATS.map((k) => ({ value: k, label: KEEP_CHATS_INFO[k].label, description: KEEP_CHATS_INFO[k].description }))}
@@ -410,23 +419,23 @@ function Properties({ item, save }: { item: Sentinel; save: (patch: SentinelPatc
           />
         </Prop>
       ) : null}
-      <Prop label="Notify">
-        <Select label="Notify" size="small" value={item.notify} options={NOTIFY_WHERE.map((n) => ({ value: n, label: NOTIFY_LABEL[n], description: n === 'off' ? 'Only failures and pausing still tell you' : 'When a run ends (a Notify step says more)' }))} onChange={(notify) => save({ notify })} />
+      <Prop label={t('sentinel.page.notify')}>
+        <Select label={t('sentinel.page.notify')} size="small" value={item.notify} options={NOTIFY_WHERE.map((n) => ({ value: n, label: NOTIFY_LABEL[n], description: n === 'off' ? t('sentinel.page.notifyOff') : t('sentinel.page.notifyOn') }))} onChange={(notify) => save({ notify })} />
       </Prop>
-      <div className={t.propsRule} />
-      <Prop label="Id" quiet>
-        <span className={cx(t.propStatic, t.mono, 'selectable')}>{item.id}</span>
+      <div className={tk.propsRule} />
+      <Prop label={t('sentinel.page.id')} quiet>
+        <span className={cx(tk.propStatic, tk.mono, 'selectable')}>{item.id}</span>
       </Prop>
       {item.recipe ? (
-        <Prop label="Recipe" quiet>
-          <span className={t.propStatic}>{recipeById(item.recipe)?.name ?? item.recipe}</span>
+        <Prop label={t('sentinel.page.recipe')} quiet>
+          <span className={tk.propStatic}>{recipeById(item.recipe)?.name ?? item.recipe}</span>
         </Prop>
       ) : null}
-      <Prop label="Created" quiet>
-        <span className={t.propStatic}>{ago(item.createdAt)}</span>
+      <Prop label={t('sentinel.page.created')} quiet>
+        <span className={tk.propStatic}>{ago(item.createdAt)}</span>
       </Prop>
-      <Prop label="Changed" quiet>
-        <span className={t.propStatic}>{ago(item.updatedAt)}</span>
+      <Prop label={t('sentinel.page.changed')} quiet>
+        <span className={tk.propStatic}>{ago(item.updatedAt)}</span>
       </Prop>
     </aside>
   );
@@ -434,9 +443,9 @@ function Properties({ item, save }: { item: Sentinel; save: (patch: SentinelPatc
 
 function Prop({ label, children, quiet }: { label: string; children: React.ReactNode; quiet?: boolean }) {
   return (
-    <div className={cx(t.prop, quiet && t.propStaticRow)}>
-      <span className={t.propLabel}>{label}</span>
-      <div className={t.propControl}>{children}</div>
+    <div className={cx(tk.prop, quiet && tk.propStaticRow)}>
+      <span className={tk.propLabel}>{label}</span>
+      <div className={tk.propControl}>{children}</div>
     </div>
   );
 }

@@ -18,6 +18,9 @@ import { useSentinelActions } from './use-sentinel.js';
 import v from '../views/views.module.css';
 import s from './sentinel.module.css';
 import home from './home.module.css';
+import { useT } from '../lib/i18n.js';
+
+type T = ReturnType<typeof useT>;
 
 /**
  * Ask Sentinel (docs/sentinel.md §12, BLG-306): one conversation with your own Claude for the whole
@@ -32,41 +35,41 @@ type Starter = { readonly label: string; readonly icon: Parameters<typeof Icon>[
 
 /** What your agent makes here (BLG-590): newcomers don't know, so the empty chat shows each with examples. */
 type Kind = 'dashboard' | 'watcher' | 'pipeline';
-const KINDS: ReadonlyArray<{ value: Kind; label: string; icon: Parameters<typeof Icon>[0]['name']; line: string }> = [
-  { value: 'dashboard', label: 'Dashboards', icon: 'gauge', line: 'Any numbers, charts or tables you care about, kept fresh on their own.' },
-  { value: 'watcher', label: 'Watchers', icon: 'sentinel', line: 'On a schedule or when something happens, it looks and tells you.' },
-  { value: 'pipeline', label: 'Pipelines', icon: 'link', line: 'Steps in a row: fetch, have the agent work on it, then tell you or open a pull request.' },
+const KINDS = (t: T): ReadonlyArray<{ value: Kind; label: string; icon: Parameters<typeof Icon>[0]['name']; line: string }> => [
+  { value: 'dashboard', label: t('sentinel.chat.dashboards'), icon: 'gauge', line: t('sentinel.chat.dashboardsLine') },
+  { value: 'watcher', label: t('sentinel.chat.watchers'), icon: 'sentinel', line: t('sentinel.chat.watchersLine') },
+  { value: 'pipeline', label: t('sentinel.chat.pipelines'), icon: 'link', line: t('sentinel.chat.pipelinesLine') },
 ];
 
 /** The first line, whatever kind is picked: your agent looks and suggests; with sentinels already, what they found. */
-function leadsFor(has: boolean): Starter[] {
+function leadsFor(t: T, has: boolean): Starter[] {
   return [
-    { label: 'Suggest Some for Me', icon: 'sparkles', prompt: 'Look at my projects and what they use, and suggest three things you could build for me (a dashboard, a watcher or a pipeline), each in one plain line. Set them up when I say yes.' },
-    ...(has ? [{ label: 'What Did They Find?', icon: 'sentinel', prompt: 'What did my sentinels find this week? Lead with anything that needs me.' } satisfies Starter] : []),
+    { label: t('sentinel.home.idea.suggest'), icon: 'sparkles', prompt: t('sentinel.chat.suggestPrompt') },
+    ...(has ? [{ label: t('sentinel.chat.whatFound'), icon: 'sentinel', prompt: t('sentinel.chat.whatFoundPrompt') } satisfies Starter] : []),
   ];
 }
 
 /** Examples of each kind, naming your own projects when there are some. */
-function examplesFor(kind: Kind, projects: readonly string[]): Starter[] {
+function examplesFor(t: T, kind: Kind, projects: readonly string[]): Starter[] {
   const [one, two] = projects;
   if (kind === 'dashboard') {
     return [
-      { label: one ? `${one} at a Glance` : 'My Projects at a Glance', icon: 'gauge', prompt: `Make me a dashboard for ${one ?? 'my projects'} with the numbers that matter (open issues, pull requests, failing checks, and anything else you find), kept fresh.` },
-      { label: 'My Open Pull Requests', icon: 'gauge', prompt: 'Make me a dashboard of my open pull requests across my projects, by project, kept fresh every hour.' },
-      { label: 'Revenue per Day', icon: 'gauge', prompt: 'Put my revenue per day this month on a dashboard, kept fresh every morning.' },
+      { label: one ? t('sentinel.chat.glanceAt', { project: one }) : t('sentinel.chat.glance'), icon: 'gauge', prompt: t('sentinel.chat.glancePrompt', { project: one ?? t('sentinel.chat.myProjects') }) },
+      { label: t('sentinel.chat.openPrs'), icon: 'gauge', prompt: t('sentinel.chat.openPrsPrompt') },
+      { label: t('sentinel.chat.revenue'), icon: 'gauge', prompt: t('sentinel.chat.revenuePrompt') },
     ];
   }
   if (kind === 'watcher') {
     return [
-      { label: one ? `A Morning Brief for ${one}` : 'A Morning Brief', icon: 'clock', prompt: `Every weekday morning, tell me on my phone what changed in ${one ?? 'my projects'} and what needs me first.` },
-      { label: 'When My Site Goes Down', icon: 'pulse', prompt: 'Check my website every 5 minutes and tell me on my phone the moment it stops answering, and when it’s back.' },
-      { label: 'New Issues on GitHub', icon: 'sentinel', prompt: `When a new issue opens on GitHub for ${one ?? 'one of my projects'}, tell me on my phone in one line what it’s about.` },
+      { label: one ? t('sentinel.chat.briefFor', { project: one }) : t('sentinel.home.idea.brief'), icon: 'clock', prompt: t('sentinel.chat.briefPrompt', { project: one ?? t('sentinel.chat.myProjects') }) },
+      { label: t('sentinel.chat.siteDown'), icon: 'pulse', prompt: t('sentinel.chat.siteDownPrompt') },
+      { label: t('sentinel.chat.newIssues'), icon: 'sentinel', prompt: t('sentinel.chat.newIssuesPrompt', { project: one ?? t('sentinel.chat.oneOfMyProjects') }) },
     ];
   }
   return [
-    { label: two ? `Fix ${two}’s Failing Tests` : 'Fix Failing Tests', icon: 'wrench', prompt: `When the tests fail on GitHub for ${two ?? 'one of my projects'}, have the agent fix it in a new worktree and open a pull request for me to merge.` },
-    { label: 'Review Each Pull Request', icon: 'link', prompt: 'When a pull request opens, have the agent review it, then tell me on my phone what it found.' },
-    { label: 'A Weekly Report', icon: 'link', prompt: 'Every Friday afternoon, gather what changed in my projects this week, have the agent write a short report, and send it to my phone.' },
+    { label: two ? t('sentinel.chat.fixTestsOf', { project: two }) : t('sentinel.home.idea.tests'), icon: 'wrench', prompt: t('sentinel.chat.fixTestsPrompt', { project: two ?? t('sentinel.chat.oneOfMyProjects') }) },
+    { label: t('sentinel.chat.reviewPrs'), icon: 'link', prompt: t('sentinel.chat.reviewPrsPrompt') },
+    { label: t('sentinel.chat.weekly'), icon: 'link', prompt: t('sentinel.chat.weeklyPrompt') },
   ];
 }
 
@@ -75,8 +78,10 @@ function examplesFor(kind: Kind, projects: readonly string[]): Starter[] {
  * "Suggest Some for Me" first. Tapping one sends it, as if you'd typed it.
  */
 function Starts({ projects, has, send }: { projects: readonly string[]; has: boolean; send: (prompt: string) => void }) {
+  const t = useT();
   const [kind, setKind] = useState<Kind>('dashboard');
-  const picked = KINDS.find((k) => k.value === kind)!;
+  const kinds = KINDS(t);
+  const picked = kinds.find((k) => k.value === kind)!;
   const pill = (x: Starter, lead?: boolean) => (
     <button key={x.label} type="button" className={home.idea} data-lead={lead || undefined} onClick={() => send(x.prompt)}>
       <Icon name={x.icon} size={13} />
@@ -85,13 +90,13 @@ function Starts({ projects, has, send }: { projects: readonly string[]; has: boo
   );
   return (
     <div className={s.starts} data-testid="sentinel-starts">
-      <Segmented<Kind> radio label="What your agent can make" value={kind} options={KINDS.map(({ value, label, icon }) => ({ value, label, icon }))} onChange={setKind} />
+      <Segmented<Kind> radio label={t('sentinel.chat.canMake')} value={kind} options={kinds.map(({ value, label, icon }) => ({ value, label, icon }))} onChange={setKind} />
       <p className={s.startsLine}>{picked.line}</p>
-      <div className={home.ideas} role="group" aria-label={`${picked.label} to ask for`}>
-        {examplesFor(kind, projects).map((x) => pill(x))}
+      <div className={home.ideas} role="group" aria-label={t('sentinel.chat.toAskFor', { kinds: picked.label })}>
+        {examplesFor(t, kind, projects).map((x) => pill(x))}
       </div>
-      <div className={home.ideas} role="group" aria-label="Or let it look first">
-        {leadsFor(has).map((x, i) => pill(x, i === 0))}
+      <div className={home.ideas} role="group" aria-label={t('sentinel.chat.lookFirst')}>
+        {leadsFor(t, has).map((x, i) => pill(x, i === 0))}
       </div>
     </div>
   );
@@ -126,6 +131,7 @@ const REDOCK_MS = 600;
  * page making room, and the conversation goes on there.
  */
 export function AskPanel({ children }: { children: React.ReactNode }) {
+  const t = useT();
   const panel = useRef<HTMLElement>(null);
   const [opening, setOpening] = useState(() => Date.now() - closedAt > REDOCK_MS);
   useEffect(() => () => void (closedAt = Date.now()), []);
@@ -144,10 +150,10 @@ export function AskPanel({ children }: { children: React.ReactNode }) {
     }
   };
   return (
-    <aside ref={panel} className={home.panel} data-opening={opening || undefined} onAnimationEnd={(e) => e.target === e.currentTarget && setOpening(false)} style={{ width: fitWidth(width, windowWidth) }} aria-label="Ask Sentinel">
+    <aside ref={panel} className={home.panel} data-opening={opening || undefined} onAnimationEnd={(e) => e.target === e.currentTarget && setOpening(false)} style={{ width: fitWidth(width, windowWidth) }} aria-label={t('sentinel.chat.askSentinel')}>
       <ResizeHandle
         axis="x"
-        label="Resize Ask Sentinel"
+        label={t('sentinel.chat.resize')}
         className={home.panelEdge}
         onMove={(x) => {
           const r = panel.current?.getBoundingClientRect();
@@ -173,6 +179,7 @@ export function AskPanel({ children }: { children: React.ReactNode }) {
 }
 
 export function SentinelChat({ onClose }: { onClose?: () => void }) {
+  const t = useT();
   const view = useApp((st) => st.view);
   const channel = channelOf(view);
   // Opened beside a sentinel's own page: going between chats keeps that page.
@@ -188,7 +195,7 @@ export function SentinelChat({ onClose }: { onClose?: () => void }) {
   const names = useMemo(() => JSON.parse(titles) as string[], [titles]);
   const busy = useApp((st) => activityOf(st.log, channel).running);
   const has = useApp((st) => st.log.some((l) => l.channel === channel));
-  const name = names[chats.findIndex((c) => c.id === id)] ?? 'New chat';
+  const name = names[chats.findIndex((c) => c.id === id)] ?? t('sentinel.chat.newChatName');
   const projectNames = useApp((st) => st.projects.filter((p) => p.root && !p.error).map((p) => p.name).join('\n'));
   const hasSentinels = useApp((st) => st.sentinel.items.length > 0);
   const projects = useMemo(() => (projectNames ? projectNames.split('\n') : []), [projectNames]);
@@ -201,20 +208,20 @@ export function SentinelChat({ onClose }: { onClose?: () => void }) {
     if (made) actions.run({ type: 'view', view: { kind: 'sentinel_chat', chat: made.id, ...here } });
   };
   const more: ActionItem[] = [
-    { label: 'New Chat', icon: 'plus', onSelect: () => void fresh() },
-    { label: 'Clear', icon: 'x', hint: 'Its messages go, and the agent starts afresh; the chat stays', disabled: !has, separate: true, onSelect: () => void a.act(() => api.sentinel.chatClear(id), 'Cleared. The agent starts a fresh conversation here') },
+    { label: t('sentinel.chat.newChat'), icon: 'plus', onSelect: () => void fresh() },
+    { label: t('sentinel.chat.clear'), icon: 'x', hint: t('sentinel.chat.clearHint'), disabled: !has, separate: true, onSelect: () => void a.act(() => api.sentinel.chatClear(id), t('sentinel.chat.cleared')) },
     {
-      label: 'Delete Chat…',
+      label: t('sentinel.run.deleteChatMenu'),
       danger: true,
       onSelect: () =>
         openSheet({
           kind: 'confirm',
-          title: `Delete “${name}”?`,
-          message: 'Its messages and the agent’s memory of it go for good. Your sentinels and dashboards stay as they are.',
-          confirm: 'Delete Chat',
+          title: t('sentinel.dash.deleteTitle', { name }),
+          message: t('sentinel.chat.deleteMessage'),
+          confirm: t('sentinel.chat.deleteChat'),
           destructive: true,
           run: () =>
-            void a.act(() => api.sentinel.chatDelete(id), 'Deleted the chat').then(() => {
+            void a.act(() => api.sentinel.chatDelete(id), t('sentinel.chat.deleted')).then(() => {
               // The one now open (the next, or a fresh first one) is shown.
               actions.run({ type: 'view', view: { kind: 'sentinel_chat', ...here } });
             }),
@@ -227,32 +234,32 @@ export function SentinelChat({ onClose }: { onClose?: () => void }) {
         {onClose ? (
           <span className={s.chatTitle}>
             <Icon name="claude" size={13} />
-            <span className={s.chatTitleText}>Your Agent</span>
+            <span className={s.chatTitleText}>{t('sentinel.chat.yourAgent')}</span>
           </span>
         ) : null}
         {/* Always the picker (with New Chat in it), so going between chats never hides behind ⋯. */}
         <PickMenu<string>
-          label="Chats"
-          choices={chats.map((c, i) => ({ value: c.id, label: names[i] ?? 'New chat', mark: <Icon name="chat" size={13} /> }))}
+          label={t('sentinel.chat.chats')}
+          choices={chats.map((c, i) => ({ value: c.id, label: names[i] ?? t('sentinel.chat.newChatName'), mark: <Icon name="chat" size={13} /> }))}
           chosen={[id]}
           onPick={open}
-          actions={[{ label: 'New Chat', icon: 'plus', onSelect: () => void fresh() }]}
+          actions={[{ label: t('sentinel.chat.newChat'), icon: 'plus', onSelect: () => void fresh() }]}
         >
-          <button type="button" className={s.chatName} aria-label={`Chat: ${name}`}>
+          <button type="button" className={s.chatName} aria-label={t('sentinel.chat.chatAria', { name })}>
             {onClose ? null : <Icon name="chat" size={13} />}
             <span>{name}</span>
             <Icon name="chevronDown" size={10} />
           </button>
         </PickMenu>
-        {busy ? <span className={s.chatBusy}>Working…</span> : null}
+        {busy ? <span className={s.chatBusy}>{t('sentinel.chat.working')}</span> : null}
         <span className={s.grow} />
-        <Tip label="A new conversation beside this one">
-          <IconButton icon="plus" label="New Chat" onClick={() => void fresh()} />
+        <Tip label={t('sentinel.chat.newTip')}>
+          <IconButton icon="plus" label={t('sentinel.chat.newChat')} onClick={() => void fresh()} />
         </Tip>
         <ActionsDropdown items={more}>
-          <IconButton icon="more" label="More for this chat" />
+          <IconButton icon="more" label={t('sentinel.chat.moreForChat')} />
         </ActionsDropdown>
-        {onClose ? <IconButton icon="x" label="Close" onClick={onClose} /> : null}
+        {onClose ? <IconButton icon="x" label={t('common.close')} onClick={onClose} /> : null}
       </div>
       <div className={v.chat} data-drop-zone>
         <ChatLog
@@ -261,8 +268,8 @@ export function SentinelChat({ onClose }: { onClose?: () => void }) {
           empty={
             <Empty
               icon="claude"
-              title="Ask your agent to build it"
-              detail="Say what you want to see or keep an eye on, in your own words. It sets it up for you; nothing runs until you turn it on."
+              title={t('sentinel.chat.emptyTitle')}
+              detail={t('sentinel.chat.emptyDetail')}
               action={<Starts projects={projects} has={hasSentinels} send={(prompt) => actions.submit(prompt)} />}
             />
           }

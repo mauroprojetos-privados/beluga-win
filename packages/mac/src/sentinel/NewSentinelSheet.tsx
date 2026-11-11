@@ -11,13 +11,14 @@ import { MAC_SCOPE, describedName, iconOf, recipeWhen } from './sentinel-model.j
 import { useSentinelActions } from './use-sentinel.js';
 import s from './sentinel.module.css';
 import { ASSISTANT_TITLE, THIS_COMPUTER } from '@beluga/shared/assistant.js';
+import { useT } from '../lib/i18n.js';
 
 type Way = 'describe' | 'recipe' | 'build';
 
-const WAYS: ReadonlyArray<{ readonly value: Way; readonly label: string; readonly icon: 'claude' | 'wand' | 'wrench'; readonly hint: string }> = [
-  { value: 'describe', label: 'Describe it', icon: 'claude', hint: 'Say what it should do; your agent writes it' },
-  { value: 'recipe', label: 'Recipe', icon: 'wand', hint: 'Start from one that works, then change anything' },
-  { value: 'build', label: 'Build it yourself', icon: 'wrench', hint: 'A name and a project; you add when it runs and its steps' },
+const WAYS = (t: ReturnType<typeof useT>): ReadonlyArray<{ readonly value: Way; readonly label: string; readonly icon: 'claude' | 'wand' | 'wrench'; readonly hint: string }> => [
+  { value: 'describe', label: t('sentinel.newSheet.describe'), icon: 'claude', hint: t('sentinel.newSheet.describeHint') },
+  { value: 'recipe', label: t('sentinel.newSheet.recipe'), icon: 'wand', hint: t('sentinel.newSheet.recipeHint') },
+  { value: 'build', label: t('sentinel.newSheet.build'), icon: 'wrench', hint: t('sentinel.newSheet.buildHint') },
 ];
 
 /**
@@ -27,6 +28,7 @@ const WAYS: ReadonlyArray<{ readonly value: Way; readonly label: string; readonl
  * that runs when you press Run. Every new sentinel starts paused.
  */
 export function NewSentinelSheet({ projectId, way: first = 'describe', close }: { projectId?: string; way?: Way; close: () => void }) {
+  const t = useT();
   const a = useSentinelActions();
   const startDeps = useStartDeps();
   const all = useApp((st) => st.projects);
@@ -60,7 +62,7 @@ export function NewSentinelSheet({ projectId, way: first = 'describe', close }: 
   const make = async (draft: SentinelDraft): Promise<string | void> => {
     if (there({ kind: 'sentinel', draft: { ...draft } })) return;
     const made = await a.act(() => a.create({ ...draft, projectId: where }));
-    if (!made) return 'Couldn’t make it: see the message above';
+    if (!made) return t('sentinel.newSheet.couldntMake');
     close();
     a.open(made.id);
   };
@@ -70,7 +72,7 @@ export function NewSentinelSheet({ projectId, way: first = 'describe', close }: 
     if (!text) return;
     if (there({ kind: 'sentinel', draft: { name: describedName(text), trigger: { kind: 'manual' }, steps: [] }, ask: text })) return;
     const made = await a.act(() => a.create({ name: describedName(text), projectId: where, trigger: { kind: 'manual' }, steps: [] }));
-    if (!made) return 'Couldn’t make it: see the message above';
+    if (!made) return t('sentinel.newSheet.couldntMake');
     close();
     a.open(made.id);
     await a.act(() => a.api.ask(made.id, text));
@@ -91,10 +93,10 @@ export function NewSentinelSheet({ projectId, way: first = 'describe', close }: 
   const projectName = project === MAC_SCOPE ? ASSISTANT_TITLE : projects.find((p) => p.id === project)?.name;
   return (
     <FormSheet
-      title="New Sentinel"
+      title={t('sentinel.home.newSentinel')}
       icon="sentinel"
-      intro="A sentinel runs on a schedule or when you press Run, does its steps in order, and leaves a report. It starts paused: you look it over, then Turn It On."
-      submitLabel={way === 'build' ? 'Make Sentinel' : way === 'describe' ? 'Write It' : 'Pick a Recipe'}
+      intro={t('sentinel.newSheet.intro')}
+      submitLabel={way === 'build' ? t('sentinel.newSheet.make') : way === 'describe' ? t('sentinel.newSheet.writeIt') : t('sentinel.newSheet.pickRecipe')}
       canSubmit={(way === 'build' && Boolean(name.trim())) || (way === 'describe' && Boolean(words.trim()))}
       width={640}
       onCancel={close}
@@ -102,46 +104,46 @@ export function NewSentinelSheet({ projectId, way: first = 'describe', close }: 
     >
       <div className={s.sheetBody}>
         <div className={s.ways}>
-          <Segmented<Way> label="How to make it" value={way} onChange={setWay} options={WAYS} />
+          <Segmented<Way> label={t('sentinel.newSheet.how')} value={way} onChange={setWay} options={WAYS(t)} />
         </div>
         <div className={s.row2}>
-          <span className={s.label}>Where</span>
+          <span className={s.label}>{t('sentinel.cards.where')}</span>
           <Popup
-            label="Where it works"
+            label={t('sentinel.newSheet.whereWorks')}
             value={project}
             onChange={setProject}
-            options={[{ value: MAC_SCOPE, label: ASSISTANT_TITLE, description: `Not tied to a project: things about ${THIS_COMPUTER} itself` }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
+            options={[{ value: MAC_SCOPE, label: ASSISTANT_TITLE, description: t('sentinel.newSheet.notTied', { computer: THIS_COMPUTER }) }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
           />
         </div>
         {/* Which computer it runs on (BLG-786). Only with a computer paired. */}
         <RunsOnRow project={project === MAC_SCOPE ? undefined : project} className={s.row2} labelClassName={s.label} />
         {way === 'describe' ? (
-          <Field label="What should it do?" htmlFor="sentinel-words" hint={`Your agent sets it up in ${projectName ?? ASSISTANT_TITLE}, looking at the project first when that helps. It starts paused: look it over, then Turn On.`}>
+          <Field label={t('sentinel.newSheet.whatDo')} htmlFor="sentinel-words" hint={t('sentinel.newSheet.describeField', { place: projectName ?? ASSISTANT_TITLE })}>
             <TextArea
               id="sentinel-words"
               value={words}
               onChange={setWords}
               rows={4}
               maxLength={8000}
-              placeholder="Every weekday morning, read yesterday’s commits and open issues, write me a brief, and create tasks for anything that looks urgent"
+              placeholder={t('sentinel.newSheet.wordsPlaceholder')}
               data-autofocus
-              aria-label="What should it do?"
+              aria-label={t('sentinel.newSheet.whatDo')}
             />
           </Field>
         ) : way === 'recipe' ? (
           !recipes ? (
-            <div className={s.empty}>Reading the recipes…</div>
+            <div className={s.empty}>{t('sentinel.newSheet.reading')}</div>
           ) : (
             <div className={s.recipeLists}>
               {(
                 [
-                  ['Recipes', recipes.filter((r) => r.group !== 'numbers')],
-                  ['Keep the numbers', recipes.filter((r) => r.group === 'numbers')],
+                  ['recipes', t('sentinel.newSheet.recipes'), recipes.filter((r) => r.group !== 'numbers')],
+                  ['numbers', t('sentinel.model.new.measure'), recipes.filter((r) => r.group === 'numbers')],
                 ] as const
-              ).map(([label, list]) =>
+              ).map(([id, label, list]) =>
                 list.length ? (
-                  <div key={label}>
-                    {label !== 'Recipes' ? <div className={s.recipeGroup}>Numbers: they show on the sentinel’s page and your Dashboard</div> : null}
+                  <div key={id}>
+                    {id !== 'recipes' ? <div className={s.recipeGroup}>{t('sentinel.newSheet.numbersGroup')}</div> : null}
                     <div className={s.recipes} role="list" aria-label={label}>
                       {list.map((r) => (
                         <button key={r.id} type="button" role="listitem" className={s.recipe} aria-busy={busy === r.id} disabled={Boolean(busy)} onClick={() => void pick(r)} data-recipe={r.id}>
@@ -160,8 +162,8 @@ export function NewSentinelSheet({ projectId, way: first = 'describe', close }: 
             </div>
           )
         ) : (
-          <Field label="Name" htmlFor="sentinel-name" hint={`In ${projectName ?? ASSISTANT_TITLE}; it runs when you press Run until you give it a schedule.`}>
-            <TextInput id="sentinel-name" value={name} onChange={setName} maxLength={80} placeholder="Morning brief" data-autofocus />
+          <Field label={t('sentinel.page.name')} htmlFor="sentinel-name" hint={t('sentinel.newSheet.buildField', { place: projectName ?? ASSISTANT_TITLE })}>
+            <TextInput id="sentinel-name" value={name} onChange={setName} maxLength={80} placeholder={t('sentinel.newSheet.namePlaceholder')} data-autofocus />
           </Field>
         )}
       </div>
