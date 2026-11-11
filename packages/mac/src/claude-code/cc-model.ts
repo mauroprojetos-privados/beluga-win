@@ -4,6 +4,7 @@ import type { CcAgent, CcAgentStatus, CcSession } from '@beluga/core/claude-code
 import { sessionLive } from '@beluga/core/claude-code/model.js';
 import type { SocketClient } from '@beluga/ipc/socket-client.js';
 import { tildePath } from '../lib/brand.js';
+import { t } from '@beluga/shared/i18n/index.js';
 
 /**
  * Words, tones and groupings for Claude Code sessions running outside Beluga (the Activity place,
@@ -12,10 +13,10 @@ import { tildePath } from '../lib/brand.js';
 
 export type Tone = 'claude' | 'ok' | 'error' | 'warn' | 'muted';
 
-const LABEL: Readonly<Record<CcAgentStatus, string>> = { running: 'Running', finished: 'Finished', failed: 'Failed', stopped: 'Stopped', idle: 'Idle' };
+const LABEL: Readonly<Record<CcAgentStatus, () => string>> = { running: () => t('github.cc.running'), finished: () => t('github.cc.finished'), failed: () => t('github.cc.failed'), stopped: () => t('github.cc.stopped'), idle: () => t('github.cc.idle') };
 const TONE: Readonly<Record<CcAgentStatus, Tone>> = { running: 'claude', finished: 'ok', failed: 'error', stopped: 'muted', idle: 'warn' };
 
-export const agentLabel = (a: Pick<CcAgent, 'status'>): string => LABEL[a.status];
+export const agentLabel = (a: Pick<CcAgent, 'status'>): string => LABEL[a.status]();
 export const agentTone = (a: Pick<CcAgent, 'status'>): Tone => TONE[a.status];
 
 /** "45s", "12m", "1h 05m". */
@@ -33,10 +34,10 @@ export const agentElapsed = (a: CcAgent, now: number): string => since((a.status
 /** "Working · 12m", "Waiting for you", "Idle · 8m ago". */
 export function sessionLabel(s: CcSession, now: number): { label: string; tone: Tone } {
   const running = s.agents.filter((a) => a.status === 'running').length;
-  if (s.status === 'working') return { label: running ? `Working · ${plural(running, 'agent')} running` : 'Working', tone: 'claude' };
-  if (running) return { label: `Waiting for ${running} agent${running === 1 ? '' : 's'}`, tone: 'claude' };
-  if (s.status === 'waiting') return { label: 'Waiting for you', tone: 'ok' };
-  return { label: `Quiet for ${since(now - s.lastAt)}`, tone: 'muted' };
+  if (s.status === 'working') return { label: running ? t('github.cc.workingAgents', { count: running }) : t('github.cc.working'), tone: 'claude' };
+  if (running) return { label: t('github.cc.waitingAgents', { count: running }), tone: 'claude' };
+  if (s.status === 'waiting') return { label: t('github.cc.waitingYou'), tone: 'ok' };
+  return { label: t('github.cc.quietFor', { time: since(now - s.lastAt) }), tone: 'muted' };
 }
 
 export const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
@@ -45,9 +46,9 @@ export const plural = (n: number, one: string, many = `${one}s`): string => `${n
 export function activitySummary(sessions: readonly CcSession[]): string {
   const running = sessions.reduce((n, s) => n + s.agents.filter((a) => a.status === 'running').length, 0);
   const live = sessions.filter(sessionLive).length;
-  if (running) return `${plural(running, 'agent')} running${live > 1 ? ` in ${plural(live, 'session')}` : ''}`;
-  if (live) return `${plural(live, 'session')} working`;
-  return sessions.length ? 'Nothing running right now' : 'No Claude Code sessions lately';
+  if (running) return live > 1 ? t('github.cc.runningIn', { running: t('github.cc.agentsRunning', { count: running }), sessions: t('github.cc.sessions', { count: live }) }) : t('github.cc.agentsRunning', { count: running });
+  if (live) return t('github.cc.sessionsWorking', { count: live });
+  return sessions.length ? t('github.cc.nothingRunning') : t('github.cc.noSessionsLately');
 }
 
 /** "~/code/api/madrid" for a path under your home folder. */
@@ -56,7 +57,7 @@ export const tildify = (state: Pick<AppState, 'home'>, p: string): string => til
 /** Where it runs, in Beluga's words: the workspace's name, else the folder. */
 export function placeLabel(state: Pick<AppState, 'projects' | 'home'>, s: CcSession): string {
   const ws = s.workspaceId ? state.projects.flatMap((p) => p.workspaces).find((w) => w.id === s.workspaceId) : undefined;
-  return ws ? ws.name : tildify(state, s.cwd) || 'Unknown folder';
+  return ws ? ws.name : tildify(state, s.cwd) || t('github.cc.unknownFolder');
 }
 
 export interface ProjectGroup {
@@ -73,7 +74,7 @@ export function groupByProject(state: Pick<AppState, 'projects'>, sessions: read
   for (const s of sessions) {
     const project = s.projectId ? state.projects.find((p) => p.id === s.projectId) : undefined;
     const key = project ? `p:${project.id}` : `d:${s.cwd}`;
-    const name = project?.name ?? (baseName(s.cwd) || 'Other');
+    const name = project?.name ?? (baseName(s.cwd) || t('github.cc.other'));
     const g = groups.get(key) ?? { ...(project ? { projectId: project.id } : {}), name, sessions: [] };
     g.sessions.push(s);
     groups.set(key, g);
@@ -92,7 +93,8 @@ export function openActivity(client: SocketClient, session?: string, agent?: str
 
 /** "general-purpose" → "General", "typescript-reviewer" → "TypeScript reviewer". */
 export function typeLabel(type: string): string {
-  if (type === 'general-purpose') return 'General';
+  if (type === 'general-purpose') return t('github.cc.general');
+
   const words = type.split(/[-_]/).filter(Boolean);
   const fix = (w: string): string => ({ typescript: 'TypeScript', javascript: 'JavaScript', e2e: 'E2E', tdd: 'TDD', ui: 'UI', api: 'API' })[w.toLowerCase()] ?? w;
   return words.map((w, i) => (i === 0 ? fix(w).replace(/^./, (c) => c.toUpperCase()) : fix(w))).join(' ') || type;

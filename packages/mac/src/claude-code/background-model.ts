@@ -1,4 +1,5 @@
 import type { CcSession, CcTask } from '../../../../src/core/claude-code/model.js';
+import { t as tr } from '../../../../src/shared/i18n/index.js';
 
 /**
  * Background commands (a dev server, the full tests, a build) and watches that Claude or its
@@ -21,7 +22,7 @@ function itemsOf(s: CcSession): TaskItem[] {
   return (s.tasks ?? []).map((task) => {
     const agent = task.agentId ? s.agents.find((a) => a.id === task.agentId) : undefined;
     // agent-wording: claude
-    return { task, sessionId: s.id, who: agent ? agent.description || agent.name || 'An agent' : task.agentId ? 'An agent' : 'Claude' };
+    return { task, sessionId: s.id, who: agent ? agent.description || agent.name || tr('github.bg.anAgent') : task.agentId ? tr('github.bg.anAgent') : 'Claude' };
   });
 }
 
@@ -53,18 +54,19 @@ function since(ms: number): string {
 
 /** "Running · 3m", "Failed · exit 2 · 1m ago", "Done · 5s ago". */
 export function taskLabel(t: CcTask, now: number): { label: string; tone: TaskTone } {
-  const ago = `${since(now - (t.endedAt ?? now))} ago`;
-  const exit = t.exitCode !== undefined && t.exitCode !== 0 ? ` · exit ${t.exitCode}` : '';
+  const ago = tr('github.bg.ago', { time: since(now - (t.endedAt ?? now)) });
+  const exit = t.exitCode !== undefined && t.exitCode !== 0 ? tr('github.bg.exit', { code: t.exitCode }) : '';
   switch (t.status) {
     case 'running':
-      return { label: `${t.kind === 'monitor' ? 'Watching' : 'Running'} · ${since(now - t.startedAt)}`, tone: 'claude' };
+      return { label: tr(t.kind === 'monitor' ? 'github.bg.watching' : 'github.bg.runningFor', { time: since(now - t.startedAt) }), tone: 'claude' };
     case 'failed':
-      return { label: `Failed${exit} · ${ago}`, tone: 'error' };
+      return { label: tr('github.bg.failed', { exit, ago }), tone: 'error' };
     case 'finished':
-      return { label: `Done${exit} · ${ago}`, tone: 'ok' };
+      return { label: tr('github.bg.done', { exit, ago }), tone: 'ok' };
     case 'stopped':
-      return { label: `Stopped · ${ago}`, tone: 'muted' };
+      return { label: tr('github.bg.stopped', { ago }), tone: 'muted' };
     default:
-      return { label: `No word from it · ${since(now - t.startedAt)}`, tone: 'muted' };
+      return { label: tr('github.bg.noWord', { time: since(now - t.startedAt) }), tone: 'muted' };
+
   }
 }

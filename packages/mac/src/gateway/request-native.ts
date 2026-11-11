@@ -7,6 +7,7 @@ import { dndActive } from '@beluga/shared/quiet.js';
 import { planOfChannel } from '@beluga/core/notify.js';
 import { NOTIFICATION_TAP, macNoticeTarget } from '../lib/notices.js';
 import { popupPublisher } from './popup-bridge.js';
+import { t } from '@beluga/shared/i18n/index.js';
 import { type PopupItem, type PopupNeed, isNeedId, isPreviewId, popupNeeds, popupRequests, previewItems } from './popup-model.js';
 import { REQUEST_NOTIFICATION, type RequestAction, outsideStep, parseRequestMenuId, trayRequests } from './request-actions.js';
 
@@ -54,14 +55,14 @@ export async function runRequestAction(client: SocketClient, action: RequestActi
   if (isPreviewId(approval)) {
     // The preview's buttons: nothing was asked, so nothing is answered.
     stopPreview();
-    return void client.store.dispatch({ type: 'toast', text: 'That was a preview: nothing was asked, and nothing was sent', level: 'info' });
+    return void client.store.dispatch({ type: 'toast', text: t('github.native.preview'), level: 'info' });
   }
   if (isNeedId(approval)) return openNeed(client, approval!);
   const approvals = client.store.getState().approvals;
   const known = approvals.find((a) => a.id === approval) ?? (task ? approvals.find((a) => a.task === task) : undefined);
   const say = (text: string, level: 'info' | 'success' | 'error' = 'info'): void => void client.store.dispatch({ type: 'toast', text, level });
   const step = outsideStep(action, known, task);
-  if (step.kind === 'gone') return say('That request was already answered');
+  if (step.kind === 'gone') return say(t('github.native.gone'));
   if (step.kind === 'review') {
     if (step.task) openRequest(step.task);
     // Your own Claude's approval: the conversation it holds up, where its card is.
@@ -73,10 +74,11 @@ export async function runRequestAction(client: SocketClient, action: RequestActi
     if (step.kind === 'decide') await client.api.gateway.decide(step.task, step.decision);
     else await client.api.host.answerApproval(step.answer, step.id);
     const answer = step.kind === 'decide' ? step.decision.answer : step.answer;
-    const always = step.kind === 'decide' && step.decision.expiry === 'never' ? 'Allowed; requests like it run without asking (Settings › People & access)' : 'Approved; requests like it run without asking for a week';
-    say(answer === 'no' ? 'Declined' : answer === 'always' ? always : 'Approved', answer === 'no' ? 'info' : 'success');
+    const always = step.kind === 'decide' && step.decision.expiry === 'never' ? t('github.native.allowedRule') : t('github.native.approvedWeek');
+    say(answer === 'no' ? t('github.native.declined') : answer === 'always' ? always : t('github.native.approved'), answer === 'no' ? 'info' : 'success');
   } catch (err) {
-    say(`Couldn't answer it: ${message(err)}`, 'error');
+    say(t('github.native.cantAnswer', { error: message(err) }), 'error');
+
   }
 }
 

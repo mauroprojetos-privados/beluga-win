@@ -15,6 +15,7 @@ import { revealLabel } from '../lib/os-words.js';
 import { useRevealFileLabel, useRevealLabel } from '../lib/remote-open.js';
 import { revealThereLabel } from '@beluga/machines/open.js';
 import { useMachine } from '../lib/beluga.js';
+import { useT } from '../lib/i18n.js';
 
 /**
  * A sub-agent's Outputs: what it made or looked at while it worked (screenshots, test output,
@@ -94,6 +95,7 @@ function Preview({ sessionId, agentId, item, places, onClose }: { sessionId: str
   // On a computer's page: Download for a file, Copy Path for a folder (BLG-852).
   const revealFile = useRevealFileLabel();
   const now = useNow();
+  const t = useT();
   const [file, setFile] = useState<CcOutputFile | null>();
   useEffect(() => {
     let alive = true;
@@ -109,7 +111,7 @@ function Preview({ sessionId, agentId, item, places, onClose }: { sessionId: str
   const { name, dir } = placeOf(item.path, places);
   const openIt = (
     <Button icon="external" onClick={() => void openWithDefaultApp(client, item.path)}>
-      Open With Its App
+      {t('github.out.openWithApp')}
     </Button>
   );
   const shown = file && (file.data || file.text !== undefined) ? <Contents file={file} fallback={openIt} /> : null;
@@ -124,28 +126,28 @@ function Preview({ sessionId, agentId, item, places, onClose }: { sessionId: str
           {howLabel(item.how)} · {timeAgo(item.mtime, Math.max(now, Date.now()))}
         </span>
         <span className={s.flex} />
-        <IconButton icon="external" label="Open With Its App" onClick={() => void openWithDefaultApp(client, item.path)} />
+        <IconButton icon="external" label={t('github.out.openWithApp')} onClick={() => void openWithDefaultApp(client, item.path)} />
         <IconButton icon="folder" label={revealFile} onClick={() => void revealInFinder(client, item.path)} />
-        <IconButton icon="x" label="Close" keys="Esc" onClick={onClose} />
+        <IconButton icon="x" label={t('common.close')} keys="Esc" onClick={onClose} />
       </div>
       {dir ? <div className={cx(s.previewPath, 'selectable')} title={item.path}>{dir}</div> : null}
       <div className={cx(s.previewBody, 'selectable')} tabIndex={0}>
         {file === undefined ? (
-          <div className={s.dimPad}>Opening…</div>
+          <div className={s.dimPad}>{t('github.out.opening')}</div>
         ) : shown ? (
           <>
             {shown}
-            {file?.truncated ? <div className={s.dimPad}>Only the start is shown: open it with its app for the rest.</div> : null}
+            {file?.truncated ? <div className={s.dimPad}>{t('github.out.onlyStart')}</div> : null}
           </>
         ) : (
           <Empty
             icon={ICONS[item.kind]}
-            title={item.kind === 'image' || item.kind === 'video' ? 'Too big to show here' : 'Not shown here'}
-            detail={`${formatBytes(item.size)}. Open it with its app to look at it.`}
+            title={item.kind === 'image' || item.kind === 'video' ? t('github.out.tooBig') : t('github.out.notShown')}
+            detail={t('github.out.openToLook', { size: formatBytes(item.size) })}
             action={
               <EmptyActions>
                 <Button icon="external" onClick={() => void openWithDefaultApp(client, item.path)}>
-                  Open With Its App
+                  {t('github.out.openWithApp')}
                 </Button>
               </EmptyActions>
             }
@@ -159,7 +161,8 @@ function Preview({ sessionId, agentId, item, places, onClose }: { sessionId: str
 /** The Outputs of one sub-agent (its page's second tab). */
 export function AgentOutputs({ sessionId, agentId, list, cwd }: { sessionId: string; agentId: string; list: CcOutputs | undefined; cwd?: string }) {
   const { client } = useBeluga();
-  const revealFolder = useRevealLabel('Its Folder');
+  const t = useT();
+  const revealFolder = useRevealLabel(t('github.out.itsFolder'));
   const machine = useMachine();
   const now = useNow();
   const [follow, setFollow] = useState(true);
@@ -198,21 +201,21 @@ export function AgentOutputs({ sessionId, agentId, list, cwd }: { sessionId: str
     }
   };
 
-  if (!list) return <div className={s.dimPad}>Looking for what it made…</div>;
-  if (list.missing) return <Empty icon="bot" title="Not watched any more" detail="Claude Code no longer has this agent’s transcript open." />;
+  if (!list) return <div className={s.dimPad}>{t('github.out.looking')}</div>;
+  if (list.missing) return <Empty icon="bot" title={t('github.out.notWatched')} detail={t('github.out.notWatchedDetail')} />;
   if (!files.length) {
     return (
       <div className={s.empty}>
         <Empty
           icon="image"
-          title="Nothing yet"
-          detail={`Screenshots, test output, logs and notes this agent saves or looks at show here as it works, wherever it puts them.${list.scratch ? ' It was given its own folder for them.' : ''}`}
+          title={t('github.out.nothingYet')}
+          detail={`${t('github.out.nothingYetDetail')}${list.scratch ? t('github.out.ownFolder') : ''}`}
           {...(list.scratch
             ? {
                 action: (
                   <EmptyActions>
                     <Button icon="folder" title={list.scratch} onClick={() => void revealInFinder(client, list.scratch!)}>
-                      {machine ? revealThereLabel('folder') : 'Show Its Folder'}
+                      {machine ? revealThereLabel('folder') : t('github.out.showItsFolder')}
                     </Button>
                   </EmptyActions>
                 ),
@@ -227,24 +230,24 @@ export function AgentOutputs({ sessionId, agentId, list, cwd }: { sessionId: str
       <div className={s.side}>
         <div className={s.summary}>
           <span className={s.summaryTitle}>
-            {files.length} file{files.length === 1 ? '' : 's'}
+            {t('github.out.files', { count: files.length })}
           </span>
           <span className={s.flex} />
           <Segmented
-            label="Preview"
+            label={t('github.out.preview')}
             value={follow ? 'follow' : 'pinned'}
             onChange={(v) => {
               setFollow(v === 'follow');
               setClosed(false);
             }}
             options={[
-              { value: 'follow', label: 'Latest', hint: 'Show each new file as it lands' },
-              { value: 'pinned', label: 'Picked', hint: 'Stay on the file you picked' },
+              { value: 'follow', label: t('github.out.latest'), hint: t('github.out.latestHint') },
+              { value: 'pinned', label: t('github.out.picked'), hint: t('github.out.pickedHint') },
             ]}
           />
           {list.scratch ? <IconButton icon="folder" label={revealFolder} onClick={() => void revealInFinder(client, list.scratch!)} /> : null}
         </div>
-        <div ref={listRef} className={s.list} role="listbox" aria-label="Outputs" tabIndex={0} onKeyDown={onKey}>
+        <div ref={listRef} className={s.list} role="listbox" aria-label={t('github.out.outputs')} tabIndex={0} onKeyDown={onKey}>
           {files.map((f) => {
             const { name, dir } = placeOf(f.path, places);
             const sel = f.path === shown;
@@ -255,7 +258,7 @@ export function AgentOutputs({ sessionId, agentId, list, cwd }: { sessionId: str
                   {name}
                   {dir ? <span className={s.rowDir}>{dir}</span> : null}
                 </span>
-                {isFresh(f.mtime, Math.max(now, Date.now())) ? <span className={s.freshDot} aria-label="new" /> : null}
+                {isFresh(f.mtime, Math.max(now, Date.now())) ? <span className={s.freshDot} aria-label={t('github.out.new')} /> : null}
                 <span className={s.ago}>{timeAgo(f.mtime, Math.max(now, Date.now()))}</span>
               </div>
             );
@@ -266,7 +269,8 @@ export function AgentOutputs({ sessionId, agentId, list, cwd }: { sessionId: str
         <Preview sessionId={sessionId} agentId={agentId} item={item} places={places} onClose={() => setClosed(true)} />
       ) : (
         <div className={s.previewNone}>
-          <Empty icon="eye" title="Pick a file to look at it" />
+          <Empty icon="eye" title={t('github.out.pick')} />
+
         </div>
       )}
     </div>

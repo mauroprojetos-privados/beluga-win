@@ -4,6 +4,7 @@ import { Tip, cx } from '../components/ui.js';
 import { usePrefs } from '../lib/prefs.js';
 import { chordLabel } from '../lib/shortcuts-model.js';
 import { useIssueActions } from './use-issues.js';
+import { useT } from '../lib/i18n.js';
 import h from '../views/project-home.module.css';
 import d from '../chat/draft.module.css';
 import s from './issues.module.css';
@@ -16,6 +17,7 @@ import s from './issues.module.css';
 export function IssueReply({ projectId, number, posted }: { projectId: string; number: number; posted: () => void }) {
   const a = useIssueActions();
   const prefs = usePrefs();
+  const t = useT();
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null);
@@ -40,13 +42,13 @@ export function IssueReply({ projectId, number, posted }: { projectId: string; n
   };
 
   return (
-    <section className={s.reply} aria-label={`Comment on #${number}`}>
+    <section className={s.reply} aria-label={t('github.reply.label', { number })}>
       <div className={cx(h.box, busy && h.busy)}>
         <textarea
           ref={box}
           className={cx(h.input, s.composerInput, 'selectable')}
-          aria-label="Your comment"
-          placeholder={`Comment on #${number}…`}
+          aria-label={t('github.reply.yours')}
+          placeholder={t('github.reply.placeholder', { number })}
           value={body}
           rows={2}
           spellCheck
@@ -63,13 +65,14 @@ export function IssueReply({ projectId, number, posted }: { projectId: string; n
         <div className={h.bar}>
           <span className={h.note}>
             <Icon name="globe" size={12} />
-            On GitHub as you, for everyone who can see the issue. Markdown works.
+            {t('github.reply.note')}
           </span>
           <span className={h.flex} />
-          <Tip label={`Post your comment on #${number}`} keys={sendKeys}>
+          <Tip label={t('github.reply.post', { number })} keys={sendKeys}>
             <button type="button" className={cx(d.create, ready && d.createReady)} aria-disabled={!ready} onClick={() => void go()} data-testid="issue-comment">
               <Icon name="send" size={12} />
-              {busy ? 'Posting…' : 'Comment'}
+              {busy ? t('github.reply.posting') : t('github.reply.comment')}
+
               <span className={d.createKey}>{sendKeys}</span>
             </button>
           </Tip>

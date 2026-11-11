@@ -5,6 +5,8 @@ import { type WorkflowShape, readWorkflow, workflowGraph } from '@beluga/core/ci
 import { GraphBlock } from '../components/graph/GraphBlock.js';
 import { useNow } from './use-ci.js';
 import s from './ci.module.css';
+import { t as tr } from '@beluga/shared/i18n/index.js';
+import { useT } from '../lib/i18n.js';
 
 /** The YAML reader, loaded the first time a workflow is drawn. */
 let yaml: Promise<typeof import('yaml')> | undefined;
@@ -21,12 +23,12 @@ export function useWorkflowShape(text: string | undefined): { readonly shape?: W
         if (gone) return;
         try {
           const shape = readWorkflow(y.parse(text, { uniqueKeys: false }));
-          setGot(shape ? { text, shape } : { text, error: 'This file has no jobs to draw' });
+          setGot(shape ? { text, shape } : { text, error: tr('github.ci.noJobs') });
         } catch (err) {
           setGot({ text, error: err instanceof Error ? err.message.split('\n')[0]! : String(err) });
         }
       },
-      () => !gone && setGot({ text, error: 'Couldn’t load the YAML reader' }),
+      () => !gone && setGot({ text, error: tr('github.ci.noYamlReader') }),
     );
     return () => void (gone = true);
   }, [text]);
@@ -45,10 +47,12 @@ export const shapeOf = (graph: Graph): string => JSON.stringify([graph.nodes.map
  */
 export function WorkflowGraph({ text, path, title, jobs }: { text: string; path: string; title?: string; jobs?: readonly GhJob[] }) {
   const { shape, error } = useWorkflowShape(text);
+  const t = useT();
   const live = Boolean(jobs?.some(isLive));
   const now = useNow(live);
   const graph = useMemo(() => (shape ? workflowGraph(shape, { path, ...(title ? { title } : {}), ...(jobs ? { jobs } : {}), now }) : undefined), [shape, path, title, jobs, live ? now : 0]);
-  if (error) return <p className={s.graphNote}>Can’t draw {path.split('/').pop()}: {error}</p>;
-  if (!graph) return <div className={s.graphWait} aria-label="Drawing the workflow" />;
+  if (error) return <p className={s.graphNote}>{t('github.ci.cantDraw', { file: path.split('/').pop() ?? '', error })}</p>;
+  if (!graph) return <div className={s.graphWait} aria-label={t('github.ci.drawing')} />;
+
   return <GraphBlock code={JSON.stringify(graph)} shapeKey={shapeOf(graph)} />;
 }

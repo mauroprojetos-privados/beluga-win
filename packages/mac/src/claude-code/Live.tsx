@@ -6,10 +6,11 @@ import { Badge, Button, Dot, cx } from '../components/ui.js';
 import { useApp, useBeluga } from '../lib/beluga.js';
 import { Row } from '../layout/sidebar-parts.js';
 import { AgentCard } from './Cards.js';
-import { agentLabel, agentTone, openActivity, placeLabel, plural, sessionLabel, tokens } from './cc-model.js';
+import { agentLabel, agentTone, openActivity, placeLabel, sessionLabel, tokens } from './cc-model.js';
 import { cappedAgents, inStartOrder } from './subagents-model.js';
 import i from '../layout/Inspector.module.css';
 import s from './claude-code.module.css';
+import { useT } from '../lib/i18n.js';
 
 /**
  * Where Claude Code's live sessions show outside Activity: a strip above a workspace's chat, a
@@ -28,6 +29,7 @@ const MAX_PILLS = 3;
 export function LiveStrip({ workspaceId }: { workspaceId: string }) {
   const { client } = useBeluga();
   const sessions = useSessionsIn(workspaceId);
+  const t = useT();
   const session = sessions[0];
   const now = useNow(Boolean(session && session.status === 'working'), 5000);
   if (!session) return null;
@@ -37,12 +39,13 @@ export function LiveStrip({ workspaceId }: { workspaceId: string }) {
   const running = agents.filter((a) => a.status === 'running').length;
   const { shown, hidden } = cappedAgents(agents, MAX_PILLS);
   return (
-    <div className={s.liveStrip} role="region" aria-label="Claude Code in this folder">
+    <div className={s.liveStrip} role="region" aria-label={t('github.live.inFolder')}>
       <button type="button" className={s.liveLead} onClick={() => openActivity(client, session.id)} title={`${session.title} · ${st.label}`}>
         {st.tone === 'claude' ? <Dot tone="claude" live /> : <Dot tone={st.tone === 'ok' ? 'ok' : 'muted'} />}
+        {/* i18n-ignore */}
         <span className={s.liveName}>Claude Code</span>
         <span className={s.liveTitle}>{session.title}</span>
-        <span className={cx(s.liveState, s[`tone_${st.tone}`])}>{running ? `${running} running` : st.label}</span>
+        <span className={cx(s.liveState, s[`tone_${st.tone}`])}>{running ? t('github.cc.countRunning', { count: running }) : st.label}</span>
       </button>
       {shown.map((a) => (
         <button key={a.id} type="button" className={s.pill} onClick={() => openActivity(client, session.id, a.id)} title={`${a.description} · ${agentLabel(a)}${a.step ? ` · ${a.step}` : ''}`}>
@@ -52,13 +55,13 @@ export function LiveStrip({ workspaceId }: { workspaceId: string }) {
       ))}
       {hidden ? (
         // Always the same place: this session in Activity, with every one of its agents.
-        <button type="button" className={cx(s.pill, s.pillMore)} onClick={() => openActivity(client, session.id)} title={`${plural(hidden, 'earlier agent')}: show all ${agents.length} in Activity`} aria-label={`Show all ${agents.length} agents in Activity`}>
+        <button type="button" className={cx(s.pill, s.pillMore)} onClick={() => openActivity(client, session.id)} title={t('github.live.earlier', { count: hidden, all: agents.length })} aria-label={t('github.live.showAll', { all: agents.length })}>
           +{hidden}
         </button>
       ) : null}
       {sessions.length > 1 ? (
         <button type="button" className={cx(s.pill, s.pillMore)} onClick={() => openActivity(client)}>
-          {plural(sessions.length - 1, 'more session')}
+          {t('github.live.moreSessions', { count: sessions.length - 1 })}
         </button>
       ) : null}
     </div>
@@ -69,10 +72,11 @@ export function LiveStrip({ workspaceId }: { workspaceId: string }) {
 export function LivePanel({ workspaceId }: { workspaceId: string }) {
   const { client } = useBeluga();
   const sessions = useSessionsIn(workspaceId);
+  const t = useT();
   const now = useNow(sessions.some((x) => x.status === 'working'), 5000);
   if (!sessions.length) return null;
   return (
-    <section className={s.livePanel} aria-label="Live in Claude Code">
+    <section className={s.livePanel} aria-label={t('github.live.liveIn')}>
       {sessions.map((x) => {
         const st = sessionLabel(x, now);
         return (
@@ -80,12 +84,12 @@ export function LivePanel({ workspaceId }: { workspaceId: string }) {
             <div className={s.livePanelHead}>
               {st.tone === 'claude' ? <Dot tone="claude" live /> : <Dot tone={st.tone === 'ok' ? 'ok' : 'muted'} />}
               <span className={s.livePanelTitle}>
-                <span className={s.livePanelKicker}>Live in Claude Code</span>
+                <span className={s.livePanelKicker}>{t('github.live.liveIn')}</span>
                 <span className={s.sessionTitle}>{x.title}</span>
               </span>
               <span className={cx(s.liveState, s[`tone_${st.tone}`])}>{st.label}</span>
               <Button size="small" variant="primary" icon="chevronRight" onClick={() => openActivity(client, x.id)}>
-                Open
+                {t('github.cc.open')}
               </Button>
             </div>
             {x.step ? <div className={s.livePanelStep}>{x.step}</div> : null}
@@ -106,6 +110,7 @@ export function LivePanel({ workspaceId }: { workspaceId: string }) {
 function SessionDetails({ session }: { session: CcSession }) {
   const { client } = useBeluga();
   const place = useApp((st) => placeLabel(st, session));
+  const t = useT();
   const now = useNow(session.status === 'working', 5000);
   const st = sessionLabel(session, now);
   return (
@@ -116,30 +121,30 @@ function SessionDetails({ session }: { session: CcSession }) {
         <Icon name="chevronRight" size={10} />
       </button>
       <div className={i.field}>
-        <span className={i.fieldLabel}>State</span>
+        <span className={i.fieldLabel}>{t('github.live.state')}</span>
         <span className={cx(i.fieldValue, s[`tone_${st.tone}`])}>{st.label}</span>
       </div>
       <div className={i.field}>
-        <span className={i.fieldLabel}>Folder</span>
+        <span className={i.fieldLabel}>{t('github.live.folder')}</span>
         <span className={i.fieldValue}>{place}</span>
       </div>
       {session.model ? (
         <div className={i.field}>
-          <span className={i.fieldLabel}>Model</span>
+          <span className={i.fieldLabel}>{t('github.live.model')}</span>
           <span className={i.fieldValue}>{session.model}</span>
         </div>
       ) : null}
       {session.tokens ? (
         <div className={i.field}>
-          <span className={i.fieldLabel}>Context</span>
-          <span className={cx(i.fieldValue, s.num)}>{tokens(session.tokens)} tokens</span>
+          <span className={i.fieldLabel}>{t('github.live.context')}</span>
+          <span className={cx(i.fieldValue, s.num)}>{t('github.live.tokens', { count: tokens(session.tokens) })}</span>
         </div>
       ) : null}
       {session.agents.map((a) => (
         <button key={a.id} type="button" className={s.inspectorAgent} onClick={() => openActivity(client, session.id, a.id)} title={a.step ?? ''}>
           {a.status === 'running' ? <Dot tone="subagent" live /> : <Icon name={a.status === 'failed' ? 'x' : a.status === 'finished' ? 'check' : 'clock'} size={10} className={s[`tone_${agentTone(a)}`]} />}
           <span className={s.inspectorAgentText}>{a.description}</span>
-          <span className={s.num}>{plural(a.steps, 'step')}</span>
+          <span className={s.num}>{t('github.cc.steps', { count: a.steps })}</span>
         </button>
       ))}
     </div>
@@ -158,6 +163,7 @@ export function ClaudeCodeInspector() {
   return (
     <section className={i.panel}>
       <div className={i.panelHead}>
+        {/* i18n-ignore */}
         <h3>Claude Code</h3>
       </div>
       {sessions.map((x) => (
@@ -174,12 +180,14 @@ export function ActivityRow({ whenLive }: { whenLive?: boolean } = {}) {
   const running = useApp((st) => runningAgents(outsideSessions(st.claudeCode.sessions)));
   const live = useApp((st) => outsideSessions(st.claudeCode.sessions).length > 0);
   const selected = useApp((st) => st.view.kind === 'claude_code');
+  const t = useT();
   if (whenLive && !live && !selected) return null;
   return (
     <Row
       icon={<Icon name="pulse" size={14} />}
-      label="Activity"
-      detail={running ? `${plural(running, 'Claude Code agent')} running outside Beluga` : 'Claude Code sessions running outside Beluga (a terminal, another app), live'}
+      label={t('github.cc.activity')}
+      detail={running ? t('github.live.rowRunning', { count: running }) : t('github.live.rowDetail')}
+
       selected={selected}
       onClick={() => openActivity(client)}
       trailing={running ? <Badge count={running} /> : live ? <Dot tone="muted" /> : null}

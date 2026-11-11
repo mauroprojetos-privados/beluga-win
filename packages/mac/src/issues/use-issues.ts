@@ -8,6 +8,7 @@ import { keepSeen, lastSeen } from '../lib/last-seen.js';
 import { type IssuesPrefs, readIssuesPrefs } from './issues-model.js';
 import { teammateOn } from '@beluga/core/team/model.js';
 import { openSheet } from '../lib/sheets.js';
+import { t } from '@beluga/shared/i18n/index.js';
 
 /** What the Issues screens share: a project's issues and one issue (read through the core, kept a little while), how far Beluga got with each, and acting on them. */
 
@@ -144,8 +145,8 @@ export function useIssueActions() {
         openSheet({
           kind: 'confirm',
           title: on.words,
-          message: `Starting #${number} here too means two of you work on it. Ask ${on.name} first, or start anyway.`,
-          confirm: 'Start Anyway',
+          message: t('github.use.twoOfYou', { number, name: on.name }),
+          confirm: t('github.use.startAnyway'),
           run: () => void start(true).then(resolve),
         }),
       );
@@ -153,14 +154,14 @@ export function useIssueActions() {
     const extra = (note: string | undefined, anyway: boolean) => (note?.trim() || anyway ? { ...(note?.trim() ? { note: note.trim() } : {}), ...(anyway ? { anyway: true } : {}) } : undefined);
     return {
       /** Claude finds out why and reproduces it, in a worktree of the issue's task. */
-      investigate: (projectId: string, number: number, note?: string) => unlessTeammate(projectId, number, (anyway) => act(() => api.issues.investigate(projectId, number, extra(note, anyway)), (w) => `The agent is investigating #${number} (${w.key})`)),
+      investigate: (projectId: string, number: number, note?: string) => unlessTeammate(projectId, number, (anyway) => act(() => api.issues.investigate(projectId, number, extra(note, anyway)), (w) => t('github.use.investigating', { number, key: w.key }))),
       /** Claude fixes it and opens a pull request that closes it. */
-      fix: (projectId: string, number: number, note?: string) => unlessTeammate(projectId, number, (anyway) => act(() => api.issues.fix(projectId, number, extra(note, anyway)), (w) => `The agent is fixing #${number} (${w.key})`)),
+      fix: (projectId: string, number: number, note?: string) => unlessTeammate(projectId, number, (anyway) => act(() => api.issues.fix(projectId, number, extra(note, anyway)), (w) => t('github.use.fixing', { number, key: w.key }))),
       /** On the board, written by Claude (`look`: after a quick look at the code). */
       toTask: (projectId: string, number: number, look = false, note?: string) =>
         act(
           () => api.issues.toTask(projectId, number, look || note?.trim() ? { ...(look ? { look: true } : {}), ...(note?.trim() ? { note: note.trim() } : {}) } : undefined),
-          (w) => (look ? `${w.key}: the agent is looking at the code to write it` : `#${number} is on the board as ${w.key}`),
+          (w) => (look ? t('github.use.looking', { key: w.key }) : t('github.use.onBoard', { number, key: w.key })),
         ),
       comment: (projectId: string, number: number, body: string) =>
         act(
@@ -169,7 +170,8 @@ export function useIssueActions() {
             forgetIssues(projectId, number);
             return url;
           },
-          () => `Posted on #${number}`,
+          () => t('github.use.posted', { number }),
+
         ),
       openIssue: (projectId: string, number: number): void => actions.run({ type: 'view', view: { kind: 'gh_issue', projectId, number } }),
       openList: (projectId?: string): void => actions.run({ type: 'view', view: { kind: 'issues', ...(projectId ? { projectId } : {}) } }),

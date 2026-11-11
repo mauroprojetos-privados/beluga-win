@@ -6,6 +6,7 @@ import { isDecisionQid } from '../../../../src/core/plans/decisions.js';
 import { planTitle } from '../../../../src/core/plans/model.js';
 import { planView } from '../../../../src/core/plans/progress.js';
 import type { RequestAction } from './request-actions.js';
+import { t as tr } from '../../../../src/shared/i18n/index.js';
 
 /**
  * The floating card a friend's request gets on top of whatever you're doing (the app shell's
@@ -43,10 +44,10 @@ export const POPUP_MAX = 3;
 
 /** Where a request would run or read, in words (the request sheet says the same). */
 export const whereLine = (t: TaskView): string =>
-  t.kind === 'file' ? (t.path ?? 'a file') : t.project ? `In your project ${t.project}` : t.kind === 'run' ? (t.folder ?? t.cwd ?? 'Your shared folder (or home, with full trust)') : 'A new scratch folder, just for this request';
+  t.kind === 'file' ? (t.path ?? tr('github.popup.aFile')) : t.project ? tr('github.popup.inProject', { project: t.project }) : t.kind === 'run' ? (t.folder ?? t.cwd ?? tr('github.popup.sharedFolder')) : tr('github.popup.scratch');
 
 /** What goes back to them, in words. */
-export const backLine = (t: TaskView): string => (t.kind === 'run' ? 'The output and exit code' : t.kind === 'file' ? 'The file' : t.expects === 'files' ? 'Files' : t.expects ? 'Structured data (JSON)' : 'A summary of what your agent did');
+export const backLine = (t: TaskView): string => (t.kind === 'run' ? tr('github.popup.output') : t.kind === 'file' ? tr('github.popup.theFile') : t.expects === 'files' ? tr('github.popup.files') : t.expects ? tr('github.popup.json') : tr('github.popup.summary'));
 
 /** The sender chooses the summary, so a command or a file is named as it is, never by their words alone. */
 const gistOf = (t: TaskView): string => {
@@ -62,8 +63,8 @@ const saidOf = (t: TaskView): string | undefined => {
 };
 
 const fullOf = (t: TaskView): string => {
-  if (t.kind === 'run') return `$ ${t.command ?? ''}${t.ask && t.ask !== t.command ? `\n\nWhy: ${t.ask}` : ''}`;
-  if (t.kind === 'file') return `${t.path ?? ''}${t.ask && !t.ask.startsWith('Send me ') ? `\n\nWhy: ${t.ask}` : ''}`;
+  if (t.kind === 'run') return `$ ${t.command ?? ''}${t.ask && t.ask !== t.command ? `\n\n${tr('github.sheet.why', { text: t.ask })}` : ''}`;
+  if (t.kind === 'file') return `${t.path ?? ''}${t.ask && !t.ask.startsWith('Send me ') ? `\n\n${tr('github.sheet.why', { text: t.ask })}` : ''}`;
   return t.ask;
 };
 
@@ -103,15 +104,31 @@ export function popupRequests(approvals: readonly Approval[], tasks: readonly Ta
 export const popupWho = (r: Pick<PopupRequest, 'peerName' | 'claude'>): string => `${r.peerName}${r.claude ? '’s agent' : ''}`;
 
 /** What a button on the card does (answered by the main window, like a notification's). */
+// Labels are getters: said in the language chosen when they're read, not when this loads.
 export const POPUP_BUTTONS: ReadonlyArray<{ readonly action: RequestAction; readonly label: string }> = [
-  { action: 'decline', label: 'Decline' },
-  { action: 'allow_always', label: 'Allow Always' },
-  { action: 'approve', label: 'Allow' },
+  {
+    action: 'decline',
+    get label() {
+      return tr('github.popup.decline');
+    },
+  },
+  {
+    action: 'allow_always',
+    get label() {
+      return tr('github.popup.allowAlways');
+    },
+  },
+  {
+    action: 'approve',
+    get label() {
+      return tr('github.popup.allow');
+    },
+  },
 ];
 
 /** The buttons one request gets: a file is allowed one at a time here (Always for files, with its folder spelled out, is on the request sheet; a secret never has one). */
 export const popupButtons = (r: Pick<PopupRequest, 'kind'> & { readonly secret?: string }): typeof POPUP_BUTTONS =>
-  r.secret ? POPUP_BUTTONS.filter((b) => b.action !== 'allow_always').map((b) => (b.action === 'approve' ? { ...b, label: 'Allow Once' } : b)) : r.kind === 'file' ? POPUP_BUTTONS.filter((b) => b.action !== 'allow_always') : POPUP_BUTTONS;
+  r.secret ? POPUP_BUTTONS.filter((b) => b.action !== 'allow_always').map((b) => (b.action === 'approve' ? { ...b, label: tr('github.popup.allowOnce') } : b)) : r.kind === 'file' ? POPUP_BUTTONS.filter((b) => b.action !== 'allow_always') : POPUP_BUTTONS;
 
 // ------------------------------------------------------------------ when your own Claude needs you
 
@@ -173,7 +190,7 @@ export function popupNeeds(state: NeedState, opts: { readonly quiet: boolean; re
     if (showing(q.channel)) continue;
     const where = placeOf(state, q.channel);
     if (q.question.kind === 'plan') {
-      out.push({ need: true, approval: `${NEED}q:${q.qid}`, task: '', tag: 'plan', title: where, body: 'Approve it, or say what to change', channel: q.channel });
+      out.push({ need: true, approval: `${NEED}q:${q.qid}`, task: '', tag: 'plan', title: where, body: tr('github.popup.approvePlan'), channel: q.channel });
       continue;
     }
     const first = q.question.questions[0];
@@ -205,7 +222,7 @@ export function popupNeeds(state: NeedState, opts: { readonly quiet: boolean; re
       task: '',
       tag: 'milestone',
       title: `${planTitle(plan)}: “${oneLine(m.milestone.title, 60)}”`,
-      body: m.run.check?.verdict === 'pass' ? 'The agent checked it: pass it to go on' : 'Its tasks are finished: pass it to go on',
+      body: m.run.check?.verdict === 'pass' ? tr('github.popup.checkedPass') : tr('github.popup.tasksFinished'),
       channel: plan.home,
       plan: plan.id,
     });
@@ -227,12 +244,12 @@ export function previewItems(now: number): PopupItem[] {
       peerName: 'Mia',
       claude: true,
       kind: 'ask',
-      gist: 'take a screenshot of your desktop and send it to me',
-      said: 'A preview: nothing is asked, and nothing is sent.',
-      full: 'This is how a friend’s request looks. Allow, Allow Always and Decline do nothing here.',
-      needs: ['See the screen'],
-      where: 'A new scratch folder, just for this request',
-      back: 'Files',
+      gist: tr('github.popup.previewGist'),
+      said: tr('github.popup.previewSaid'),
+      full: tr('github.popup.previewFull'),
+      needs: [tr('github.popup.previewNeeds')],
+      where: tr('github.popup.scratch'),
+      back: tr('github.popup.files'),
       askedAt: now,
     },
     {
@@ -240,8 +257,9 @@ export function previewItems(now: number): PopupItem[] {
       approval: `${PREVIEW_PREFIX}need`,
       task: '',
       tag: 'decision',
-      title: 'Card checkout · KLD-12',
-      body: 'Which payment providers should checkout offer at launch?',
+      title: tr('github.popup.previewTitle'),
+      body: tr('github.popup.previewBody'),
+
       options: ['Stripe', 'Apple Pay', 'PayPal'],
     },
   ];

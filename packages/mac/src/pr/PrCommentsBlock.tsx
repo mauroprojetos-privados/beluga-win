@@ -6,6 +6,7 @@ import { useApp } from '../lib/beluga.js';
 import { ItemCard } from './PrConversation.js';
 import { conversationCounts, openPrPage, timeline, usePrConversation } from './use-pr-conversation.js';
 import s from './pr-conversation.module.css';
+import { useT } from '../lib/i18n.js';
 
 /** The most a message shows; the rest is on the PR's page. */
 const MAX_ITEMS = 12;
@@ -19,13 +20,15 @@ export function PrCommentsBlock({ code }: { code: string }) {
   const ref = useMemo(() => parsePrCommentsRef(code), [code]);
   const wsId = useApp((st) => (st.view.kind === 'workspace' ? st.view.id : undefined));
   const pr = useApp((st) => (wsId ? st.prs[wsId] : undefined));
-  if (!wsId || !pr) return <div className={s.chatNote}>The pull request’s comments show in its worktree’s conversation.</div>;
+  const t = useT();
+  if (!wsId || !pr) return <div className={s.chatNote}>{t('github.pr.inChat')}</div>;
   return <Comments wsId={wsId} show={ref.show} {...(ref.path ? { path: ref.path } : {})} />;
 }
 
 function Comments({ wsId, show, path }: { wsId: string; show: 'open' | 'all'; path?: string }) {
   const pr = useApp((st) => st.prs[wsId])!;
   const { data, error, loading } = usePrConversation(wsId);
+  const t = useT();
   const items = data
     ? timeline(data).filter((i) => {
         if (i.kind !== 'thread') return !path;
@@ -41,20 +44,21 @@ function Comments({ wsId, show, path }: { wsId: string; show: 'open' | 'all'; pa
         <strong>#{pr.number}</strong>
         <span className={s.chatTitle}>{pr.title}</span>
         <span className={s.grow} />
-        <span className={s.when}>{data ? (counts.open ? `${counts.open} open ${counts.open === 1 ? 'thread' : 'threads'}` : `${counts.said} ${counts.said === 1 ? 'comment' : 'comments'}`) : loading ? 'Reading GitHub…' : ''}</span>
+        <span className={s.when}>{data ? (counts.open ? t('github.pr.openThreadsAlone', { count: counts.open }) : t('github.comments', { count: counts.said })) : loading ? t('github.pr.reading') : ''}</span>
         <Button size="small" icon="chat" onClick={() => openPrPage(wsId)}>
-          Reply on the PR Page
+          {t('github.pr.replyOnPage')}
         </Button>
       </figcaption>
       <div className={s.chatItems}>
         {error && !data ? <div className={s.problem}>{error}</div> : null}
-        {data && !items.length ? <div className={s.empty}>{show === 'open' ? 'Nothing open: every thread is resolved.' : 'Nobody has commented yet.'}</div> : null}
+        {data && !items.length ? <div className={s.empty}>{show === 'open' ? t('github.pr.allResolved') : t('github.pr.noComments')}</div> : null}
         {items.slice(0, MAX_ITEMS).map((item) => (
           <ItemCard key={item.id} wsId={wsId} item={item} />
         ))}
         {items.length > MAX_ITEMS ? (
           <button type="button" className={s.more} onClick={() => openPrPage(wsId)}>
-            {items.length - MAX_ITEMS} more on the PR page
+            {t('github.pr.moreOnPage', { count: items.length - MAX_ITEMS })}
+
           </button>
         ) : null}
       </div>

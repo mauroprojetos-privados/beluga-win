@@ -14,6 +14,7 @@ import { TaskStep } from './TaskStep.js';
 import a from './access.module.css';
 import s from './gateway.module.css';
 import { fileManager, revealLabel, yourComputer } from '../lib/os-words.js';
+import { useT } from '../lib/i18n.js';
 
 /**
  * One task between Claudes, as a card: in the conversation your Claude asked from (sent →
@@ -26,17 +27,18 @@ const message = (err: unknown): string => (err instanceof Error ? err.message : 
 
 function useCall(): (what: string, call: Promise<unknown>) => void {
   const { client } = useBeluga();
-  return (what, call) => void call.catch((err: unknown) => client.store.dispatch({ type: 'toast', text: `Couldn't ${what}: ${message(err)}`, level: 'error' }));
+  return (what, call) => void call.catch((err: unknown) => client.store.dispatch({ type: 'toast', text: `${what}: ${message(err)}`, level: 'error' }));
 }
 
 /** Structured data as a table when it has the shape of one, else as JSON. */
 export function DataTable({ data }: { data: unknown }) {
+  const t = useT();
   const isRow = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
   const cell = (v: unknown): string => (v === null || v === undefined ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v));
   if (Array.isArray(data) && data.length && data.every(isRow)) {
     const cols = [...new Set(data.flatMap((r) => Object.keys(r)))].slice(0, 8);
     return (
-      <table className={s.table} aria-label="Data">
+      <table className={s.table} aria-label={t('github.task.data')}>
         <thead>
           <tr>
             {cols.map((c) => (
@@ -60,7 +62,7 @@ export function DataTable({ data }: { data: unknown }) {
   }
   if (isRow(data) && Object.keys(data).length <= 24) {
     return (
-      <table className={s.table} aria-label="Data">
+      <table className={s.table} aria-label={t('github.task.data')}>
         <tbody>
           {Object.entries(data).map(([k, v]) => (
             <tr key={k}>
@@ -82,6 +84,7 @@ function Shot({ task, name, path }: { task: TaskView; name: string; path: string
   const api = useApi();
   const { client } = useBeluga();
   const [url, setUrl] = useState<string>();
+  const t = useT();
   useEffect(() => {
     let alive = true;
     void api.gateway
@@ -93,7 +96,7 @@ function Shot({ task, name, path }: { task: TaskView; name: string; path: string
     };
   }, [task.id, name]);
   return (
-    <button type="button" className={a.shot} aria-label={`Screenshot ${name}: show in ${fileManager()}`} title={name} onClick={() => void revealInFinder(client, path)}>
+    <button type="button" className={a.shot} aria-label={t('github.task.screenshot', { name, app: fileManager() })} title={name} onClick={() => void revealInFinder(client, path)}>
       {url ? <img src={url} alt={name} draggable={false} /> : null}
     </button>
   );
@@ -109,6 +112,7 @@ export const relayed = (t: Pick<TaskView, 'direction' | 'by' | 'conversation' | 
 function Result({ task }: { task: TaskView }) {
   const { client } = useBeluga();
   const [open, setOpen] = useState(false);
+  const t = useT();
   const r = task.result;
   if (!r) return null;
   const shots = r.files.filter((f) => f.image && f.path);
@@ -118,14 +122,14 @@ function Result({ task }: { task: TaskView }) {
       {relayed(task) ? (
         <button type="button" className={s.reveal} aria-expanded={open} onClick={() => setOpen(!open)}>
           <Icon name={open ? 'chevronDown' : 'chevronRight'} size={10} />
-          {open ? `Hide ${task.peerName}’s reply` : `Show ${task.peerName}’s reply`}
-          <span className={s.via}>your agent passes it on below</span>
+          {open ? t('github.task.hideReply', { name: task.peerName }) : t('github.task.showReply', { name: task.peerName })}
+          <span className={s.via}>{t('github.task.passesOn')}</span>
         </button>
       ) : null}
       {r.summary && !folded ? <Markdown text={r.summary} /> : null}
       {shots.length ? (
         <>
-          <span className={s.label}>Screenshots</span>
+          <span className={s.label}>{t('github.task.screenshots')}</span>
           <div className={a.shots}>
             {shots.map((f) => (
               <Shot key={f.name} task={task} name={f.name} path={f.path!} />
@@ -135,13 +139,13 @@ function Result({ task }: { task: TaskView }) {
       ) : null}
       {r.data !== undefined && !folded ? (
         <>
-          <span className={s.label}>Data</span>
+          <span className={s.label}>{t('github.task.data')}</span>
           <DataTable data={r.data} />
         </>
       ) : null}
       {r.files.length ? (
         <>
-          <span className={s.label}>Files</span>
+          <span className={s.label}>{t('github.task.files')}</span>
           <div className={s.files}>
             {r.files.map((f) => (
               <div key={f.name} className={s.file}>
@@ -153,7 +157,7 @@ function Result({ task }: { task: TaskView }) {
                 ) : (
                   <span>{f.name}</span>
                 )}
-                <span className={s.via}>{f.path ? kb(f.size) : 'didn’t arrive'}</span>
+                <span className={s.via}>{f.path ? kb(f.size) : t('github.task.didntArrive')}</span>
               </div>
             ))}
           </div>
@@ -161,15 +165,15 @@ function Result({ task }: { task: TaskView }) {
       ) : null}
       {r.secret && r.status === 'done' ? (
         <div className={s.hint}>
-          <Icon name="lock" size={11} /> A secret ({r.secret}): {task.direction === 'sent' ? `${task.peerName} approved sending it to you` : 'you approved sending it'}, this once.
+          <Icon name="lock" size={11} /> {task.direction === 'sent' ? t('github.task.secretSent', { secret: r.secret, name: task.peerName }) : t('github.task.secretReceived', { secret: r.secret })}
         </div>
       ) : null}
       {r.agent && task.direction === 'sent' ? (
         <div className={s.hint}>
-          <Icon name={agentMark(r.agent)} size={11} /> Answered by {agentLabel(r.agent, task.peerName, false, { model: true })}
+          <Icon name={agentMark(r.agent)} size={11} /> {t('github.task.answeredBy', { agent: agentLabel(r.agent, task.peerName, false, { model: true }) })}
         </div>
       ) : null}
-      {r.problems?.length ? <div className={s.problems}>{r.valid === false ? 'The data doesn’t match what was asked for: ' : ''}{r.problems.join(' · ')}</div> : null}
+      {r.problems?.length ? <div className={s.problems}>{r.valid === false ? t('github.task.dataMismatch') : ''}{r.problems.join(' · ')}</div> : null}
     </div>
   );
 }
@@ -178,31 +182,32 @@ function Result({ task }: { task: TaskView }) {
 function Approve({ task, inChat }: { task: TaskView; inChat?: boolean }) {
   const api = useApi();
   const call = useCall();
+  const t = useT();
   const waiting = useApp((st) => st.approvals.some((x) => x.task === task.id || x.title === approvalTitle(task)));
   const answer = (decision: 'yes' | 'always' | 'no'): Promise<unknown> => api.gateway.decide(task.id, { answer: decision, scope: 'this', command: 'this', expiry: 'never' });
   // In a friends' chat the card is where you answer: there's no approval above the message box there.
   if (!waiting && inChat)
     return (
       <div className={s.actions}>
-        <span className={s.hint}>Waiting for your answer.</span>
+        <span className={s.hint}>{t('github.task.waitingAnswer')}</span>
         <Button variant="quiet" icon="eye" onClick={() => openRequest(task.id)}>
-          Review…
+          {t('github.task.review')}
         </Button>
       </div>
     );
-  if (!waiting) return <div className={s.hint}>Waiting for your answer above the message box.</div>;
+  if (!waiting) return <div className={s.hint}>{t('github.task.waitingAbove')}</div>;
   return (
     <div className={s.actions}>
-      <Button variant="primary" onClick={() => call('approve it', answer('yes'))}>
-        {task.secret ? 'Allow Once' : 'Approve'}
+      <Button variant="primary" onClick={() => call(t('github.task.cantApprove'), answer('yes'))}>
+        {task.secret ? t('github.task.allowOnce') : t('github.task.approve')}
       </Button>
       {/* A secret is asked about each time: nothing to make "Always". */}
-      {task.secret ? null : <Button onClick={() => call('approve it', answer('always'))}>Always Allow from {task.peerName}</Button>}
-      <Button variant="quiet" onClick={() => call('decline it', answer('no'))}>
-        Decline
+      {task.secret ? null : <Button onClick={() => call(t('github.task.cantApprove'), answer('always'))}>{t('github.task.alwaysFrom', { name: task.peerName })}</Button>}
+      <Button variant="quiet" onClick={() => call(t('github.task.cantDecline'), answer('no'))}>
+        {t('github.task.decline')}
       </Button>
       <Button variant="quiet" icon="eye" onClick={() => openRequest(task.id)}>
-        Review…
+        {t('github.task.review')}
       </Button>
     </div>
   );
@@ -212,6 +217,7 @@ function Approve({ task, inChat }: { task: TaskView; inChat?: boolean }) {
 function Question({ task }: { task: TaskView }) {
   const api = useApi();
   const call = useCall();
+  const tr = useT();
   const q = task.question;
   const draft = q && task.answerDraft?.qid === q.qid ? task.answerDraft.answers : undefined;
   const [texts, setTexts] = useState<string[]>(() => [...(draft ?? [])]);
@@ -219,15 +225,15 @@ function Question({ task }: { task: TaskView }) {
     if (draft) setTexts([...draft]);
   }, [draft?.join('\u0000')]);
   if (!q) return null;
-  const send = (answers: string[] | 'skip'): void => call('answer', api.gateway.answer(task.id, answers));
+  const send = (answers: string[] | 'skip'): void => call(tr('github.task.cantAnswer'), api.gateway.answer(task.id, answers));
   // Your Claude's answer waits for you: shown to edit and send.
   const single = !draft && q.questions.length === 1 && q.questions[0]!.options.length > 0 && !q.questions[0]!.multiSelect;
   return (
-    <div className={a.question} role="group" aria-label={`${task.peerName}’s agent asks`}>
+    <div className={a.question} role="group" aria-label={tr('github.task.asks', { name: task.peerName })}>
       {q.questions.map((item, i) => (
         <div key={i}>
           <div className={a.questionText}>
-            {task.peerName}’s agent asks: {item.question}
+            {tr('github.task.asksQuestion', { name: task.peerName, question: item.question })}
           </div>
           {single ? (
             <div className={a.answers}>
@@ -242,8 +248,8 @@ function Question({ task }: { task: TaskView }) {
             <input
               className={a.input}
               style={{ width: '100%', marginBottom: 6 }}
-              aria-label={`Answer: ${item.question}`}
-              placeholder={item.options.length ? item.options.map((o) => o.label).join(' / ') : 'Your answer'}
+              aria-label={tr('github.task.answerTo', { question: item.question })}
+              placeholder={item.options.length ? item.options.map((o) => o.label).join(' / ') : tr('github.task.yourAnswer')}
               value={texts[i] ?? ''}
               onChange={(e) => setTexts(Object.assign([...texts], { [i]: e.target.value }))}
             />
@@ -253,13 +259,13 @@ function Question({ task }: { task: TaskView }) {
       <div className={s.actions} style={{ marginTop: 4 }}>
         {!single ? (
           <Button size="small" variant="primary" disabled={!texts.some((t) => t?.trim())} onClick={() => send(q.questions.map((_, i) => texts[i] ?? ''))}>
-            {draft ? 'Send It' : 'Send Answer'}
+            {draft ? tr('github.task.sendIt') : tr('github.task.sendAnswer')}
           </Button>
         ) : null}
         <Button size="small" variant="quiet" onClick={() => send('skip')}>
-          Let Them Decide
+          {tr('github.task.letThemDecide')}
         </Button>
-        <span className={s.via}>{draft ? 'Your agent’s answer: you hadn’t seen this request, so it waits for you' : task.by === 'agent' ? 'Your agent was asked first' : ''}</span>
+        <span className={s.via}>{draft ? tr('github.task.draftWaits') : task.by === 'agent' ? tr('github.task.askedFirst') : ''}</span>
       </div>
     </div>
   );
@@ -271,22 +277,23 @@ function Confirm({ task }: { task: TaskView }) {
   const call = useCall();
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(task.ask);
+  const t = useT();
   return (
     <>
-      {editing ? <textarea className={s.edit} aria-label="What to ask" value={text} onChange={(e) => setText(e.target.value)} autoFocus /> : <div className={`${s.ask} selectable`}>{task.ask}</div>}
-      <div className={s.hint}>Your agent wants to send this, so it asks you first. Always lets it ask {task.peerName} without checking from now on (it doesn’t change what they may do on {yourComputer()}).</div>
+      {editing ? <textarea className={s.edit} aria-label={t('github.req.whatToAsk')} value={text} onChange={(e) => setText(e.target.value)} autoFocus /> : <div className={`${s.ask} selectable`}>{task.ask}</div>}
+      <div className={s.hint}>{t('github.task.confirmHint', { name: task.peerName, computer: yourComputer() })}</div>
       <div className={s.actions}>
-        <Button variant="primary" onClick={() => call('send it', api.gateway.confirm(task.id, true, editing && text.trim() !== task.ask ? text : undefined))}>
-          Ask {task.peerName}
+        <Button variant="primary" onClick={() => call(t('github.task.cantSend'), api.gateway.confirm(task.id, true, editing && text.trim() !== task.ask ? text : undefined))}>
+          {t('github.task.askName', { name: task.peerName })}
         </Button>
-        <Button onClick={() => call('send it', api.gateway.confirm(task.id, true, editing && text.trim() !== task.ask ? text : undefined, true))}>Always</Button>
+        <Button onClick={() => call(t('github.task.cantSend'), api.gateway.confirm(task.id, true, editing && text.trim() !== task.ask ? text : undefined, true))}>{t('github.task.always')}</Button>
         {editing ? null : (
           <Button icon="pencil" onClick={() => setEditing(true)}>
-            Edit
+            {t('github.task.edit')}
           </Button>
         )}
-        <Button variant="quiet" onClick={() => call('answer', api.gateway.confirm(task.id, false))}>
-          Not now
+        <Button variant="quiet" onClick={() => call(t('github.task.cantAnswer'), api.gateway.confirm(task.id, false))}>
+          {t('github.task.notNow')}
         </Button>
       </div>
     </>
@@ -306,26 +313,27 @@ export function LogTaskCard({ task, inChat }: { task: TaskView; inChat?: boolean
 export const TaskCard = memo(function TaskCard({ task, inChat }: { task: TaskView; inChat?: boolean }) {
   const api = useApi();
   const call = useCall();
+  const t = useT();
   const live = !isFinal(task.state) && task.state !== 'confirm';
   const now = useNow(task.state === 'working');
   const tone = stateTone(task);
   const sent = task.direction === 'sent';
-  const working = task.incoming ? ` · ${kb(task.incoming.received)} of ${kb(task.incoming.total)}` : task.state === 'working' && task.startedAt ? ` · ${formatDuration(now - task.startedAt)}` : '';
+  const working = task.incoming ? t('github.task.incoming', { received: kb(task.incoming.received), total: kb(task.incoming.total) }) : task.state === 'working' && task.startedAt ? ` · ${formatDuration(now - task.startedAt)}` : '';
   const done = isFinal(task.state) && task.endedAt ? ` · ${formatDuration(task.endedAt - task.createdAt)}` : '';
-  const title = task.state === 'confirm' ? `Ask ${targetLabel(task)}?` : sent ? `To ${targetLabel(task)}` : `From ${task.peerName}${task.by === 'agent' ? '’s agent' : ''}`;
+  const title = task.state === 'confirm' ? t('github.task.askTarget', { target: targetLabel(task) }) : sent ? t('github.task.toTarget', { target: targetLabel(task) }) : t(task.by === 'agent' ? 'github.task.fromAgent' : 'github.task.from', { name: task.peerName });
   return (
-    <section className={`${s.card} ${task.state === 'confirm' ? s.confirm : ''} ${task.secret && !isFinal(task.state) ? s.secret : ''}`} aria-label={`Task: ${title}`} data-task={task.id} data-state={task.state}>
+    <section className={`${s.card} ${task.state === 'confirm' ? s.confirm : ''} ${task.secret && !isFinal(task.state) ? s.secret : ''}`} aria-label={t('github.task.label', { title })} data-task={task.id} data-state={task.state}>
       {/* A secret is its own approval, each time (BLG-209): the card says so before anything else. */}
       {task.secret && !isFinal(task.state) ? (
         <div className={s.secretLine}>
           <Icon name="lock" size={12} />
-          {sent ? `A secret · only ${task.peerName} can allow it, each time` : 'A secret · only you can allow it, each time'}
+          {sent ? t('github.task.secretTheirs', { name: task.peerName }) : t('github.task.secretYours')}
         </div>
       ) : null}
       <div className={s.head}>
         <Avatar name={task.peerName} id={task.peerId} claude={task.kind === 'ask'} agent={task.kind === 'ask' ? task.result?.agent : undefined} size={20} />
         <span className={s.who}>{title}</span>
-        {sent && task.by === 'agent' && task.state !== 'confirm' ? <span className={s.via}>asked by your agent</span> : null}
+        {sent && task.by === 'agent' && task.state !== 'confirm' ? <span className={s.via}>{t('github.task.askedByAgent')}</span> : null}
         {!sent && task.where ? <span className={s.via}>{task.where}</span> : null}
         <span className={`${s.status} ${s[`tone_${tone}`]}`} role="status">
           {task.state === 'confirm' ? null : <Dot tone={tone === 'claude' ? 'claude' : tone === 'ok' ? 'ok' : tone === 'warn' ? 'warn' : tone === 'error' ? 'error' : 'muted'} live={live} />}
@@ -339,7 +347,7 @@ export const TaskCard = memo(function TaskCard({ task, inChat }: { task: TaskVie
         <>
           {task.kind === 'run' && task.command ? <div className={`${s.command} selectable`}>$ {task.command}</div> : relayed(task) ? null : <div className={`${s.ask} selectable`}>{task.ask}</div>}
           {live && task.steps.length ? (
-            <div className={s.steps} aria-label="Steps">
+            <div className={s.steps} aria-label={t('github.task.steps')}>
               {task.steps.slice(-4).map((step, i) => (
                 <TaskStep key={i} line={step} owner={sent ? task.peerName : undefined} className={s.step} />
               ))}
@@ -350,8 +358,9 @@ export const TaskCard = memo(function TaskCard({ task, inChat }: { task: TaskVie
           {!sent && task.state === 'awaiting_approval' ? <Approve task={task} {...(inChat ? { inChat } : {})} /> : null}
           {live && !(!sent && task.state === 'awaiting_approval') ? (
             <div className={s.actions}>
-              <Button size="small" variant="quiet" icon="stop" onClick={() => call(sent ? 'cancel it' : 'stop it', api.gateway.cancel(task.id))}>
-                {sent ? 'Cancel' : 'Stop'}
+              <Button size="small" variant="quiet" icon="stop" onClick={() => call(sent ? t('github.task.cantCancel') : t('github.task.cantStop'), api.gateway.cancel(task.id))}>
+                {sent ? t('common.cancel') : t('common.stop')}
+
               </Button>
             </div>
           ) : null}

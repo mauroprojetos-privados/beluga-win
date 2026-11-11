@@ -1,4 +1,5 @@
 import { humanizeLine } from '../../../../src/shared/step-titles.js';
+import { t } from '../../../../src/shared/i18n/index.js';
 
 /**
  * One line of a friend's task ("Bash npm test", or its owner being asked to allow a step) as a
@@ -20,11 +21,11 @@ const TOOL = /^((?:mcp__)?[A-Za-z][\w-]*)\s/;
 
 /** `owner`: whose Mac it ran on, when it's not yours (a task you sent); else the ask was to you. */
 export function taskStepLine(line: string, owner?: string): TaskStepLine {
-  const who = owner ?? 'you';
   const asked = ASKED.exec(line);
   if (asked) {
-    const what = asked[1] ? asked[1].replace(/^mcp__beluga__/, '') : `changing ${asked[2]}`;
-    return { words: `Asked ${who} to allow ${what}`, asked: true, full: line };
+    const what = asked[1] ? asked[1].replace(/^mcp__beluga__/, '') : t('github.step.changing', { file: asked[2] ?? '' });
+    return { words: owner !== undefined ? t('github.step.asked', { who: owner, what }) : t('github.step.askedYou', { what }), asked: true, full: line };
+
   }
   const tool = TOOL.exec(`${line} `)?.[1];
   const words = humanizeLine(line).done;
