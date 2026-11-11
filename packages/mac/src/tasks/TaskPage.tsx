@@ -30,13 +30,15 @@ import { useBoard, useSelfId, useSolo, useTaskActions } from './use-tasks.js';
 import { useSwipeBack } from './use-swipe-back.js';
 import { SwipeBackEdge } from './SwipeBackEdge.js';
 import { FixItButton, GitHubIssueProp, useInvestigated } from '../issues/task-bits.js';
-import t from './tasks.module.css';
+import css from './tasks.module.css';
 import { AssignedToYou, WaitingFor, WorkingOn } from '../team/Team.js';
 import { shortcutKeys } from '../lib/shortcuts.js';
 import { ProjectIcon } from '../components/ProjectIcon.js';
 import { RepoPicker, useSeveralRepos } from './boards.js';
 import { showWorktreeFolder } from '../lib/remote-open.js';
 import { revealThereLabel } from '@beluga/machines/open.js';
+import { useT } from '../lib/i18n.js';
+import { formatDateWith } from '@beluga/shared/i18n/format.js';
 
 /**
  * One task: its title (click to rename), what to do next (start a worktree with Claude on it, or
@@ -44,10 +46,11 @@ import { revealThereLabel } from '@beluga/machines/open.js';
  * happened, with its properties down the right.
  */
 export function TaskPage({ id }: { id: string }) {
+  const t = useT();
   const board = useBoard();
   const issue = issueById(board, id);
-  if (!board.enabled) return <Empty icon="task" title="Tasks need the Beluga app" />;
-  if (!issue) return <Empty icon="task" title="This task isn’t here anymore" detail="It may have been deleted." />;
+  if (!board.enabled) return <Empty icon="task" title={t('tasks.needsApp')} />;
+  if (!issue) return <Empty icon="task" title={t('tasks.gone')} detail={t('tasks.goneDetail')} />;
   return <IssuePage issue={issue} />;
 }
 
@@ -56,6 +59,7 @@ export function TaskPage({ id }: { id: string }) {
  * top while the page scrolls, and a two-finger swipe right, ⌘[ or Esc go back too.
  */
 function IssuePage({ issue }: { issue: Issue }) {
+  const t = useT();
   const wrap = useRef<HTMLDivElement>(null);
   const { back } = useTaskActions();
   const swipe = useSwipeBack(wrap, () => back(boardOf(issue)));
@@ -63,11 +67,11 @@ function IssuePage({ issue }: { issue: Issue }) {
   // Files dropped anywhere on the page are added to the task.
   const dropping = useTaskFileDrop();
   return (
-    <div ref={wrap} className={t.pageWrap} {...taskDropProps(issue)}>
+    <div ref={wrap} className={css.pageWrap} {...taskDropProps(issue)}>
     {dropping}
     <SwipeBackEdge progress={swipe} />
-    <div className={t.page}>
-      <div className={t.pageMain}>
+    <div className={css.page}>
+      <div className={css.pageMain}>
         <Header issue={issue} />
         {/* Finished work: what shows it works comes first (BLG-13). */}
         {proofFirst ? <ProofList issue={issue} /> : null}
@@ -76,9 +80,9 @@ function IssuePage({ issue }: { issue: Issue }) {
         <SubTasks issue={issue} />
         <Relations issue={issue} />
         {proofFirst ? null : <ProofList issue={issue} />}
-        <section className={t.block} aria-label="Activity">
-          <header className={t.blockHead}>
-            <h3 className={t.sectionTitle}>Activity</h3>
+        <section className={css.block} aria-label={t('tasks.activity')}>
+          <header className={css.blockHead}>
+            <h3 className={css.sectionTitle}>{t('tasks.activity')}</h3>
           </header>
           <ActivityFeed issue={issue} />
         </section>
@@ -90,6 +94,7 @@ function IssuePage({ issue }: { issue: Issue }) {
 }
 
 function Header({ issue }: { issue: Issue }) {
+  const t = useT();
   const board = useBoard();
   const onBoard = useApp((s) => boardName(s.board, boardOf(issue), (id) => s.projects.find((p) => p.id === id)?.name));
   const parent = issue.parent ? issueById(board, issue.parent) : undefined;
@@ -98,30 +103,30 @@ function Header({ issue }: { issue: Issue }) {
   // The bar is the page's own child (not the header's), so it stays at the top all the way down.
   return (
     <>
-      <nav className={t.crumbs} aria-label="Where this task is">
-        <IconButton icon="back" label="Back" keys={shortcutKeys('page-back')} className={t.crumbBack} onClick={() => back(boardOf(issue))} />
-        <button type="button" className={t.crumb} onClick={() => openList(boardOf(issue))}>
-          Tasks
+      <nav className={css.crumbs} aria-label={t('tasks.whereThisTaskIs')}>
+        <IconButton icon="back" label={t('common.back')} keys={shortcutKeys('page-back')} className={css.crumbBack} onClick={() => back(boardOf(issue))} />
+        <button type="button" className={css.crumb} onClick={() => openList(boardOf(issue))}>
+          {t('tasks.tasks')}
         </button>
         <Icon name="chevronRight" size={10} />
-        <button type="button" className={t.crumb} onClick={() => openList(boardOf(issue))}>
+        <button type="button" className={css.crumb} onClick={() => openList(boardOf(issue))}>
           {onBoard}
         </button>
         {parent ? (
           <>
             <Icon name="chevronRight" size={10} />
-            <button type="button" className={t.crumb} onClick={() => open(parent)}>
+            <button type="button" className={css.crumb} onClick={() => open(parent)}>
               {parent.key} {parent.title}
             </button>
           </>
         ) : null}
-        <span className={t.grow} />
-        <span className={t.pageKey}>{issue.key}</span>
+        <span className={css.grow} />
+        <span className={css.pageKey}>{issue.key}</span>
         <ActionsDropdown items={menu(issue).filter((i) => i.label !== 'Open')}>
-          <IconButton icon="more" label="More" />
+          <IconButton icon="more" label={t('common.more')} />
         </ActionsDropdown>
       </nav>
-      <header className={t.pageHead}>
+      <header className={css.pageHead}>
         {isEpic(board, issue) ? <EpicLine issue={issue} /> : null}
         <Title issue={issue} />
         <WorkingOn issueId={issue.id} />
@@ -139,19 +144,21 @@ function Header({ issue }: { issue: Issue }) {
 
 /** Above an epic's title: that it is one, and how far its sub-tasks are. */
 function EpicLine({ issue }: { issue: Issue }) {
+  const t = useT();
   const board = useBoard();
   const { done, total } = progressOf(board, issue);
   return (
-    <div className={t.pageEpic}>
+    <div className={css.pageEpic}>
       <Icon name="epic" size={12} />
-      Epic
-      {total ? <span className={t.epicCount}>· {done} of {total} sub-tasks done</span> : null}
+      {t('tasks.epic')}
+      {total ? <span className={css.epicCount}>{t('tasks.epicProgress', { done, total })}</span> : null}
     </div>
   );
 }
 
 /** The title, renamed in place (Return saves, Esc puts it back). */
 function Title({ issue }: { issue: Issue }) {
+  const t = useT();
   const [draft, setDraft] = useState<string>();
   const { api, act } = useTaskActions();
   const input = useRef<HTMLTextAreaElement>(null);
@@ -171,10 +178,10 @@ function Title({ issue }: { issue: Issue }) {
   return (
     <textarea
       ref={input}
-      className={cx(t.pageTitle, writing && t.pageTitleWriting)}
+      className={cx(css.pageTitle, writing && css.pageTitleWriting)}
       value={draft ?? issue.title}
       rows={1}
-      aria-label="Title"
+      aria-label={t('tasks.title')}
       readOnly={writing}
       spellCheck={false}
       onChange={(e) => setDraft(e.target.value)}
@@ -194,14 +201,15 @@ function Title({ issue }: { issue: Issue }) {
 
 /** Kept out of review: which criteria still need a tick or a reason. */
 function ChecksBanner({ issue }: { issue: Issue }) {
+  const t = useT();
   if (!issue.needsChecks || !STATUS_INFO[issue.status].open) return null;
   const open = unexplained(issue.brief.acceptance);
   if (!open.length) return null;
   return (
-    <div className={t.banner} role="status">
+    <div className={css.banner} role="status">
       <Icon name="alert" size={14} />
-      <span className={t.bannerText}>
-        <strong>Needs its checks.</strong> {open.length === 1 ? 'A criterion is' : `${open.length} criteria are`} neither ticked nor explained, so it stays out of review: tick each one, or add “— deferred: why” after it.
+      <span className={css.bannerText}>
+        <strong>{t('tasks.checksTitle')}</strong> {t('tasks.checksBody', { count: open.length })}
       </span>
     </div>
   );
@@ -209,20 +217,21 @@ function ChecksBanner({ issue }: { issue: Issue }) {
 
 /** Private (BLG-501): only you see it, and who would once it's shared, in one click. */
 function PrivateBanner({ issue }: { issue: Issue }) {
+  const t = useT();
   const { api, act } = useTaskActions();
   const board = useBoard();
   const sharedWith = useSharedWith()(issue.projectId);
   if (!issue.private || isArchived(issue)) return null;
   const kids = board.issues.filter((i) => i.parent === issue.id && i.private).length;
   return (
-    <div className={t.banner} role="status">
+    <div className={css.banner} role="status">
       <Icon name="lock" size={14} />
-      <span className={t.bannerText}>
-        <strong>Private.</strong> Only you see it{sharedWith ? '; your team won’t until you share it' : ''}.
+      <span className={css.bannerText}>
+        <strong>{t('tasks.private')}</strong> {t(sharedWith ? 'tasks.privateOnlyYouTeam' : 'tasks.privateOnlyYou')}
       </span>
       {sharedWith ? (
-        <Button size="small" onClick={() => void act(() => api.setPrivate(issue.id, false), `Shared ${issue.key}${kids ? ' and its sub-tasks' : ''} with the team`)}>
-          Share with Team
+        <Button size="small" onClick={() => void act(() => api.setPrivate(issue.id, false), t(kids ? 'tasks.sharedWithSubTasks' : 'tasks.shared', { key: issue.key }))}>
+          {t('tasks.shareWithTeam')}
         </Button>
       ) : null}
     </div>
@@ -231,16 +240,17 @@ function PrivateBanner({ issue }: { issue: Issue }) {
 
 /** In the Archive: off the board, its words kept, its proof files let go. Back out, or gone for good. */
 function ArchivedBanner({ issue }: { issue: Issue }) {
+  const t = useT();
   const { api, act, back } = useTaskActions();
   if (!isArchived(issue)) return null;
   return (
-    <div className={t.banner} role="status">
+    <div className={css.banner} role="status">
       <Icon name="archive" size={14} />
-      <span className={t.bannerText}>
-        <strong>Archived {ago(issue.archivedAt!)}.</strong> Its words and history are kept{issue.proof.some((p) => p.thumb || p.bytes !== undefined) ? '; its screenshots were kept small and its other proof files let go' : ''}.
+      <span className={css.bannerText}>
+        <strong>{t('tasks.archivedAt', { when: ago(issue.archivedAt!) })}</strong> {t(issue.proof.some((p) => p.thumb || p.bytes !== undefined) ? 'tasks.archivedKeptProof' : 'tasks.archivedKept')}
       </span>
-      <Button size="small" onClick={() => void act(() => api.unarchive(issue.id), `${issue.key} is back on the board`)}>
-        Restore
+      <Button size="small" onClick={() => void act(() => api.unarchive(issue.id), t('tasks.backOnBoard', { key: issue.key }))}>
+        {t('tasks.restore')}
       </Button>
       <Button
         size="small"
@@ -248,15 +258,15 @@ function ArchivedBanner({ issue }: { issue: Issue }) {
         onClick={() =>
           openSheet({
             kind: 'confirm',
-            title: `Delete ${issue.key} for good?`,
-            message: `“${issue.title}”, its brief, its history and what’s left of its proof go away. This can’t be undone.`,
-            confirm: 'Delete for Good',
+            title: t('tasks.deleteTitle', { key: issue.key }),
+            message: t('tasks.deleteMessage', { title: issue.title }),
+            confirm: t('tasks.deleteForGood'),
             destructive: true,
-            run: () => void act(() => api.remove(issue.id), `Deleted ${issue.key}`).then(() => back(boardOf(issue))),
+            run: () => void act(() => api.remove(issue.id), t('tasks.deleted', { key: issue.key })).then(() => back(boardOf(issue))),
           })
         }
       >
-        Delete for Good
+        {t('tasks.deleteForGood')}
       </Button>
     </div>
   );
@@ -264,20 +274,21 @@ function ArchivedBanner({ issue }: { issue: Issue }) {
 
 /** Its worktree was archived or deleted before it was done: what now? */
 function GoneBanner({ issue }: { issue: Issue }) {
+  const t = useT();
   const { api, act } = useTaskActions();
   if (!issue.worktreeGone) return null;
   return (
-    <div className={t.banner} role="status">
+    <div className={css.banner} role="status">
       <Icon name="archive" size={14} />
-      <span className={t.bannerText}>Its worktree was put away before the task was done.</span>
+      <span className={css.bannerText}>{t('tasks.worktreePutAway')}</span>
       <Button size="small" variant="quiet" onClick={() => void act(() => api.settleGone(issue.id, 'keep'))}>
-        Keep As Is
+        {t('tasks.keepAsIs')}
       </Button>
       <Button size="small" onClick={() => void act(() => api.settleGone(issue.id, 'backlog'))}>
-        Back to Backlog
+        {t('tasks.backToBacklog')}
       </Button>
       <Button size="small" onClick={() => void act(() => api.settleGone(issue.id, 'canceled'))}>
-        Cancel Task
+        {t('tasks.cancelTask')}
       </Button>
     </div>
   );
@@ -302,10 +313,11 @@ function useTaskWorktree(issue: Issue): { readonly ws: Workspace | undefined; re
 
 /** Where a task's work is: its worktree (open it, reveal its folder in Finder), or what became of it. `secondary`: something else is the main action (Fix It). */
 function WorktreeLinks({ issue, ws, live, secondary }: { issue: Issue; ws: Workspace | undefined; live: Workspace | undefined; secondary?: boolean }) {
+  const t = useT();
   const { openWorktree } = useTaskActions();
   const { client } = useBeluga();
   // On a computer's page: Copy Path, never Finder over there (BLG-852).
-  const revealWords = useMachine() ? revealThereLabel('folder') : 'Reveal Folder';
+  const revealWords = useMachine() ? revealThereLabel('folder') : t('tasks.revealFolder');
   const api = useApi();
   // An epic across repos (BLG-561): the repos of its sub-tasks' worktrees it works in too.
   const also = useApp((s) =>
@@ -317,15 +329,15 @@ function WorktreeLinks({ issue, ws, live, secondary }: { issue: Issue; ws: Works
     return (
       <>
         <Button variant={secondary ? 'plain' : 'primary'} size="small" icon="branch" onClick={() => openWorktree(live.id)}>
-          Open Worktree
+          {t('tasks.openWorktree')}
         </Button>
         <Button size="small" variant="quiet" icon="folder" onClick={() => void showWorktreeFolder(client, live.id)}>
           {revealWords}
         </Button>
-        <span className={t.nextInfo}>
-          <span className={t.mono}>{live.name}</span>
-          {issue.branch ? <span className={t.nextBranch}>on {issue.branch}</span> : null}
-          {also ? <span className={t.nextBranch}>also in {also}</span> : null}
+        <span className={css.nextInfo}>
+          <span className={css.mono}>{live.name}</span>
+          {issue.branch ? <span className={css.nextBranch}>{t('tasks.onBranch', { branch: issue.branch })}</span> : null}
+          {also ? <span className={css.nextBranch}>{t('tasks.alsoIn', { repos: also })}</span> : null}
         </span>
       </>
     );
@@ -335,18 +347,18 @@ function WorktreeLinks({ issue, ws, live, secondary }: { issue: Issue; ws: Works
     <>
       {ws ? (
         <Button size="small" icon="chat" onClick={() => openWorktree(ws.id)}>
-          Open the Conversation
+          {t('tasks.openConversation')}
         </Button>
       ) : null}
-      <span className={t.nextInfo}>
+      <span className={css.nextInfo}>
         {ws ? (
           <>
-            <span className={t.mono}>{ws.name}</span> is archived
+            <span className={css.mono}>{ws.name}</span> {t('tasks.isArchived')}
           </>
         ) : (
-          'Its worktree was removed'
+          t('tasks.worktreeRemoved')
         )}
-        {issue.branch ? <span className={t.nextBranch}>on {issue.branch}</span> : null}
+        {issue.branch ? <span className={css.nextBranch}>{t('tasks.onBranch', { branch: issue.branch })}</span> : null}
       </span>
     </>
   );
@@ -354,6 +366,7 @@ function WorktreeLinks({ issue, ws, live, secondary }: { issue: Issue; ws: Works
 
 /** What to do next: open the worktree doing it (and its pull request), or start one; finished work shows how it ended. */
 function NextStep({ issue }: { issue: Issue }) {
+  const t = useT();
   const { ws, live, had } = useTaskWorktree(issue);
   const [starting, setStarting] = useState(false);
   // Its GitHub issue investigated: Fix It (there) is the one main action.
@@ -361,7 +374,7 @@ function NextStep({ issue }: { issue: Issue }) {
   const { who, start: startWith, items } = useTaskStart(issue);
   // An epic across repos (BLG-561): Start makes a worktree in each of its sub-tasks' repos too, one agent on all.
   const along = useApp((s) => reposAlong(s.board, issue).map((r) => s.projects.find((p) => p.id === r)?.name ?? r).join('\u0000'));
-  const repo = useApp((s) => s.projects.find((p) => p.id === issue.projectId)?.name ?? 'its repo');
+  const repo = useApp((s) => s.projects.find((p) => p.id === issue.projectId)?.name ?? t('tasks.itsRepo'));
   const others = along ? along.split('\u0000') : [];
   // One click: a new worktree named after it, In Progress, its agent on it with its brief, and you there (BLG-55).
   // Start with… (BLG-506): another agent, this start only.
@@ -375,7 +388,7 @@ function NextStep({ issue }: { issue: Issue }) {
   // Its agent is still writing it: Start waits for the brief (BLG-598).
   const writing = Boolean(issue.drafting);
   return (
-    <div className={t.nextStep}>
+    <div className={css.nextStep}>
       {had || live ? (
         <>
           <FixItButton issue={issue} />
@@ -383,21 +396,21 @@ function NextStep({ issue }: { issue: Issue }) {
         </>
       ) : (
         <>
-          <SplitButton label="Start with another agent" disabled={starting || writing} items={items((a) => void start(a))}>
+          <SplitButton label={t('tasks.startWithAnother')} disabled={starting || writing} items={items((a) => void start(a))}>
             <Button variant="primary" size="small" icon="play" disabled={starting || writing} onClick={() => void start()}>
-              {starting ? 'Starting…' : 'Start'}
+              {starting ? t('tasks.starting') : t('tasks.start')}
             </Button>
           </SplitButton>
-          <span className={t.nextInfo}>
+          <span className={css.nextInfo}>
             {writing
-              ? 'You can start it once its brief is written'
+              ? t('tasks.startOnceWritten')
               : others.length
-              ? `A worktree in ${[repo, ...others].slice(0, -1).join(', ')} and ${others.at(-1)} from the latest origin, with ${who} working on ${issue.key} across them`
-              : `A new worktree from the latest origin, with ${who} working on ${issue.key}${issue.brief.goal ? ' from this brief' : ''}`}
+              ? t('tasks.startAcross', { repos: [repo, ...others].slice(0, -1).join(', '), last: others.at(-1) ?? '', who, key: issue.key })
+              : t(issue.brief.goal ? 'tasks.startNewBrief' : 'tasks.startNew', { who, key: issue.key })}
           </span>
         </>
       )}
-      <span className={t.grow} />
+      <span className={css.grow} />
       {issue.pr ? <PrLink pr={issue.pr} /> : null}
     </div>
   );
@@ -409,32 +422,33 @@ function NextStep({ issue }: { issue: Issue }) {
  * ask it things still. Starting again is ⋯ › Reopen the Task.
  */
 function Outcome({ issue, ws, live }: { issue: Issue; ws: Workspace | undefined; live: Workspace | undefined }) {
+  const t = useT();
   const { openWorktree } = useTaskActions();
   const { client } = useBeluga();
   // On a computer's page: Copy Path, never Finder over there (BLG-852).
-  const revealWords = useMachine() ? revealThereLabel('folder') : 'Reveal Folder';
+  const revealWords = useMachine() ? revealThereLabel('folder') : t('tasks.revealFolder');
   const api = useApi();
   const plan = useApp((s) => (issue.plan ? s.plans.plans.find((p) => p.id === issue.plan!.id) : undefined));
   const { open: openPlan } = usePlanActions();
   const what =
     issue.status === 'in_review'
-      ? issue.pr ? 'In review · its pull request is open' : 'In review'
+      ? issue.pr ? t('tasks.inReviewPr') : t('tasks.inReview')
       : issue.status === 'in_plan'
-        ? 'Merged into the plan · ships with the plan’s pull request'
-        : plan ? 'Done · shipped with the plan' : 'Done';
+        ? t('tasks.inPlan')
+        : plan ? t('tasks.doneWithPlan') : t('tasks.done');
   const pr = issue.status === 'in_plan' ? (plan?.pr ?? issue.pr) : issue.pr;
   return (
-    <div className={t.nextStep} data-testid="task-outcome">
-      <span className={t.outcome}>
+    <div className={css.nextStep} data-testid="task-outcome">
+      <span className={css.outcome}>
         <StatusIcon status={issue.status} />
         {what}
       </span>
-      {issue.branch ? <span className={t.mono}>{issue.branch}</span> : null}
-      <span className={t.grow} />
+      {issue.branch ? <span className={css.mono}>{issue.branch}</span> : null}
+      <span className={css.grow} />
       {pr ? <PrLink pr={pr} /> : null}
       {plan ? (
         <Button size="small" variant="quiet" icon="graph" onClick={() => openPlan(plan.id)}>
-          Open the Plan
+          {t('tasks.openPlan')}
         </Button>
       ) : null}
       {live ? (
@@ -443,12 +457,12 @@ function Outcome({ issue, ws, live }: { issue: Issue; ws: Workspace | undefined;
             {revealWords}
           </Button>
           <Button size="small" icon="branch" onClick={() => openWorktree(live.id)}>
-            Open Worktree
+            {t('tasks.openWorktree')}
           </Button>
         </>
       ) : ws ? (
         <Button size="small" icon="chat" onClick={() => openWorktree(ws.id)}>
-          Open the Conversation
+          {t('tasks.openConversation')}
         </Button>
       ) : null}
     </div>
@@ -458,9 +472,9 @@ function Outcome({ issue, ws, live }: { issue: Issue; ws: Workspace | undefined;
 function PrLink({ pr }: { pr: NonNullable<Issue['pr']> }) {
   const actions = useActions();
   return (
-    <button type="button" className={t.prLink} onClick={() => actions.openLink({ kind: 'url', url: pr.url })}>
+    <button type="button" className={css.prLink} onClick={() => actions.openLink({ kind: 'url', url: pr.url })}>
       <PrChip pr={pr} />
-      <span className={t.prTitle}>{pr.title}</span>
+      <span className={css.prTitle}>{pr.title}</span>
       <Icon name="external" size={11} />
     </button>
   );
@@ -468,6 +482,7 @@ function PrLink({ pr }: { pr: NonNullable<Issue['pr']> }) {
 
 /** The right column: every property, each one a menu. */
 function Properties({ issue }: { issue: Issue }) {
+  const t = useT();
   const board = useBoard();
   const solo = useSolo(issue.projectId);
   const selfId = useSelfId();
@@ -479,10 +494,10 @@ function Properties({ issue }: { issue: Issue }) {
   const several = useSeveralRepos(issue);
   const boardTitle = useApp((s) => boardName(s.board, boardOf(issue), (id) => s.projects.find((p) => p.id === id)?.name));
   return (
-    <aside className={t.props} aria-label="Properties">
-      <Prop label="Status">
+    <aside className={css.props} aria-label={t('tasks.properties')}>
+      <Prop label={t('tasks.status')}>
         <StatusPicker issue={issue} align="end">
-          <button type="button" className={t.propValue}>
+          <button type="button" className={css.propValue}>
             <StatusIcon status={issue.status} />
             {STATUS_INFO[issue.status].label}
           </button>
@@ -490,98 +505,98 @@ function Properties({ issue }: { issue: Issue }) {
       </Prop>
       {/* A board of several repos: the one it runs in (Start makes its worktree there). */}
       {several ? (
-        <Prop label="Repo">
+        <Prop label={t('tasks.repo')}>
           <RepoPicker issue={issue}>
-            <button type="button" className={t.propValue}>
-              <ProjectIcon id={issue.projectId} name={project?.name ?? 'Repo'} size={16} />
-              {project?.name ?? 'Repo'}
+            <button type="button" className={css.propValue}>
+              <ProjectIcon id={issue.projectId} name={project?.name ?? t('tasks.repo')} size={16} />
+              {project?.name ?? t('tasks.repo')}
             </button>
           </RepoPicker>
         </Prop>
       ) : null}
-      <Prop label="Priority">
+      <Prop label={t('tasks.priority')}>
         <PriorityPicker issue={issue} align="end">
-          <button type="button" className={t.propValue}>
+          <button type="button" className={css.propValue}>
             <PriorityIcon priority={issue.priority} />
             {PRIORITY_INFO[issue.priority].label}
           </button>
         </PriorityPicker>
       </Prop>
-      {solo ? null : <Prop label="Assignee">
+      {solo ? null : <Prop label={t('tasks.assignee')}>
         <AssigneePicker projectId={issue.projectId} value={issue.assignee} onChange={(a) => void act(() => api.update(issue.id, { assignee: a }))} align="end">
-          <button type="button" className={t.propValue}>
+          <button type="button" className={css.propValue}>
             <AssigneeMark assignee={issue.assignee} selfId={selfId} size={16} />
             {assigneeName(issue.assignee, selfId)}
           </button>
         </AssigneePicker>
       </Prop>}
       <AgentProp issue={issue} />
-      <Prop label="Labels">
-        <div className={t.propLabels}>
+      <Prop label={t('tasks.labels')}>
+        <div className={css.propLabels}>
           {issue.labels.map((l) => (
             <LabelChip key={l} label={l} projectId={boardOf(issue)} onRemove={() => void act(() => api.update(issue.id, { labels: issue.labels.filter((x) => x !== l) }))} />
           ))}
           <LabelsPicker issue={issue} align="end">
-            <button type="button" className={cx(t.propValue, t.propAdd)}>
+            <button type="button" className={cx(css.propValue, css.propAdd)}>
               <Icon name="plus" size={11} />
-              {issue.labels.length ? '' : 'Add Label'}
+              {issue.labels.length ? '' : t('tasks.addLabel')}
             </button>
           </LabelsPicker>
         </div>
       </Prop>
-      <Prop label="Estimate">
-        <div className={t.estimates} role="radiogroup" aria-label="Estimate">
+      <Prop label={t('tasks.estimate')}>
+        <div className={css.estimates} role="radiogroup" aria-label={t('tasks.estimate')}>
           {[1, 2, 3, 5, 8].map((n) => (
-            <button key={n} type="button" role="radio" aria-checked={issue.estimate === n} className={cx(t.estimate, issue.estimate === n && t.estimateOn)} onClick={() => void act(() => api.update(issue.id, { estimate: issue.estimate === n ? null : n }))}>
+            <button key={n} type="button" role="radio" aria-checked={issue.estimate === n} className={cx(css.estimate, issue.estimate === n && css.estimateOn)} onClick={() => void act(() => api.update(issue.id, { estimate: issue.estimate === n ? null : n }))}>
               {n}
             </button>
           ))}
         </div>
       </Prop>
-      <Prop label="Due">
+      <Prop label={t('tasks.due')}>
         <DuePicker issue={issue} late={Boolean(due?.late && STATUS_INFO[issue.status].open)} text={due?.text} />
       </Prop>
-      <Prop label="Parent">
+      <Prop label={t('tasks.parent')}>
         {parent ? (
-          <div className={t.propRow}>
-            <button type="button" className={t.propValue} onClick={() => open(parent)}>
+          <div className={css.propRow}>
+            <button type="button" className={css.propValue} onClick={() => open(parent)}>
               <StatusIcon status={parent.status} />
-              <span className={t.ellipsis}>
+              <span className={css.ellipsis}>
                 {parent.key} {parent.title}
               </span>
             </button>
-            <IconButton icon="x" label="Make It a Task of Its Own" onClick={() => void act(() => api.update(issue.id, { parent: null }))} />
+            <IconButton icon="x" label={t('tasks.makeOwnTask')} onClick={() => void act(() => api.update(issue.id, { parent: null }))} />
           </div>
         ) : (
-          <TaskPicker label="Parent" candidates={parents} onPick={(p) => void act(() => api.update(issue.id, { parent: p.id }))} align="end">
-            <button type="button" className={cx(t.propValue, t.propAdd)}>
+          <TaskPicker label={t('tasks.parent')} candidates={parents} onPick={(p) => void act(() => api.update(issue.id, { parent: p.id }))} align="end">
+            <button type="button" className={cx(css.propValue, css.propAdd)}>
               <Icon name="plus" size={11} />
-              Set Parent
+              {t('tasks.setParent')}
             </button>
           </TaskPicker>
         )}
       </Prop>
-      <div className={t.propsRule} />
+      <div className={css.propsRule} />
       {/* On a board of several repos the repo is up top: here, the board it's on. */}
-      <Prop label={several ? 'Board' : 'Project'} quiet>
-        <span className={t.propStatic}>{several ? boardTitle : (project?.name ?? '—')}</span>
+      <Prop label={several ? t('tasks.board') : t('tasks.project')} quiet>
+        <span className={css.propStatic}>{several ? boardTitle : (project?.name ?? '—')}</span>
       </Prop>
       {issue.branch ? (
-        <Prop label="Branch" quiet>
+        <Prop label={t('tasks.branch')} quiet>
           <Tip label={issue.branch}>
-            <span className={cx(t.propStatic, t.mono, t.ellipsis)}>{issue.branch}</span>
+            <span className={cx(css.propStatic, css.mono, css.ellipsis)}>{issue.branch}</span>
           </Tip>
         </Prop>
       ) : null}
       {issue.link ? <TrackerLink link={issue.link} /> : null}
       <GitHubIssueProp issue={issue} Prop={Prop} />
-      <Prop label="Created" quiet>
-        <span className={t.propStatic}>
-          {ago(issue.createdAt)} by {actorName(issue.createdBy, selfId)}
+      <Prop label={t('tasks.created')} quiet>
+        <span className={css.propStatic}>
+          {t('tasks.createdBy', { when: ago(issue.createdAt), who: actorName(issue.createdBy, selfId) })}
         </span>
       </Prop>
-      <Prop label="Updated" quiet>
-        <span className={t.propStatic}>{ago(issue.updatedAt)}</span>
+      <Prop label={t('tasks.updated')} quiet>
+        <span className={css.propStatic}>{ago(issue.updatedAt)}</span>
       </Prop>
     </aside>
   );
@@ -593,6 +608,7 @@ function Properties({ issue }: { issue: Issue }) {
  * that will (Start › Start with another agent picks another for that start).
  */
 function AgentProp({ issue }: { issue: Issue }) {
+  const t = useT();
   const { live } = useTaskWorktree(issue);
   const { openWorktree } = useTaskActions();
   const { who } = useTaskStart(issue);
@@ -600,8 +616,8 @@ function AgentProp({ issue }: { issue: Issue }) {
   const running = useApp((s) => (live ? pickedAgent(agentPicker(pickerState(s), `ws:${live.id}`, myRuntime(s.prefs))) : undefined), sameAgent);
   if (running && live) {
     return (
-      <Prop label="Agent">
-        <button type="button" className={t.propValue} onClick={() => openWorktree(live.id)} title={`Running in ${live.name}: change it in its conversation`} aria-label={`Agent: ${agentName(running, { model: true })}, in ${live.name}`}>
+      <Prop label={t('tasks.agent')}>
+        <button type="button" className={css.propValue} onClick={() => openWorktree(live.id)} title={t('tasks.runningIn', { worktree: live.name })} aria-label={t('tasks.agentIn', { agent: agentName(running, { model: true }), worktree: live.name })}>
           <Icon name={runtimeMark(running.runtime)} size={13} />
           {agentName(running, { model: true })}
         </button>
@@ -610,9 +626,9 @@ function AgentProp({ issue }: { issue: Issue }) {
   }
   if (!isStartable(issue)) return null;
   return (
-    <Prop label="Agent" quiet>
-      <span className={t.propStatic} title="Works it when it starts: Start › Start with another agent picks another">
-        {who === 'your agent' ? `Your agent (${mine})` : who}
+    <Prop label={t('tasks.agent')} quiet>
+      <span className={css.propStatic} title={t('tasks.agentWhenStarts')}>
+        {who === 'your agent' ? t('tasks.yourAgent', { name: mine }) : who}
       </span>
     </Prop>
   );
@@ -622,6 +638,7 @@ const sameAgent = (a: AgentRef | undefined, b: AgentRef | undefined): boolean =>
 
 /** A due date: the Mac's date picker from a plain button, and a way to clear it. */
 function DuePicker({ issue, late, text }: { issue: Issue; late: boolean; text: string | undefined }) {
+  const t = useT();
   const { api, act } = useTaskActions();
   const input = useRef<HTMLInputElement>(null);
   const pick = (): void => {
@@ -634,26 +651,28 @@ function DuePicker({ issue, late, text }: { issue: Issue; late: boolean; text: s
     }
   };
   return (
-    <div className={t.propRow}>
-      <button type="button" className={cx(t.propValue, !issue.due && t.propAdd, late && t.dueLate)} onClick={pick}>
+    <div className={css.propRow}>
+      <button type="button" className={cx(css.propValue, !issue.due && css.propAdd, late && css.dueLate)} onClick={pick}>
         <Icon name="calendar" size={12} />
-        {issue.due ? `${new Date(`${issue.due}T12:00:00`).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })} · ${text ?? ''}` : 'Set Due Date'}
+        {issue.due ? `${formatDateWith(new Date(`${issue.due}T12:00:00`), { month: 'short', day: 'numeric', year: 'numeric' })} · ${text ?? ''}` : t('tasks.setDueDate')}
       </button>
-      {issue.due ? <IconButton icon="x" label="Remove the Due Date" onClick={() => void act(() => api.update(issue.id, { due: null }))} /> : null}
-      <input ref={input} type="date" className={t.dateHidden} tabIndex={-1} aria-hidden="true" value={issue.due ?? ''} onChange={(e) => void act(() => api.update(issue.id, { due: e.target.value || null }))} />
+      {issue.due ? <IconButton icon="x" label={t('tasks.removeDueDate')} onClick={() => void act(() => api.update(issue.id, { due: null }))} /> : null}
+      <input ref={input} type="date" className={css.dateHidden} tabIndex={-1} aria-hidden="true" value={issue.due ?? ''} onChange={(e) => void act(() => api.update(issue.id, { due: e.target.value || null }))} />
     </div>
   );
 }
 
 /** The same task in Linear (kept in step by sync): its key, opening it there. */
 function TrackerLink({ link }: { link: NonNullable<Issue['link']> }) {
+  const t = useT();
   const actions = useActions();
   const name = PROVIDER_INFO[link.provider].label;
   return (
     <Prop label={name} quiet>
-      <Tip label={`Open ${link.key} in ${name}`}>
-        <button type="button" className={t.propValue} onClick={() => actions.openLink({ kind: 'url', url: link.url })}>
-          <span className={t.mono}>{link.key}</span>
+      <Tip label={t('tasks.openIn', { key: link.key, name })}>
+
+        <button type="button" className={css.propValue} onClick={() => actions.openLink({ kind: 'url', url: link.url })}>
+          <span className={css.mono}>{link.key}</span>
           <Icon name="external" size={11} />
         </button>
       </Tip>
@@ -663,9 +682,9 @@ function TrackerLink({ link }: { link: NonNullable<Issue['link']> }) {
 
 function Prop({ label, children, quiet }: { label: string; children: React.ReactNode; quiet?: boolean }) {
   return (
-    <div className={cx(t.prop, quiet && t.propStaticRow)}>
-      <span className={t.propLabel}>{label}</span>
-      <div className={t.propControl}>{children}</div>
+    <div className={cx(css.prop, quiet && css.propStaticRow)}>
+      <span className={css.propLabel}>{label}</span>
+      <div className={css.propControl}>{children}</div>
     </div>
   );
 }
