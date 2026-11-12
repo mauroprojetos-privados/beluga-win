@@ -21,8 +21,13 @@ describe('a folder the Windows app picked, for an engine in WSL', () => {
   it('leaves another distro’s share, Linux paths, and everything outside WSL as they are', () => {
     expect(fromWindowsSide('\\\\wsl.localhost\\Debian\\home\\me', wsl)).toBe('\\\\wsl.localhost\\Debian\\home\\me');
     expect(fromWindowsSide('/home/me/app', wsl)).toBe('/home/me/app');
-    expect(fromWindowsSide('D:\\Projetos', {} as NodeJS.ProcessEnv)).toBe('D:\\Projetos');
-    expect(fromWindowsSide('\\\\wsl.localhost\\Ubuntu-24.04\\home', {} as NodeJS.ProcessEnv)).toBe('\\\\wsl.localhost\\Ubuntu-24.04\\home');
+    expect(fromWindowsSide('D:\\Projetos', {} as NodeJS.ProcessEnv, false)).toBe('D:\\Projetos');
+    expect(fromWindowsSide('\\\\wsl.localhost\\Ubuntu-24.04\\home', {} as NodeJS.ProcessEnv, false)).toBe('\\\\wsl.localhost\\Ubuntu-24.04\\home');
+  });
+
+  it('reads the share in a systemd service too, where WSL_DISTRO_NAME isn’t set', () => {
+    expect(fromWindowsSide('\\\\wsl.localhost\\Ubuntu-24.04\\home\\me\\app', { HOME: '/home/me' } as NodeJS.ProcessEnv, true)).toBe('/home/me/app');
+    expect(fromWindowsSide('D:\\x', { HOME: '/home/me' } as NodeJS.ProcessEnv, true)).toBe('/mnt/d/x');
   });
 
   it('still expands ~', () => {
