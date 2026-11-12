@@ -4,7 +4,12 @@
  * system's own way (a user-level install first, sudo only when there's none and it's allowed),
  * the steps with their words, and git's errors in plain words. No I/O here (ready.ts runs it);
  * tested on its own (tests/machines-ready.test.ts). Browser-safe: the app draws the same steps.
+ *
+ * The steps' labels and the install and clone words are English: the daemon makes them, keeps
+ * them with the run and reads them back. A screen says a step with stepLabel and the run with readyLine.
  */
+
+import { t } from '../shared/i18n/index.js';
 
 export type ReadyPlatform = 'macos' | 'linux' | 'windows';
 export type PackageManager = 'brew' | 'apt' | 'dnf' | 'apk';
@@ -327,19 +332,31 @@ export function withStep(run: ReadyRun, id: StepId, patch: Partial<Omit<ReadySte
   return { ...run, steps: run.steps.map((s) => (s.id === id ? { ...s, ...patch } : s)) };
 }
 
-/** What it's doing, said once: "Getting build-box ready: cloning, Node 20, npm ci". */
+/** What it's doing, said once, in the app's language (the screens read it): "Getting build-box ready: cloning, Node 20, npm ci". */
 export function readyLine(run: Pick<ReadyRun, 'computer' | 'steps' | 'state'>): string {
-  if (run.state === 'done') return `${run.computer} is ready`;
+  const name = run.computer;
+  if (run.state === 'done') return t('shared.ready.done', { name });
   const failed = run.steps.find((s) => s.state === 'failed');
-  if (failed) return `${run.computer} couldn’t get ready: ${failed.error ?? failed.label}`;
-  if (run.state === 'asking') return `${run.computer} needs tools installed first`;
+  if (failed) return t('shared.ready.failed', { name, why: failed.error ?? stepLabel(failed) });
+  if (run.state === 'asking') return t('shared.ready.asking', { name });
   const words = run.steps.filter((s) => s.state === 'active' || s.state === 'todo').map((s) => stepWord(s));
-  return `Getting ${run.computer} ready${words.length ? `: ${words.join(', ')}` : ''}`;
+  return words.length ? t('shared.ready.gettingSteps', { name, steps: words.join(', ') }) : t('shared.ready.getting', { name });
 }
 
 const stepWord = (s: ReadyStep): string => {
-  if (s.id === 'clone') return 'cloning';
-  if (s.id === 'folder') return 'its folder';
-  if (s.id === 'tools') return s.label === 'Tools it needs' ? 'tools' : s.label;
-  return s.label.startsWith('Setup: ') ? s.label.slice(7) : 'setup';
+  if (s.id === 'clone') return t('shared.ready.word.clone');
+  if (s.id === 'folder') return t('shared.ready.word.folder');
+  if (s.id === 'tools') return s.label === 'Tools it needs' ? t('shared.ready.word.tools') : s.label;
+  return s.label.startsWith('Setup: ') ? s.label.slice(7) : t('shared.ready.word.setup');
 };
+
+/** A step's label on a screen: firstSteps' own words in the app's language, anything else as the daemon wrote it. */
+export function stepLabel(s: Pick<ReadyStep, 'id' | 'label'>): string {
+  if (s.id === 'folder' && s.label === 'Projects folder') return t('shared.ready.step.folder');
+  if (s.id === 'tools' && s.label === 'Tools it needs') return t('shared.ready.step.tools');
+  if (s.id === 'setup' && s.label === 'Setup') return t('shared.ready.step.setup');
+  const setup = s.id === 'setup' ? /^Setup: (.+)$/.exec(s.label) : null;
+  if (setup) return t('shared.ready.step.setupCommand', { command: setup[1]! });
+  const clone = s.id === 'clone' ? /^Cloning (.+)$/.exec(s.label) : null;
+  return clone ? t('shared.ready.step.clone', { project: clone[1]! }) : s.label;
+}

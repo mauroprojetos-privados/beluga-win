@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import type { View } from '@beluga/core/store.js';
 import type { Method } from '@beluga/ipc/api.js';
 import type { Notice } from '@beluga/core/work-store.js';
-import { dndActive, dndLabel } from '@beluga/shared/quiet.js';
+import { dndActive, dndWords } from '@beluga/shared/quiet.js';
 import { type NoticeFilter, type NoticeLook, NOTICE_FILTERS, filterNotices, foldPlanNotices, groupNotices, noticeAgo, noticeGroupTitle, noticeLook } from '@beluga/ui/notice-models.js';
 import { planTitle } from '@beluga/core/plans/model.js';
 import { Icon, type IconName } from '../components/Icon.js';
@@ -296,7 +296,7 @@ function Center({ close }: { close: () => void }) {
       {quiet ? (
         <div className={s.quiet}>
           <Mark look="moon" size={13} />
-          <span>{t('sidebar.notifications.dndUntil', { when: dndLabel(notify, now) })}</span>
+          <span>{t('sidebar.notifications.dndUntil', { when: dndWords(notify, now) })}</span>
           <button type="button" className={s.link} onClick={() => void api.session.setPrefs({ notify: { ...notify, dnd: null } })}>
             {t('sidebar.notifications.turnOff')}
           </button>

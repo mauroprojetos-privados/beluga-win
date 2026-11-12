@@ -6,6 +6,7 @@
  * "<endpoint id>/<model>". Browser-safe: the daemon, the Mac app and the phone import it.
  */
 import type { RuntimeModel } from './agent-runtimes.js';
+import { t } from './i18n/index.js';
 
 /** The runtime id local endpoints run under (see agent-runtimes.ts KNOWN_RUNTIMES). */
 export const LOCAL_RUNTIME = 'local';
@@ -113,4 +114,4 @@ export function tokensPerSecond(tokens: number, ms: number): number | undefined 
 }
 
 /** "free · 42 tok/s": what a local model shows where Claude shows plan limits. */
-export const speedWords = (tps: number | undefined): string => (tps ? `free · ${tps} tok/s` : 'free');
+export const speedWords = (tps: number | undefined): string => (tps ? t('shared.local.freeSpeed', { tps }) : t('shared.local.free'));

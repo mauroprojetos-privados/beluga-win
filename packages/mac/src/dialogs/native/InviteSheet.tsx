@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { GuestCan } from '@beluga/protocol.js';
-import { CAN_INFO, DAY_MS, expiresIn } from '@beluga/shared/invites.js';
+import { DAY_MS, canWords, expiryWords } from '@beluga/shared/invites.js';
 import { fallbackFor } from '@beluga/shared/runtime-fallbacks.js';
 import { useMyAgent } from '../../lib/agent-words.js';
 import { CAN_ORDER, type InviteChoice } from '@beluga/ui/invite-menus.js';
@@ -103,9 +103,9 @@ function HostInvite({ menu, close }: NativeMenuProps<'invite_link'>) {
         <span className={s.hint}>{c.scope === 'room' ? t('native.invite.roomHint') : t('native.invite.projectHint')}</span>
       </Field>
       <Field label={t('native.invite.theyCan')}>
-        <Choice<GuestCan> label={t('native.invite.theyCan')} value={c.can} options={CAN_ORDER.map((can) => ({ value: can, label: CAN_INFO[can].label, icon: can === 'watch' ? 'eye' : can === 'prompt' ? 'chat' : 'pencil' }))} onChange={(can) => set({ can })} />
+        <Choice<GuestCan> label={t('native.invite.theyCan')} value={c.can} options={CAN_ORDER.map((can) => ({ value: can, label: canWords(can).label, icon: can === 'watch' ? 'eye' : can === 'prompt' ? 'chat' : 'pencil' }))} onChange={(can) => set({ can })} />
         <span className={s.hint}>
-          {sentence(CAN_INFO[c.can].detail)}.{noGuests && c.can !== 'watch' ? ` ${noGuests}` : ''}
+          {sentence(canWords(c.can).detail)}.{noGuests && c.can !== 'watch' ? ` ${noGuests}` : ''}
         </span>
       </Field>
       <Field label={t('native.invite.theLink')}>
@@ -126,9 +126,9 @@ function HostInvite({ menu, close }: NativeMenuProps<'invite_link'>) {
                   <Icon name="link" size={14} className={s.itemIcon} />
                   <div className={s.itemText}>
                     <span className={s.itemTitle}>
-                      {l.label === 'everything' ? t('native.invite.everything') : l.label} <Tag tone="accent">{CAN_INFO[l.can].short}</Tag>
+                      {l.label === 'everything' ? t('native.invite.everything') : l.label} <Tag tone="accent">{canWords(l.can).short}</Tag>
                     </span>
-                    <span className={s.itemDetail}>{[sentence(expiresIn(l.expiresAt, Date.now())), l.used ? t('native.invite.usedBy', { n: l.used }) : t('native.invite.notUsed'), l.singleUse ? t('native.invite.onePersonShort') : t('native.invite.anyone'), l.knock ? t('native.invite.knocksFirst') : t('native.invite.noKnock')].join(' · ')}</span>
+                    <span className={s.itemDetail}>{[sentence(expiryWords(l.expiresAt, Date.now())), l.used ? t('native.invite.usedBy', { n: l.used }) : t('native.invite.notUsed'), l.singleUse ? t('native.invite.onePersonShort') : t('native.invite.anyone'), l.knock ? t('native.invite.knocksFirst') : t('native.invite.noKnock')].join(' · ')}</span>
                   </div>
                   <div className={s.itemButtons}>
                     <Button size="small" variant="quiet" icon={copied === l.id ? 'check' : 'copy'} className={cx(copied === l.id && s.copied)} onClick={() => copyAgain(l.id)} aria-label={t('native.invite.copyLinkTo', { label: l.label })}>
@@ -194,7 +194,7 @@ function Waiting() {
               <Avatar name={name} id={k.peerId} size={24} />
               <div className={s.itemText}>
                 <span className={s.itemTitle}>{name}</span>
-                <span className={s.itemDetail}>{link ? t('native.invite.wantsToJoin', { label: link.label, can: CAN_INFO[link.can].short }) : t('native.invite.atTheDoor')}</span>
+                <span className={s.itemDetail}>{link ? t('native.invite.wantsToJoin', { label: link.label, can: canWords(link.can).short }) : t('native.invite.atTheDoor')}</span>
               </div>
               <div className={s.itemButtons}>
                 <Button size="small" variant="quiet" onClick={() => void api.invites.decline(k.peerId)}>

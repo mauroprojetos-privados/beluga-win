@@ -1,8 +1,10 @@
 /**
  * Experimental features (Settings › Experimental): early work that's off until you turn it on.
  * One list for the daemon (what Claude is told, what the API allows) and the screens (the pane
- * that explains each one). Browser-safe: data only.
+ * that explains each one). Browser-safe: data, its words read when they're said (the app's language).
  */
+
+import { t } from './i18n/index.js';
 
 export const EXPERIMENTS = ['previews'] as const;
 export type Experiment = (typeof EXPERIMENTS)[number];
@@ -23,17 +25,19 @@ export interface ExperimentInfo {
 export const EXPERIMENT_INFO: Readonly<Record<Experiment, ExperimentInfo>> = {
   previews: {
     id: 'previews',
-    title: 'Live previews',
-    summary: 'See the React components and web pages your agent builds, drawn live in the chat, and play with them there.',
-    changes: [
-      'Your agent can show a component it made or changed as a live preview in its answer: React, Vue or Svelte, a web page, or your own dev server.',
-      'Props are filled in from the component’s own types, and you can change each one beside it. What you change is kept.',
-      'Tailwind, Next.js and your app’s providers work as in the app; your agent can add a small preview wrapper file for the providers.',
-      'Each preview can pin hover and focus, switch to a dark canvas or a phone’s width, check accessibility and save a picture.',
-      'Component files in Files get a Preview view. The preview follows the file: save it and the drawing updates in place.',
-    ],
-    keywords: 'preview component react render storybook page html props live',
-    cost: 'Each preview is built on this computer when it scrolls into view, which takes a moment of CPU and some memory. Beluga lets it go when you look away, and while this is off nothing of it runs at all.',
+    get title() {
+      return t('shared.experiments.previews.title');
+    },
+    get summary() {
+      return t('shared.experiments.previews.summary');
+    },
+    get changes() {
+      return [t('shared.experiments.previews.change1'), t('shared.experiments.previews.change2'), t('shared.experiments.previews.change3'), t('shared.experiments.previews.change4'), t('shared.experiments.previews.change5')];
+    },
+    keywords: 'preview component react render storybook page html props live', // i18n-ignore
+    get cost() {
+      return t('shared.experiments.previews.cost');
+    },
   },
 };
 

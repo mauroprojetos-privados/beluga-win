@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useClock } from '../lib/window-active.js';
-import { REMOTE_FULL_WARNING } from '@beluga/shared/remote-full.js';
+import { remoteFullWarning } from '@beluga/shared/remote-full.js';
 import { Button } from '../components/ui.js';
 import { useApi, useApp } from '../lib/beluga.js';
 import { copyText } from '../lib/copy.js';
@@ -186,7 +186,7 @@ export function ExternalAgentsSettings() {
             <Select<Level> label={say('What it may do')} value={level} options={LEVELS()} onChange={(next) => { setLevel(next); setConfirmFull(false); }} />
           </Row>
           {remote && level === 'full' ? (
-            <Row label={say('Full trust for this code')} detail={<span className={s.fullWarning} role="alert">{REMOTE_FULL_WARNING}</span>}>
+            <Row label={say('Full trust for this code')} detail={<span className={s.fullWarning} role="alert">{remoteFullWarning()}</span>}>
               <Switch label={t('prefs.external.fullUnderstand')} on={confirmFull} onChange={setConfirmFull} />
             </Row>
           ) : null}

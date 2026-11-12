@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import { formatDateWith } from '../../../src/shared/i18n/format';
 import { sayNeed, t } from './language';
 import type { NeedsYou, OutputView, Topic } from './link/protocol';
 import { kv } from './kv';
@@ -142,10 +143,10 @@ export function useSince(ts: number | undefined): number | undefined {
 /** "42s", "3m 05s", "1h 02m". */
 export const elapsed = (s: number | undefined): string => {
   if (s === undefined) return '';
-  if (s < 60) return `${s}s`;
+  if (s < 60) return t('shared.time.secs', { s });
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ${String(s % 60).padStart(2, '0')}s`;
-  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`;
+  if (m < 60) return t('shared.time.minSecs', { m, s: String(s % 60).padStart(2, '0') });
+  return t('shared.time.hourMins', { h: Math.floor(m / 60), m: String(m % 60).padStart(2, '0') });
 };
 
 export function useOutbox(): OutboxItem[] {
@@ -163,7 +164,7 @@ export function useToasts(): Toast[] {
 }
 
 /** "as of 10:42" for a view that didn't come from the Mac this session. */
-export const asOf = (at: number): string => `as of ${new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+export const asOf = (at: number): string => t('shared.time.asOf', { time: formatDateWith(at, { hour: '2-digit', minute: '2-digit' }) });
 
 export function ago(ts: number | undefined, now = Date.now()): string {
   if (!ts) return '';
@@ -179,11 +180,11 @@ export function ago(ts: number | undefined, now = Date.now()): string {
 export function until(ts: number | undefined, now = Date.now()): string {
   if (!ts) return '';
   const m = Math.max(0, Math.round((ts - now) / 60000));
-  if (m < 60) return `${m} min`;
+  if (m < 60) return t('shared.time.min', { m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h} h ${m % 60} min`;
+  if (h < 24) return t('shared.time.hMin', { h, m: m % 60 });
   const d = Math.floor(h / 24);
-  return `${d} d ${h % 24} h`;
+  return t('shared.time.dH', { d, h: h % 24 });
 }
 
 /**

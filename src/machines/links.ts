@@ -5,6 +5,8 @@
  * no screen at all, says the link is lost (what's kept on this Mac still shows). Browser-safe.
  */
 
+import { t } from '../shared/i18n/index.js';
+
 /** A round trip slower than this is said. */
 export const SLOW_LINK_MS = 300;
 /** A ping unanswered this long: the link is lost. */
@@ -30,10 +32,10 @@ export interface LinkHealth {
   readonly words: string;
 }
 
-export function linkHealth(s: LinkSample, name = 'This computer'): LinkHealth {
-  if (!s.connected || (s.waitingMs ?? 0) >= LOST_LINK_MS) return { state: 'lost', words: `${name} can’t be reached right now. What you saw last still shows; Beluga keeps trying.` };
+export function linkHealth(s: LinkSample, name = t('shared.links.thisComputer')): LinkHealth {
+  if (!s.connected || (s.waitingMs ?? 0) >= LOST_LINK_MS) return { state: 'lost', words: t('shared.links.lost', { name }) };
   // A ping waiting longer than a slow round trip is a slow link already.
   const rtt = Math.max(s.rttMs ?? 0, s.waitingMs ?? 0);
-  if (rtt > SLOW_LINK_MS) return { state: 'slow', rttMs: rtt, words: `The link to ${name} is slow (${Math.round(rtt)} ms). Typing stays here; what you send arrives a moment later.` };
-  return { state: 'ok', ...(s.rttMs !== undefined ? { rttMs: s.rttMs } : {}), words: s.rttMs !== undefined ? `Runs on ${name} (${Math.round(s.rttMs)} ms)` : `Runs on ${name}` };
+  if (rtt > SLOW_LINK_MS) return { state: 'slow', rttMs: rtt, words: t('shared.links.slow', { name, ms: Math.round(rtt) }) };
+  return { state: 'ok', ...(s.rttMs !== undefined ? { rttMs: s.rttMs } : {}), words: s.rttMs !== undefined ? t('shared.links.okMs', { name, ms: Math.round(s.rttMs) }) : t('shared.links.ok', { name }) };
 }

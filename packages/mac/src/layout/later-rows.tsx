@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { laterUntil } from '@beluga/core/triage/facts.js';
-import { remindLabel } from '@beluga/shared/remind.js';
+import { remindWhen } from '@beluga/shared/remind.js';
 import type { Workspace } from '@beluga/workspaces/types.js';
 import { Icon } from '../components/Icon.js';
 import { cx } from '../components/ui.js';
@@ -50,7 +50,7 @@ export function LaterRows({ list, indent, foldKey }: { list: readonly Workspace[
   const later = useLater();
   if (!list.length) return null;
   const shown = open ? list : list.filter((w) => w.id === here);
-  const next = remindLabel(later.get(list[0]!.id));
+  const next = remindWhen(later.get(list[0]!.id));
   return (
     <>
       <Row
@@ -68,7 +68,7 @@ export function LaterRows({ list, indent, foldKey }: { list: readonly Workspace[
           </span>
         }
         label={t('layout.later.later')}
-        detail={`${t('layout.later.detail', { count: list.length })}${next ? `\n${t('layout.later.next', { when: next.replace(/^Reminds you /, '') })}` : ''}`}
+        detail={`${t('layout.later.detail', { count: list.length })}${next ? `\n${t('layout.later.next', { when: next })}` : ''}`}
         trailing={<span className={s.count}>{list.length}</span>}
         onClick={() => actions.run({ type: 'toggle_fold', key: foldKey })}
       />

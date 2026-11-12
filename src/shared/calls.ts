@@ -10,6 +10,8 @@
 
 import { type LanguageCount, languageCode } from './call-language.js';
 import { VOICE_MODEL_IDS, type VoiceModelId } from './voice-models.js';
+import { formatDateWith, formatTime } from './i18n/format.js';
+import { t } from './i18n/index.js';
 
 /** Someone in a call, as screens show them. */
 export interface CallPersonView {
@@ -60,9 +62,9 @@ export interface MissedCallView {
 /** "Ann tried calling you at 14:05" (with the day too when it wasn't today). */
 export function missedCallText(m: Pick<MissedCallView, 'name' | 'at'>, now = Date.now()): string {
   const when = new Date(m.at);
-  const time = when.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const time = formatTime(when);
   const today = when.toDateString() === new Date(now).toDateString();
-  return `${m.name} tried calling you at ${time}${today ? '' : ` on ${when.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })}`}`;
+  return today ? t('shared.calls.missed', { name: m.name, time }) : t('shared.calls.missedOn', { name: m.name, time, day: formatDateWith(when, { weekday: 'short', day: 'numeric', month: 'short' }) });
 }
 
 /** How long a call rings before it counts as missed. */

@@ -1,4 +1,4 @@
-import { resetWords } from '@beluga/shared/run-failure.js';
+import { resetWhen } from '@beluga/shared/run-failure.js';
 import { Button } from '../components/ui.js';
 import { toast, useApi, useApp, useBeluga } from '../lib/beluga.js';
 import { Group, Row, Switch } from './settings-controls.js';
@@ -25,7 +25,7 @@ export function UsageLimitSettings() {
         <Switch label={say('Continue when your usage limit resets')} on={p.autoContinue} onChange={(v) => set(v ? { autoContinue: true, autoContinueSkip: Date.now() } : { autoContinue: false })} />
       </Row>
       {skipping ? (
-        <Row label={say('Skipped this session')} detail={t('prefs.usageLimit.skippedDetail', { when: resetWords(p.autoContinueSkip, now) })}>
+        <Row label={say('Skipped this session')} detail={t('prefs.usageLimit.skippedDetail', { when: resetWhen(p.autoContinueSkip, now) })}>
           <Button size="small" onClick={() => set({ autoContinueSkip: 0 })}>
             {t('prefs.usageLimit.turnBackOn')}
           </Button>

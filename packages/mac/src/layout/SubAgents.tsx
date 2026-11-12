@@ -13,7 +13,7 @@ import { type Residue, type SubAgent, agentResidue, agentTitle, cappedAgents, is
 import { setPrefs, usePrefs } from '../lib/prefs.js';
 import { useNow } from '../chat/Items.js';
 import { agoText } from '../views/project/home-model.js';
-import { type FoldRow, type ThreadChild, THREAD_WORDS, agentFamilyRow, capFold, foldNoun, foldRows, foldRunning, foldSummary, openPath, threadNesting, threadStateOf, threadsShownUnder } from '../threads/threads-model.js';
+import { type FoldRow, type ThreadChild, agentFamilyRow, capFold, foldNoun, foldRows, foldRunning, foldSummary, openPath, threadNesting, threadStateOf, threadsShownUnder, threadWord } from '../threads/threads-model.js';
 import { FamilyEnd, FamilyMark, FamilyTitle } from '../threads/FamilyRow.js';
 import { sameDeep } from '../lib/stable.js';
 import { Row } from './sidebar-parts.js';
@@ -103,7 +103,7 @@ function FamilyAgentRow({ sub, parent, indent, worktree }: { sub: SubAgent; pare
   const row = useApp((st) => agentFamilyRow(st, parent, sub), sameDeep);
   const now = useNow(row.state === 'running');
   const on = selected.agent === sub.agent.id || (worktree !== undefined && selected.ws === worktree.id);
-  const word = THREAD_WORDS[row.state];
+  const word = threadWord(row.state);
   return (
     <Row
       data-subagent={sub.agent.id}

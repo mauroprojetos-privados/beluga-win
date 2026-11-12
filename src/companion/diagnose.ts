@@ -5,6 +5,10 @@ import type { DialAttempt, LinkPath } from './protocol.js';
  * it can't connect"). The phone shows `title` and `body` on the surface and the rest in its "Why?"
  * sheet; the Mac's Settings › Phone uses `pathNote`. Pure and runtime-free: the app, the worklet
  * and the Mac all import it. Never a raw error code on the surface (only in `detail`).
+ *
+ * Its words are English, and each carries its key in the words catalog (`words`, src/shared/i18n
+ * areas/shared.ts `shared.diagnose.*`): this file imports nothing, so it runs in Bare, and the phone
+ * says them in its language (packages/companion/lib/link/diagnose.ts).
  */
 
 export type Problem =
@@ -48,6 +52,8 @@ export interface Diagnosis {
   /** It should fix itself: the phone keeps trying by itself while you look, and says so. */
   readonly auto?: boolean;
   readonly action?: 'pair-again' | 'update-app' | 'update-mac' | 'open-settings';
+  /** The catalog keys of `title`, `body` and `tryThis` (`shared.diagnose.<id>.title`…), so a screen says them in its language. */
+  readonly words?: { readonly title: string; readonly body: string; readonly tryThis?: string };
 }
 
 /** Why the Mac turned a pairing away (dev_refused `why`). */
@@ -89,7 +95,10 @@ export function attemptLine(a: DialAttempt): string {
   return `${WAY[a.way]}: ${OUTCOME[a.outcome]}${extras ? ` (${extras})` : ''}`;
 }
 
-/** How a link came, in a few words (the phone's Settings › Advanced, the Mac's phone popover). */
+/** pathLabel's key in the words catalog. */
+export const pathLabelKey = (path: LinkPath): string => `shared.diagnose.path.${path === 'lan' || path === 'direct' ? path : 'relay'}`;
+
+/** How a link came, in a few words (the phone's Settings › Advanced, the Mac's phone popover). English: see pathLabelKey. */
 export function pathLabel(path: LinkPath): string {
   if (path === 'lan') return 'Connected directly · same network';
   if (path === 'direct') return 'Connected directly · over the internet';
@@ -112,44 +121,45 @@ export function diagnose(input: DiagnoseInput): Diagnosis {
   if (input.report?.dht === 'unreachable') detail.push('The peer-to-peer network (DHT) didn’t answer this phone.');
   if (input.report?.recordAge !== undefined) detail.push(`Your Mac last said where its relay is ${Math.round(input.report.recordAge / 60_000)} min ago.`);
   if (input.online !== undefined) detail.push(input.online ? 'This phone is online.' : 'This phone couldn’t reach the internet.');
-  const make = (d: Omit<Diagnosis, 'detail'>): Diagnosis => ({ ...d, detail });
+  // `id`: its words' keys (shared.diagnose.<id>.title, .body, .try); `body`: another body's key.
+  const make = (id: string, d: Omit<Diagnosis, 'detail' | 'words'>, body?: string): Diagnosis => ({ ...d, detail, words: { title: `shared.diagnose.${id}.title`, body: `shared.diagnose.${body ?? id}.body`, ...(d.tryThis ? { tryThis: `shared.diagnose.${id}.try` } : {}) } });
   const reason = input.reason ?? '';
 
   if (input.refusal === 'version-mac' || (input.closeCode === 4002 && /Mac/.test(reason)) || /^Update Beluga on your Mac/.test(reason))
-    return make({ problem: 'update-mac', title: 'Update Beluga on your Mac', body: 'This app is newer than Beluga on your Mac, so they can’t talk yet.', tryThis: 'Update Beluga on your Mac, then try again.', retry: true, action: 'update-mac' });
+    return make('updateMac', { problem: 'update-mac', title: 'Update Beluga on your Mac', body: 'This app is newer than Beluga on your Mac, so they can’t talk yet.', tryThis: 'Update Beluga on your Mac, then try again.', retry: true, action: 'update-mac' });
   if (input.refusal === 'version-app' || input.closeCode === 4002 || /^Update the Beluga app/.test(reason))
-    return make({ problem: 'update-app', title: 'Update the Beluga app', body: 'Beluga on your Mac is newer than this app.', tryThis: 'Update the app from the Play Store.', retry: false, action: 'update-app' });
-  if (input.closeCode === 4010) return make({ problem: 'removed', title: 'This phone was removed', body: 'Your Mac doesn’t know this phone any more (it was removed there, or signed out).', tryThis: 'Pair it again from your Mac’s Settings › Phone.', retry: false, action: 'pair-again' });
+    return make('updateApp', { problem: 'update-app', title: 'Update the Beluga app', body: 'Beluga on your Mac is newer than this app.', tryThis: 'Update the app from the Play Store.', retry: false, action: 'update-app' });
+  if (input.closeCode === 4010) return make('removed', { problem: 'removed', title: 'This phone was removed', body: 'Your Mac doesn’t know this phone any more (it was removed there, or signed out).', tryThis: 'Pair it again from your Mac’s Settings › Phone.', retry: false, action: 'pair-again' });
 
   switch (input.refusal) {
     case 'expired':
     case 'used':
     case 'cancelled':
-      return make({ problem: 'pairing-gone', title: 'That pairing is closed', body: input.refusal === 'used' ? 'Each pairing works for one phone, and that one was used.' : 'Pairings work for 10 minutes, and this one was closed or ran out.', tryThis: 'On your Mac, open Settings › Phone › Pair a Phone… and scan the new code.', retry: false, action: 'pair-again' });
+      return make('closed', { problem: 'pairing-gone', title: 'That pairing is closed', body: input.refusal === 'used' ? 'Each pairing works for one phone, and that one was used.' : 'Pairings work for 10 minutes, and this one was closed or ran out.', tryThis: 'On your Mac, open Settings › Phone › Pair a Phone… and scan the new code.', retry: false, action: 'pair-again' }, input.refusal === 'used' ? 'closedUsed' : 'closed');
     case 'unverified':
     case 'tries':
-      return make({ problem: 'pairing-wrong', title: 'That code didn’t work', body: input.refusal === 'tries' ? 'There were too many tries with it.' : 'The code or link didn’t match the pairing on your Mac.', tryThis: 'Check the code, or start a new pairing on your Mac.', retry: false, action: 'pair-again' });
+      return make('wrong', { problem: 'pairing-wrong', title: 'That code didn’t work', body: input.refusal === 'tries' ? 'There were too many tries with it.' : 'The code or link didn’t match the pairing on your Mac.', tryThis: 'Check the code, or start a new pairing on your Mac.', retry: false, action: 'pair-again' }, input.refusal === 'tries' ? 'wrongTries' : 'wrong');
     case 'busy':
-      return make({ problem: 'pairing-busy', title: 'Another phone is pairing', body: 'Your Mac is pairing another phone right now.', tryThis: 'Wait a moment, then try again.', retry: true });
+      return make('busy', { problem: 'pairing-busy', title: 'Another phone is pairing', body: 'Your Mac is pairing another phone right now.', tryThis: 'Wait a moment, then try again.', retry: true });
     case 'full':
-      return make({ problem: 'pairing-full', title: 'Your Mac has 4 phones', body: 'That’s as many as it pairs.', tryThis: 'Remove one in your Mac’s Settings › Phone, then try again.', retry: true });
+      return make('full', { problem: 'pairing-full', title: 'Your Mac has 4 phones', body: 'That’s as many as it pairs.', tryThis: 'Remove one in your Mac’s Settings › Phone, then try again.', retry: true });
     default:
       break;
   }
 
-  if (input.online === false) return make({ problem: 'offline', title: 'This phone is offline', body: 'It can’t reach the internet right now, so it can’t reach your Mac either.', tryThis: 'Turn on Wi-Fi or mobile data, then try again.', retry: true, action: 'open-settings' });
+  if (input.online === false) return make('offline', { problem: 'offline', title: 'This phone is offline', body: 'It can’t reach the internet right now, so it can’t reach your Mac either.', tryThis: 'Turn on Wi-Fi or mobile data, then try again.', retry: true, action: 'open-settings' });
 
   const r = input.report;
-  if (r?.removed) return make({ problem: 'removed', title: 'Your Mac doesn’t know this phone any more', body: 'It was removed on the Mac (Settings › Phone › Remove), or signed out.', tryThis: 'On your Mac, open Settings › Phone › Pair a Phone…, then pair again here.', retry: false, action: 'pair-again' });
+  if (r?.removed) return make('forgotten', { problem: 'removed', title: 'Your Mac doesn’t know this phone any more', body: 'It was removed on the Mac (Settings › Phone › Remove), or signed out.', tryThis: 'On your Mac, open Settings › Phone › Pair a Phone…, then pair again here.', retry: false, action: 'pair-again' });
   if (r) {
     const relayTried = r.tried.some((t) => t.way === 'relay' && t.outcome !== 'skipped');
     // A pairing key nobody listens on: the pairing is closed (or the code is wrong).
     if (input.stage === 'pair' && r.found === 'no')
-      return make({ problem: 'pairing-gone', title: 'Your Mac isn’t offering that pairing', body: 'Pairings work for 10 minutes and for one phone. This one may have run out, been used, or the code may be off.', tryThis: 'On your Mac, open Settings › Phone › Pair a Phone… and scan the new code.', retry: true, action: 'pair-again' });
+      return make('notOffered', { problem: 'pairing-gone', title: 'Your Mac isn’t offering that pairing', body: 'Pairings work for 10 minutes and for one phone. This one may have run out, been used, or the code may be off.', tryThis: 'On your Mac, open Settings › Phone › Pair a Phone… and scan the new code.', retry: true, action: 'pair-again' });
     const p2pFailed = r.tried.some((t) => t.way === 'p2p' && (t.outcome === 'unreachable' || t.outcome === 'refused' || t.outcome === 'timeout'));
     const relayDown = r.tried.some((t) => t.way === 'relay' && (t.outcome === 'unreachable' || t.outcome === 'not-found' || (t.outcome === 'skipped' && t.code === 'NO_RELAY')));
     if (r.found === 'yes' && p2pFailed && relayDown)
-      return make({
+      return make('relayDown', {
         problem: 'relay-down',
         title: 'Reconnecting to your Mac…',
         body: 'Your Mac is online, but this network won’t let them connect directly, and the Mac’s relay isn’t answering yet. Beluga on your Mac restarts it by itself, and this phone keeps trying.',
@@ -158,11 +168,11 @@ export function diagnose(input: DiagnoseInput): Diagnosis {
         auto: true,
       });
     if (r.found === 'yes')
-      return make({ problem: 'no-path', title: 'Your Mac is there, but this network won’t connect you', body: `This network doesn’t let your phone and your Mac connect directly${relayTried ? ', and the relay didn’t get through either' : ''}.`, tryThis: MOBILE, retry: true });
+      return make('noPath', { problem: 'no-path', title: 'Your Mac is there, but this network won’t connect you', body: `This network doesn’t let your phone and your Mac connect directly${relayTried ? ', and the relay didn’t get through either' : ''}.`, tryThis: MOBILE, retry: true }, relayTried ? 'noPathRelay' : 'noPath');
     if (r.dht === 'unreachable')
-      return make({ problem: 'dht-blocked', title: 'This network blocks Beluga’s connection', body: `It doesn’t let your phone reach the peer-to-peer network Beluga uses${relayTried ? ', and the relay didn’t answer either' : ''}.`, tryThis: MOBILE, retry: true });
+      return make('dhtBlocked', { problem: 'dht-blocked', title: 'This network blocks Beluga’s connection', body: `It doesn’t let your phone reach the peer-to-peer network Beluga uses${relayTried ? ', and the relay didn’t answer either' : ''}.`, tryThis: MOBILE, retry: true }, relayTried ? 'dhtBlockedRelay' : 'dhtBlocked');
     if (r.found === 'no' || (r.recordAge !== undefined && r.recordAge > 30 * 60_000))
-      return make({ problem: 'mac-offline', title: 'Your Mac isn’t online', body: 'It may be asleep, Beluga may be closed, or its network is off. This phone connects by itself as soon as it’s back.', tryThis: 'Wake your Mac and open Beluga. To keep it from sleeping, turn on Keep this Mac awake in Settings.', retry: true, auto: true });
+      return make('macOffline', { problem: 'mac-offline', title: 'Your Mac isn’t online', body: 'It may be asleep, Beluga may be closed, or its network is off. This phone connects by itself as soon as it’s back.', tryThis: 'Wake your Mac and open Beluga. To keep it from sleeping, turn on Keep this Mac awake in Settings.', retry: true, auto: true });
   }
-  return make({ problem: 'unknown', title: 'Your Mac didn’t answer', body: 'It may be asleep or offline, or this network may not let you connect.', tryThis: 'Make sure Beluga is open on your Mac. If it is, try mobile data.', retry: true, auto: true });
+  return make('unknown', { problem: 'unknown', title: 'Your Mac didn’t answer', body: 'It may be asleep or offline, or this network may not let you connect.', tryThis: 'Make sure Beluga is open on your Mac. If it is, try mobile data.', retry: true, auto: true });
 }

@@ -5,6 +5,8 @@
  * card, the phone shows the sentence.
  */
 
+import { type Key, type Params, isKey, t, translator } from './i18n/index.js';
+
 /** What went wrong, from git's or gh's own words. */
 export type GitTroubleKind =
   /** SSH: GitHub didn't accept this Mac's key ("Permission denied (publickey)", "Could not read from remote repository"). */
@@ -41,6 +43,8 @@ export interface GitFix {
   readonly url?: string;
   /** What it types in the terminal, shown as it is. */
   readonly command?: string;
+  /** The keys of its label and detail, so a screen says them in its language (sayGitTrouble). */
+  readonly words?: { readonly label: string; readonly detail: string; readonly params?: Params };
 }
 
 export interface GitTrouble {
@@ -53,6 +57,8 @@ export interface GitTrouble {
   readonly fixes: readonly GitFix[];
   /** git's or gh's own words, for Details. */
   readonly raw: string;
+  /** The keys of its title and explanation (sayGitTrouble). */
+  readonly words?: { readonly title: string; readonly explain: string; readonly params?: Params };
 }
 
 /** What Beluga knows about this Mac's GitHub setup, to pick the fixes that can work. */
@@ -122,21 +128,31 @@ export function remoteHost(url: string | undefined): string {
 /** Where a key lives, for the SSH fix. */
 const SSH_KEY = '~/.ssh/id_ed25519';
 
+// The card's words are made in English (the daemon's message and toasts read them) and carry their
+// keys, so a screen says them in the app's language (sayGitTrouble).
+const english = translator('en');
+type Then = 'https' | 'retry';
+
+/** A fix in English, with the keys of its label and detail. */
+function fix(id: GitFixId, label: Key, detail: Key, params?: Params, extra: { readonly url?: string; readonly command?: string } = {}): GitFix {
+  return { id, label: english(label, params), detail: english(detail, params), ...extra, words: { label, detail, ...(params ? { params } : {}) } };
+}
+
 /** The fixes that set gh up, when it isn't (install it, or log in): undefined once it's logged in. */
-function ghSetupFix(setup: GitSetup, then: string): GitFix | undefined {
+function ghSetupFix(setup: GitSetup, then: Then): GitFix | undefined {
   const gh = setup.ghCommand ?? 'gh';
   if (setup.gh === 'missing') {
     if (setup.brew) {
       const brew = `${setup.brew}/brew`;
-      return { id: 'install_gh', label: 'Install GitHub CLI', detail: `Installs GitHub’s own tool with Homebrew, then opens github.com so you can log in. ${then}`, command: `${brew} install gh && ${setup.brew}/gh auth login --web --git-protocol https --hostname ${remoteHost(setup.remote)}` };
+      return fix('install_gh', 'shared.git.installGh.label', then === 'https' ? 'shared.git.installGh.detailHttps' : 'shared.git.installGh.detailRetry', undefined, { command: `${brew} install gh && ${setup.brew}/gh auth login --web --git-protocol https --hostname ${remoteHost(setup.remote)}` });
     }
-    return { id: 'link', label: 'Get GitHub CLI', detail: 'Download GitHub’s own tool, open it once, then try again.', url: GH_CLI_URL };
+    return fix('link', 'shared.git.getGh.label', 'shared.git.getGh.detail', undefined, { url: GH_CLI_URL });
   }
-  if (setup.gh === 'logged_out') return { id: 'gh_login', label: 'Log In to GitHub', detail: `Opens github.com in your browser to log in. ${then}`, command: `${gh} auth login --web --git-protocol https --hostname ${remoteHost(setup.remote)}` };
+  if (setup.gh === 'logged_out') return fix('gh_login', 'shared.git.ghLogin.label', then === 'https' ? 'shared.git.ghLogin.detailHttps' : 'shared.git.ghLogin.detailRetry', undefined, { command: `${gh} auth login --web --git-protocol https --hostname ${remoteHost(setup.remote)}` });
   return undefined;
 }
 
-const retry: GitFix = { id: 'retry', label: 'Try Again', detail: 'Run it again as it is.' };
+const retry: GitFix = fix('retry', 'shared.git.retry.label', 'shared.git.retry.detail');
 
 /**
  * git's or gh's error as a card: a plain title, what it means, and the fixes that can work with
@@ -148,60 +164,77 @@ export function explainGitTrouble(raw: string, setup: GitSetup = { gh: 'unknown'
   const ssh = isSshRemote(setup.remote);
   const https = httpsRemoteOf(setup.remote);
   const host = remoteHost(setup.remote);
+  const name = host === 'github.com' ? 'GitHub' : host;
   const gh = setup.ghCommand ?? 'gh';
-  const pushHttps: GitFix | undefined = ssh && https ? { id: 'push_https', label: 'Push over HTTPS', detail: `Pushes this once with your GitHub CLI login instead of SSH. Your remote stays as it is.` } : undefined;
-  const useHttps: GitFix | undefined = ssh && https ? { id: 'use_https', label: 'Always Use HTTPS for This Project…', detail: `Changes origin to ${https} (asks first). You can change it back any time.` } : undefined;
-  const thenHttps = 'Then Beluga pushes over HTTPS with that login.';
-  const thenRetry = 'Then Beluga tries again.';
+  const pushHttps: GitFix | undefined = ssh && https ? fix('push_https', 'shared.git.pushHttps.label', 'shared.git.pushHttps.detail') : undefined;
+  const useHttps: GitFix | undefined = ssh && https ? fix('use_https', 'shared.git.useHttps.label', 'shared.git.useHttps.detail', { https }) : undefined;
   // Each fix once (two routes can land on the same page).
-  const out = (title: string, explain: string, fixes: ReadonlyArray<GitFix | undefined>): GitTrouble => ({ kind, title, explain, fixes: fixes.filter((f, i, all): f is GitFix => Boolean(f) && all.findIndex((g) => g && (g.id === 'link' ? g.url === f!.url : g.id === f!.id)) === i), raw: raw.trim() });
+  const out = (title: Key, explain: Key, params: Params | undefined, fixes: ReadonlyArray<GitFix | undefined>): GitTrouble => ({
+    kind,
+    title: english(title, params),
+    explain: english(explain, params),
+    fixes: fixes.filter((f, i, all): f is GitFix => Boolean(f) && all.findIndex((g) => g && (g.id === 'link' ? g.url === f!.url : g.id === f!.id)) === i),
+    raw: raw.trim(),
+    words: { title, explain, ...(params ? { params } : {}) },
+  });
+  const notFound = fix('link', 'shared.git.notFound.label', 'shared.git.notFound.detail', undefined, { url: ACCESS_DOCS });
 
   switch (kind) {
     case 'ssh_denied':
     case 'host_key': {
       const hostKey = kind === 'host_key';
-      const title = hostKey ? `This Mac hasn’t met ${host} over SSH yet` : `${host === 'github.com' ? 'GitHub' : host} didn’t accept this Mac’s SSH key`;
-      const explain = hostKey
-        ? `Your project talks to ${host} over SSH, and SSH wants you to confirm it’s really ${host} the first time (or its fingerprint changed). The easiest way around it is HTTPS with your GitHub login.`
-        : `Your project pushes over SSH, which needs a key on this Mac that your GitHub account knows. There isn’t one yet (or SSH can’t reach it). The easiest way around it is HTTPS with your GitHub login.`;
       const sshFix: GitFix = hostKey
-        ? { id: 'check_host', label: `Check ${host}’s Fingerprint`, detail: `Connects once in the terminal so you can compare the fingerprint with GitHub’s list and accept it.`, command: `ssh -T git@${host}` }
+        ? fix('check_host', 'shared.git.checkHost.label', 'shared.git.checkHost.detail', { host }, { command: `ssh -T git@${host}` })
         : setup.gh === 'ok'
-          ? { id: 'add_ssh_key', label: 'Add an SSH Key to GitHub', detail: `Makes a key on this Mac if there isn’t one (${SSH_KEY}: it asks for an optional passphrase) and adds it to your GitHub account, in the terminal.`, command: `${gh} auth refresh --hostname ${host} --scopes admin:public_key && { [ -f ${SSH_KEY}.pub ] || ssh-keygen -t ed25519 -f ${SSH_KEY}; } && ${gh} ssh-key add ${SSH_KEY}.pub --title "Beluga on $(scutil --get ComputerName 2>/dev/null || hostname)"` }
-          : { id: 'link', label: 'How SSH Keys Work', detail: 'GitHub’s guide to making a key and adding it to your account.', url: SSH_DOCS };
-      const docs: GitFix = hostKey ? { id: 'link', label: 'GitHub’s Fingerprints', detail: 'The fingerprints to compare with.', url: HOST_KEYS_URL } : { id: 'link', label: 'GitHub’s SSH Guide', detail: 'Making a key and adding it to your account.', url: SSH_DOCS };
+          ? fix('add_ssh_key', 'shared.git.addKey.label', 'shared.git.addKey.detail', { key: SSH_KEY }, { command: `${gh} auth refresh --hostname ${host} --scopes admin:public_key && { [ -f ${SSH_KEY}.pub ] || ssh-keygen -t ed25519 -f ${SSH_KEY}; } && ${gh} ssh-key add ${SSH_KEY}.pub --title "Beluga on $(scutil --get ComputerName 2>/dev/null || hostname)"` })
+          : fix('link', 'shared.git.sshHow.label', 'shared.git.sshHow.detail', undefined, { url: SSH_DOCS });
+      const docs: GitFix = hostKey ? fix('link', 'shared.git.fingerprints.label', 'shared.git.fingerprints.detail', undefined, { url: HOST_KEYS_URL }) : fix('link', 'shared.git.sshGuide.label', 'shared.git.sshGuide.detail', undefined, { url: SSH_DOCS });
       // gh logged in: HTTPS works right away. Otherwise gh comes first (and HTTPS after it).
-      const setupGh = ghSetupFix(setup, pushHttps ? thenHttps : thenRetry);
-      return out(title, explain, setupGh ? [setupGh, ...(hostKey ? [sshFix] : []), docs, retry] : [pushHttps ?? sshFix, useHttps, ...(pushHttps ? [sshFix] : []), docs, retry]);
+      const setupGh = ghSetupFix(setup, pushHttps ? 'https' : 'retry');
+      const fixes = setupGh ? [setupGh, ...(hostKey ? [sshFix] : []), docs, retry] : [pushHttps ?? sshFix, useHttps, ...(pushHttps ? [sshFix] : []), docs, retry];
+      return hostKey ? out('shared.git.hostKey.title', 'shared.git.hostKey.explain', { host }, fixes) : out('shared.git.sshDenied.title', 'shared.git.sshDenied.explain', { name }, fixes);
     }
     case 'no_access': {
-      const setupGh = ghSetupFix(setup, thenRetry);
-      if (setupGh) return out('GitHub can’t find this repository for you', `GitHub says the repository isn’t there, which is what it says when you aren’t logged in, or your account can’t see it. Log in with the account that has access.`, [setupGh, pushHttps, { id: 'link', label: 'Why GitHub Says “Not Found”', detail: 'GitHub’s guide to this error.', url: ACCESS_DOCS }, retry]);
-      return out('Your GitHub account can’t see this repository', `GitHub says the repository isn’t there for the account you’re logged in with. Ask its owner to add you, or log in with the account that has access.`, [
+      const setupGh = ghSetupFix(setup, 'retry');
+      if (setupGh) return out('shared.git.noAccessOut.title', 'shared.git.noAccessOut.explain', undefined, [setupGh, pushHttps, notFound, retry]);
+      return out('shared.git.noAccess.title', 'shared.git.noAccess.explain', undefined, [
         ssh ? pushHttps : undefined,
-        { id: 'gh_login', label: 'Log In With Another Account', detail: `Opens github.com in your browser to log in. ${thenRetry}`, command: `${gh} auth login --web --git-protocol https --hostname ${host}` },
-        { id: 'link', label: 'Why GitHub Says “Not Found”', detail: 'GitHub’s guide to this error.', url: ACCESS_DOCS },
+        fix('gh_login', 'shared.git.otherAccount.label', 'shared.git.ghLogin.detailRetry', undefined, { command: `${gh} auth login --web --git-protocol https --hostname ${host}` }),
+        notFound,
         retry,
       ]);
     }
     case 'https_auth': {
-      const setupGh = ghSetupFix(setup, thenRetry);
-      return out(`git isn’t logged in to ${host === 'github.com' ? 'GitHub' : host}`, `Your project pushes over HTTPS, and git has no GitHub login on this Mac (or an old password, which GitHub stopped taking). Your GitHub CLI login can do it.`, [
-        setupGh ?? { id: 'push_https', label: 'Push With Your GitHub Login', detail: 'Pushes with your GitHub CLI login. Nothing else changes.' },
-        setupGh ? undefined : { id: 'gh_login', label: 'Log In Again', detail: `Opens github.com in your browser to log in. ${thenRetry}`, command: `${gh} auth login --web --git-protocol https --hostname ${host}` },
+      const setupGh = ghSetupFix(setup, 'retry');
+      return out('shared.git.httpsAuth.title', 'shared.git.httpsAuth.explain', { name }, [
+        setupGh ?? fix('push_https', 'shared.git.pushLogin.label', 'shared.git.pushLogin.detail'),
+        setupGh ? undefined : fix('gh_login', 'shared.git.loginAgain.label', 'shared.git.ghLogin.detailRetry', undefined, { command: `${gh} auth login --web --git-protocol https --hostname ${host}` }),
         retry,
       ]);
     }
     case 'gh_missing':
-      return out('The GitHub CLI isn’t on this Mac', 'Beluga opens pull requests and merges with GitHub’s own command-line tool (gh). It takes a minute to set up, once.', [ghSetupFix({ ...setup, gh: 'missing' }, thenRetry), setup.brew ? { id: 'link', label: 'About GitHub CLI', detail: 'GitHub’s page for it.', url: GH_CLI_URL } : undefined, retry]);
+      return out('shared.git.ghMissing.title', 'shared.git.ghMissing.explain', undefined, [ghSetupFix({ ...setup, gh: 'missing' }, 'retry'), setup.brew ? fix('link', 'shared.git.aboutGh.label', 'shared.git.aboutGh.detail', undefined, { url: GH_CLI_URL }) : undefined, retry]);
     case 'gh_logged_out':
-      return out('The GitHub CLI isn’t logged in', 'Beluga opens pull requests and merges with GitHub’s own command-line tool, and it needs your GitHub login (once).', [ghSetupFix({ ...setup, gh: setup.gh === 'missing' ? 'missing' : 'logged_out' }, thenRetry), retry]);
+      return out('shared.git.ghLoggedOut.title', 'shared.git.ghLoggedOut.explain', undefined, [ghSetupFix({ ...setup, gh: setup.gh === 'missing' ? 'missing' : 'logged_out' }, 'retry'), retry]);
     case 'no_remote':
-      return out('This project isn’t on GitHub yet', 'There’s no GitHub repository to push to: the project has no “origin” remote. Add one (or publish the project on GitHub), then try again.', [{ id: 'link', label: 'How Remotes Work', detail: 'GitHub’s guide to adding a remote.', url: REMOTE_DOCS }, retry]);
+      return out('shared.git.noRemote.title', 'shared.git.noRemote.explain', undefined, [fix('link', 'shared.git.remotes.label', 'shared.git.remotes.detail', undefined, { url: REMOTE_DOCS }), retry]);
     case 'offline':
-      return out(`Couldn’t reach ${host === 'github.com' ? 'GitHub' : host}`, ssh ? 'This Mac couldn’t connect. Check your internet connection. Some networks also block SSH: HTTPS usually still works there.' : 'This Mac couldn’t connect. Check your internet connection, then try again.', [retry, setup.gh === 'ok' ? pushHttps : undefined]);
+      return out('shared.git.offline.title', ssh ? 'shared.git.offline.explainSsh' : 'shared.git.offline.explain', { name }, [retry, setup.gh === 'ok' ? pushHttps : undefined]);
   }
 }
 
+/** A word whose key this screen knows, in the app's language; else as it was sent. */
+const said = (text: string, key: string | undefined, params?: Params): string => (key && isKey(key) ? t(key, params) : text);
+
+/** The card in the app's language (a card from an older daemon, with no keys, as it was sent). */
+export function sayGitTrouble(trouble: GitTrouble): GitTrouble {
+  const w = trouble.words;
+  return {
+    ...trouble,
+    ...(w ? { title: said(trouble.title, w.title, w.params), explain: said(trouble.explain, w.explain, w.params) } : {}),
+    fixes: trouble.fixes.map((f) => (f.words ? { ...f, label: said(f.label, f.words.label, f.words.params), detail: said(f.detail, f.words.detail, f.words.params) } : f)),
+  };
+}
+
 /** The card in one line, for a toast or the phone: "GitHub didn’t accept this Mac’s SSH key. Fix it on your Mac." */
-export const troubleLine = (t: GitTrouble): string => `${t.title}. ${t.fixes.length > 1 || t.fixes[0]?.id !== 'retry' ? 'See how to fix it in Beluga on your Mac' : 'Try again in a moment'}.`;
+export const troubleLine = (tr: GitTrouble): string => `${tr.title}. ${tr.fixes.length > 1 || tr.fixes[0]?.id !== 'retry' ? 'See how to fix it in Beluga on your Mac' : 'Try again in a moment'}.`;

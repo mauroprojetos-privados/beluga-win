@@ -3,7 +3,7 @@ import { type ThreadNode, stopOrder } from '../../../../src/core/threads/model.j
 import { type AgentRef, defaultAgentOf } from '../../../../src/protocol.js';
 import { type AgentMark, agentMark } from '../../../../src/shared/agent-marks.js';
 import { span } from '../../../../src/shared/clock.js';
-import { resetWords } from '../../../../src/shared/run-failure.js';
+import { resetWhen } from '../../../../src/shared/run-failure.js';
 import { agentName } from '../../../../src/shared/agent-label.js';
 import { type ThreadState, isThreadWorking } from '../../../../src/shared/threads.js';
 import { type Key, t } from '../../../../src/shared/i18n/index.js';
@@ -198,7 +198,7 @@ export function familyRowOf(state: ThreadFamilySource, parent: Workspace, row: F
 
 /** A row's last word: its timer while it works, else what it is now. */
 export function rowEnd(row: ThreadFamilyRow, now: number): string {
-  if (row.state === 'waiting_limit' && row.resumesAt !== undefined) return t('chat.threads.waitingUntil', { when: resetWords(row.resumesAt, now) });
+  if (row.state === 'waiting_limit' && row.resumesAt !== undefined) return t('chat.threads.waitingUntil', { when: resetWhen(row.resumesAt, now) });
   return row.state === 'running' ? span(now - row.since) : threadWord(row.state);
 }
 

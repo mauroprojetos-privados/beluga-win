@@ -3,8 +3,8 @@ import type { LogItem, ShellItem } from '@beluga/core/store.js';
 import { HIDDEN_STEPS, isRunning } from '@beluga/ui/format.js';
 import { formatDuration } from '@beluga/shared/text.js';
 import { splitImages } from '@beluga/shared/attachment-links.js';
-import { READS_AFTER_STEP, STEERED_IN, STOPPING_FOR, type SteeredMessage, isLimitNotice } from '@beluga/shared/claude-notices.js';
-import { CONTINUE_PROMPT, type RunFailure, decodeFailure, failureTitle, resetWords } from '@beluga/shared/run-failure.js';
+import { READS_AFTER_STEP, STEERED_IN, STOPPING_FOR, type SteeredMessage, isLimitNotice, noticeLine } from '@beluga/shared/claude-notices.js';
+import { CONTINUE_PROMPT, type RunFailure, decodeFailure, failureHeadline, resetWhen } from '@beluga/shared/run-failure.js';
 import { autoContinueFor, chatsOff, limitResumeAt, sessionSkip } from '@beluga/shared/auto-continue.js';
 import { sentinelOfChannel } from '@beluga/core/sentinel/model.js';
 import { Icon } from '../components/Icon.js';
@@ -552,7 +552,7 @@ function TurnCard({
             </div>
           ))}
           {steeredIn ? (
-            <div className={s.idle}>{item.text === STEERED_IN ? t('chat.items.steeredBelow') : item.text}</div>
+            <div className={s.idle}>{item.text === STEERED_IN ? t('chat.items.steeredBelow') : noticeLine(item.text)}</div>
           ) : failure ? (
             <FailureNotice failure={failure} />
           ) : item.text ? (
@@ -618,7 +618,7 @@ function LimitResume({ channel, failure, stoppedAt, agent, onContinue }: { chann
       () => toast(client, said, 'success'),
       (err: unknown) => toast(client, err instanceof Error ? err.message : String(err), 'error'),
     );
-  const when = resetWords(at, now);
+  const when = resetWhen(at, now);
   if (auto.kind === 'scheduled') {
     const dontSend: ActionItem[] = [
       { label: t('chat.limit.forSession'), icon: 'pause', hint: t('chat.limit.forSessionHint'), onSelect: () => set({ autoContinueSkip: sessionSkip(at) }, t('chat.limit.forSessionDone', { when })) },
@@ -676,7 +676,7 @@ function FailureNotice({ failure }: { failure: RunFailure }) {
   const t = useT();
   return (
     <div className={s.failure}>
-      <div className={s.failureTitle}>{failureTitle(failure)}</div>
+      <div className={s.failureTitle}>{failureHeadline(failure)}</div>
       {failure.kind === 'stopped' ? null : (
         <button type="button" className={s.failureToggle} onClick={() => setOpen(!open)} aria-expanded={open}>
           {open ? t('chat.items.hideDetails') : t('chat.items.showDetails')}

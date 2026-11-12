@@ -1,3 +1,5 @@
+import { t } from './i18n/index.js';
+
 /**
  * What was new when you came into a chat, for the Mac's and the phone's "New messages" line
  * (BLG-573, BLG-574): the last `count` of their messages, up to the one that was last then
@@ -16,4 +18,4 @@ export function unreadSince(messages: readonly { readonly id: string; readonly m
 }
 
 /** The line above them: "New message", "3 new messages". */
-export const unreadLine = (count: number): string => (count === 1 ? 'New message' : `${count} new messages`);
+export const unreadLine = (count: number): string => t('shared.unread.line', { count });

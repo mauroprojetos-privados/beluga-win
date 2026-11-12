@@ -7,7 +7,7 @@ import { usagesOf } from '@beluga/agent/usage.js';
 import { windowsOf } from '@beluga/ui/usage-cards.js';
 import { agentName } from '@beluga/shared/agent-label.js';
 import { agentMark } from '@beluga/shared/agent-marks.js';
-import { CAN_INFO } from '@beluga/shared/invites.js';
+import { canWords } from '@beluga/shared/invites.js';
 import type { TrustLevel } from '@beluga/shared/settings-schema.js';
 import { CAN_ORDER } from '@beluga/ui/invite-menus.js';
 import type { MenuKind } from '@beluga/ui/menus.js';
@@ -302,8 +302,8 @@ export function GuestCard({ peer, guest, close, confirm }: CardProps & { guest: 
       </div>
       <div className={p.block}>
         <div className={p.blockLabel}>{t('native.person.nameCan', { name: peer.name })}</div>
-        <Choice<GuestCan> wide label={t('native.person.nameCan', { name: peer.name })} value={guest.can} options={CAN_ORDER.map((c) => ({ value: c, label: CAN_INFO[c].label }))} onChange={(can) => void api.invites.change(peer.peerId, { can })} />
-        <div className={p.blockDetail}>{CAN_INFO[guest.can].detail.charAt(0).toUpperCase() + CAN_INFO[guest.can].detail.slice(1)}.</div>
+        <Choice<GuestCan> wide label={t('native.person.nameCan', { name: peer.name })} value={guest.can} options={CAN_ORDER.map((c) => ({ value: c, label: canWords(c).label }))} onChange={(can) => void api.invites.change(peer.peerId, { can })} />
+        <div className={p.blockDetail}>{canWords(guest.can).detail.charAt(0).toUpperCase() + canWords(guest.can).detail.slice(1)}.</div>
       </div>
       <div className={p.rows}>
         <Row

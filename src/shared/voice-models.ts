@@ -2,8 +2,10 @@
  * Speaking instead of typing (the phone's Ask sheet, BLG-139): which models write down speech,
  * where they run (on the phone through whisper.rn, on the Mac through whisper.node on its GPU), the
  * presets Settings › Voice offers, and the one Beluga suggests. Data only: the Mac's daemon and the
- * phone app both import it. No imports, runs anywhere.
+ * phone app both import it. Runs anywhere: its only import is the words (labels are read when they're said).
  */
+
+import { t } from './i18n/index.js';
 
 export type VoiceWhere = 'phone' | 'mac';
 export const VOICE_MODEL_IDS = ['whisper-base', 'whisper-turbo', 'parakeet'] as const;
@@ -68,7 +70,12 @@ export function voiceSize(bytes: number): string {
 
 /** The languages Settings offers ('auto': the model tells). Whisper knows many more. */
 export const VOICE_LANGUAGES: ReadonlyArray<{ readonly code: string; readonly label: string }> = [
-  { code: 'auto', label: 'Any (it tells)' },
+  {
+    code: 'auto',
+    get label() {
+      return t('shared.voice.anyLanguage');
+    },
+  },
   { code: 'en', label: 'English' },
   { code: 'tr', label: 'Türkçe' },
   { code: 'de', label: 'Deutsch' },
@@ -110,11 +117,27 @@ export interface VoicePreset {
 }
 
 export const VOICE_PRESETS: readonly VoicePreset[] = [
-  { id: 'quick', label: 'Quick, on this phone', where: 'phone', model: 'whisper-base', sub: `Whisper Base · ${voiceSize(VOICE_MODELS['whisper-base'].files.phone!.bytes)}` },
-  { id: 'best-phone', label: 'Best, on this phone', where: 'phone', model: 'whisper-turbo', sub: `Whisper Turbo · ${voiceSize(VOICE_MODELS['whisper-turbo'].files.phone!.bytes)}` },
-  { id: 'mac', label: 'Best, on your Mac', where: 'mac', model: 'whisper-turbo', sub: 'Whisper Turbo' },
-  { id: 'mac-fast', label: 'Fastest, on your Mac', where: 'mac', model: 'parakeet', sub: 'Parakeet · no Turkish' },
+  preset('quick', 'phone', 'whisper-base', () => `Whisper Base · ${voiceSize(VOICE_MODELS['whisper-base'].files.phone!.bytes)}`), // i18n-ignore
+  preset('best-phone', 'phone', 'whisper-turbo', () => `Whisper Turbo · ${voiceSize(VOICE_MODELS['whisper-turbo'].files.phone!.bytes)}`), // i18n-ignore
+  preset('mac', 'mac', 'whisper-turbo', () => 'Whisper Turbo'), // i18n-ignore
+  preset('mac-fast', 'mac', 'parakeet', () => t('shared.voice.parakeetSub')),
 ];
+
+/** A preset whose words are read when they're said (the app's language of the moment). */
+function preset(id: VoicePresetId, where: VoiceWhere, model: VoiceModelId, sub: () => string): VoicePreset {
+  const key = { quick: 'shared.voice.quick', 'best-phone': 'shared.voice.bestPhone', mac: 'shared.voice.mac', 'mac-fast': 'shared.voice.macFast' } as const;
+  return {
+    id,
+    where,
+    model,
+    get label() {
+      return t(key[id]);
+    },
+    get sub() {
+      return sub();
+    },
+  };
+}
 
 /** What Beluga knows when it suggests a preset. */
 export interface VoiceSituation {

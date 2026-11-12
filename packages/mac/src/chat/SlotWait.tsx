@@ -1,4 +1,4 @@
-import { SLOT_WAIT_TITLE, type SlotWait, slotWaitDetail } from '@beluga/shared/run-slots.js';
+import { type SlotWait, slotWaitLine, slotWaitTitle } from '@beluga/shared/run-slots.js';
 import { Icon } from '../components/Icon.js';
 import { Button, Tip } from '../components/ui.js';
 import { toast, useBeluga } from '../lib/beluga.js';
@@ -22,8 +22,8 @@ export function SlotWaitNotice({ wait, requestId }: { wait: SlotWait; requestId?
         <Icon name="gauge" size={14} />
       </span>
       <div className={s.body}>
-        <div className={s.title}>{SLOT_WAIT_TITLE}</div>
-        <div className={s.detail}>{slotWaitDetail(wait)}</div>
+        <div className={s.title}>{slotWaitTitle()}</div>
+        <div className={s.detail}>{slotWaitLine(wait)}</div>
         <Tip label={t('chat.slot.atOnce', { busy, limit: wait.limit })}>
           <span className={s.pills} aria-label={t('chat.slot.working', { busy, limit: wait.limit })}>
             {Array.from({ length: Math.min(busy, 30) }, (_, i) => (

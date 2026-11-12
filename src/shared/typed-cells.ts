@@ -5,6 +5,8 @@
  * (core/sentinel/columns.ts re-exports it; the phone's bundle reads src/shared).
  */
 
+import { type Key, t } from './i18n/index.js';
+
 /** A document's kind for the viewer, from its name. */
 export function documentMime(name: string): string {
   const ext = /\.([A-Za-z0-9]{1,8})$/.exec(name)?.[1]?.toLowerCase() ?? '';
@@ -31,15 +33,15 @@ export function documentLook(mime: string): DocumentLook {
   return 'other';
 }
 
-const KIND_WORDS: Readonly<Record<string, string>> = { 'application/zip': 'ZIP archive', 'application/gzip': 'Gzip archive', 'application/pdf': 'PDF document', 'text/html': 'Web page', 'text/markdown': 'Markdown', 'application/json': 'JSON', 'text/csv': 'CSV table', 'text/tab-separated-values': 'TSV table', 'text/plain': 'Plain text', 'image/svg+xml': 'SVG image', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Word document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'Excel spreadsheet', 'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'PowerPoint presentation' };
+const KIND_WORDS: Readonly<Record<string, Key>> = { 'application/zip': 'shared.cells.zip', 'application/gzip': 'shared.cells.gzip', 'application/pdf': 'shared.cells.pdf', 'text/html': 'shared.cells.html', 'text/markdown': 'shared.cells.markdown', 'application/json': 'shared.cells.json', 'text/csv': 'shared.cells.csv', 'text/tab-separated-values': 'shared.cells.tsv', 'text/plain': 'shared.cells.text', 'image/svg+xml': 'shared.cells.svg', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'shared.cells.word', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'shared.cells.excel', 'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'shared.cells.powerpoint' };
 
-/** What kind of file it is, in words ("PDF document", "PNG image", "DMG file"). */
+/** What kind of file it is, in words ("PDF document", "PNG image", "DMG file"), in the app's language (the screens read it). */
 export function kindWords(name: string, mime: string): string {
-  if (KIND_WORDS[mime]) return KIND_WORDS[mime]!;
+  if (Object.hasOwn(KIND_WORDS, mime)) return t(KIND_WORDS[mime]!);
   const sub = mime.split('/')[1]?.replace(/^x-/, '').toUpperCase();
-  if (/^(image|video|audio)\//.test(mime) && sub) return `${sub} ${mime.startsWith('image/') ? 'image' : mime.startsWith('video/') ? 'video' : 'audio'}`;
+  if (/^(image|video|audio)\//.test(mime) && sub) return t(mime.startsWith('image/') ? 'shared.cells.image' : mime.startsWith('video/') ? 'shared.cells.video' : 'shared.cells.audio', { kind: sub });
   const ext = /\.([A-Za-z0-9]{1,8})$/.exec(name)?.[1]?.toUpperCase();
-  return ext ? `${ext} file` : 'File';
+  return ext ? t('shared.cells.extFile', { ext }) : t('shared.cells.file');
 }
 
 /** A progress cell's share, 0 to 1 (a number, "40%", "3/8"); none when it isn't one. */

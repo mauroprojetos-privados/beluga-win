@@ -1,5 +1,5 @@
 import type { NotifySettings } from '@beluga/shared/settings-schema.js';
-import { DND_CHOICES, type DndChoice, dndActive, dndFor, dndLabel } from '@beluga/shared/quiet.js';
+import { DND_CHOICES, type DndChoice, dndActive, dndFor, dndWords } from '@beluga/shared/quiet.js';
 import { Button } from '../components/ui.js';
 import { previewRequestPopup } from '../gateway/request-native.js';
 import { useApi, useApp } from '../lib/beluga.js';
@@ -39,7 +39,7 @@ export function NotificationSettings() {
   const save = (patch: Partial<NotifySettings>): void => void api.session.setPrefs({ notify: { ...n, ...patch } });
   const quiet = dndActive(n);
   const { access, recheck } = useNotificationAccess();
-  const status = notifyStatus(access, { desktop: n.desktop, quietUntil: quiet ? dndLabel(n) : null }, keyPlatform());
+  const status = notifyStatus(access, { desktop: n.desktop, quietUntil: quiet ? dndWords(n) : null }, keyPlatform());
   // Opening System Settings: checked again when you come back (window focus). Asking: right away.
   const act = (action: AccessAction): void => void runAccessAction(action).then((a) => a && recheck(a)).catch(() => undefined);
   return (
@@ -61,7 +61,7 @@ export function NotificationSettings() {
       </Group>
       <SoundSettings n={n} save={save} test={<TestNotification n={n} onChecked={recheck} onAction={act} />} />
       <Group>
-        <Row label={say('Do Not Disturb')} detail={quiet ? t('prefs.notify.dndOn', { until: dndLabel(n) }) : t('prefs.notify.dndDetail')}>
+        <Row label={say('Do Not Disturb')} detail={quiet ? t('prefs.notify.dndOn', { until: dndWords(n) }) : t('prefs.notify.dndDetail')}>
           {quiet ? (
             <Button onClick={() => save({ dnd: null })}>{t('prefs.notify.turnOff')}</Button>
           ) : (

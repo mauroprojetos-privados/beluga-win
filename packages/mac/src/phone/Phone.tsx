@@ -10,13 +10,13 @@ import { QrCode } from '../network/QrCode.js';
 import { errorText, quietly } from '../network/use-net.js';
 import { Group, Row, Select } from '../dialogs/settings-controls.js';
 import type { KeepAwake } from '@beluga/shared/settings-schema.js';
-import { pathLabel } from '../../../../src/companion/diagnose.js';
+import { pathLabelKey } from '../../../../src/companion/diagnose.js';
 import { leftText, markOf, seenText } from './phone-model.js';
 import p from '../dialogs/native/person.module.css';
 import s from './phone.module.css';
 import { computerWord, thisComputer, upFirst, yourComputer } from '../lib/os-words.js';
 import { say, useT } from '../lib/i18n.js';
-import { t } from '@beluga/shared/i18n/index.js';
+import { type Key, t } from '@beluga/shared/i18n/index.js';
 
 /**
  * Your phone on the Mac (docs/companion.md, "On the Mac"): a small mark in the sidebar's footer
@@ -196,7 +196,7 @@ function DeviceList({ now, control = false }: { now: number; control?: boolean }
               </span>
               {d.path ? (
                 <span className={s.path} title={d.note}>
-                  {d.path === 'relay' ? (d.note ?? pathLabel(d.path)) : pathLabel(d.path)}
+                  {d.path === 'relay' ? (d.note ?? t(pathLabelKey(d.path) as Key)) : t(pathLabelKey(d.path) as Key)}
                 </span>
               ) : null}
             </span>

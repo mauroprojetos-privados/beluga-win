@@ -1,5 +1,7 @@
 import { hhmm } from './clock.js';
 import { isLimitNotice } from './claude-notices.js';
+import { formatDateWith } from './i18n/format.js';
+import { t } from './i18n/index.js';
 
 /**
  * How a run of Claude's ended when it didn't finish: it hit your usage limit (and when that
@@ -40,14 +42,45 @@ export const CRASH_RETRY_MS = 30_000;
 const MARK = '⁣klaud-failure:';
 const STDERR_LINES = 12;
 
-/** "15:00", or "Oct 24, 15:00" when it isn't today. */
+/**
+ * "15:00", or "Oct 24, 15:00" when it isn't today. English: the failed card's own words and the
+ * daemon's lines read it; a screen says it with resetWhen.
+ */
 export function resetWords(at: number, now = Date.now()): string {
   const d = new Date(at);
   const today = new Date(now).toDateString() === d.toDateString();
-  return today ? hhmm(at) : `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${hhmm(at)}`;
+  return today ? hhmm(at) : `${formatDateWith(d, { month: 'short', day: 'numeric' }, 'en')}, ${hhmm(at)}`;
 }
 
-/** The card's headline: "Claude hit your usage limit · resets at 15:00". */
+/** The same on a screen, in the app's language: "15:00", "24 de out., 15:00". */
+export function resetWhen(at: number, now = Date.now()): string {
+  const d = new Date(at);
+  if (new Date(now).toDateString() === d.toDateString()) return hhmm(at);
+  return t('shared.runFailure.resetDay', { date: formatDateWith(d, { month: 'short', day: 'numeric' }), time: hhmm(at) });
+}
+
+/** The card's headline on a screen, in the app's language (failureTitle says it in English). */
+export function failureHeadline(f: RunFailure, now = Date.now()): string {
+  const id = f.runtime ?? 'claude';
+  const who = WHO[id] ?? WHO.claude!;
+  const vendor = id === 'opencode' ? t('shared.runFailure.anyProvider') : who.vendor;
+  switch (f.kind) {
+    case 'usage_limit':
+      return f.resetsAt ? t('shared.runFailure.limitResets', { agent: who.agent, when: resetWhen(f.resetsAt, now) }) : t('shared.runFailure.limit', { agent: who.agent });
+    case 'signed_out':
+      return t(EXPIRED.test(f.detail) ? 'shared.runFailure.signInExpired' : 'shared.runFailure.signedOut', { app: who.app });
+    case 'crash':
+      return f.exitCode !== undefined ? t('shared.runFailure.crashExit', { app: who.app, code: f.exitCode }) : t('shared.runFailure.crash', { app: who.app });
+    case 'network':
+      return t('shared.runFailure.network', { app: who.app, vendor });
+    case 'api':
+      return t('shared.runFailure.api', { vendor, error: firstLine(f.detail).slice(0, 120) || t('shared.runFailure.unknownError') });
+    case 'stopped':
+      return t('shared.runFailure.stopped');
+  }
+}
+
+/** The card's headline: "Claude hit your usage limit · resets at 15:00". English: it is the failed card's own words (encodeFailure). */
 export function failureTitle(f: RunFailure, now = Date.now()): string {
   const who = WHO[f.runtime ?? 'claude'] ?? WHO.claude!;
   switch (f.kind) {

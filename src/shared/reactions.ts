@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { t } from './i18n/index.js';
 
 /**
  * Emoji reactions on chat messages (BLG-702), as Slack has them: under a message, a chip per emoji
@@ -119,7 +120,7 @@ export function quickReactions(messages: Iterable<{ readonly reactions?: readonl
 export function reactorsLine(by: readonly string[], nameOf: (peerId: string) => string, shown = 3): string {
   const names = by.map(nameOf);
   if (names.length <= 1) return names[0] ?? '';
-  if (names.length <= shown) return `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+  if (names.length <= shown) return t('shared.reactions.and', { names: names.slice(0, -1).join(', '), last: names.at(-1)! });
   const rest = names.length - shown;
-  return `${names.slice(0, shown).join(', ')} and ${rest} other${rest === 1 ? '' : 's'}`;
+  return t('shared.reactions.others', { names: names.slice(0, shown).join(', '), count: rest });
 }

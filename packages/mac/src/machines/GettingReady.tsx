@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { SocketClient } from '@beluga/ipc/socket-client.js';
-import { type ReadyRun, type ReadyStep, readyLine } from '@beluga/machines/ready-model.js';
+import { type ReadyRun, type ReadyStep, readyLine, stepLabel } from '@beluga/machines/ready-model.js';
 import { Icon } from '../components/Icon.js';
 import { Button } from '../components/ui.js';
 import { copyText } from '../lib/copy.js';
@@ -72,7 +72,7 @@ export function GettingReady({ client, run: first, onRetry }: { client: SocketCl
               <StepMark step={step} />
             </span>
             <span className={c.stepText}>
-              <span className={c.stepLabel}>{step.label}</span>
+              <span className={c.stepLabel}>{stepLabel(step)}</span>
               {step.error ? <span className={c.stepError}>{step.error}</span> : step.detail ? <span className={c.stepDetail}>{step.detail}</span> : null}
               {step.fix ? (
                 <span className={c.stepFix}>
