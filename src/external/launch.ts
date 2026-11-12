@@ -20,7 +20,7 @@ import { workspaceTools } from './adapters/tools/workspace.js';
 import { sessionState } from './adapters/session-state.js';
 import { sessionPeers } from './adapters/session-peers.js';
 import { sessionWorkspace } from './adapters/session-workspace.js';
-import { REMOTE_FULL_WARNING } from '../shared/remote-full.js';
+import { remoteFullWarning } from '../shared/remote-full.js';
 import { LIMITS } from './domain/limits.js';
 import { DISCOVERY_TOOLS } from './domain/tools.js';
 import { attachExternal, detachExternal } from './registry.js';
@@ -48,7 +48,7 @@ export function launchExternal(deps: { readonly session: Session; readonly log?:
     stopWork: (grantId) => stopAgentWork(deps.session, grantId),
     notify: (grant) => deps.session.toast(t('toasts.external.connected', { name: grant.name, level: grant.level }), 'info'),
     notifyRemoteFull: (grant) => {
-      const body = t('toasts.external.remoteFull', { name: grant.name, host: grant.redirectHost, warning: REMOTE_FULL_WARNING });
+      const body = t('toasts.external.remoteFull', { name: grant.name, host: grant.redirectHost, warning: remoteFullWarning() });
       deps.session.toast(body, 'error');
       deps.session.notifier.notify({ kind: 'problems', title: `${grant.name} has Full trust from outside this computer`, body });
     },

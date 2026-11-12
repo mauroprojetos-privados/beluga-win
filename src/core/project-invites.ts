@@ -18,7 +18,7 @@ export interface GuestControl {
 }
 
 export { type LinkOptions, DAY_MS, DEFAULT_LINK, CAN_INFO, roleFor, trustFor, guestSummary, expiresIn } from '../shared/invites.js';
-import { type LinkOptions, CAN_INFO, roleFor, trustFor } from '../shared/invites.js';
+import { type LinkOptions, canWords, roleFor, trustFor } from '../shared/invites.js';
 
 /** Whether a new person may come in with this link right now. */
 export function linkUsable(link: Pick<ProjectLink, 'singleUse' | 'used' | 'expiresAt'>, now: number): boolean {
@@ -132,7 +132,7 @@ export class ProjectInvites {
       this.deps.toast(t('toasts.projectInvites.opening'));
       return;
     }
-    await this.deps.copy(url, link.knock ? t('toasts.projectInvites.copiedKnock', { label: link.label, can: CAN_INFO[link.can].short }) : t('toasts.projectInvites.copied', { label: link.label, can: CAN_INFO[link.can].short }));
+    await this.deps.copy(url, link.knock ? t('toasts.projectInvites.copiedKnock', { label: link.label, can: canWords(link.can).short }) : t('toasts.projectInvites.copied', { label: link.label, can: canWords(link.can).short }));
   }
 
   /** The link stops working; people already in keep their place until you remove them. */
@@ -193,7 +193,7 @@ export class ProjectInvites {
     this.arrivals.delete(peerId);
     const guest: Guest = { peerId, name: peer.name, projects: link.scope === 'room' ? [] : [link.scope], room: link.scope === 'room', can: can ?? link.can };
     this.apply(guest);
-    this.deps.toast(guest.room ? t('toasts.projectInvites.inRoom', { name: peer.name, can: CAN_INFO[guest.can].short }) : t('toasts.projectInvites.inLink', { name: peer.name, label: link.label, can: CAN_INFO[guest.can].short }), 'success');
+    this.deps.toast(guest.room ? t('toasts.projectInvites.inRoom', { name: peer.name, can: canWords(guest.can).short }) : t('toasts.projectInvites.inLink', { name: peer.name, label: link.label, can: canWords(guest.can).short }), 'success');
   }
 
   decline(peerId: string, quiet = false): void {
@@ -215,7 +215,7 @@ export class ProjectInvites {
       can: patch.can ?? guest.can,
     };
     this.apply(next);
-    const what = patch.room ? t('toasts.projectInvites.everything') : patch.addProject ? this.labelFor(patch.addProject) : CAN_INFO[next.can].short;
+    const what = patch.room ? t('toasts.projectInvites.everything') : patch.addProject ? this.labelFor(patch.addProject) : canWords(next.can).short;
     this.deps.toast(`${guest.name}: ${what}`, 'success');
   }
 
