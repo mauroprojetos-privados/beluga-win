@@ -19,6 +19,34 @@ export const expandHome = (p: string, home: string = homeDir()): string => {
   return TILDE.test(p) ? path.join(home, p.slice(2)) : p;
 };
 
+const SEPS = /[\\/]+/;
+/** "\\wsl.localhost\<distro>\…" or "\\wsl$\<distro>\…" (either slash): how Windows writes a WSL distro's files. */
+const WSL_SHARE = /^[\\/]{2}(?:wsl\.localhost|wsl\$)[\\/]([^\\/]+)(?:[\\/](.*))?$/i;
+/** "D:\…" or "D:/…", or the drive alone ("D:", "D:\"). */
+const DRIVE = /^([A-Za-z]):(?:[\\/](.*))?$/;
+const joinPosix = (root: string, rest: string | undefined): string => {
+  const parts = (rest ?? '').split(SEPS).filter(Boolean);
+  return parts.length ? `${root === '/' ? '' : root}/${parts.join('/')}` : root;
+};
+
+/**
+ * In WSL, a path as the Windows app wrote it (its folder picker, a drop) → the path Linux uses:
+ * "\\wsl.localhost\Ubuntu\home\me\app" (this distro) → "/home/me/app", and "D:\code\app" →
+ * "/mnt/d/code/app" (WSL's default automount). Outside WSL, or another distro's share, as it is.
+ */
+export const fromWindowsSide = (p: string, env: NodeJS.ProcessEnv = process.env): string => {
+  const distro = env.WSL_DISTRO_NAME;
+  if (!distro) return p;
+  const share = WSL_SHARE.exec(p);
+  if (share) return share[1]!.toLowerCase() === distro.toLowerCase() ? joinPosix('/', share[2]) : p;
+  const drive = DRIVE.exec(p);
+  if (drive) return joinPosix(`/mnt/${drive[1]!.toLowerCase()}`, drive[2]);
+  return p;
+};
+
+/** A folder the user named, from any screen: "~" expanded, and in WSL a Windows-written path made Linux's. */
+export const localPath = (p: string, env: NodeJS.ProcessEnv = process.env): string => expandHome(fromWindowsSide(p, env), env.HOME || os.homedir());
+
 /** Starts with "~/" or "~\" (or is "~"). */
 export const startsAtHome = (p: string): boolean => TILDE.test(p);
 

@@ -10,7 +10,6 @@ import { ATTACHMENT_SHARE, type FetchShared, attachmentOnDisk, chipText, expandC
 import { fetchBytes } from '../core/downloads.js';
 import { testDatabase } from '../core/views/sources.js';
 import { existsSync, statSync } from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { findProjects, isMainCheckout } from '../workspaces/discovery.js';
 import { cloneProject, createProject, defaultProjectsHome, initProject } from '../workspaces/new-project.js';
@@ -59,6 +58,7 @@ import { worktreePorts } from '../workspaces/ports.js';
 import { waitingNeeds } from '../companion/needs-you.js';
 import { saveDismissedNeeds, withDismissed } from '../core/dismissed-needs.js';
 import { t } from '../shared/i18n/index.js';
+import { localPath } from '../core/home-path.js';
 
 /**
  * What each API method does (see api.ts for the list and its arguments). Runs in the core:
@@ -77,7 +77,8 @@ const moverIn = (s: Session): WorktreeMover => {
   return worktreeMover(s.store, c);
 };
 const rootOf = (s: Session, projectId: string): string | undefined => s.store.getState().projects.find((p) => p.id === projectId)?.root || undefined;
-const expandHome = (p: string): string => p.replace(/^~(?=$|\/)/, os.homedir());
+// A folder a screen sent: "~" expanded, and in WSL a path the Windows app wrote ("\\wsl.localhost\…", "D:\…") made Linux's.
+const expandHome = (p: string): string => localPath(p);
 const bench = (s: Session): Workbench | undefined => s.workbench;
 
 /** Pull a file from a friend's share through this session's connection. */
@@ -276,8 +277,8 @@ export const HANDLERS = {
   'workspaces.removeOther': (s, id, force) => ctl(s)?.removeOther(id, force ?? false) ?? false,
   'workspaces.staleOthers': (s, projectId, source) => ctl(s)?.others.stale(projectId, source) ?? [],
   'workspaces.cleanUpOthers': (s, projectId, ids) => ctl(s)?.others.cleanUp(projectId, ids),
-  'workspaces.addProject': (s, dir) => ctl(s)?.addProject(dir),
-  'workspaces.addFolder': (s, dir) => ctl(s)?.addFolder(dir),
+  'workspaces.addProject': (s, dir) => ctl(s)?.addProject(expandHome(dir)),
+  'workspaces.addFolder': (s, dir) => ctl(s)?.addFolder(expandHome(dir)),
   'workspaces.selectFile': (s, index) => ctl(s)?.selectFile(index),
   'workspaces.diffAhead': (s, index) => ctl(s)?.diffAhead(index),
   'workspaces.review': (s, id) => ctl(s)?.loadReview(id),
