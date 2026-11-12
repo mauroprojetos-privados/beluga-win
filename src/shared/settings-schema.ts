@@ -182,6 +182,10 @@ export const Settings = z.object({
   pushToPr: z.boolean().catch(true),
   /** Claude keeps screenshots and scratch output in the workspace's git-ignored `.beluga/scratch/` folder. */
   scratchFolder: z.boolean().default(true),
+  /** Your stack (docs/stack.md): start a service that's down by itself. */
+  stackRepair: z.boolean().catch(true),
+  /** Your stack: set a project up for it as it's added or made. */
+  stackBootstrap: z.boolean().catch(true),
   /** How much of Claude's sub-agent work the chat shows. */
   subagents: z.enum(['full', 'compact', 'hidden']).default('full'),
   /** Workspace buttons you chose to hide from the top bar. */

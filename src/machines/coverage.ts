@@ -25,6 +25,7 @@ export const MACHINE: Record<Method, MachineSide> = {
   'routing.resetCombos': 'drive',
   'routing.retry': 'drive',
   'routing.usage': 'drive',
+  'routing.useClaudeByKind': 'drive',
   // ---- bots (docs/bots.md): that computer's bots, as if you sat at it
   'bots.list': 'drive',
   'bots.status': 'drive',
@@ -363,6 +364,9 @@ export const MACHINE: Record<Method, MachineSide> = {
   'support.answer': 'drive',
   // ---- languages (docs/i18n.md): your settings, as the rest
   'settings.language': 'drive',
+  // ---- your stack (docs/stack.md): the computer's own services and projects, as the rest
+  'stack.check': 'drive',
+  'stack.setupProject': 'drive',
   'settings.commitLanguage': 'drive',
   // ---- stats
   'stats.get': 'drive',

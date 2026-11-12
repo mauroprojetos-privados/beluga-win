@@ -326,6 +326,10 @@ export const PHONE: Record<Method, Side> = {
   'support.answer': 'mac',
   // The language (docs/i18n.md): Settings stay the Mac's; the phone has its own picker, in the app.
   'settings.language': 'mac',
+  // Your stack (docs/stack.md): Check Again is its Needs You card's button, a look (the phone reads it);
+  // setting a project up writes files in it, so it's the Mac's.
+  'stack.check': 'phone',
+  'stack.setupProject': 'mac',
   'settings.commitLanguage': 'mac',
   // ---- your stats: the Usage tab's charts and what the composer saw (the phone keeps its plan meters)
   'stats.get': 'mac',
@@ -728,6 +732,8 @@ export const PHONE: Record<Method, Side> = {
   // Needs You's Try Again for a used-up combo: like Continue, phone-sized.
   'routing.retry': 'phone',
   'routing.usage': 'phone',
+  // A preset for Settings › Agents › Combos: settings stay the Mac's.
+  'routing.useClaudeByKind': 'mac',
 
   // ---- bots (docs/bots.md): seeing them and what they do is the phone's (chatting is session.submit in
   // their conversation); making, editing, knowledge, tools, versions, export and import are Bot Studio's, on the Mac

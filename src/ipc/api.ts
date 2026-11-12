@@ -15,6 +15,7 @@ import { REVENUECAT_API } from './revenuecat-api.js';
 import { TRIAGE_API } from './triage-api.js';
 import { SUPPORT_API } from './support-api.js';
 import { I18N_API } from './i18n-api.js';
+import { STACK_API } from './stack-api.js';
 import { LANGUAGE_CHOICES, LOCALES } from '../shared/i18n/locales.js';
 import { STATS_API } from './stats-api.js';
 import { WEB_API } from './web-api.js';
@@ -134,6 +135,8 @@ export const PrefsPatch = z
     settleIdleDays: z.number().int().min(0).max(SETTLE_IDLE_DAYS_MAX),
     pushToPr: bool,
     scratchFolder: bool,
+    stackRepair: bool,
+    stackBootstrap: bool,
     subagents: z.enum(['full', 'compact', 'hidden']),
     hiddenButtons: z.array(z.string().max(40)).max(40),
     friendWorktrees: z.enum(['ask', 'off']),
@@ -538,6 +541,8 @@ export const API = {
   ...SUPPORT_API,
   // ---- the app's language, and each project's for its commits and PRs (i18n-api.ts, docs/i18n.md)
   ...I18N_API,
+  // ---- your stack: the services and tools your agents lean on, and setting a project up for them (stack-api.ts, docs/stack.md)
+  ...STACK_API,
   // ---- your stats in the Usage tab: counted by the daemon, pastes and dictation from the Mac (stats-api.ts)
   ...STATS_API,
   // ---- problem reports: the daemon's black box in one redacted file (diagnostics-api.ts)

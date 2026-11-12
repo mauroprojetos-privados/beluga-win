@@ -16,6 +16,7 @@ import { exhaustedCombos } from '../core/routing/model.js';
 import { hhmm } from '../shared/clock.js';
 import { botBehind } from '../core/bots/schema.js';
 import { isAssistant } from '../shared/assistant.js';
+import { stackKey, stackProblems } from '../core/stack-store.js';
 
 /**
  * Everything waiting for you, each with the API calls its buttons make: the phone's Needs You
@@ -636,6 +637,7 @@ export function waitingNeeds(state: DomainState): NeedsYou[] {
     ...sentinelItems(state),
     ...dialogueItems(state),
     ...comboItems(state),
+    ...stackItems(state),
   ];
 }
 
@@ -655,6 +657,26 @@ function comboItems(state: DomainState): NeedsYou[] {
     askedAt: Math.round(stop.at),
     actions: [btn('daemon.needs.tryAgain', 'main', 'routing.retry', [stop.channel])],
   }));
+}
+
+/**
+ * Your stack (docs/stack.md): what's down or missing now, with how to fix each. One item, its id the
+ * set it names, so dismissing it hides that set only: a new outage asks again. Check Again looks now.
+ */
+function stackItems(state: DomainState): NeedsYou[] {
+  const problems = stackProblems(state.stack);
+  if (!problems.length) return [];
+  const names = problems.map((p) => t(`stack.name.${stackKey(p.id)}` as Key));
+  return [
+    {
+      id: `stack:${problems.map((p) => p.id).sort().join(',')}`,
+      kind: 'stack',
+      ...keyed('stack.needs.title', { list: names.join(', '), count: problems.length }),
+      detail: clip(problems.map((p, i) => t('stack.needs.line', { name: names[i]!, fix: t(`stack.fix.${stackKey(p.id)}` as Key) })).join('\n'), 64_000),
+      ...(state.stack.checkedAt ? { askedAt: Math.round(state.stack.checkedAt) } : {}),
+      actions: [btn('stack.needs.checkAgain', 'main', 'stack.check', [])],
+    },
+  ];
 }
 
 /** A notice's `need` names this item: its id, or the start of it (`gwq:<task>` for that task's question). */

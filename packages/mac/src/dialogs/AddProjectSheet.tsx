@@ -74,21 +74,25 @@ export function AddProjectSheet() {
   }, [open, asked]);
 
   const mark = (path: string, row: Row): void => setRows((m) => new Map(m).set(path, row));
+  // A plain folder: git there, what's in it in a first commit, and it's added.
+  const initGit = async (p: string): Promise<void> => {
+    mark(p, { kind: 'adding', init: true });
+    const res = await api.projects.initGit(p).catch((err: unknown) => ({ error: errorText(err) }));
+    mark(p, res.error ? { kind: 'failed', error: res.error } : { kind: 'added' });
+  };
+  // Settings › Stack › Set up new projects (docs/stack.md): a plain folder gets git by itself instead of the offer.
+  const autoGit = useApp((st) => st.prefs.stackBootstrap ?? true);
   // Each folder shows Adding… on its row at once, then Added or what went wrong.
   const add = async (paths: readonly string[]): Promise<void> => {
     await Promise.all(
       paths.map(async (p) => {
         mark(p, { kind: 'adding' });
         const res = await api.projects.add(p).catch((err: unknown) => ({ error: errorText(err) }));
-        mark(p, res.error ? { kind: 'failed', error: res.error, canInit: 'canInit' in res && res.canInit } : { kind: 'added' });
+        const canInit = 'canInit' in res && Boolean(res.canInit);
+        if (res.error && canInit && autoGit) return initGit(p);
+        mark(p, res.error ? { kind: 'failed', error: res.error, canInit } : { kind: 'added' });
       }),
     );
-  };
-  // A plain folder: git there, what's in it in a first commit, and it's added.
-  const initGit = async (p: string): Promise<void> => {
-    mark(p, { kind: 'adding', init: true });
-    const res = await api.projects.initGit(p).catch((err: unknown) => ({ error: errorText(err) }));
-    mark(p, res.error ? { kind: 'failed', error: res.error } : { kind: 'added' });
   };
 
   // Folders dropped anywhere on the window while this is open are added.

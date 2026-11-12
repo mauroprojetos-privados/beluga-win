@@ -7,6 +7,7 @@ import * as plans from './areas/plans.js';
 import * as phone from './areas/phone.js';
 import * as layout from './areas/layout.js';
 import * as bots from './areas/bots.js';
+import * as stack from './areas/stack.js';
 import * as routing from './areas/routing.js';
 import * as chat from './areas/chat.js';
 import * as prefs from './areas/prefs.js';
@@ -166,6 +167,7 @@ export const en = {
   ...macLib.en,
   ...shared.en,
   ...botAutonomy.en,
+  ...stack.en,
 } as const satisfies Record<string, Message>;
 
 /** Every key the app may say. */

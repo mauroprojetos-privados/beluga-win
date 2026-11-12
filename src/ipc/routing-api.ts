@@ -27,4 +27,7 @@ export const ROUTING_API = {
   // Your runs through combos, by combo and by the target each went to (runs, at a limit, time),
   // from `since` (ms) on. → ComboUsage[]
   'routing.usage': { args: z.tuple([z.number().int().min(0).optional()]) },
+  // "Claude by kind of work" (core/routing/presets.ts, docs/stack.md): the three Claude combos added to
+  // yours, and each kind of work's and each plan role's combo set to them. → your combos
+  'routing.useClaudeByKind': { args: z.tuple([]) },
 } as const;

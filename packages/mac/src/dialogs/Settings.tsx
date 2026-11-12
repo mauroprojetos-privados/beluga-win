@@ -26,6 +26,7 @@ import { ContextSettings } from './ContextSettings.js';
 import { UsageLimitSettings } from './UsageLimitSettings.js';
 import { ParallelSettings } from './ParallelSettings.js';
 import { AgentThreadsSettings, ThreadLimitsSettings } from './AgentThreadsSettings.js';
+import { StackSettings } from './StackSettings.js';
 import { EngineLocationSettings } from './EngineLocationSettings.js';
 import { ChatLimitSettings } from './ChatLimitSettings.js';
 import { McpSettings } from './McpSettings.js';
@@ -746,6 +747,7 @@ const BODY: Record<SettingsPane, () => ReactNode> = {
   computers: MachinesSettings,
   voice: VoiceSettings,
   keyboard: KeyboardSettings,
+  stack: StackSettings,
   advanced: Advanced,
   experimental: ExperimentalSettings,
   about: About,

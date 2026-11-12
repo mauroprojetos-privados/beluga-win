@@ -73,6 +73,22 @@ function useHide(): (p: Project) => void {
   };
 }
 
+/** Set Up Stack (docs/stack.md): GitNexus and graphify index it, OpenViking gets its docs, beluga.json and CLAUDE.md where it has none. */
+function useStackItem(p: Project): readonly ActionItem[] {
+  const t = useT();
+  const api = useApi();
+  const { client } = useBeluga();
+  if (!p.root) return [];
+  return [
+    {
+      label: t('stack.menu.setUp'),
+      icon: 'plug',
+      onSelect: () =>
+        void api.stack.setupProject(p.id).catch((err: unknown) => client.store.dispatch({ type: 'toast', text: err instanceof Error ? err.message : String(err), level: 'error' })),
+    },
+  ];
+}
+
 /** "Change Icon…" for a project, and going back to the one it ships. */
 function useIconItems(p: Project): readonly ActionItem[] {
   const t = useT();
@@ -175,6 +191,7 @@ const ProjectBlock = memo(function ProjectBlock({ p, depth, entries, arrange }: 
   const onHome = view.kind === 'project' && view.id === p.id;
   const hide = useHide();
   const iconItems = useIconItems(p);
+  const stackItem = useStackItem(p);
   const insideTip = tallyTip(inside);
   const live = p.workspaces.filter((w) => !w.archived);
   // Not the main checkout (work happens in worktrees); questions asked in its folder stay, as chats.
@@ -209,7 +226,7 @@ const ProjectBlock = memo(function ProjectBlock({ p, depth, entries, arrange }: 
   const importItem: ActionItem[] = p.root ? [{ label: t('layout.tree.importClaudeCode'), icon: 'claude', onSelect: () => openSheet({ kind: 'import_conversation', projectId: p.id }) }] : [];
   // Its variables and its main folder's .env, without going through Settings (BLG-369).
   const envItem: ActionItem[] = p.root ? [{ label: t('layout.tree.environment'), icon: 'lock', onSelect: () => openSheet({ kind: 'project_env', projectId: p.id }) }] : [];
-  const extra: ActionItem[] = [...shareItem, ...teamItems, ...importItem, ...envItem, ...showArchivedItem, ...cleanUpItem, ...moveItems(entries, item, arrange), ...groupItems(p, entries, arrange), earningsMenuItem(p, earning), ...githubItems, ...iconItems, { label: t('layout.tree.hideProject'), danger: true, separate: true, onSelect: () => hide(p) }, { label: t('layout.tree.deleteProject'), danger: true, onSelect: () => openSheet({ kind: 'delete_project', projectId: p.id }) }];
+  const extra: ActionItem[] = [...shareItem, ...teamItems, ...importItem, ...envItem, ...stackItem, ...showArchivedItem, ...cleanUpItem, ...moveItems(entries, item, arrange), ...groupItems(p, entries, arrange), earningsMenuItem(p, earning), ...githubItems, ...iconItems, { label: t('layout.tree.hideProject'), danger: true, separate: true, onSelect: () => hide(p) }, { label: t('layout.tree.deleteProject'), danger: true, onSelect: () => openSheet({ kind: 'delete_project', projectId: p.id }) }];
   const kids = depth + 2;
   // Nothing to unfold: no arrow (its place kept, so the icons stay in line).
   const sessions = useCcSessions();

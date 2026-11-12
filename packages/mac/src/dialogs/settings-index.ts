@@ -23,6 +23,7 @@ export const PANES: ReadonlyArray<PaneInfo<SettingsPane> & { icon: IconName; key
   { id: 'computers', label: 'Your Computers', icon: 'server', keywords: 'machines servers mac mini aws cloud ssh remote linux pair' },
   { id: 'voice', label: 'Voice', icon: 'mic', keywords: 'dictation speech microphone talk transcribe' },
   { id: 'keyboard', label: 'Keyboard', icon: 'command', keywords: 'shortcuts keys hotkeys bindings' },
+  { id: 'stack', label: 'Stack', icon: 'plug', keywords: 'ollama openviking hooktop rtk token-goat gitnexus graphify gls graph-loop-solo services tools index setup' },
   { id: 'advanced', label: 'Advanced', icon: 'wrench', keywords: 'engine wsl linux web access browser agent threads' },
   { id: 'experimental', label: 'Experimental', icon: 'flask', keywords: 'labs beta early preview features try' },
   { id: 'about', label: 'About', icon: 'globe', keywords: 'version logs support' },
@@ -347,6 +348,13 @@ export const SETTINGS: readonly Entry[] = [
   ]),
 
   // Advanced
+  group('stack', 'Your stack', 'What your agents lean on, looked at every few minutes.', 'check now status running installed'),
+  group('stack', 'Services', 'Ollama, OpenViking, hooktop.', 'ollama openviking hooktop running down start'),
+  group('stack', 'Tools', 'RTK, token-goat, GitNexus, graphify, gls.', 'rtk token-goat gitnexus graphify gls installed missing'),
+  ...rows('stack', 'Automatically', [
+    ['Start services that are down', 'Ollama, OpenViking and hooktop, once per outage.', 'repair restart start ollama openviking hooktop'],
+    ['Set up new projects', 'Git, GitNexus, graphify, OpenViking, beluga.json and CLAUDE.md.', 'bootstrap setup git index beluga.json claude.md new project'],
+  ]),
   ...rows('advanced', 'Engine', [['Where Beluga runs', 'On Windows, or in a WSL distro.', 'engine wsl linux ubuntu distro windows subsystem remote daemon']]),
   ...rows('advanced', 'Web access', [
     ['Open Beluga in a browser', 'Use Beluga from a browser.', 'web browser remote access'],

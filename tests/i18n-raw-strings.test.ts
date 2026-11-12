@@ -58,6 +58,7 @@ const MIGRATED: readonly string[] = [
   'packages/mac/src/dialogs/ParallelSettings.tsx',
   'packages/mac/src/dialogs/AgentThreadsSettings.tsx',
   'packages/mac/src/dialogs/ChatLimitSettings.tsx',
+  'packages/mac/src/dialogs/StackSettings.tsx',
   'packages/mac/src/dialogs/EarningsSettings.tsx',
   'packages/mac/src/dialogs/ExperimentalSettings.tsx',
   'packages/mac/src/dialogs/EngineLocationSettings.tsx',

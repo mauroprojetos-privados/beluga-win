@@ -5,6 +5,7 @@ import { CONTINUE_PROMPT } from '../shared/run-failure.js';
 import { comboStops, routeOf, routeWords } from '../core/routing/model.js';
 import { sendAutomatic } from '../core/triage/launch.js';
 import { comboReport, strongerOf } from '../core/routing/outcomes.js';
+import { claudeByKind } from '../core/routing/presets.js';
 import type { Args, Method } from './api.js';
 
 /** What each `routing.*` method does (see routing-api.ts). */
@@ -48,6 +49,10 @@ export const ROUTING_HANDLERS = {
     const st = s.store.getState();
     // With how its tasks went, what it saved against your baseline, and suggestions (Phase 5).
     return comboReport(st.log, st.board.issues, st.selfId, { since: since ?? 0, ...(st.prefs.savingsBaseline ? { baseline: st.prefs.savingsBaseline } : {}), ...strongerOf(st) });
+  },
+  'routing.useClaudeByKind': (s) => {
+    s.setPrefs(claudeByKind(s.store.getState().prefs.combos));
+    return combosIn(s.store.getState());
   },
   'routing.resetCombos': (s) => {
     s.setPrefs({ combos: null });

@@ -594,6 +594,7 @@ Beluga de hoje.
 | Código das fases 1 a 5 | na branch `feat/windows-port` (commits `10ab8653`, `cb7fcab5`, `659a0631`, `b2636afb`), que também está no GitHub (fork privado); no ar no motor do WSL |
 | Pendências para o celular | o telefone mostra o combo e o alvo de cada resposta, a dificuldade da tarefa e o Needs You de combo esgotado; editar combos é só no Mac, como manda o `CLAUDE.md` |
 | Fase 7: idiomas (pt-BR) | não iniciada; hoje não há biblioteca de tradução, e os textos estão escritos direto no código |
+| Stack do projeto (`docs/stack.md`) | ✅ feita: Settings › Stack verifica Ollama, OpenViking e hooktop (e os inicia, uma vez por queda) e RTK, token-goat, GitNexus, graphify e gls; o que faltar vira Needs You `stack`, também no celular. Projeto novo é preparado sozinho (git, índices do GitNexus e do graphify, documentação no OpenViking, `beluga.json` e `CLAUDE.md` onde não houver). "Claude por tipo de trabalho" (Opus planeja, Sonnet constrói, Haiku explora e documenta) é aplicado uma vez, se você nunca escolheu combos por tipo ou papel |
 | Navegador para os agentes | Playwright MCP registrado no Claude do WSL (escopo de usuário), com o Chromium já baixado, sem tela; vale para todas as conversas do Beluga do WSL |
 | OpenViking (base do conhecimento da 6b) | instalado no WSL; falta `openviking-server init` |
 | Modo WSL do app do Windows (pré-requisito para usar o app nativo) | commit `cd0a8c4c`, unificado na `feat/windows-port`; ainda não testado num app compilado |

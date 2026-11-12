@@ -22,6 +22,7 @@ import { STRIPE_HANDLERS } from './stripe-handlers.js';
 import { REVENUECAT_HANDLERS } from './revenuecat-handlers.js';
 import { SUPPORT_HANDLERS } from './support-handlers.js';
 import { I18N_HANDLERS } from './i18n-handlers.js';
+import { STACK_HANDLERS } from './stack-handlers.js';
 import { STATS_HANDLERS } from './stats-handlers.js';
 import { maybeStatsOf } from '../core/stats/counter.js';
 import { WEB_HANDLERS } from './web-handlers.js';
@@ -452,6 +453,7 @@ export const HANDLERS = {
   ...REVENUECAT_HANDLERS,
   ...SUPPORT_HANDLERS,
   ...I18N_HANDLERS,
+  ...STACK_HANDLERS,
   ...STATS_HANDLERS,
   ...WEB_HANDLERS,
   ...ROUTING_HANDLERS,

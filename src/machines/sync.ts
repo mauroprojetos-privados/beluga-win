@@ -95,6 +95,9 @@ export const LOCAL_SETTINGS = [
   'askMeFor',
   'askFreely',
   'capabilities',
+  // Your stack runs on this computer (docs/stack.md): what it starts and sets up is its own.
+  'stackRepair',
+  'stackBootstrap',
 ] as const satisfies ReadonlyArray<keyof Settings>;
 
 /** What Settings calls each synced setting, for a conflict said in words. */

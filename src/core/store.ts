@@ -21,6 +21,7 @@ import { type NetworkAction, type NetworkSlice, initialNetwork, reduceNetwork } 
 import { type RevenueCatAction, type RevenueCatSlice, initialRevenueCat, reduceRevenueCat } from './revenuecat-store.js';
 import { type EarningsAction, type EarningsSlice, initialEarnings, reduceEarnings } from './earnings-store.js';
 import { type SupportAction, type SupportSlice, initialSupport } from './support-store.js';
+import { type StackAction, type StackSlice, initialStack } from './stack-store.js';
 import { type ClaudeCodeAction, type ClaudeCodeSlice, initialClaudeCode, reduceClaudeCode } from './claude-code/model.js';
 import { type GatewayAction, type GatewaySlice, initialGateway, reduceGateway } from './gateway/model.js';
 import { type FriendShareAction, type FriendShareSlice, initialFriendShare, reduceFriendShare } from './friend-share-store.js';
@@ -377,6 +378,10 @@ export interface Prefs {
   readonly pushToPr: boolean;
   /** Claude keeps screenshots and scratch output in the workspace's git-ignored `.beluga/scratch/` folder (watched live in the Mac app). */
   readonly scratchFolder: boolean;
+  /** Your stack (docs/stack.md): start a service that's down (Ollama, OpenViking, hooktop) by itself. */
+  readonly stackRepair: boolean;
+  /** Your stack: set a project up for it (indexes, beluga.json, CLAUDE.md) as it's added or made. */
+  readonly stackBootstrap: boolean;
   /** Experimental features that are on (shared/experiments.ts), off until you turn each on. */
   readonly experiments: readonly string[];
   readonly subagents: Settings['subagents'];
@@ -564,7 +569,7 @@ export interface MyShare {
  * Everything Beluga knows that isn't about a screen: the room, people, projects, conversations,
  * approvals… The core (the daemon) owns it and every client sees the same.
  */
-export interface DomainState extends CollabState, WorkState, NetworkSlice, EarningsSlice, RevenueCatSlice, SupportSlice, ClaudeCodeSlice, GatewaySlice, BoardSlice, SentinelSlice, PlansSlice, DialoguesSlice, CompanionSlice, FriendShareSlice, TeamSlice {
+export interface DomainState extends CollabState, WorkState, NetworkSlice, EarningsSlice, RevenueCatSlice, SupportSlice, StackSlice, ClaudeCodeSlice, GatewaySlice, BoardSlice, SentinelSlice, PlansSlice, DialoguesSlice, CompanionSlice, FriendShareSlice, TeamSlice {
   readonly room: string;
   readonly projects: readonly Project[];
   readonly projectGroups: readonly ProjectGroup[];
@@ -768,7 +773,8 @@ export type Action =
   | PlansAction
   | DialoguesAction
   | TeamAction
-  | SupportAction;
+  | SupportAction
+  | StackAction;
 
 const LOG_LIMIT = 1000;
 const TRANSFER_LIMIT = 20;
@@ -813,6 +819,8 @@ export const DEFAULT_PREFS: Prefs = {
   settleIdleDays: SETTLE_IDLE_DAYS_DEFAULT,
   pushToPr: true,
   scratchFolder: true,
+  stackRepair: true,
+  stackBootstrap: true,
   experiments: [],
   subagents: 'full',
   hiddenButtons: [],
@@ -877,6 +885,7 @@ export function initialState(room: string, policy: Policy = 'ask', prefs: Partia
     ...initialEarnings,
     ...initialRevenueCat,
     ...initialSupport,
+    ...initialStack,
     ...initialClaudeCode,
     ...initialGateway,
     ...initialFriendShare,
@@ -1406,6 +1415,8 @@ export function reduceDomain(state: DomainState, action: Action): DomainState {
       return { ...state, ...reduceNetwork(state, action) };
     case 'support':
       return { ...state, support: action.support };
+    case 'stack':
+      return { ...state, stack: action.stack };
     case 'assistant_chats':
       return { ...state, assistant: action.assistant };
     case 'bots':

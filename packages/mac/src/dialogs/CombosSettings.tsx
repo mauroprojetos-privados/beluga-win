@@ -226,6 +226,10 @@ export function CombosSettings() {
       </Row>
       <Row label={say('By kind of work')} detail={t('routing.combos.byKindDetail')}>
         <div style={STACK}>
+          {/* One click: the three Claude combos, each kind and each plan role on them (docs/stack.md). */}
+          <Button variant="quiet" disabled={busy} title={t('routing.combos.claudeByKindHint')} onClick={() => void api.routing.useClaudeByKind().catch((err: unknown) => setError(errorText(err)))}>
+            {t('routing.combos.claudeByKind')}
+          </Button>
           {WORK_CATEGORIES.map((k) => {
             const route = byKind?.[k];
             const kind = categoryLabel(k);

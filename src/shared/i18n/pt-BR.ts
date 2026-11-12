@@ -8,6 +8,7 @@ import * as plans from './areas/plans.js';
 import * as phone from './areas/phone.js';
 import * as layout from './areas/layout.js';
 import * as bots from './areas/bots.js';
+import * as stack from './areas/stack.js';
 import * as routing from './areas/routing.js';
 import * as chat from './areas/chat.js';
 import * as prefs from './areas/prefs.js';
@@ -160,4 +161,5 @@ export const ptBR: Partial<Record<Key, Message>> = {
   ...macLib.ptBR,
   ...shared.ptBR,
   ...botAutonomy.ptBR,
+  ...stack.ptBR,
 };

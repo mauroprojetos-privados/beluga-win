@@ -225,6 +225,8 @@ export const PhoneCalls = {
   // 1.55: a bot's own chats, started and deleted from the phone (which is open is the Mac's).
   'bots.newChat': entry('bots.newChat', z.string()),
   'bots.deleteChat': entry('bots.deleteChat', done),
+  // Your stack (docs/stack.md): its Needs You card's Check Again (the view comes back in Home's needs).
+  'stack.check': entry('stack.check', done),
 } as const;
 
 export type PhoneMethod = keyof typeof PhoneCalls;

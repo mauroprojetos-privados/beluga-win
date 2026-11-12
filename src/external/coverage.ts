@@ -222,6 +222,7 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'routing.resetCombos': { refused: NO_TOOL },
   'routing.retry': { refused: NO_TOOL },
   'routing.usage': { refused: STATS },
+  'routing.useClaudeByKind': { refused: NO_TOOL },
   // Bots (docs/bots.md): the person's own orchestrators and their files (secrets among them), set up in Bot Studio.
   'bots.list': { refused: BOTS },
   'bots.status': { refused: BOTS },
@@ -323,6 +324,9 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'stripe.refresh': 'gated',
   'support.answer': 'gated',
   'settings.language': { refused: LANGUAGE },
+  // Your stack: a person's computer, its services started and its projects set up from Settings.
+  'stack.check': { refused: NO_TOOL },
+  'stack.setupProject': { refused: NO_TOOL },
   'settings.commitLanguage': { refused: LANGUAGE },
   'claudeCode.steps': 'gated',
   'claudeCode.step': 'gated',

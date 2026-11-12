@@ -172,6 +172,7 @@ const AHEAD_DIFF_MS = 10_000;
 export class WorkspaceController {
   private readonly worktreeListeners = new Set<(event: WorktreeEvent) => void>();
   private readonly goingListeners = new Set<(ws: Workspace) => void>();
+  private readonly addedListeners = new Set<(root: string) => void>();
   private readonly loaded = new Set<string>();
   /** Conversations of worktrees deleted here: their agent's last words, echoed back late, don't land (deletedChannel). */
   private readonly deleted = new Set<string>();
@@ -216,6 +217,12 @@ export class WorkspaceController {
   onWorktree(listener: (event: WorktreeEvent) => void): () => void {
     this.worktreeListeners.add(listener);
     return () => void this.worktreeListeners.delete(listener);
+  }
+
+  /** Hear about a project added (or made) here, by its root: your stack sets it up (docs/stack.md). */
+  onProjectAdded(listener: (root: string) => void): () => void {
+    this.addedListeners.add(listener);
+    return () => void this.addedListeners.delete(listener);
   }
 
   /** Hear about a workspace about to be archived or deleted, while its folder is still there (the board keeps proof files from it). */
@@ -1708,6 +1715,8 @@ export class WorkspaceController {
       });
       this.publish();
       this.deps.toast(t('toasts.workspace.projectAdded'), 'success');
+      const root = project?.root ?? real(dir);
+      for (const l of this.addedListeners) l(root);
       void this.refresh().catch(() => undefined);
       return project ? { project: { id: project.id, name: project.name } } : {};
     } catch (err) {

@@ -44,6 +44,9 @@ export const en = {
   'routing.combos.inOrder': 'Agents in order',
   'routing.combos.inOrderDetail': 'A combo is a list of agents and models. Pick one in the agent box, New Task or Start with: each run goes to the first that can run then, skipping one that isn’t set up, isn’t signed in, isn’t answering or is at its usage limit.',
   'routing.combos.useDefaults': 'Use the Defaults',
+  // agent-wording: claude — the preset runs on Claude's models only, so it names the runtime.
+  'routing.combos.claudeByKind': 'Claude by Kind of Work',
+  'routing.combos.claudeByKindHint': 'Opus for planning and hard problems, Sonnet for building and reviews, Haiku for quick changes, exploring and docs; each goes on to the next model at its usage limit',
   'routing.combos.newCombo': 'New Combo',
   'routing.combos.newName': 'New combo',
   'routing.combos.now': ' · now: {now}',
@@ -153,6 +156,9 @@ export const ptBR: { readonly [K in keyof typeof en]?: Message } = {
   'routing.combos.inOrder': 'Agentes em ordem',
   'routing.combos.inOrderDetail': 'Um combo é uma lista de agentes e modelos. Escolha um na caixa do agente, em Nova tarefa ou em Começar com: cada execução vai para o primeiro que puder rodar na hora, pulando o que não está configurado, não está conectado, não responde ou chegou ao limite de uso.',
   'routing.combos.useDefaults': 'Usar os padrões',
+  // agent-wording: claude — the preset runs on Claude's models only, so it names the runtime.
+  'routing.combos.claudeByKind': 'Claude por tipo de trabalho',
+  'routing.combos.claudeByKindHint': 'Opus para planejar e problemas difíceis, Sonnet para construir e revisar, Haiku para mudanças rápidas, explorar e documentação; cada um passa para o próximo modelo no limite de uso',
   'routing.combos.newCombo': 'Novo combo',
   'routing.combos.newName': 'Novo combo',
   'routing.combos.now': ' · agora: {now}',
