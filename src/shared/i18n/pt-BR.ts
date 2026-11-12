@@ -27,6 +27,7 @@ import * as daemon from './areas/daemon.js';
 import * as toasts from './areas/toasts.js';
 import * as macLib from './areas/macLib.js';
 import * as shared from './areas/shared.js';
+import * as botAutonomy from './areas/bot-autonomy.js';
 
 /**
  * Brazilian Portuguese. A key missing here is said in English (never blank); tests/i18n.test.ts
@@ -158,4 +159,5 @@ export const ptBR: Partial<Record<Key, Message>> = {
   ...toasts.ptBR,
   ...macLib.ptBR,
   ...shared.ptBR,
+  ...botAutonomy.ptBR,
 };

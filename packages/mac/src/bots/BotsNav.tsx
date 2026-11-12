@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { MAC_BOT, botStatusLine } from '@beluga/core/bots/schema.js';
+import { MAC_BOT, botOfChannel, botStatusLine } from '@beluga/core/bots/schema.js';
 import type { BotInfo } from '@beluga/core/bots/schema.js';
 import { Icon, type IconName } from '../components/Icon.js';
 import { Button, Empty, IconButton } from '../components/ui.js';
@@ -65,7 +65,11 @@ function BotRow({ bot }: { bot: BotInfo }) {
       label={<BotLabel name={bot.name} bot={bot} />}
       detail={signal.tip || bot.description || t('bots.nav.rowDetail', { name: bot.name, dir: bot.dir })}
       selected={selected}
-      onClick={() => actions.run({ type: 'view', view: { kind: 'bot', id: bot.id } })}
+      onClick={() => {
+        // Its chat open now (its tabs, like Your Mac's).
+        const chat = botOfChannel(bot.channel)?.chat;
+        actions.run({ type: 'view', view: { kind: 'bot', id: bot.id, ...(chat && chat !== 'main' ? { chat } : {}) } });
+      }}
       trailing={<SignalMark signal={signal} />}
     />
   );

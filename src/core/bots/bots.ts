@@ -4,7 +4,11 @@ import type { AgentPlace, DispatchInput, MacTools } from '../../agent/types.js';
 import { dropAgentSession } from '../../agent/runtime/drop-session.js';
 import { type AgentRef, CLAUDE_AGENT } from '../../protocol.js';
 import type { BodyInput } from '../plans/edit.js';
-import { ASSISTANT_TITLE } from '../../shared/assistant.js';
+import { ASSISTANT_CHANNEL, ASSISTANT_TITLE, activeAssistantChannel } from '../../shared/assistant.js';
+import { chatFits, chatLimitMessage } from '../../shared/chat-limit.js';
+import { randomBytes } from 'node:crypto';
+import type { TriggerDeps } from '../sentinel/triggers/types.js';
+import { BotTriggers } from './triggers.js';
 import { issueForWorkspace } from '../board/model.js';
 import { HistorySaver } from '../history-saver.js';
 import { tilde } from '../paths.js';
@@ -14,22 +18,29 @@ import { combosIn } from '../routing/model.js';
 import { chosenAgent } from '../settings.js';
 import { type LogItem, type Store, settleRun } from '../store.js';
 import { type TaskRoute, botAgent, planStatus, routeTask } from './dispatch.js';
-import { BOT_JSON, BotFolder, KNOWLEDGE_JSON, MCP_JSON, MEMORY, PERSONA, fingerprint, mcpNames, mcpServersOf } from './folder.js';
+import { BOT_JSON, BotFolder, KNOWLEDGE_JSON, MCP_JSON, MEMORY, PERSONA, fingerprint, mcpKindsOf, mcpServersOf } from './folder.js';
+import { RUNTIME_NAMES } from '../../shared/agent-label.js';
 import { Knowledge, passagesText } from './knowledge.js';
 import {
   BOT_AUTONOMY_INFO,
   BOT_ID,
   type BotAutonomy,
+  type BotChat,
   type BotDispatch,
   type BotFile,
   type BotInfo,
   type BotStatus,
   type KnowledgeBackend,
   MAC_BOT,
+  MAIN_CHAT,
   MAX_BOTS,
+  MAX_BOT_CHATS,
+  TEST_CHAT,
   botChannel,
   botOfChannel,
   botTestChannel,
+  mcpReach,
+  nextRunOf,
   orchestrates,
   targetOf,
 } from './schema.js';
@@ -70,6 +81,19 @@ export interface BotsDeps {
   readonly watch?: boolean;
   /** Where knowledge is searched (OpenViking or the local index); the tests pass the local one. */
   readonly knowledge?: (dir: string, id: string) => Knowledge;
+  /** Say a trigger’s message in a bot’s chat as you would (session.submit): without it, triggers never fire. */
+  readonly submit?: (channel: string, text: string) => boolean;
+  /** Where Sentinels’ event triggers look (none: a bot’s triggers are schedules and Run Now only). */
+  readonly triggerEvents?: Omit<TriggerDeps, 'store' | 'selfId'>;
+  /** How often schedules are looked at (0: by hand, the tests). */
+  readonly triggerTickMs?: number;
+  readonly tz?: string;
+}
+
+/** A bot’s chats as kept in bot-chats/<id>/chats.json: in tab order, and the one open. */
+interface ChatList {
+  readonly chats: ReadonlyArray<{ readonly id: string; readonly createdAt: number }>;
+  readonly active: string;
 }
 
 interface ChatState {
@@ -77,8 +101,8 @@ interface ChatState {
   readonly runtime?: string;
 }
 
-/** A chat of a bot (not Your Mac's): its main conversation or its Test chat. */
-type ChatKey = 'main' | 'test';
+/** A chat of a bot (not Your Mac's): its first (`main`), another of its chats, or its Test chat (`test`). */
+type ChatKey = string;
 
 const KEEP = 500;
 
@@ -119,6 +143,8 @@ export class Bots {
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
   private statusTimer: ReturnType<typeof setTimeout> | undefined;
   private backends = new Map<string, KnowledgeBackend>();
+  private readonly chatLists = new Map<string, ChatList>();
+  private readonly triggers: BotTriggers | undefined;
 
   constructor(private readonly deps: BotsDeps) {
     mkdirSync(this.botsDir, { recursive: true, mode: 0o700 });
@@ -126,10 +152,10 @@ export class Bots {
     this.dispatches = readJson<BotDispatch[]>(path.join(this.chatsDir, 'dispatch.json'), []).filter((d) => d && typeof d.planId === 'string' && typeof d.bot === 'string');
     this.saver = new HistorySaver({
       log: () => deps.store.getState().log,
-      channels: () => new Set(this.ids().filter((id) => id !== MAC_BOT).flatMap((id) => [botChannel(id), botTestChannel(id)]).concat(botTestChannel(MAC_BOT))),
+      channels: () => new Set(this.ids().filter((id) => id !== MAC_BOT).flatMap((id) => [...this.chatList(id).chats.map((c) => botChannel(id, c.id)), botTestChannel(id)]).concat(botTestChannel(MAC_BOT))),
       idOf: (channel) => {
         const b = botOfChannel(channel);
-        return b && this.has(b.id) ? `${b.id}~${b.test ? 'test' : 'main'}` : undefined;
+        return b && this.has(b.id) && (b.test || this.chatList(b.id).chats.some((c) => c.id === b.chat)) ? `${b.id}~${b.chat}` : undefined;
       },
       write: async (key, items, current) => {
         const file = this.historyFile(key);
@@ -143,6 +169,21 @@ export class Bots {
       keep: KEEP,
     });
     for (const id of this.ids()) this.loadChats(id);
+    this.triggers = deps.submit
+      ? new BotTriggers({
+          store: deps.store,
+          selfId: deps.selfId,
+          dir: this.chatsDir,
+          bots: () => this.triggered(),
+          submit: (id, text) => this.submitTo(id, text),
+          ...(deps.triggerEvents ? { events: deps.triggerEvents } : {}),
+          ...(deps.now ? { now: deps.now } : {}),
+          ...(deps.tz ? { tz: deps.tz } : {}),
+          ...(deps.triggerTickMs !== undefined ? { tickMs: deps.triggerTickMs } : {}),
+          changed: () => this.statusSoon(),
+        })
+      : undefined;
+    this.triggers?.sync();
     this.publish();
     this.lastLog = deps.store.getState().log;
     this.unsubscribe = deps.store.subscribe(() => {
@@ -165,6 +206,7 @@ export class Bots {
   stop(): void {
     this.unsubscribe();
     this.saver.stop();
+    this.triggers?.stop();
     clearTimeout(this.refreshTimer);
     clearTimeout(this.statusTimer);
     void this.watcher?.close();
@@ -285,8 +327,57 @@ export class Bots {
     this.fileInfo ??= this.readFiles();
     return this.fileInfo.map((info): BotInfo => {
       const status = this.statusOf(info.id, st, live);
-      return { ...info, ...(status ? { status } : {}), behind: this.behindOf(info.id, st) };
+      const list = info.mac ? undefined : this.chatList(info.id);
+      const chats: BotChat[] | undefined = list?.chats.map((c) => ({ id: c.id, channel: botChannel(info.id, c.id), createdAt: c.createdAt }));
+      const file = this.has(info.id) ? new BotFolder(this.dirOf(info.id)).bot().bot : undefined;
+      const triggers = this.triggers && file?.triggers?.length ? this.triggers.infoOf(info.id, file.triggers) : undefined;
+      const nextRun = triggers ? nextRunOf(triggers) : undefined;
+      return {
+        ...info,
+        ...(list ? { channel: botChannel(info.id, list.active), chats } : {}),
+        ...(triggers ? { triggers } : {}),
+        ...(nextRun !== undefined ? { nextRun } : {}),
+        ...(status ? { status } : {}),
+        behind: this.behindOf(info.id, st),
+      };
     });
+  }
+
+  // ------------------------------------------------------------------ what it does on its own
+
+  /** The bots' triggers for BotTriggers: each bot's bot.json, its autonomy and the project its events are watched in. */
+  private triggered(): Array<{ id: string; name: string; autonomy: BotAutonomy; triggers: NonNullable<BotFile['triggers']>; projectId?: string }> {
+    return this.ids().flatMap((id) => {
+      const bot = new BotFolder(this.dirOf(id)).bot().bot;
+      if (!bot.triggers?.length) return [];
+      const projectId = bot.projects?.[0];
+      return [{ id, name: bot.name ?? (id === MAC_BOT ? ASSISTANT_TITLE : id), autonomy: bot.autonomy ?? 'ask', triggers: bot.triggers, ...(projectId ? { projectId } : {}) }];
+    });
+  }
+
+  /** A trigger's run: its message said in the bot's chat open now (Your Mac: its first chat, else the one open). */
+  private submitTo(id: string, text: string): boolean {
+    if (!this.deps.submit || !this.has(id)) return false;
+    const st = this.deps.store.getState();
+    const channel = id === MAC_BOT ? (st.assistant.chats.some((c) => c.channel === ASSISTANT_CHANNEL) || !st.assistant.chats.length ? ASSISTANT_CHANNEL : activeAssistantChannel(st.assistant)) : botChannel(id, this.chatList(id).active);
+    return this.deps.submit(channel, text);
+  }
+
+  /** Run one of a bot's triggers now (Bot Studio's Run Now). */
+  runTrigger(id: string, triggerId: string): boolean {
+    if (!this.triggers) throw new Error('Triggers need the Beluga app');
+    this.folder(id);
+    return this.triggers.runNow(id, triggerId);
+  }
+
+  /** Look at the schedules now (the tests; the daemon ticks every 30 seconds). */
+  tickTriggers(): void {
+    this.triggers?.tick();
+  }
+
+  /** Which event watchers run now (the tests). */
+  watchingTriggers(): string[] {
+    return this.triggers?.watching() ?? [];
   }
 
   /** The conversations of a bot's dispatched work: each plan's own, and its tasks' worktrees (newest plans first). */
@@ -324,8 +415,27 @@ export class Bots {
       if (t?.kind === 'combo' && !combos.some((c) => c.id === t.id)) out.push(`Category “${cat}” points to a combo that was deleted`);
       if (t?.kind === 'bot' && (t.id === id || !this.has(t.id))) out.push(t.id === id ? `Category “${cat}” points to this bot itself` : `Category “${cat}” points to a bot that was deleted`);
     }
-    if (docs.mcp.trim() && mcpNames(docs.mcp).length && combos.find((c) => c.id === bot.combo)?.targets.some((t) => t.runtime !== 'claude')) out.push('Its combo can run on an agent other than Claude Code, which doesn’t load the bot’s MCPs there');
+    for (const r of this.reachOf(id)) {
+      if (r.gets === 'all') continue;
+      out.push(r.gets === 'none' ? `Its combo can hand on to ${r.label}, which doesn’t load the bot’s MCPs` : `Its combo can hand on to ${r.label}, which loads only its HTTP servers: ${r.missing.join(', ')} don’t reach it there`);
+    }
     return out;
+  }
+
+  /**
+   * Which targets of a bot's combo get its MCP servers (Bot Studio's Tools tab): each target in
+   * order, the runtime it runs on, and what of the bot's servers that runtime takes (MCP_REACH).
+   * No combo: your agent, alone. No servers: nothing to say.
+   */
+  reachOf(id: string): Array<{ readonly label: string; readonly runtime: string; readonly gets: 'all' | 'some' | 'none'; readonly missing: readonly string[] }> {
+    const folder = new BotFolder(this.dirOf(id));
+    const servers = mcpKindsOf(folder.read(MCP_JSON));
+    if (!servers.length) return [];
+    const st = this.deps.store.getState();
+    const bot = folder.bot().bot;
+    const combo = bot.combo ? combosIn(st).find((c) => c.id === bot.combo) : undefined;
+    const targets = combo ? combo.targets.map((t) => ({ runtime: t.runtime, model: t.model })) : [{ runtime: chosenAgent(st.prefs).runtime, model: chosenAgent(st.prefs).model }];
+    return targets.map((t) => ({ label: `${RUNTIME_NAMES[t.runtime] ?? t.runtime}${t.model ? ` ${t.model}` : ''}`, ...mcpReach(t.runtime, servers) }));
   }
 
   /** What a bot is doing: its newest plan that isn't done. */
@@ -351,7 +461,9 @@ export class Bots {
   /** The files changed (a save here, the watcher): the screens see them now. */
   refresh(): void {
     this.fileInfo = undefined;
+    this.chatLists.clear();
     for (const id of this.ids()) this.loadChats(id);
+    this.triggers?.sync();
     this.publish();
   }
 
@@ -387,14 +499,89 @@ export class Bots {
   private loadChats(id: string): void {
     if (this.loaded.has(id)) return;
     this.loaded.add(id);
-    for (const chat of (id === MAC_BOT ? ['test'] : ['main', 'test']) as ChatKey[]) {
-      const channel = chat === 'test' ? botTestChannel(id) : botChannel(id);
-      const saved = readJson<LogItem[]>(this.historyFile(`${id}~${chat}`), []);
-      const live = this.deps.store.getState().log.filter((l) => l.channel === channel);
-      const known = new Set(saved.map((l) => l.id));
-      if (saved.length || live.length) this.deps.store.dispatch({ type: 'history', channel, items: [...saved.map(settleRun), ...live.filter((l) => !known.has(l.id))] });
-      this.saver.loaded(channel);
-    }
+    for (const chat of id === MAC_BOT ? [TEST_CHAT] : [...this.chatList(id).chats.map((c) => c.id), TEST_CHAT]) this.loadChat(id, chat);
+  }
+
+  private loadChat(id: string, chat: ChatKey): void {
+    const channel = chat === TEST_CHAT ? botTestChannel(id) : botChannel(id, chat);
+    const saved = readJson<LogItem[]>(this.historyFile(`${id}~${chat}`), []);
+    const live = this.deps.store.getState().log.filter((l) => l.channel === channel);
+    const known = new Set(saved.map((l) => l.id));
+    if (saved.length || live.length) this.deps.store.dispatch({ type: 'history', channel, items: [...saved.map(settleRun), ...live.filter((l) => !known.has(l.id))] });
+    this.saver.loaded(channel);
+  }
+
+  /** A bot's chats (never empty: its first, `main`, until another takes its place) and the one open. */
+  chatList(id: string): ChatList {
+    const had = this.chatLists.get(id);
+    if (had) return had;
+    const raw = readJson<Partial<ChatList>>(path.join(this.chatsDir, id, 'chats.json'), {});
+    const chats = (Array.isArray(raw.chats) ? raw.chats : []).filter((c) => c && typeof c.id === 'string' && /^[a-z0-9]{1,24}$/.test(c.id) && c.id !== TEST_CHAT).slice(0, MAX_BOT_CHATS);
+    const list: ChatList = chats.length ? { chats, active: chats.some((c) => c.id === raw.active) ? raw.active! : chats[0]!.id } : { chats: [{ id: MAIN_CHAT, createdAt: 0 }], active: MAIN_CHAT };
+    this.chatLists.set(id, list);
+    return list;
+  }
+
+  private saveChats(id: string, list: ChatList): void {
+    this.chatLists.set(id, list);
+    writeJson(path.join(this.chatsDir, id, 'chats.json'), list);
+  }
+
+  /** Every conversation of a bot: its chats and its Test chat (stopping them all when it's deleted). */
+  channelsOf(id: string): string[] {
+    if (id === MAC_BOT) return [botTestChannel(id)];
+    return [...this.chatList(id).chats.map((c) => botChannel(id, c.id)), botTestChannel(id)];
+  }
+
+  /**
+   * A new, empty chat of a bot, after the others, open now → its id. Your Open chats limit
+   * (Settings › Agent) counts a bot's chats as it counts Your Mac's. Your Mac's are its own tabs.
+   */
+  newChat(id: string): string {
+    if (id === MAC_BOT) throw new Error(`${ASSISTANT_TITLE}’s chats are its own tabs`);
+    this.folder(id);
+    const list = this.chatList(id);
+    const limit = this.deps.store.getState().prefs.chatLimit;
+    if (!chatFits(list.chats.length, limit)) throw new Error(chatLimitMessage(list.chats.length, limit, `${this.nameOf(id)}’s chats`));
+    if (list.chats.length >= MAX_BOT_CHATS) throw new Error(`A bot keeps up to ${MAX_BOT_CHATS} chats: delete one first`);
+    let chat = '';
+    do chat = randomBytes(5).toString('hex');
+    while (list.chats.some((c) => c.id === chat) || chat === MAIN_CHAT || chat === TEST_CHAT);
+    this.saveChats(id, { chats: [...list.chats, { id: chat, createdAt: this.now }], active: chat });
+    this.saver.loaded(botChannel(id, chat));
+    this.publish();
+    return chat;
+  }
+
+  /** Open one of a bot's chats (which is open is kept across restarts). */
+  openChat(id: string, chat: string): void {
+    const list = this.chatList(id);
+    if (!list.chats.some((c) => c.id === chat)) throw new Error('That chat was deleted');
+    if (list.active !== chat) this.saveChats(id, { ...list, active: chat });
+    this.publish();
+  }
+
+  /**
+   * Delete one of a bot's chats for good: its messages, its history and its agent transcript. The one
+   * beside it opens if it was open; the last one leaves a fresh first chat. Stopping its run is the caller's.
+   */
+  async deleteChat(id: string, chat: string): Promise<void> {
+    const list = this.chatList(id);
+    const at = list.chats.findIndex((c) => c.id === chat);
+    if (at < 0) return;
+    const channel = botChannel(id, chat);
+    const { sessionId, runtime } = this.session(id, chat);
+    const rest = list.chats.filter((c) => c.id !== chat);
+    const chats = rest.length ? rest : [{ id: MAIN_CHAT, createdAt: this.now }];
+    const active = list.active !== chat && rest.length ? list.active : chats[Math.min(at, chats.length - 1)]!.id;
+    this.deps.store.dispatch({ type: 'clear', channel });
+    this.deps.store.dispatch({ type: 'context_reset', channel });
+    rmSync(this.historyFile(`${id}~${chat}`), { force: true });
+    this.remember(id, chat, {});
+    if (sessionId) await dropAgentSession(this.dirOf(id), sessionId, runtime, { ...(this.deps.claudeDir ? { claude: this.deps.claudeDir } : {}), ...(this.deps.codexDir ? { codex: this.deps.codexDir } : {}) }).catch(() => undefined);
+    this.saveChats(id, { chats, active });
+    for (const c of chats) this.saver.loaded(botChannel(id, c.id));
+    this.publish();
   }
 
   private session(id: string, chat: ChatKey): ChatState {
@@ -411,18 +598,18 @@ export class Bots {
   /** Start one of a bot's chats over: a fresh agent conversation next time (its messages cleared by the caller). */
   forget(channel: string): void {
     const b = botOfChannel(channel);
-    if (b && this.has(b.id)) this.remember(b.id, b.test ? 'test' : 'main', {});
+    if (b && this.has(b.id)) this.remember(b.id, b.chat, {});
   }
 
   // ------------------------------------------------------------------ runs
 
   /** Where a bot's agent runs, and on what. `test`: its Test chat, which touches no project. */
-  private placeFor(id: string, test: boolean): AgentPlace {
+  private placeFor(id: string, chat: ChatKey): AgentPlace {
+    const test = chat === TEST_CHAT;
     const folder = this.folder(id);
     const bot = folder.bot().bot;
     const st = this.deps.store.getState();
     const agent = botAgent(st, bot) ?? chosenAgent(st.prefs);
-    const chat: ChatKey = test ? 'test' : 'main';
     const was = this.session(id, chat);
     const resume = (was.runtime ?? CLAUDE_AGENT.runtime) === agent.runtime ? was.sessionId : undefined;
     const roots = test ? [] : this.projectRoots(bot);
@@ -452,8 +639,10 @@ export class Bots {
     const b = botOfChannel(channel);
     if (!b || from !== this.deps.selfId() || !this.has(b.id)) return undefined;
     if (b.id === MAC_BOT && !b.test) return undefined;
+    // A chat that was deleted (a stale screen) gets nothing: its run would land nowhere.
+    if (!b.test && !this.chatList(b.id).chats.some((c) => c.id === b.chat)) return undefined;
     const tools = b.test ? this.testTools(b.id) : this.toolsFor(b.id);
-    return { place: this.placeFor(b.id, b.test), tools, brief: this.brief(b.id, { test: b.test, tools }) };
+    return { place: this.placeFor(b.id, b.chat), tools, brief: this.brief(b.id, { test: b.test, tools }) };
   }
 
   /** What Your Mac's own runs get from its folder; undefined when nothing is set (Your Mac as always). */
@@ -697,8 +886,8 @@ export class Bots {
   async remove(id: string): Promise<void> {
     if (id === MAC_BOT) throw new Error(`${ASSISTANT_TITLE} is the first bot: it can’t be deleted (clear its settings instead)`);
     if (!this.has(id)) return;
-    for (const chat of ['main', 'test'] as const) {
-      const channel = chat === 'test' ? botTestChannel(id) : botChannel(id);
+    for (const chat of [...this.chatList(id).chats.map((c) => c.id), TEST_CHAT]) {
+      const channel = chat === TEST_CHAT ? botTestChannel(id) : botChannel(id, chat);
       const { sessionId, runtime } = this.session(id, chat);
       this.deps.store.dispatch({ type: 'clear', channel });
       if (sessionId) await dropAgentSession(this.dirOf(id), sessionId, runtime, { ...(this.deps.claudeDir ? { claude: this.deps.claudeDir } : {}), ...(this.deps.codexDir ? { codex: this.deps.codexDir } : {}) }).catch(() => undefined);
@@ -707,6 +896,7 @@ export class Bots {
     rmSync(path.join(this.chatsDir, id), { recursive: true, force: true });
     this.loaded.delete(id);
     this.revs.delete(id);
+    this.chatLists.delete(id);
     this.refresh();
   }
 

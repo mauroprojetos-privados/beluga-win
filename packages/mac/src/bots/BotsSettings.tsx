@@ -15,6 +15,7 @@ import { formatDate, formatDateTime } from '@beluga/shared/i18n/format.js';
 import { Group, Row } from '../dialogs/settings-controls.js';
 import { botIcon, pickBot, usePickedBot } from './BotsNav.js';
 import b from './bots.module.css';
+import { RepoSource, Reach, TriggersTab } from './BotAutonomy.js';
 
 /**
  * Settings › Bots (docs/bots.md): Your Mac first, then the bots you made, and Bot Studio for the one
@@ -24,10 +25,11 @@ import b from './bots.module.css';
  * The same pane works in `beluga web`: nothing here needs the app's own windows.
  */
 
-type Tab = 'identity' | 'model' | 'tools' | 'skills' | 'knowledge' | 'memory' | 'test';
+type Tab = 'identity' | 'model' | 'triggers' | 'tools' | 'skills' | 'knowledge' | 'memory' | 'test';
 const TABS = (): ReadonlyArray<{ readonly id: Tab; readonly label: string; readonly icon: IconName }> => [
   { id: 'identity', label: tr('bots.tab.identity'), icon: 'person' },
   { id: 'model', label: tr('bots.tab.model'), icon: 'spark' },
+  { id: 'triggers', label: tr('botStudio.triggers.tab'), icon: 'bolt' },
   { id: 'tools', label: tr('bots.tab.tools'), icon: 'plug' },
   { id: 'skills', label: tr('bots.tab.skills'), icon: 'book' },
   { id: 'knowledge', label: tr('bots.tab.knowledge'), icon: 'search' },
@@ -416,6 +418,7 @@ function Studio({ bot }: { bot: BotInfo }) {
       </div>
       {tab === 'identity' ? <IdentityTab bot={bot} view={view} /> : null}
       {tab === 'model' ? <ModelTab bot={bot} view={view} /> : null}
+      {tab === 'triggers' ? <TriggersTab bot={bot} view={view} /> : null}
       {tab === 'tools' ? <ToolsTab bot={bot} view={view} /> : null}
       {tab === 'skills' ? <SkillsTab bot={bot} view={view} /> : null}
       {tab === 'knowledge' ? <KnowledgeTab bot={bot} view={view} /> : null}
@@ -563,6 +566,7 @@ function ToolsTab({ bot, view }: { bot: BotInfo; view: BotView }) {
             {saving.busy ? t('bots.tools.connecting') : t('bots.tools.check')}
           </Button>
         </Row>
+        <Reach view={view} />
         {view.servers.map((name) => {
           const c = checks?.find((x) => x.name === name);
           return (
@@ -689,10 +693,11 @@ function KnowledgeTab({ bot, view }: { bot: BotInfo; view: BotView }) {
         <div className={b.list}>
           {k.sources.map((src) => (
             <div key={src.id} className={b.item}>
-              <Icon name={src.kind === 'url' ? 'globe' : src.kind === 'text' ? 'pencil' : 'file'} size={13} />
+              <Icon name={src.kind === 'url' ? 'globe' : src.kind === 'text' ? 'pencil' : src.kind === 'repo' ? 'branch' : 'file'} size={13} />
               <span className={b.grow}>
                 <strong>{src.name}</strong>
                 <span>{t('bots.knowledge.source', { origin: src.origin ?? t('bots.knowledge.pasted'), size: Math.max(1, Math.round(src.size / 1024)), date: formatDate(src.addedAt) })}</span>
+                {src.kind === 'repo' ? <RepoSource.Status id={src.id} view={view} /> : null}
               </span>
               <Button size="small" variant="quiet" icon="trash" aria-label={t('bots.model.remove', { name: src.name })} onClick={() => saving.run(() => api.bots['knowledge.remove'](bot.id, src.id))} />
             </div>
@@ -722,6 +727,7 @@ function KnowledgeTab({ bot, view }: { bot: BotInfo; view: BotView }) {
             {t('bots.knowledge.add')}
           </Button>
         </Row>
+        <RepoSource bot={bot} view={view} />
         <Row label={say('Try a search')} detail={t('bots.knowledge.trySearchDetail')}>
           <input className={b.area} style={{ minHeight: 0, height: 26, width: 200 }} value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && query.trim() && saving.run(async () => setFound((await api.bots['knowledge.search'](bot.id, query.trim())) as never))} aria-label={t('bots.knowledge.searchAria')} />
           <Button size="small" icon="search" disabled={!query.trim() || saving.busy} onClick={() => saving.run(async () => setFound((await api.bots['knowledge.search'](bot.id, query.trim())) as never))}>

@@ -26,6 +26,7 @@ import * as daemon from './areas/daemon.js';
 import * as toasts from './areas/toasts.js';
 import * as macLib from './areas/macLib.js';
 import * as shared from './areas/shared.js';
+import * as botAutonomy from './areas/bot-autonomy.js';
 
 /**
  * English, the source catalog: every key is here first (docs/i18n.md). Keys are `area.thing`;
@@ -164,6 +165,7 @@ export const en = {
   ...toasts.en,
   ...macLib.en,
   ...shared.en,
+  ...botAutonomy.en,
 } as const satisfies Record<string, Message>;
 
 /** Every key the app may say. */

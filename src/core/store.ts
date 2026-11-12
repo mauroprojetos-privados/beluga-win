@@ -417,7 +417,7 @@ export type View =
   /** "Your Mac" (core/assistant): your Claude for the whole Mac, the same as on the phone; one of its chats (tabs, BLG-102), the open one when unset. */
   | { readonly kind: 'assistant'; readonly chat?: string }
   /** A bot of yours other than Your Mac (core/bots): its conversation, beside its plan. */
-  | { readonly kind: 'bot'; readonly id: string }
+  | { readonly kind: 'bot'; readonly id: string; /** One of its chats (unset: its first). */ readonly chat?: string }
   /** "Your phone" (BLG-171): the live mirror of your paired Android phone and what Claude's done on it. Only when one is paired. */
   | { readonly kind: 'phone' }
   | { readonly kind: 'files' }
@@ -527,7 +527,7 @@ export const channelOf = (view: View): string =>
       : view.kind === 'sentinel_chat'
         ? sentinelChatChannel(view.chat ?? FIRST_SENTINEL_CHAT)
         : view.kind === 'bot'
-          ? botChannel(view.id)
+          ? botChannel(view.id, view.chat)
           : view.kind === 'draft' || view.kind === 'draft_worktree'
             ? 'draft'
             : 'room';

@@ -490,6 +490,10 @@ const MIGRATED: readonly string[] = [
   'packages/mac/src/sentinel/SentinelPage.tsx',
   'packages/mac/src/sentinel/Showcase.tsx',
   'packages/mac/src/sentinel/marks.tsx',
+  // The bots' follow-up: triggers, several chats
+  'packages/mac/src/bots/BotAutonomy.tsx',
+  'packages/mac/src/bots/BotTabs.tsx',
+  'packages/companion/components/BotChats.tsx',
 ];
 
 describe('migrated screens say every word through t()', () => {

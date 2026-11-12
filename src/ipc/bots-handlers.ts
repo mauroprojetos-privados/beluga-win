@@ -1,7 +1,7 @@
 import { botsOf } from '../core/bots/registry.js';
 import type { Bots } from '../core/bots/bots.js';
 import { MCP_JSON, MEMORY, PERSONA } from '../core/bots/folder.js';
-import { botStatusLine } from '../core/bots/schema.js';
+import { botChannel, botStatusLine } from '../core/bots/schema.js';
 import { addInstalledMcp, applyDraft, botView, checkTools, copySkill, draftBot, exportBot, importBot, installedMcps, patchBot, saveFile, saveSkill, yourSkills } from '../core/bots/studio.js';
 import type { Session } from '../core/session.js';
 import type { Args, Method } from './api.js';
@@ -25,11 +25,20 @@ export const BOTS_HANDLERS = {
     const line = botStatusLine(info.status);
     return { ...(info.status ? { status: info.status } : {}), ...(line ? { line } : {}) };
   },
+  'bots.newChat': (s, id) => bots(s).newChat(id),
+  'bots.openChat': (s, id, chat) => bots(s).openChat(id, chat),
+  'bots.deleteChat': async (s, id, chat) => {
+    // Its run stops first: nothing it says after lands anywhere.
+    const channel = botChannel(id, chat);
+    s.host.stopRun(channel);
+    s.host.forgetContext(channel);
+    await bots(s).deleteChat(id, chat);
+  },
   'bots.get': (s, id) => botView(bots(s), id),
   'bots.create': (s, input) => bots(s).create(input),
   'bots.delete': async (s, id) => {
     // Its runs stop first: nothing they say after lands anywhere.
-    for (const channel of [`bot:${id}`, `bot:${id}:test`]) {
+    for (const channel of bots(s).channelsOf(id)) {
       s.host.stopRun(channel);
       s.host.forgetContext(channel);
     }
@@ -66,6 +75,12 @@ export const BOTS_HANDLERS = {
     await commitKnowledge(b, id, `Knowledge: ${source.name}`);
     return source;
   },
+  'bots.knowledge.addRepo': async (s, id, where) => {
+    const b = bots(s);
+    const source = await b.knowledge(id).addRepo(where);
+    await commitKnowledge(b, id, `Knowledge: ${source.name}`);
+    return source;
+  },
   'bots.knowledge.remove': async (s, id, source) => {
     const b = bots(s);
     b.knowledge(id).remove(source);
@@ -80,6 +95,7 @@ export const BOTS_HANDLERS = {
   },
   'bots.knowledge.search': (s, id, query) => bots(s).knowledge(id).search(query, 8),
   'bots.validate': (s, id) => checkTools(bots(s), id),
+  'bots.triggers.run': (s, id, trigger) => bots(s).runTrigger(id, trigger),
   'bots.versions': (s, id) => bots(s).folder(id).versions(),
   'bots.undo': async (s, id) => {
     const b = bots(s);

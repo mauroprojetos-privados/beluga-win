@@ -49,6 +49,7 @@ Beluga too: everything but `bot.json` is in Claude Code's own formats.
 | `difficulty` | `simple` / `normal` / `hard` → combo, for a task with no category (unset: Settings' own map) |
 | `autonomy` | `ask`, `run-stop-on-fail` or `autopilot` |
 | `projects` | project ids it acts in (their folders are added to its runs); empty: like Your Mac |
+| `triggers` | what it does on its own: Sentinels' trigger shapes, each with the message it gets ([Triggers](#triggers)) |
 
 A field that doesn't fit (a hand edit's typo) is dropped alone and named in the bot's problems; an
 unreadable file reads as a bot with nothing set.
@@ -66,9 +67,19 @@ computer, saves still work, without history.
   anywhere: a bot reads and delegates.
 - **load only its own MCP servers**: its `.mcp.json`, `${env:NAME}` filled in from your secrets,
   passed with `--strict-mcp-config` (`AgentPlace.mcp`), so your servers and another bot's never reach
-  it. Beluga's own tools still come. A bot with no `.mcp.json` keeps yours, as before. Claude Code is
-  the runtime that loads them; a bot whose combo can run on another runtime is warned that its MCPs
-  don't load there.
+  it. Beluga's own tools still come. A bot with no `.mcp.json` keeps yours, as before. Its combo can
+  hand on to another runtime, and each takes them its own way (`src/agent/runtime/place-mcp.ts`):
+
+  | Runtime | How | What reaches it |
+  |---|---|---|
+  | Claude Code | `--mcp-config` + `--strict-mcp-config` | all of them |
+  | Codex | the thread's `mcp_servers.<name>` overrides (`command`/`args`/`env`, or `url` + `http_headers`); your own servers turned off for the run | all of them |
+  | OpenCode | ACP's `session/new` `mcpServers` (stdio; HTTP when it says `mcpCapabilities.http`) | all of them (your own OpenCode config's servers still load: ACP has no strict switch) |
+  | Copilot | ACP's `session/new` `mcpServers`, HTTP only (it turns a client's started servers down) | its HTTP servers |
+  | a local model | — | none |
+
+  The Tools tab says, for each target of its combo, which of them get there (`BotView.reach`), and a
+  target that misses some is one of the bot's problems.
 - **load its skills and sub-agents**: the folder's `.claude/skills` (as a project's) and, for a bot's
   folder only, `.claude/agents`, through the shadow plugin (`skill-plugins.ts`).
 - **are told who they are**: its persona (`CLAUDE.md`) and the end of its memory go in the run's
@@ -77,10 +88,46 @@ computer, saves still work, without history.
 Your Mac's runs get the same additions from its folder when something is set (`MacAssistant`'s
 `bot` dep); a chat a sentinel opened with an agent of its own keeps that agent.
 
-Its conversation is `bot:<id>` (Your Mac's stay `mac:assistant…`), kept in
-`~/.beluga/bot-chats/<id>/` (its agent session and history, secret to the phone like the rest of
-`~/.beluga`). Bot Studio's Test chat is `bot:<id>:test`: the same folder, tools, skills and
-knowledge, but nothing that starts work in a project.
+Its conversations are its chats, like Your Mac's tabs: the first is `bot:<id>`, the others
+`bot:<id>:<chat>` (Your Mac's stay `mac:assistant…`), each its own agent session. They're kept in
+`~/.beluga/bot-chats/<id>/` (`chats.json` with the one open, and per chat its session and history,
+secret to the phone like the rest of `~/.beluga`). `bots.newChat` / `openChat` / `deleteChat` work as
+`assistant.*` do: the Open chats limit (Settings › Agent) counts a bot's chats (up to 40), deleting one
+drops its agent transcript, and the last one leaves a fresh first chat. The Mac shows them as tabs
+above the bot's chat (`bots/BotTabs.tsx`); `BotInfo.channel` is the one open. Bot Studio's Test chat
+is `bot:<id>:test`: the same folder, tools, skills and knowledge, but nothing that starts work in a
+project.
+
+## Triggers
+
+`src/core/bots/triggers.ts`. A bot can act on its own, with Sentinels' own triggers rather than a
+scheduler of its own. In `bot.json`:
+
+```json
+"triggers": [
+  { "id": "nightly", "name": "Nightly deploy", "trigger": { "kind": "schedule", "every": "day", "at": "02:00" },
+    "message": "Check staging and deploy if green" },
+  { "id": "red-ci", "trigger": { "kind": "github", "what": "workflow-failed" }, "projectId": "p1",
+    "message": "CI failed: find out why and plan the fix" }
+]
+```
+
+- **The kinds** are Sentinels' (`TriggerSchema`): `schedule`, `manual` (Run Now only), `beluga`,
+  `github`, `stripe`, `uptime`, `sentry`. Not `after` (a sentinel's run) nor `webhook` (its address and
+  secret are a sentinel's): a sentinel with a Message step covers those. A trigger that doesn't fit
+  is dropped alone and named in the bot's problems.
+- **Schedules** go by Sentinels' clock (`dueNow`): a slot runs once; slots missed while the computer
+  slept run once (`catch-up`) or not at all (`skip`); one turned on counts from then.
+- **Events** are watched by Sentinels' coordinator (`Triggers`), each bot trigger standing in as a
+  sentinel of its own (`bot~<bot>~<trigger>`) with the same deps (gh, Stripe keys, your variables).
+  `projectId` (else the bot's first project) is where GitHub, Stripe and Sentry are watched. Events
+  closer than a minute to the last run are one run.
+- **A run is a turn in the bot's chat** (the one open; Your Mac's first): `session.submit` of its
+  message, headed by what started it and the bot's autonomy ("…The owner isn't here: work within your
+  autonomy, Ask First…"), so an Ask First bot plans and waits for your Approve as when you ask it.
+- What each saw last, when it ran and why it can't watch are in `~/.beluga/bot-chats/triggers.json`
+  (`BotInfo.triggers`, `nextRun`). Bot Studio's Triggers tab adds, edits, turns off and runs them
+  (`bots.edit.bot` with `triggers`, `bots.triggers.run`); the phone shows the next run on the bot's row.
 
 ## Planning and dispatching
 
@@ -125,6 +172,13 @@ where it searched. The tool is made per bot, with that bot's folder, so a bot ne
 - **Sources** (`knowledge.json`): a file (copied into `knowledge/`), words you pasted, a web page
   (fetched once, its HTML turned to text). A file `isSecretPath` calls a secret (a `.env`, a key) is
   refused when added and skipped when indexed.
+- **A repository or folder** (`bots.knowledge.addRepo`): a folder on this computer, read where it is
+  each time it's indexed, or a git address, cloned shallow into `.index/repos/<id>` (never committed or
+  exported) and pulled again on Index Again. Only its text files are read (git's own list where it's a
+  repository, so its `.gitignore` holds; else a walk that skips `node_modules`, `dist` and the like),
+  never a secret, no link out of it, at most 3,000 files, 12 MB in all and 256 KB each. The Knowledge
+  tab says, under it, how many files were indexed and left out (`indexed.repos`). OpenViking gets a
+  staged copy of exactly those files, as one folder (`…/<id>/<source>`).
 - **OpenViking**, when it runs here: `ov health` answers (`$BELUGA_OPENVIKING` names its `ov`, or
   `off`). Index Again adds each source under `viking://resources/beluga-bots/<id>/` and searches go to
   `ov find` there.
@@ -132,8 +186,14 @@ where it searched. The tool is made per bot, with that bot's folder, so a bot ne
   `.index/`, never committed or exported). It's also built every time, so a search falls back to it
   when OpenViking stops answering.
 
-The Knowledge tab says which is used. On the WSL engine OpenViking is installed but not set up yet
-(`openviking-server init`), so the local index is what runs until then.
+The Knowledge tab says which is used. On the WSL engine OpenViking is set up (`openviking-server` on
+127.0.0.1:1933, `ov language en`, embeddings from Ollama), and against it `ov health` answers and
+Index Again reaches `add-resource`. On 2026-11-11 its embedding model (`qwen3-embedding:0.6b`) wasn't in
+Ollama any more, so the server refused each resource and Beluga fell back to the local index, as meant;
+a search through OpenViking itself is still to be seen on the real server. The whole OpenViking path
+is tested end to end against a fake `ov` (`tests/fixtures/fake-ov.mjs`: `health`, `rm`, `add-resource`,
+`find -o json`), including the fall back when it stops answering. A server just started can be slow:
+`ov health` gets 20 seconds and `ov find` 90.
 
 ## Bot Studio
 
@@ -144,9 +204,10 @@ one picked:
 |---|---|---|
 | Identity | name, what it's for, icon and colour, projects it acts in; the persona | `bot.json`, `CLAUDE.md` |
 | Model | its own combo, categories → combo or bot, by how hard, autonomy | `bot.json` |
-| Tools | its MCP servers and whether each connects (Check Them), Add one of yours (its tokens and headers moved into secrets), Secrets, the `.mcp.json` itself | `.mcp.json`, `env.json` |
+| Triggers | what it does on its own: a schedule or an event, its message, next and last run, Run Now | `bot.json` |
+| Tools | its MCP servers and whether each connects (Check Them), which targets of its combo get them, Add one of yours (its tokens and headers moved into secrets), Secrets, the `.mcp.json` itself | `.mcp.json`, `env.json` |
 | Skills | skills and sub-agents: new, edit (the header is checked), remove, copy one of yours | `.claude/skills/`, `.claude/agents/` |
-| Knowledge | drop files, a web page, what's indexed and with what, Index Again, Try a search | `knowledge.json`, `knowledge/` |
+| Knowledge | drop files, a web page, a repository or folder, what's indexed and with what, Index Again, Try a search | `knowledge.json`, `knowledge/` |
 | Memory | read, edit, clear | `memory.md` |
 | Test | a chat that touches no project, with the tools, skills and knowledge searches it used | — |
 
@@ -175,11 +236,14 @@ one picked:
 | Method | Phone | What |
 |---|---|---|
 | `bots.list`, `bots.status` | ✓ | the bots and what each is doing (also the shared state's `bots`) |
+| `bots.newChat`, `bots.deleteChat` | ✓ | a bot's chats, like Your Mac's |
+| `bots.openChat` | Mac | which of them is open (the tabs) |
 | `bots.get` | Mac | a bot's files for Bot Studio, with each file's fingerprint for conflict checks |
 | `bots.create`, `bots.delete` | Mac | New Bot; delete one for good (not Your Mac) |
 | `bots.edit.bot`, `.persona`, `.mcp`, `.addMcp`, `.secret`, `.skill`, `.copySkill`, `.agent`, `.memory` | Mac | the tabs' saves (each a commit; `expect` refuses a stale save) |
 | `bots.installed` | Mac | your skills and MCP servers a bot can take |
-| `bots.knowledge.addFile`, `.addText`, `.addUrl`, `.remove`, `.reindex`, `.search` | Mac | its knowledge |
+| `bots.knowledge.addFile`, `.addText`, `.addUrl`, `.addRepo`, `.remove`, `.reindex`, `.search` | Mac | its knowledge |
+| `bots.triggers.run` | Mac | Run Now of one of its triggers |
 | `bots.validate` | Mac | whether each MCP connects |
 | `bots.versions`, `bots.undo`, `bots.restore` | Mac | its history |
 | `bots.export`, `bots.import` | Mac | a `.zip` without secrets, and back |
@@ -194,10 +258,15 @@ its line and its plan), each bot's chat (`conv:bot:<id>`, written in like Your M
 a Needs You (`NeedsYou.bot`). An older phone leaves them out; an older Mac sends neither. Editing a
 bot, its knowledge, tools and skills stays on the Mac.
 
+1.55 (additive): a bot's chats (`BotSummary.chats`, its tabs; a long-press on its row lists them, with
+New chat and, on a chat's long-press, Delete) and when it next acts on its own (`BotSummary.nextRun`,
+`nextRunName`), on its row's second line. Your Mac's row shows once it has a trigger. SINCE.botChats
+and SINCE.botTriggers.
+
 ## Not done yet
 
-- Bot triggers (a bot acting on a schedule or an event through Sentinels).
-- A lane for other runtimes' own MCP configuration: today only Claude Code loads a bot's MCPs.
-- Knowledge from a whole repository (files, pages and pasted text only), and OpenViking's levels
-  (L0/L1/L2) shown in the Knowledge tab.
-- Several chats per bot (one chat and its Test chat each, besides Your Mac's tabs).
+- A bot's trigger on `after` (another sentinel) or a `webhook`: a sentinel with a Message step does it.
+- OpenViking against a real server (only the fake `ov` is tested), and its levels (L0/L1/L2) shown in
+  the Knowledge tab.
+- A cloned repository's clone path: only folders on this computer are covered by the tests.
+- OpenCode runs still load the servers of your own OpenCode config beside a bot's (ACP has no strict switch).

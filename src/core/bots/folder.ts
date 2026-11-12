@@ -295,3 +295,8 @@ export function mcpServersOf(text: string | undefined, env: Readonly<Record<stri
 export function mcpNames(text: string | undefined): string[] {
   return Object.keys(mcpServersOf(text, {}));
 }
+
+/** The servers a .mcp.json declares, each with whether it’s reached over HTTP (`url`) or started (`command`). */
+export function mcpKindsOf(text: string | undefined): Array<{ readonly name: string; readonly http: boolean }> {
+  return Object.entries(mcpServersOf(text, {})).map(([name, c]) => ({ name, http: typeof c.url === 'string' && typeof c.command !== 'string' }));
+}

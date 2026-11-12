@@ -7,7 +7,7 @@ import { ownerMcpEntries } from '../../agent/runtime/claude/owner-mcp.js';
 import { isSecretPath } from '../shares.js';
 import type { Bots } from './bots.js';
 import { BOT_JSON, BotFolder, KNOWLEDGE_DIR, KNOWLEDGE_JSON, MCP_JSON, MEMORY, PERSONA, fingerprint, isBotFile, mcpNames, mcpServersOf } from './folder.js';
-import { type BotFile, MAC_BOT, SKILL_NAME, botFileText, parseBotFile, parseSkillHeader, secretsIn } from './schema.js';
+import { type BotFile, type BotTriggerInfo, MAC_BOT, SKILL_NAME, botFileText, parseBotFile, parseSkillHeader, secretsIn } from './schema.js';
 import { readZip, safeName, writeZip } from './zip.js';
 
 /**
@@ -38,8 +38,12 @@ export interface BotView {
   readonly servers: readonly string[];
   /** The secrets .mcp.json names, and whether each is set (never its value). */
   readonly secrets: ReadonlyArray<{ readonly name: string; readonly set: boolean }>;
-  readonly knowledge: { readonly sources: ReadonlyArray<{ readonly id: string; readonly kind: string; readonly name: string; readonly origin?: string; readonly size: number; readonly addedAt: number }>; readonly indexed?: { readonly at: number; readonly backend: 'openviking' | 'local'; readonly chunks: number; readonly skipped?: readonly string[] }; readonly backend: 'openviking' | 'local' };
+  readonly knowledge: { readonly sources: ReadonlyArray<{ readonly id: string; readonly kind: string; readonly name: string; readonly origin?: string; readonly size: number; readonly addedAt: number }>; readonly indexed?: { readonly at: number; readonly backend: 'openviking' | 'local'; readonly chunks: number; readonly skipped?: readonly string[]; readonly repos?: Readonly<Record<string, { readonly files: number; readonly skipped: number; readonly bytes: number; readonly capped?: boolean; readonly error?: string }>> }; readonly backend: 'openviking' | 'local' };
   readonly problems: readonly string[];
+  /** Which targets of its combo get its MCP servers (the Tools tab), each with those that don't reach it. */
+  readonly reach: ReadonlyArray<{ readonly label: string; readonly runtime: string; readonly gets: 'all' | 'some' | 'none'; readonly missing: readonly string[] }>;
+  /** What its triggers are doing (the Triggers tab): next run, last run, trouble. */
+  readonly triggers: readonly BotTriggerInfo[];
   /** Each file's fingerprint as read, sent back with a save. */
   readonly prints: Readonly<Record<string, string>>;
 }
@@ -64,6 +68,8 @@ export async function botView(bots: Bots, id: string): Promise<BotView> {
     secrets: secretsIn(docs.mcp).map((name) => ({ name, set: Boolean(have[name]) })),
     knowledge: { sources: kf.sources.map((s) => ({ id: s.id, kind: s.kind, name: s.name, ...(s.origin ? { origin: s.origin } : {}), size: s.size, addedAt: s.addedAt })), ...(kf.indexed ? { indexed: kf.indexed } : {}), backend: await k.backend() },
     problems: info?.problems ?? [],
+    reach: bots.reachOf(id),
+    triggers: info?.triggers ?? [],
     prints: { ...docs.prints, [KNOWLEDGE_JSON]: fingerprint(folder.read(KNOWLEDGE_JSON)) },
   };
 }
@@ -89,7 +95,7 @@ export async function patchBot(bots: Bots, id: string, patch: Readonly<Record<st
   const parsed = parseBotFile(JSON.stringify(next));
   if (parsed.problems.length) throw new Error(parsed.problems[0]);
   const keys = Object.keys(patch);
-  return saveFile(bots, id, BOT_JSON, botFileText(parsed.bot), expect, keys.some((k) => ['name', 'icon', 'color', 'description', 'projects'].includes(k)) ? 'Identity' : 'Model');
+  return saveFile(bots, id, BOT_JSON, botFileText(parsed.bot), expect, keys.some((k) => ['name', 'icon', 'color', 'description', 'projects'].includes(k)) ? 'Identity' : keys.includes('triggers') ? 'Triggers' : 'Model');
 }
 
 /** A skill (or sub-agent) written: its header must read, its name must be a folder's. */
