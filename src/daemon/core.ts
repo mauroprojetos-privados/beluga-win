@@ -27,7 +27,7 @@ import { launchTriage, sendAutomatic } from '../core/triage/launch.js';
 import { AutoContinue } from '../core/auto-continue.js';
 import { ComboFailover } from '../core/routing/failover.js';
 import { launchAssistant } from '../core/assistant/launch.js';
-import { launchStack } from '../core/stack/launch.js';
+import { launchStack, watchClaudeByKind } from '../core/stack/launch.js';
 import { launchThreads, threadsOf } from '../core/threads/launch.js';
 import { launchChat } from '../core/chat/launch.js';
 import { launchCalls } from '../core/calls/launch.js';
@@ -397,6 +397,7 @@ export async function buildCore(input: Config, hooks: CoreHooks, opts: { readonl
   let stopAutoContinue = (): void => undefined;
   let stopAssistant = (): void => undefined;
   let stopStack = (): void => undefined;
+  let stopClaudeByKind = (): void => undefined;
   let stopThreads = (): void => undefined;
   let stopCompanion = async (): Promise<void> => undefined;
   let stopExternal = async (): Promise<void> => undefined;
@@ -459,6 +460,7 @@ export async function buildCore(input: Config, hooks: CoreHooks, opts: { readonl
     if (opts.network) stopAssistant = launchAssistant({ session, store, demo: Boolean(demo) });
     // Your stack (docs/stack.md): Ollama, OpenViking, hooktop and the agents' tools, looked at and started; new projects set up for it.
     if (opts.network && !demo) stopStack = launchStack({ session, store });
+    if (!demo) stopClaudeByKind = watchClaudeByKind(session, store);
     // Child threads your agents start (core/threads): the tools show only with prefs.agentThreads on.
     if (opts.network) stopThreads = launchThreads(session);
     if (opts.network) stopClaudeCode = launchClaudeCode({ session, store, demo: Boolean(demo), notify: (e) => session.notifier.notify(e) });
@@ -507,6 +509,7 @@ export async function buildCore(input: Config, hooks: CoreHooks, opts: { readonl
     stopFriendShares();
     stopAssistant();
     stopStack();
+    stopClaudeByKind();
     stopThreads();
     stopSentinel();
     stopTriage();

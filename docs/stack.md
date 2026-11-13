@@ -43,7 +43,7 @@ Routing (docs/routing.md) picks a combo per kind of work and per plan role. **Cl
 | Claude: Sonnet first (`claude-sonnet`) | Sonnet → Opus → Haiku | Deep, Visual, Review | milestones, checks, PR review |
 | Claude: Haiku first (`claude-haiku`) | Haiku → Sonnet | Quick, Docs, Explore | |
 
-The chain is what fails over when a model hits its usage limit. It's set **once by itself** when the daemon starts and you never chose combos for kinds or roles (`~/.beluga/stack.json` remembers it, so clearing them later sticks). After that, it's a button in Settings › Agent › Combos › By kind of work (`routing.useClaudeByKind`). Your own combos are kept; the three are added beside them.
+The chain is what fails over when a model hits its usage limit. It's set **once by itself**, as soon as Claude is ready on this computer (installed and signed in), with or without a network, and you never chose combos for kinds or roles. Never in the demo, and never on a computer without Claude (`~/.beluga/stack.json` remembers it, so clearing them later sticks). After that, it's a button in Settings › Agent › Combos › By kind of work (`routing.useClaudeByKind`). Your own combos are kept; the three are added beside them.
 
 ## Code
 

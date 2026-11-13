@@ -7,7 +7,7 @@ import { needsYou } from '../src/companion/needs-you.js';
 import { CLAUDE_KIND_CATEGORIES, CLAUDE_KIND_COMBOS, CLAUDE_KIND_ROLES, claudeByKind } from '../src/core/routing/presets.js';
 import { DEFAULT_COMBOS, MAX_COMBOS } from '../src/core/routing/model.js';
 import { STACK_EXCLUDES, bootstrapProject, docPaths, stackSetup, vikingParent } from '../src/core/stack/bootstrap.js';
-import { claudeByKindOnce } from '../src/core/stack/launch.js';
+import { claudeByKindOnce, watchClaudeByKind } from '../src/core/stack/launch.js';
 import { StackMonitor, setUpWords } from '../src/core/stack/monitor.js';
 import { type RunResult, type StackDeps, findTool, lookAll, openVikingUrl } from '../src/core/stack/probe.js';
 import { STACK_CHECKS, stackProblems } from '../src/core/stack-store.js';
@@ -233,5 +233,55 @@ describe('your stack: Claude by kind of work', () => {
     const other = path.join(path.dirname(file), 'other.json');
     expect(claudeByKindOnce(session, theirs, other)).toBe(true);
     expect(set).toHaveLength(1);
+  });
+
+  describe('waits for Claude', () => {
+    const fresh = () => {
+      const file = path.join(mkdtempSync(path.join(os.tmpdir(), 'beluga-stack-')), 'stack.json');
+      return { file, store: new Store(initialState('room')), set: [] as unknown[] };
+    };
+    const claude = (available: boolean, state?: 'ready' | 'missing' | 'signed_out') => ({ type: 'runtimes' as const, runtimes: [{ id: 'claude', label: 'Claude', available, ...(state ? { state } : {}) }] });
+
+    it('does nothing, and writes nothing, while Claude is only the initial placeholder or not in the list', () => {
+      const { file, store, set } = fresh();
+      const stop = watchClaudeByKind({ setPrefs: (p: unknown) => void set.push(p) }, store, file);
+      store.dispatch({ type: 'runtimes', runtimes: [{ id: 'codex', label: 'Codex', available: true }] });
+      expect(set).toHaveLength(0);
+      expect(existsSync(file)).toBe(false);
+      stop();
+    });
+
+    it('sets it once when Claude shows up available, even if setPrefs dispatches', () => {
+      const { file, store, set } = fresh();
+      const session = { setPrefs: (p: unknown) => { set.push(p); store.dispatch({ type: 'prefs', prefs: p as never }); } };
+      const stop = watchClaudeByKind(session, store, file);
+      store.dispatch(claude(true, 'ready'));
+      expect(set).toHaveLength(1);
+      expect(JSON.parse(readFileSync(file, 'utf8')).claudeByKind).toBeGreaterThan(0);
+      store.dispatch(claude(true, 'ready'));
+      store.dispatch({ type: 'runtimes', runtimes: [] });
+      store.dispatch(claude(true, 'ready'));
+      expect(set).toHaveLength(1);
+      stop();
+    });
+
+    it('waits while Claude is missing or signed out', () => {
+      const { file, store, set } = fresh();
+      const stop = watchClaudeByKind({ setPrefs: (p: unknown) => void set.push(p) }, store, file);
+      store.dispatch(claude(false, 'missing'));
+      store.dispatch(claude(false, 'signed_out'));
+      expect(set).toHaveLength(0);
+      expect(existsSync(file)).toBe(false);
+      stop();
+    });
+
+    it('leaves roles you already chose alone', () => {
+      const { file, store, set } = fresh();
+      store.dispatch({ type: 'prefs', prefs: { roleCombos: { planHead: 'economy' } } });
+      const stop = watchClaudeByKind({ setPrefs: (p: unknown) => void set.push(p) }, store, file);
+      store.dispatch(claude(true, 'ready'));
+      expect(set).toHaveLength(0);
+      stop();
+    });
   });
 });

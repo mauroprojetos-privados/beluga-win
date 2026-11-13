@@ -157,6 +157,8 @@ record counts. Its Agent line says which combo it starts on and why ("Strong (by
 
 **Settings › Agent › Combos › By role** (`prefs.roleCombos`): the combo each of these runs on.
 
+Until you choose, the roles already come with the Plan head on Opus and the rest on Sonnet, when Claude is installed (docs/stack.md).
+
 - **Plan head**: a new plan's own conversation.
 - **Milestones**: a plan's milestone agents and its tasks, when the plan names no agent.
 - **Checker**: a milestone's check and a draft's review, over the plan's agent. A combo that starts
