@@ -48,12 +48,16 @@ export interface BoardWorkDeps {
   readonly findPr?: (dir: string, branch: string) => Promise<IssuePr | undefined>;
   /** How often to look for merged pull requests of tasks nobody watches any more (0: only when asked). */
   readonly sweepMs?: number;
+  /** How long after the start open tasks with no kind are classified (0: never by itself). */
+  readonly classifyOpenMs?: number;
   /** A run stopped a task it can't do as written (task_stop), with why: a plan's agent takes it from there (see PlansWork.taskStopped). */
   readonly onTaskStopped?: (issueId: string, reason: string) => void;
 }
 
 /** Looking for shipped work: soon after start, then every ten minutes. */
 const SWEEP_FIRST_MS = 30_000;
+/** Open tasks with no kind are looked at this long after the start (once per start; classified ones are skipped). */
+const CLASSIFY_FIRST_MS = 30_000;
 const SWEEP_MS = 10 * 60_000;
 
 const WS = 'ws:';
@@ -105,6 +109,13 @@ export class BoardWork {
       ),
     );
     for (const ws of this.workspaces()) this.names.set(ws.id, ws.name);
+    // Tasks from before classifying get their kind too, so every task starts on its kind's combo.
+    const classifyIn = deps.classifyOpenMs ?? CLASSIFY_FIRST_MS;
+    if (deps.classifyTask && classifyIn > 0) {
+      const look = setTimeout(() => void this.classifyOpen(), classifyIn);
+      look.unref?.();
+      this.offs.push(() => clearTimeout(look));
+    }
     const every = deps.sweepMs ?? SWEEP_MS;
     if (deps.findPr && every > 0) {
       const first = setTimeout(() => void this.sweepShipped(), Math.min(SWEEP_FIRST_MS, every));
@@ -328,18 +339,34 @@ export class BoardWork {
    * (docs/routing.md). Nothing to look with, or it says nothing: it keeps none.
    */
   classifyLater(ref: string): void {
+    void this.classify(ref);
+  }
+
+  /** One task's kind from a quick look → whether it got one. */
+  private async classify(ref: string): Promise<boolean> {
     const look = this.deps.classifyTask;
     const issue = this.board.get(ref);
-    if (!look || !issue || issue.category) return;
-    void look({ title: issue.title, ...(issue.brief.goal ? { goal: issue.brief.goal } : {}) })
-      .catch(() => undefined)
-      .then((kind) => {
-        try {
-          if (kind) this.board.setClassified(issue.id, kind.category, kind.why);
-        } catch {
-          // Deleted meanwhile.
-        }
-      });
+    if (!look || !issue || issue.category) return false;
+    const kind = await look({ title: issue.title, ...(issue.brief.goal ? { goal: issue.brief.goal } : {}) }).catch(() => undefined);
+    try {
+      if (kind) this.board.setClassified(issue.id, kind.category, kind.why);
+      return Boolean(kind);
+    } catch {
+      return false; // Deleted meanwhile.
+    }
+  }
+
+  /**
+   * Open tasks with no kind yet (made before tasks were classified, or when the look said nothing):
+   * looked at one at a time, so they start on their kind's combo like new ones (docs/routing.md).
+   * Finished ones are left alone. → how many got a kind.
+   */
+  async classifyOpen(): Promise<number> {
+    if (!this.deps.classifyTask) return 0;
+    const open = this.deps.store.getState().board.issues.filter((i) => !i.category && !['done', 'canceled', 'in_plan'].includes(i.status));
+    let got = 0;
+    for (const i of open) if (await this.classify(i.id)) got++;
+    return got;
   }
 
   /** The tasks after the first that one New Task message asked for, and who each is for (BLG-319). */

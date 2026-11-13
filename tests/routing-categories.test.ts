@@ -92,6 +92,33 @@ describe('Phase 3: a task keeps its kind, and your change is a correction', () =
     await new Promise((r) => setTimeout(r, 0));
     expect(board.get(b.id)).toMatchObject({ category: 'deep', categoryBy: 'you' });
   });
+
+  it('open tasks from before classifying get a kind too, one at a time; finished ones and ones with a kind are left alone', async () => {
+    let busy = 0;
+    let most = 0;
+    const asked: string[] = [];
+    const { board, work } = setup(async (t) => {
+      asked.push(t.title);
+      most = Math.max(most, ++busy);
+      await new Promise((r) => setTimeout(r, 1));
+      busy--;
+      return t.title === 'Unsure' ? undefined : { category: 'deep', why: 'Real work' };
+    });
+    const old = board.create({ projectId: 'api', title: 'Old task' }, work.me());
+    const unsure = board.create({ projectId: 'api', title: 'Unsure' }, work.me());
+    const kinded = board.create({ projectId: 'api', title: 'Has one' }, work.me());
+    board.update(kinded.id, { category: 'docs' }, work.me());
+    const done = board.create({ projectId: 'api', title: 'Shipped' }, work.me());
+    board.update(done.id, { status: 'done' }, work.me());
+    expect(await work.classifyOpen()).toBe(1);
+    expect(asked.sort()).toEqual(['Old task', 'Unsure']);
+    expect(most).toBe(1);
+    expect(board.get(old.id)).toMatchObject({ category: 'deep', categoryBy: 'classifier' });
+    expect(board.get(unsure.id)?.category).toBeUndefined();
+    expect(board.get(kinded.id)).toMatchObject({ category: 'docs', categoryBy: 'you' });
+    // Nothing to look with: nothing happens.
+    expect(await setup().work.classifyOpen()).toBe(0);
+  });
 });
 
 describe('Phase 5: success, savings and suggestions', () => {

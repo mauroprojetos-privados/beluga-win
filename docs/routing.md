@@ -141,7 +141,9 @@ It also says what **kind of work** the task is, with one line of why (`Issue.cat
 
 A task made by hand (no drafter wrote it), or one whose drafter named no kind, gets a quick Haiku
 look in the background (`classifyTask`, a side call through `routeSideCall` like the others); one
-you set meanwhile stays. **Settings › Agent › Combos › By kind of work** maps each kind to a combo and,
+you set meanwhile stays. Open tasks still without a kind (made before tasks were classified) get
+the same look 30 seconds after the engine starts, one at a time (`BoardWork.classifyOpen`); finished
+ones are left alone, and once a task has a kind it isn't asked about again. **Settings › Agent › Combos › By kind of work** maps each kind to a combo and,
 optionally, an effort (`prefs.categoryCombos`).
 
 A task starts on (`taskRoute`): **its own agent › its kind's combo › its difficulty's combo › your
