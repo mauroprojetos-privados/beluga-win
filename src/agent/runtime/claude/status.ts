@@ -52,11 +52,18 @@ const run: Run = (bin, args) =>
     });
   });
 
-/** What `claude auth status --json` says: signed in, signed out, or undefined when it said nothing we read. */
-export function readAuthStatus(stdout: string): boolean | undefined {
+/**
+ * What `claude auth status --json` says: signed in, signed out, or undefined when it said nothing we
+ * read. It answers without the network, so `loggedIn` stays true once a claude.ai login can no longer
+ * be renewed; `loginExpiresAt` (the refresh token's end) in the past means every run fails with
+ * "OAuth session expired and could not be refreshed": that's signed out.
+ */
+export function readAuthStatus(stdout: string, now = Date.now()): boolean | undefined {
   try {
-    const json = JSON.parse(stdout) as { loggedIn?: unknown };
-    return typeof json.loggedIn === 'boolean' ? json.loggedIn : undefined;
+    const json = JSON.parse(stdout) as { loggedIn?: unknown; loginExpiresAt?: unknown };
+    if (typeof json.loggedIn !== 'boolean') return undefined;
+    const ends = typeof json.loginExpiresAt === 'string' ? Date.parse(json.loginExpiresAt) : Number.NaN;
+    return json.loggedIn && !(ends <= now);
   } catch {
     return undefined;
   }

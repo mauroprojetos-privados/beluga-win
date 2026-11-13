@@ -10,6 +10,7 @@ import { Store, initialState } from '../src/core/store.js';
 import { Workbench, withRuntimeStatus } from '../src/core/workbench.js';
 import type { WorkspaceController } from '../src/core/workspace-controller.js';
 import { type RuntimeChoice, runtimeChoices } from '../src/shared/agent-runtimes.js';
+import { encodeFailure } from '../src/shared/run-failure.js';
 import { agentRows, awaitingAgent, pickDefault } from '../packages/mac/src/onboarding/agent-setup.js';
 import { STEPS, groupOf, inTour, stepBy } from '../packages/mac/src/onboarding/onboarding-model.js';
 
@@ -25,6 +26,18 @@ describe('is Claude Code signed in here', () => {
     expect(readAuthStatus(SIGNED_OUT)).toBe(false);
     expect(readAuthStatus('error: unknown command auth')).toBeUndefined();
     expect(readAuthStatus('{}')).toBeUndefined();
+  });
+
+  it('a claude.ai login that can no longer be renewed is signed out, though it still says loggedIn', () => {
+    // Claude Code 2.1.309 adds loginExpiresAt: when its refresh token ends.
+    const until = (at: string) => JSON.stringify({ loggedIn: true, authMethod: 'claude.ai', apiProvider: 'firstParty', loginExpiresAt: at });
+    const now = Date.parse('2026-11-13T12:00:00Z');
+    expect(readAuthStatus(until('2026-12-12T00:38:36.508Z'), now)).toBe(true);
+    expect(readAuthStatus(until('2026-11-01T00:00:00Z'), now)).toBe(false);
+    // Unreadable or absent: as before, loggedIn decides.
+    expect(readAuthStatus(until('soon'), now)).toBe(true);
+    expect(readAuthStatus(SIGNED_IN, now)).toBe(true);
+    expect(readAuthStatus(JSON.stringify({ loggedIn: false, loginExpiresAt: '2027-01-01T00:00:00Z' }), now)).toBe(false);
   });
 
   it('asks the binary: ready, or not signed in with how to sign in', async () => {
@@ -78,7 +91,7 @@ describe('the runtimes as the pickers have them', () => {
     expect(listed().find((r) => r.id === 'local')).toMatchObject({ available: false, state: 'no_endpoint' });
   });
 
-  const bench = (found: Array<{ id: string } & RuntimeStatus>, local: { on: boolean }) => {
+  const bench = (found: Array<{ id: string } & RuntimeStatus>, local: { on: boolean }, more: Partial<ConstructorParameters<typeof Workbench>[0]> = {}) => {
     const store = new Store(initialState('t', 'ask'));
     const status = vi.fn(async () => found);
     const wb = new Workbench({
@@ -91,6 +104,7 @@ describe('the runtimes as the pickers have them', () => {
       setPrefs: () => undefined,
       listRuntimes: () => listed(local.on),
       runtimeStatus: status,
+      ...more,
     });
     return { wb, store, status };
   };
@@ -105,6 +119,23 @@ describe('the runtimes as the pickers have them', () => {
     const after = store.getState().runtimes;
     expect(after.find((r) => r.id === 'codex')).toMatchObject({ available: true, state: 'ready', models: codexModels });
     expect(after.find((r) => r.id === 'local')).toMatchObject({ available: true, models: [{ value: 'ollama/qwen3' }] });
+    wb.stop();
+  });
+
+  it('a run that ends signed out (a login that ran out while ready) asks again at once; another failure does not', async () => {
+    const found: Array<{ id: string } & RuntimeStatus> = [{ id: 'claude', state: 'ready', models: [] }];
+    const { wb, store, status } = bench(found, { on: false }, { hasGh: async () => false, listShells: () => [] });
+    wb.start();
+    await vi.waitFor(() => expect(store.getState().runtimes.find((r) => r.id === 'claude')).toMatchObject({ state: 'ready' }));
+    const asked = status.mock.calls.length;
+    const ended = (text: string) => store.dispatch({ type: 'agent_event', owner: 'p', requestId: `r-${Math.random()}`, requester: 'p', event: 'error', text, ts: Date.now(), channel: 'ws:a' });
+    ended(encodeFailure({ kind: 'network', detail: 'socket hang up' }));
+    await new Promise((r) => setTimeout(r, 10));
+    expect(status).toHaveBeenCalledTimes(asked);
+    found.splice(0, 1, { id: 'claude', state: 'signed_out', fix: CLAUDE_SIGN_IN, models: [] });
+    ended(encodeFailure({ kind: 'signed_out', detail: 'Failed to authenticate: OAuth session expired and could not be refreshed' }));
+    await vi.waitFor(() => expect(store.getState().runtimes.find((r) => r.id === 'claude')).toMatchObject({ available: false, state: 'signed_out' }));
+    expect(status).toHaveBeenCalledTimes(asked + 1);
     wb.stop();
   });
 

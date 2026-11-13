@@ -23,7 +23,7 @@ import type { ScriptFix, SetupFix, WorkedOutScripts } from '../agent/setup-fixer
 import type { SetupTools } from '../agent/types.js';
 import { buildSetupAppend } from '../agent/prompt.js';
 import { claudeCodeCommand } from '../agent/claude-code.js';
-import { CONTINUE_PROMPT } from '../shared/run-failure.js';
+import { CONTINUE_PROMPT, decodeFailure } from '../shared/run-failure.js';
 import type { NoticeEvent } from './notify.js';
 import { type SearchSource, searchConversations } from './search.js';
 import { type LogItem, type MergedMark, type Prefs, type Store, mergedText, shippedText } from './store.js';
@@ -287,6 +287,7 @@ export class Workbench {
   private diskTimer?: NodeJS.Timeout;
   private agentTimer?: NodeJS.Timeout;
   private agentEvery?: NodeJS.Timeout;
+  private offSignedOut?: () => void;
   /** The round of measuring under way: a second ask joins it rather than walking every folder again. */
   private measuring?: Promise<void>;
   private prTimer?: NodeJS.Timeout;
@@ -355,6 +356,11 @@ export class Workbench {
     if (runtimes) this.deps.store.dispatch({ type: 'runtimes', runtimes });
     this.refreshModels();
     void this.checkRuntimes();
+    // A ready runtime isn't asked again by the timer: a run that ends signed out (a login that ran out
+    // meanwhile) asks now, so the pickers and routing stop treating it as ready.
+    this.offSignedOut = this.deps.store.onAction?.((a) => {
+      if (a.type === 'agent_event' && a.event === 'error' && decodeFailure(a.text)?.kind === 'signed_out') void this.checkRuntimes();
+    });
     // Claude Code kept current, quietly: a newer one's models (a new Opus) show in the picker once it's in.
     if (this.deps.updateAgent) {
       const update = (): void => void this.deps.updateAgent!().then((moved) => moved && this.refreshModels(), () => undefined);
@@ -381,6 +387,7 @@ export class Workbench {
     clearInterval(this.diskTimer);
     clearInterval(this.prTimer);
     clearTimeout(this.runtimeTimer);
+    this.offSignedOut?.();
     for (const off of this.watchers.values()) off();
     this.deps.terminals?.closeAll();
   }
