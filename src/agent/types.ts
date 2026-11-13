@@ -323,6 +323,8 @@ export interface BoardTools {
   ): string;
   editBrief(key: string | undefined, section: 'goal' | 'context' | 'acceptance' | 'decisions' | 'questions' | 'handoff', content: string, reason?: string, mode?: 'replace' | 'append'): string;
   note(key: string | undefined, text: string): string;
+  /** Stop a task the run can't do as written, with why: it leaves the run's queue and the plan's agent rewrites it. */
+  stop(key: string | undefined, reason: string): string;
   relate(key: string | undefined, relation: 'blocked_by' | 'blocks' | 'related', other: string, remove?: boolean): string;
   attachProof(key: string | undefined, proof: { readonly kind: 'image' | 'url' | 'file' | 'graph' | 'text'; readonly title: string; readonly path?: string; readonly url?: string; readonly body?: string }): string;
 }

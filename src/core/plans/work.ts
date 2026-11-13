@@ -13,7 +13,7 @@ import { coherenceWarnings, warningsText } from './coherence.js';
 import { DraftReviewer } from './draft-review.js';
 import { dropEpics, syncEpics } from './epics.js';
 import type { BodyInput, PlanOp, TaskInput } from './edit.js';
-import { type Autonomy, type Plan, type TestsAt, activeDecisions, allTasks, checkerOf, planForHome, planTaskOfIssue, planTitle, reviewerOf } from './model.js';
+import { type Autonomy, FAILS_TO_PAUSE, type Plan, type TestsAt, activeDecisions, allTasks, checkerOf, planForHome, planTaskOfIssue, planTitle, reviewerOf } from './model.js';
 import { PlanMover } from './move-work.js';
 import { issueForWorkspace } from '../board/model.js';
 import { type PilotDeps, PlanPilot } from './pilot.js';
@@ -73,6 +73,9 @@ export class PlansWork {
   /** A fresh agent's read of each first draft, before Approve Plan (see draft-review.ts). */
   readonly reviewer: DraftReviewer;
 
+  /** What the plans do in git (the one given, or the controller's). */
+  private readonly git: PlanGit | undefined;
+
   constructor(private readonly deps: PlansWorkDeps) {
     this.plans = deps.plans;
     this.reviewer = new DraftReviewer({
@@ -103,6 +106,7 @@ export class PlansWork {
       ...(deps.delayMs !== undefined ? { delayMs: deps.delayMs } : {}),
     });
     const git = deps.git === null ? undefined : (deps.git ?? (deps.controller?.manager ? planGitOf(deps.controller) : undefined));
+    this.git = git;
     this.pilot = new PlanPilot({
       store: deps.store,
       plans: deps.plans,
@@ -155,6 +159,19 @@ export class PlansWork {
     deps.board.setBriefExtra((issue) => this.workerBrief(issue));
     // A milestone's worktree: its one Claude gets the milestone (its tasks in order, where each stands).
     deps.board.setRunBrief((channel) => this.milestoneBrief(channel));
+    // A milestone's agent stopping a task with why (task_stop): its plan's agent rewrites it.
+    deps.board.setOnTaskStopped((issueId, reason) => this.taskStopped(issueId, reason));
+  }
+
+  /** A run stopped a task (task_stop): nothing happens unless it's a task of a plan (see PlanPilot.taskStopped). */
+  taskStopped(issueId: string, reason: string): void {
+    this.pilot.taskStopped(issueId, reason);
+  }
+
+  /** A task started again goes back to its agent's queue (it was stopped by it). */
+  private startedAgain(planId: string, task: string): void {
+    const hit = allTasks(this.plans.need(planId).body).find((t) => t.task.id === task || (t.task.issueId && this.deps.board.board.get(t.task.issueId)?.key === task.toUpperCase()));
+    if (hit) this.plans.clearStopped(planId, hit.task.id);
   }
 
   stop(): void {
@@ -438,7 +455,7 @@ export class PlansWork {
 
   /** `agent` (Start with…, BLG-506): who works it this once; none: the task's own, the plan's, or your default. */
   startTask(id: string, task: string, agent?: AgentRef): Promise<string> {
-    return this.pilot.startNow(id, task, this.me(), agent);
+    return this.pilot.startNow(id, task, this.me(), agent).then((said) => (this.startedAgain(id, task), said));
   }
 
   /** Wake a task whose Claude stopped without finishing (Resume on its card). */
@@ -564,7 +581,12 @@ export class PlansWork {
           return `${said} Your check is done: end your turn.`;
         }
         this.deps.store.dispatch({ type: 'system', channel: plan.home, text: `“${m.title}” didn’t pass its check: ${first}`, level: 'info' });
-        this.deps.askClaude(checkFailedPrompt(m.title, notes, auto), plan.home, false);
+        const fails = this.plans.need(planId).runs[m.id]?.fails ?? 1;
+        if (fails >= FAILS_TO_PAUSE) {
+          this.plans.setPaused(planId, true, { kind: 'beluga' }, `“${m.title}” failed its check ${fails} times`);
+          return 'Recorded as failed. The plan is paused for the user: this milestone failed too many times. End your turn.';
+        }
+        this.deps.askClaude(checkFailedPrompt(m.title, notes, auto, fails), plan.home, false);
         return 'Recorded as failed. The plan’s Claude adds the fix tasks from your notes. Your check is done: end your turn.';
       },
     };
@@ -610,6 +632,8 @@ export class PlansWork {
       const before = plans.need(planId);
       const was = planTitle(before);
       const plan = change();
+      const git = this.git;
+      if (git?.head && !plan.plannedAt) void git.head(plan.projectId, 'HEAD').then((sha) => sha && this.plans.setPlannedAt(plan.id, sha)).catch(() => undefined);
       this.nameHome(plan, was);
       this.syncHomeTask(plan);
       if (!plan.draft) return 'The plan is unchanged.';
@@ -645,7 +669,7 @@ export class PlansWork {
         const auto = (m.autonomy ?? plan.autonomy) === 'autopilot';
         return verdict === 'pass' ? (auto ? 'Recorded: the milestone passes and the plan moves on.' : 'Recorded: the user passes the milestone.') : 'Recorded as failed. Add the fix tasks with plan_update.';
       },
-      start: (task) => this.pilot.startNow(planId, task, by()),
+      start: (task) => this.pilot.startNow(planId, task, by()).then((said) => (this.startedAgain(planId, task), said)),
       message: (task, text, mode = 'queue') => {
         const plan = plans.need(planId);
         const hit = allTasks(plan.body).find((t) => t.task.id === task || (t.task.issueId && this.deps.board.board.get(t.task.issueId)?.key === task.toUpperCase()));

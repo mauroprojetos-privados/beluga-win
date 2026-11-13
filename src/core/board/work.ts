@@ -48,6 +48,8 @@ export interface BoardWorkDeps {
   readonly findPr?: (dir: string, branch: string) => Promise<IssuePr | undefined>;
   /** How often to look for merged pull requests of tasks nobody watches any more (0: only when asked). */
   readonly sweepMs?: number;
+  /** A run stopped a task it can't do as written (task_stop), with why: a plan's agent takes it from there (see PlansWork.taskStopped). */
+  readonly onTaskStopped?: (issueId: string, reason: string) => void;
 }
 
 /** Looking for shipped work: soon after start, then every ten minutes. */
@@ -75,8 +77,16 @@ export class BoardWork {
   /** Tasks Claude is writing from a description (by id): starting one waits for its words. */
   private readonly drafts = new Map<string, Promise<void>>();
 
+  /** Told when a run stops a task (see BoardWorkDeps.onTaskStopped); the plans' work sets it when there is no dependency to pass. */
+  private onTaskStopped: ((issueId: string, reason: string) => void) | undefined;
+
+  setOnTaskStopped(fn: (issueId: string, reason: string) => void): void {
+    this.onTaskStopped = fn;
+  }
+
   constructor(private readonly deps: BoardWorkDeps) {
     this.board = deps.board;
+    this.onTaskStopped = deps.onTaskStopped;
     if (deps.controller) this.offs.push(deps.controller.onWorktree((e) => this.onWorktree(e)));
     // An epic's worktree works in its sub-tasks' worktrees in other repos too (BLG-561).
     if (deps.controller?.setAlsoIn) this.offs.push(deps.controller.setAlsoIn((id) => this.alsoIn(id).map((w) => w.path)));
@@ -948,6 +958,14 @@ export class BoardWork {
         return `Updated the ${section} of ${next.key}`;
       },
       note: (key, text) => `Noted on ${board.comment(pick(key).id, text, by()).key}`,
+      stop: (key, reason) => {
+        const issue = pick(key);
+        board.comment(issue.id, `Stopped: ${reason}`, by());
+        // Not under way any more: back in To Do (queued in its worktree), so the watchdog doesn't wake it and Start can take it again.
+        if (issue.status === 'in_progress') board.update(issue.id, { status: 'todo' }, by());
+        this.onTaskStopped?.(issue.id, reason);
+        return 'Stopped. The plan’s agent rewrites it; go on with your other tasks.';
+      },
       relate: (key, relation, other, remove) => {
         if (home) pick(other);
         const next = board.relate(pick(key).id, relation, other, !remove, by());

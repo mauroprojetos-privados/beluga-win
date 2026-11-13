@@ -35,6 +35,12 @@ export const TESTS_AT_INFO: Readonly<Record<TestsAt, { readonly label: string; r
 /** A new plan's autonomy. */
 export const DEFAULT_AUTONOMY: Autonomy = 'gated';
 
+/** A command that proves an acceptance criterion, and what it prints when it works. */
+export interface PlanVerify {
+  readonly run: string;
+  readonly expect: string;
+}
+
 /** One task of a plan, before and after it's on the board. */
 export interface PlanTask {
   /** Stable inside the plan ("auth-api"): Claude names tasks by it, and it survives re-planning. */
@@ -53,6 +59,14 @@ export interface PlanTask {
   readonly labels?: readonly string[];
   /** Files or areas it changes: tasks that run side by side shouldn't share them. */
   readonly touches?: readonly string[];
+  /** How to prove it: a command per acceptance criterion and what it prints when it works. */
+  readonly verify?: readonly PlanVerify[];
+  /** Files or areas that look related but must not be changed. */
+  readonly outOfScope?: readonly string[];
+  /** When to stop this task and say why, instead of improvising. */
+  readonly stopIf?: readonly string[];
+  /** A file in the repository that already follows the pattern to copy. */
+  readonly exemplar?: string;
   /** Who works on it: your Claude (the default) or you. */
   readonly assignee?: 'claude' | 'me';
   /** Yours (assignee "me"): what you're asked when it's ready, in the plan's conversation (see decisions.ts). */
@@ -169,7 +183,16 @@ export interface MilestoneRun {
    * agent starts from the branch its agent there left (its work so far), not from the plan's.
    */
   readonly resumeFrom?: string;
+  /** How many times its check failed (fix rounds so far). */
+  readonly fails?: number;
+  /** Tasks its agent stopped, with why (plan task id): left out of its queue until the plan's agent rewrites or restarts them. */
+  readonly stopped?: Readonly<Record<string, { readonly at: number; readonly reason: string; readonly told?: boolean }>>;
 }
+
+/** Fix rounds a milestone gets as added tasks; from the next failure its plan is rewritten. */
+export const FIX_ROUNDS = 2;
+/** Failures of one milestone's check after which the plan pauses and waits for the user. */
+export const FAILS_TO_PAUSE = 5;
 
 /** Where a plan went, or came from, when it moved between your computers (BLG-806). */
 export interface PlanMove {
@@ -330,6 +353,8 @@ export interface Plan {
   readonly watch?: Readonly<Record<string, TaskWatch>>;
   /** Its branch (plan/<slug>, from main): every task starts from it, passed milestones merge into it, and it ends as one PR. */
   readonly branch?: string;
+  /** The commit the plan was written against (the project's HEAD when the planner first saved this plan): drift is looked for from here. */
+  readonly plannedAt?: string;
   /** Passed milestones being merged into the branch (by milestone id). */
   readonly merging?: Readonly<Record<string, PlanMerge>>;
   /** Main being merged into the plan's branch (its PR conflicted with main), or stopped at a conflict for Claude to fix. */

@@ -1,6 +1,6 @@
 import { type Criterion, criteria, criterionLine } from '../board/criteria.js';
 import { type BoardState, STATUS_INFO, filterIssues } from '../board/model.js';
-import { AUTONOMY_INFO, type Plan, type PlanBody, type ReviewFinding, TESTS_AT_INFO, diffBodies, milestoneDeps, shownBody } from './model.js';
+import { AUTONOMY_INFO, FIX_ROUNDS, type Plan, type PlanBody, type PlanTask, type ReviewFinding, TESTS_AT_INFO, diffBodies, milestoneDeps, shownBody } from './model.js';
 import { coherenceWarnings } from './coherence.js';
 import { type MilestoneView, type PlanView, type TaskView, agentTasks, overlaps } from './progress.js';
 
@@ -81,6 +81,10 @@ const HOW_TO_PLAN = [
   '  what only the user can do (accounts, secrets, decisions). A task for "me" never gets a worktree: when it\'s',
   '  ready, the user is asked in this conversation. Give it a `decision`: the question, a few options (multi: true',
   '  when several can be picked); they can always write their own. Their answer is recorded on the task and the plan goes on.',
+  '- Write each task for a smaller model that has never seen this conversation. Put in its context what it needs',
+  '  (exact paths, how the code is today in a few lines). For a task of 2 points or more, also give: `verify`, one',
+  '  command per acceptance criterion and what it prints when it works; `out_of_scope`, what is tempting to change',
+  '  but must not be; `stop_if`, what you could not confirm by reading the code (at most 6); and an `exemplar` file.',
   '- Use short, stable ids (like "auth-api"): keep them when you revise, so tasks keep their history.',
   '- Ask for proof that fits: a task writes the tests it needs and runs typecheck and those tests; the e2e and full',
   '  suites run once per milestone, at its check, on the combined work (or only at the end, if the plan says so).',
@@ -369,14 +373,28 @@ export function checkPrompt(view: PlanView, m: MilestoneView, opts: { readonly c
     .join('\n');
 }
 
+/** A milestone's agent stopped a task with why (task_stop): the head Claude fixes the task, not the code. */
+export function stoppedPrompt(key: string, title: string, reason: string, stopIf: readonly string[], autopilot: boolean): string {
+  return [
+    `${key} “${title}” was stopped by its milestone's agent: ${reason}`,
+    stopIf.length ? `Its stop conditions were: ${stopIf.join('; ')}.` : '',
+    'Fix the task, not the code: rewrite it with plan_update update_task (sharper context with real paths, verify, stop_if), split it, or give it to the user (assignee "me") if it is a decision. Then plan_start_task if it should run again.',
+    autopilot ? 'Don\'t stop to ask the user: decide yourself.' : 'Propose the change; the user approves it.',
+  ]
+    .filter((l) => l !== '')
+    .join('\n');
+}
+
 /** A milestone's checker failed it: the head Claude turns its notes into fix tasks. */
-export function checkFailedPrompt(title: string, notes: string, autopilot: boolean): string {
+export function checkFailedPrompt(title: string, notes: string, autopilot: boolean, fails = 1): string {
   return [
     `The checker of milestone “${title}” failed it. Its notes:`,
     '',
     notes.trim(),
     '',
-    `Add the tasks that fix it to this milestone with plan_update (name the criterion each one fixes in its goal)${autopilot ? ': on Autopilot they apply at once and its Claude picks them up' : '; the user approves them'}.`,
+    fails > FIX_ROUNDS
+      ? `This is failure ${fails} of “${title}”: fix tasks didn't hold, so the milestone itself needs rewriting. Call plan_get, read the milestone and these notes, and work out why the fixes failed. Then rewrite its tasks with plan_update (update_task, remove_task, add_task): sharper context with the real file paths, a verify command for each criterion, and stop_if for what you can't confirm. Don't only add another fix task.`
+      : `Add the tasks that fix it to this milestone with plan_update (name the criterion each one fixes in its goal)${autopilot ? ': on Autopilot they apply at once and its Claude picks them up' : '; the user approves them'}.`,
     autopilot ? 'Don\'t stop to ask the user: decide the fix tasks yourself.' : '',
   ]
     .filter((l, i, all) => l !== '' || all[i - 1] !== '')
@@ -489,6 +507,7 @@ export function workerNote(view: PlanView, taskId: string): string {
     `This task is part of the plan “${view.body?.title ?? ''}”, milestone ${m.index + 1} “${m.milestone.title}”.`,
     m.milestone.criteria.length ? `The milestone passes when: ${m.milestone.criteria.join('; ')}.` : '',
     me.task.touches?.length ? `This task's area: ${me.task.touches.join(', ')}.` : '',
+    guardLines(me.task, '').join('\n'),
     beside.length ? `Running beside it now, each in its own worktree (stay out of their areas):\n${beside.join('\n')}` : '',
     taskTestsNote(view.plan),
     'When every acceptance criterion is ticked and the checks pass, commit your work, rewrite the handoff, and call',
@@ -505,6 +524,16 @@ export function workerNote(view: PlanView, taskId: string): string {
 const keyOf = (t: TaskView): string => t.issue?.key ?? t.task.id;
 const clip = (text: string, n: number): string => (text.length > n ? `${text.slice(0, n).trimEnd()}…` : text);
 
+/** What a smaller model needs to stay on track: how to prove the task, what not to touch, when to stop, what to copy. */
+function guardLines(task: PlanTask, indent: string): string[] {
+  return [
+    ...(task.verify?.length ? [`${indent}Prove it:`, ...task.verify.map((v) => `${indent}- ${v.run} → ${v.expect}`)] : []),
+    ...(task.outOfScope?.length ? [`${indent}Don't touch: ${task.outOfScope.join(', ')}`] : []),
+    ...(task.stopIf?.length ? [`${indent}Stop and say why if:`, ...task.stopIf.map((s) => `${indent}- ${s}`)] : []),
+    ...(task.exemplar ? [`${indent}Follow the pattern in: ${task.exemplar}`] : []),
+  ];
+}
+
 /** One task as its milestone's Claude reads it: key, title, where it stands, its brief in short. */
 function taskBlock(t: TaskView, i: number, view: PlanView, full: boolean): string[] {
   const brief = t.issue?.brief ?? {};
@@ -520,6 +549,7 @@ function taskBlock(t: TaskView, i: number, view: PlanView, full: boolean): strin
     ...(context ? [`   Context: ${clip(context.replace(/\s+/g, ' ').trim(), 900)}`] : []),
     ...(t.task.touches?.length ? [`   Files: ${t.task.touches.join(', ')}`] : []),
     ...(acceptance ? ['   Done means:', ...acceptance.split('\n').filter((l) => l.trim()).map((l) => `   ${l.trim()}`)] : []),
+    ...guardLines(t.task, '   '),
     ...(brief.handoff ? [`   Handoff so far: ${clip(brief.handoff.replace(/\s+/g, ' ').trim(), 500)}`] : []),
   ];
 }
@@ -534,6 +564,7 @@ function milestoneHow(plan: Plan, only: boolean): string[] {
     '  don\'t run broad searches "to understand the structure", and don\'t re-read what you read for an earlier task.',
     '- One task at a time, in the order above. For each: task_update with its key and status in_progress; make it work;',
     '  tick its criteria in its brief (task_brief_edit, section acceptance: "- [x]", or "- [ ] … — deferred: why" / "— not done: why");',
+    '  run each of its "Prove it" commands and check what it prints before you tick that criterion;',
     '  run typecheck and only the tests you added or changed; commit (one commit per task, its message starting with the key);',
     '  attach proof when you have some (task_attach_proof); a line or two of handoff (task_brief_edit, section handoff);',
     '  then task_update with status in_review. Then the next task, without stopping.',
@@ -541,14 +572,20 @@ function milestoneHow(plan: Plan, only: boolean): string[] {
     '- No pull requests, no merging: this branch is merged into the plan when the milestone passes.',
     '- A task only the user can decide: say what you need in one line with task_note on it, go on with the tasks that don\'t',
     '  need it, and end your turn when nothing else is left (Beluga asks them, and tells you when they answered).',
-    only ? '- The user starts each task of this milestone: do only the task(s) you were given, then end your turn.' : '- When your last task is In Review, end your turn with one line per task.',
+    '- If one of a task\'s "Stop and say why if" happens, or its context is wrong, call task_stop on it with what you saw, and go on with the tasks that don\'t build on it. Never work around it.',
+    ...(only ? ['- The user starts each task of this milestone: do only the task(s) you were given, then end your turn.'] : ['- When your last task is In Review or stopped, end your turn with this report:']),
+    '  STATUS: COMPLETE | STOPPED',
+    '  TASKS: per task, done or stopped, and what each "Prove it" command printed',
+    '  STOPPED BECAUSE: (only if stopped) which "Stop and say why if", and what you saw',
+    '  NOTES: deviations, surprises, judgment calls',
+    '  Report only what a tool result in this run shows; if a check failed or was skipped, say so.',
   ];
 }
 
 /** What a milestone's one Claude is told when it starts: the plan, the milestone, its tasks in order with their briefs, and how to work. */
-export function milestonePrompt(view: PlanView, m: MilestoneView, tasks: readonly TaskView[], opts: { readonly only?: boolean; readonly base?: string } = {}): string {
+export function milestonePrompt(view: PlanView, m: MilestoneView, tasks: readonly TaskView[], opts: { readonly only?: boolean; readonly base?: string; readonly drift?: readonly string[] } = {}): string {
   const plan = view.plan;
-  const mine = new Set(tasks.map((t) => t.task.id));
+  const mine =new Set(tasks.map((t) => t.task.id));
   const forYou = m.tasks.filter((t) => t.forYou && !FINISHED_WORDS.has(t.state));
   const beside = view.open.filter((x) => x.milestone.id !== m.milestone.id && x.agent).map((x) => `- “${x.milestone.title}”: ${[...new Set(x.tasks.flatMap((t) => t.task.touches ?? []))].join(', ') || 'its own tasks'}`);
   return [
@@ -558,6 +595,7 @@ export function milestonePrompt(view: PlanView, m: MilestoneView, tasks: readonl
     ...(m.milestone.goal ? [`Milestone goal: ${clip(m.milestone.goal.replace(/\s+/g, ' ').trim(), 600)}`] : []),
     ...(m.milestone.criteria.length ? ['The milestone passes when:', ...m.milestone.criteria.map((c) => `- ${c}`)] : []),
     '',
+    ...(opts.drift?.length ? [`These files changed outside the plan since it was written: ${opts.drift.join(', ')}. Read them before the task that touches them; if a task's context no longer holds, say so with task_note on it and go on with the others.`, ''] : []),
     `Your tasks, in this order:`,
     ...tasks.flatMap((t, i) => taskBlock(t, i, view, true)),
     ...(forYou.length ? ['', `For the user, not you (skip them; a task of yours that waits on one comes after it's done): ${forYou.map((t) => `${keyOf(t)} “${t.task.title}”`).join(', ')}.`] : []),

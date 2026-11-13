@@ -365,6 +365,23 @@ function Milestone({ m, last, i, draft, titles, after, picked }: { m: PlanView['
                           ))}
                         </View>
                       ) : null}
+                      {shown && t.checks ? (
+                        <T v="caption" c={color.text3} style={{ marginTop: 4 }}>
+                          {say('phoneApp.plan.provedBy', { count: t.checks })}
+                        </T>
+                      ) : null}
+                      {shown && t.stopIf?.length ? (
+                        <View style={{ marginTop: 4, gap: 2 }}>
+                          <T v="caption" c={color.text3}>
+                            {say('phoneApp.plan.stopsIf')}
+                          </T>
+                          {t.stopIf.map((s) => (
+                            <T key={s} v="caption" c={color.text2}>
+                              ◦ {s}
+                            </T>
+                          ))}
+                        </View>
+                      ) : null}
                       {shown && t.why ? (
                         <T v="caption" c={color.text3} style={{ marginTop: 4 }}>
                           {t.why}

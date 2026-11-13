@@ -424,9 +424,9 @@ export function taskOrder(m: Pick<MilestoneView, 'milestone' | 'tasks'>): readon
   return waves(m.milestone).flatMap((w) => w.flatMap((t) => byId.get(t.id) ?? []));
 }
 
-/** What a milestone's Claude does (or did): its tasks that aren't the user's, canceled or gone. */
-export function agentTasks(m: Pick<MilestoneView, 'milestone' | 'tasks'>): readonly TaskView[] {
-  return taskOrder(m).filter((t) => !t.forYou && t.issue && t.state !== 'canceled' && t.state !== 'missing');
+/** What a milestone's Claude does (or did): its tasks that aren't the user's, canceled, gone or stopped by it (until they're rewritten or started again). */
+export function agentTasks(m: Pick<MilestoneView, 'milestone' | 'tasks' | 'run'>): readonly TaskView[] {
+  return taskOrder(m).filter((t) => !t.forYou && t.issue && t.state !== 'canceled' && t.state !== 'missing' && !m.run.stopped?.[t.task.id]);
 }
 
 /** Milestones whose Claude is at work (its worktree is there and it has unfinished tasks): each counts as one against the plan's limit. */

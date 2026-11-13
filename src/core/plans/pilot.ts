@@ -11,7 +11,7 @@ import { type Plan, type PlanMerge, type PlanMilestone, allTasks, openMilestones
 import type { PlanGit } from './plan-git.js';
 import type { Plans } from './plans.js';
 import { FINISHED, type MilestoneView, type PlanView, type TaskState, type TaskView, agentTasks, agentsAtWork, liveFrom, planView, startable, tidyOffer, waitingOnYou } from './progress.js';
-import { checkFailedPrompt, checkNudgePrompt, checkPrompt, criteriaNeedCheck, fixupPrompt, mainFixupPrompt, mergeFixupPrompt, milestoneNextPrompt, milestonePrompt, recapPrompt, stuckPrompt } from './prompt.js';
+import { checkFailedPrompt, checkNudgePrompt, checkPrompt, criteriaNeedCheck, fixupPrompt, mainFixupPrompt, mergeFixupPrompt, milestoneNextPrompt, milestonePrompt, recapPrompt, stoppedPrompt, stuckPrompt } from './prompt.js';
 import { TaskWatchdog } from './watchdog.js';
 import { PLAN_PR_FAST_MS, PLAN_PR_FOCUS_FRESH_MS, planPrCadence } from './pr-cadence.js';
 import { pace } from '../power-saver.js';
@@ -108,6 +108,18 @@ export const RESCUE_MS = 3 * 60_000;
 /** Steps Beluga takes for one stalled milestone, across kinds of stall, before it's yours. */
 export const MAX_RESCUES = 6;
 
+/**
+ * Files that changed since the plan was written (`changed`) that this milestone touches (`mine`, a
+ * file or a folder), leaving out what the plan's other milestones are to change themselves (`planned`).
+ */
+export function driftedPaths(changed: readonly string[], mine: readonly string[], planned: readonly string[]): string[] {
+  const within = (path: string, of: string): boolean => path === of || path.startsWith(`${of.replace(/\/+$/, '')}/`);
+  return [...new Set(changed)]
+    .filter((p) => mine.some((m) => within(p, m)) && !planned.some((o) => within(p, o)))
+    .sort()
+    .slice(0, 20);
+}
+
 
 /** Why a milestone can't be merged yet: a task of it still being worked on (undefined: none). */
 function stillWorking(m: MilestoneView): string | undefined {
@@ -159,7 +171,9 @@ export function stallOf(view: PlanView, m: MilestoneView): StallKind | undefined
   if (m.state === 'checking' || (m.state === 'gate' && m.milestone.criteria.length && !m.run.check)) return 'checking';
   if (m.state !== 'running' || m.autonomy === 'step') return undefined;
   const todo = agentTasks(m).filter((t) => !FINISHED.has(t.state));
-  return todo.some((t) => t.state === 'ready' || t.state === 'idle' || t.state === 'running') ? 'working' : undefined;
+  if (todo.some((t) => t.state === 'ready' || t.state === 'idle' || t.state === 'running')) return 'working';
+  // A task its agent stopped waits for the plan's agent to rewrite it: the ladder asks it, then you.
+  return m.tasks.some((t) => m.run.stopped?.[t.task.id] && !FINISHED.has(t.state)) ? 'working' : undefined;
 }
 
 /** How far one milestone has got: its tasks finished out of how many, its check, its merge, passed. */
@@ -396,6 +410,28 @@ export class PlanPilot {
         // Said once (a problem that stays would otherwise fill the history).
         const text = `couldn’t move the plan along: ${err instanceof Error ? err.message : String(err)}`;
         if (plan.activity.at(-1)?.text !== text) this.deps.plans.note(plan.id, 'problem', text, { kind: 'beluga' });
+      }
+    }
+  }
+
+  /**
+   * A run stopped a task (task_stop): when it's a task of a plan's milestone, it leaves that
+   * milestone's queue and the plan's agent is told, once, to rewrite it (see stoppedPrompt).
+   */
+  taskStopped(issueId: string, reason: string): void {
+    for (const plan of this.deps.plans.list()) {
+      const view = this.view(plan);
+      for (const m of view.milestones) {
+        const t = m.tasks.find((x) => x.issue?.id === issueId);
+        if (!t) continue;
+        // Stopped already and not rewritten since: the plan's agent was told.
+        if (m.run.stopped?.[t.task.id]) return;
+        const key = t.issue!.key;
+        this.deps.plans.stopTask(plan.id, m.milestone.id, t.task.id, reason, key);
+        this.deps.plans.markStopTold(plan.id, m.milestone.id, t.task.id);
+        this.deps.askClaude(stoppedPrompt(key, t.task.title, reason, t.task.stopIf ?? [], (m.autonomy ?? plan.autonomy) === 'autopilot'), plan.home, false);
+        this.schedule();
+        return;
       }
     }
   }
@@ -700,7 +736,7 @@ export class PlanPilot {
       }
       case 'failed': {
         if (tries <= 1) {
-          this.deps.askClaude(checkFailedPrompt(title, m.run.check?.notes ?? 'No notes.', true), plan.home, false);
+          this.deps.askClaude(checkFailedPrompt(title, m.run.check?.notes ?? 'No notes.', true, m.run.fails ?? 1), plan.home, false);
           return `asked the plan’s Claude to add the fix tasks for “${title}”`;
         }
         if (tries === 2) {
@@ -883,6 +919,14 @@ export class PlanPilot {
       this.deps.plans.setAgent(plan.id, milestoneId, { worktree: ws.id, ...(ws.branch ? { branch: ws.branch } : {}), at: Date.now(), tasks: ordered.map((t) => t.task.id) });
       const fresh = this.deps.plans.resumed(plan.id, milestoneId);
       const keys = ordered.map((t) => t.issue!.key);
+      // What changed outside the plan since it was written, in the files this milestone touches: said, never a stop.
+      const git = this.deps.git;
+      const mine = ordered.flatMap((t) => t.task.touches ?? []);
+      const planned = view.milestones.filter((x) => x.milestone.id !== milestoneId).flatMap((x) => x.tasks.flatMap((t) => t.task.touches ?? []));
+      const plannedAt = this.deps.plans.need(plan.id).plannedAt;
+      const changed = plannedAt && base && git?.changedFiles ? await git.changedFiles(plan.projectId, plannedAt, base).catch(() => [] as string[]) : [];
+      const drift = driftedPaths(changed, mine, planned);
+      if (drift.length) this.deps.plans.note(plan.id, 'note', `${keys.join(', ')}: ${drift.length} file(s) changed outside the plan since it was written`, { kind: 'beluga' });
       const said = `started one agent for “${m.milestone.title}” (${keys.join(', ')}) in a new worktree${base ? ` from ${base}` : ''}`;
       this.deps.plans.note(plan.id, 'started', said, by);
       const now = this.view(fresh);
@@ -890,7 +934,7 @@ export class PlanPilot {
       const channel = `ws:${ws.id}`;
       const after = this.after(channel);
       const all = new Map(mv.tasks.map((t) => [t.task.id, t]));
-      this.deps.askClaude(milestonePrompt(now, mv, ordered.map((t) => all.get(t.task.id) ?? t), { only: Boolean(only) || mv.autonomy === 'step', ...(base ? { base } : {}) }), channel, false);
+      this.deps.askClaude(milestonePrompt(now, mv, ordered.map((t) => all.get(t.task.id) ?? t), { only: Boolean(only) || mv.autonomy === 'step', ...(base ? { base } : {}), ...(drift.length ? { drift } : {}) }), channel, false);
       this.sentOn.set(key, { sig: first.issue.id, ...after, count: 0 });
       this.handed.delete(key);
       return said.charAt(0).toUpperCase() + said.slice(1);

@@ -5,7 +5,7 @@ import type { TeamOffer } from '../core/team/model.js';
 import type { PendingQuestion } from '../core/collab-store.js';
 import type { TaskView as GwTask } from '../core/gateway/model.js';
 import { parseDecisionQid } from '../core/plans/decisions.js';
-import { type Plan, planTitle, reviewState } from '../core/plans/model.js';
+import { FAILS_TO_PAUSE, type Plan, planTitle, reviewState } from '../core/plans/model.js';
 import { firstLine, sentinelById } from '../core/sentinel/model.js';
 import { type PlanView as PlanProgress, planView } from '../core/plans/progress.js';
 import { type NeedsYou, Topic } from './protocol.js';
@@ -254,6 +254,20 @@ function stuckItems(plan: Plan, progress: PlanProgress, at: Pick<NeedsYou, 'topi
       askedAt: r.at,
       actions: [],
     }));
+  // A milestone whose check failed again and again: the plan paused itself and waits for you (no button: it opens the plan).
+  const failing = plan.paused
+    ? Object.entries(plan.runs ?? {})
+        .filter(([, run]) => (run.fails ?? 0) >= FAILS_TO_PAUSE && !run.passedAt)
+        .map(([milestoneId, run]): NeedsYou => ({
+          id: `plan:${plan.id}:failing:${milestoneId}`,
+          kind: 'stuck',
+          ...keyed('daemon.needs.failingMilestone', { title: titles.get(milestoneId) ?? t('daemon.needs.aMilestone'), count: run.fails! }),
+          detail: clip(plainLine(run.check?.notes ?? '', 4000), 4000),
+          ...at,
+          askedAt: run.check?.at ?? plan.updatedAt,
+          actions: [],
+        }))
+    : [];
   // A merge conflict Claude couldn't fix (a milestone into the plan's branch, or main into it for its PR): ask it again.
   const merging = Object.entries(plan.merging ?? {}).filter(([, m]) => m.conflict?.stuck);
   const conflicts = [
@@ -270,7 +284,7 @@ function stuckItems(plan: Plan, progress: PlanProgress, at: Pick<NeedsYou, 'topi
       actions: [btn('needs.askClaudeAgain', 'main', 'plans.retryConflicts', [plan.id])],
     }),
   );
-  return [...stalled, ...rescued, ...conflicts];
+  return [...stalled, ...rescued, ...failing, ...conflicts];
 }
 
 /** What a plan waits for from you: approving its draft, passing a milestone at its gate, or what it couldn't move on itself. */

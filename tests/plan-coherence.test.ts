@@ -10,7 +10,7 @@ import { PlansWork } from '../src/core/plans/work.js';
 import { Store, initialState } from '../src/core/store.js';
 import type { WorkspaceController } from '../src/core/workspace-controller.js';
 import type { Project, Workspace } from '../src/workspaces/types.js';
-import { createPlanToolDefs } from '../src/agent/plan-tools.js';
+import { createPlanToolDefs, taskInput } from '../src/agent/plan-tools.js';
 import { needsYou } from '../src/companion/needs-you.js';
 import { planPageView } from '../src/companion/views.js';
 import { headline } from '../packages/mac/src/plans/plans-model.js';
@@ -95,6 +95,27 @@ describe('warnings next to "Saved" (BLG-772)', () => {
     // A folder and a file in it are shared too.
     const folder = applyOps(normalizeBody(machines), [{ op: 'add_task', milestone: 'phone', task: { id: 'net', title: 'Network', touches: ['src/net'] } }]);
     expect(coherenceWarnings(folder).some((x) => x.includes('[net]'))).toBe(true);
+  });
+
+  it('a task of 2 points or more needs a way to prove it; a task one says not to touch, in the same milestone, is a clash (plan 002)', () => {
+    const add = (task: BodyInput['milestones'][number]['tasks'] extends readonly (infer T)[] | undefined ? T : never) => applyOps(normalizeBody(machines), [{ op: 'add_task', milestone: 'pair', task }]);
+    const noVerify = (w: string[], id: string) => w.some((x) => x.includes(`[${id}]`) && x.includes('has no verify'));
+    expect(noVerify(coherenceWarnings(add({ id: 'big', title: 'Big one', estimate: 3 })), 'big')).toBe(true);
+    expect(noVerify(coherenceWarnings(add({ id: 'big', title: 'Big one', estimate: 3, verify: [{ run: 'npm test', expect: 'passes' }] })), 'big')).toBe(false);
+    expect(noVerify(coherenceWarnings(add({ id: 'small', title: 'Small one', estimate: 1 })), 'small')).toBe(false);
+    expect(noVerify(coherenceWarnings(add({ id: 'mine', title: 'Mine', estimate: 3, assignee: 'me' })), 'mine')).toBe(false);
+    const clash = applyOps(normalizeBody(machines), [{ op: 'add_task', milestone: 'pair', task: { id: 'fence', title: 'Fence', outOfScope: ['src/net/pair.ts'] } }]);
+    expect(coherenceWarnings(clash).some((x) => x.includes('[pair-machine]') && x.includes('[fence]') && x.includes('src/net/pair.ts') && x.includes('says not to touch'))).toBe(true);
+  });
+
+  it('editing a task keeps its verify, outOfScope, stopIf and exemplar (plan 002)', () => {
+    const full = applyOps(normalizeBody(machines), [{ op: 'update_task', id: 'pair-machine', patch: { verify: [{ run: 'npm test', expect: 'passes' }], outOfScope: ['src/a.ts'], stopIf: ['no pairing code'], exemplar: 'src/x.ts' } }]);
+    const kept = applyOps(full, [{ op: 'update_task', id: 'pair-machine', patch: { title: 'Pair one machine' } }]).milestones[0]!.tasks[0]!;
+    expect(kept).toMatchObject({ title: 'Pair one machine', verify: [{ run: 'npm test', expect: 'passes' }], outOfScope: ['src/a.ts'], stopIf: ['no pairing code'], exemplar: 'src/x.ts' });
+  });
+
+  it('the tool’s task becomes the plan’s: stop_if, out_of_scope, verify and exemplar (plan 002)', () => {
+    expect(taskInput({ title: 'x', stop_if: ['a'], out_of_scope: ['b'], verify: [{ run: 'npm test', expect: 'pass' }], exemplar: 'src/x.ts' })).toMatchObject({ stopIf: ['a'], outOfScope: ['b'], verify: [{ run: 'npm test', expect: 'pass' }], exemplar: 'src/x.ts' });
   });
 
   it('ids that were removed but are still named, and the blockers that went with them', () => {

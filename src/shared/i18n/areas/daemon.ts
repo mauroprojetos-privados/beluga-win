@@ -24,6 +24,7 @@ export const en = {
   // a plan that's stuck
   'daemon.needs.stuck': 'Stuck',
   'daemon.needs.stuckOn': 'Stuck on “{title}”',
+  'daemon.needs.failingMilestone': '“{title}” failed its check {count} times: the plan is paused',
   'daemon.needs.belugaTried': 'Beluga tried: {list}',
   'daemon.needs.belugaCouldnt': 'Beluga couldn’t move it on by itself',
   'daemon.needs.mergingInto': 'merging “{title}” into {branch}',
@@ -106,6 +107,7 @@ export const ptBR: { readonly [K in keyof typeof en]?: Message } = {
 
   'daemon.needs.stuck': 'Travado',
   'daemon.needs.stuckOn': 'Travado em “{title}”',
+  'daemon.needs.failingMilestone': '“{title}” reprovou {count} vezes: o plano está pausado',
   'daemon.needs.belugaTried': 'O Beluga tentou: {list}',
   'daemon.needs.belugaCouldnt': 'O Beluga não conseguiu seguir sozinho',
   'daemon.needs.mergingInto': 'o merge de “{title}” em {branch}',

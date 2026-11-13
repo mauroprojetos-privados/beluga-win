@@ -9,6 +9,7 @@ import { PlansWork, type PlansWorkDeps } from '../src/core/plans/work.js';
 import type { CombineResult } from '../src/workspaces/git.js';
 import type { PlanGit } from '../src/core/plans/plan-git.js';
 import type { PlanPr } from '../src/core/plans/model.js';
+import { needsYou } from '../src/companion/needs-you.js';
 import { Store, initialState } from '../src/core/store.js';
 import type { WorkspaceController, WorktreeEvent } from '../src/core/workspace-controller.js';
 import type { Project, Workspace } from '../src/workspaces/types.js';
@@ -465,6 +466,57 @@ describe('running a plan', () => {
     expect(head.prompt).toContain('The checker of milestone “Safe payments” failed it');
     expect(head.prompt).toContain('key webhook writes by event id');
     expect(head.prompt).toMatch(/Don't stop to ask the user/);
+  });
+
+  it('a milestone that keeps failing: fix tasks twice, a rewrite from the 3rd, the plan paused on the 5th (and on the phone)', async () => {
+    const t = await running('autopilot');
+    for (const title of ['Auth on payment routes', 'Idempotent webhooks', 'Receipts once']) t.board.update(issue(t, title).id, { status: 'in_review' }, t.claude);
+    await tick(5);
+    const toHead = () => t.asked.filter((a) => a.channel === 'ws:main' && a.prompt.includes('failed it'));
+    const fail = async (n: number) => {
+      const checker = t.plans.need(t.plan.id).runs.safe!.checker!;
+      t.work.forRun(`ws:${checker}`, 'p-me')!.tools!.gate('safe', 'fail', `round ${n}: ✗ still wrong`);
+      await tick(5);
+    };
+    const reopen = async () => {
+      t.plans.newRound(t.plan.id, 'safe');
+      await tick(5);
+    };
+    await fail(1);
+    await reopen();
+    await fail(2);
+    await reopen();
+    await fail(3);
+    const sent = toHead();
+    expect(sent).toHaveLength(3);
+    expect(sent[0]!.prompt).toContain('Add the tasks that fix it');
+    expect(sent[1]!.prompt).toContain('Add the tasks that fix it');
+    expect(sent[2]!.prompt).toContain('failure 3');
+    expect(sent[2]!.prompt).toContain("Don't only add another fix task");
+    expect(sent[2]!.prompt).not.toContain('Add the tasks that fix it');
+    await reopen();
+    await fail(4);
+    expect(toHead()).toHaveLength(4);
+    expect(t.plans.need(t.plan.id).paused).toBeFalsy();
+    await reopen();
+    await fail(5);
+    const plan = t.plans.need(t.plan.id);
+    expect(plan.runs.safe!.fails).toBe(5);
+    expect(plan.paused).toBeTruthy();
+    expect(toHead()).toHaveLength(4);
+    const card = needsYou(t.store.getState()).find((x) => x.id === `plan:${t.plan.id}:failing:safe`);
+    expect(card).toMatchObject({ kind: 'stuck', actions: [] });
+    expect(card?.detail).toContain('round 5');
+  });
+
+  it('a passing check keeps the count of earlier failures', async () => {
+    const t = await running('autopilot');
+    for (const title of ['Auth on payment routes', 'Idempotent webhooks', 'Receipts once']) t.board.update(issue(t, title).id, { status: 'in_review' }, t.claude);
+    await tick(5);
+    t.plans.recordCheck(t.plan.id, 'safe', { verdict: 'fail', notes: 'no', by: { kind: 'beluga' } });
+    expect(t.plans.need(t.plan.id).runs.safe!.fails).toBe(1);
+    t.plans.recordCheck(t.plan.id, 'safe', { verdict: 'pass', notes: 'ok', by: { kind: 'beluga' } });
+    expect(t.plans.need(t.plan.id).runs.safe!.fails).toBe(1);
   });
 
   it('a check that ends without a verdict is asked once more, then left to you (Autopilot never waits silently)', async () => {

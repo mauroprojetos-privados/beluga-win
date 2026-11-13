@@ -982,6 +982,8 @@ export function planPageView(state: DomainState, id: string): PlanView | undefin
           ...(t.task.acceptance.length ? { acceptance: t.task.acceptance.slice(0, 20).map((a) => clip(plainLine(a, 400), 400)) } : {}),
           ...(waits.length ? { blockedBy: waits.slice(0, 20).map((b) => clip(b, 200)) } : {}),
           ...(t.why ? { why: clip(plainLine(t.why, 300), 300) } : {}),
+          ...(t.task.stopIf?.length ? { stopIf: t.task.stopIf.slice(0, 6).map((s) => clip(plainLine(s, 300), 300)) } : {}),
+          ...(t.task.verify?.length ? { checks: t.task.verify.length } : {}),
         };
       }),
       ...(m.dependsOn.length ? { dependsOn: m.dependsOn.slice(0, 20).map((d) => clip(d, 200)) } : {}),

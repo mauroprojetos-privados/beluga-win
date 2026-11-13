@@ -1,5 +1,5 @@
 import { ESTIMATES, PRIORITIES, type Priority } from '../board/model.js';
-import { AUTONOMIES, type Autonomy, type Decided, type PlanBody, type PlanDecision, type PlanMilestone, type PlanTask, allTasks } from './model.js';
+import { AUTONOMIES, type Autonomy, type Decided, type PlanBody, type PlanDecision, type PlanMilestone, type PlanTask, type PlanVerify, allTasks } from './model.js';
 
 /**
  * Writing a plan: a whole one (Claude's plan_write), or a change at a time (Claude's plan_update,
@@ -16,6 +16,9 @@ const MAX_CONTEXT = 8000;
 const MAX_LINES = 20;
 const MAX_LINE = 400;
 const MAX_TOUCHES = 20;
+const MAX_VERIFY = 8;
+const MAX_OUT_OF_SCOPE = 10;
+const MAX_STOP_IF = 6;
 
 export interface TaskInput {
   readonly id?: string;
@@ -30,6 +33,10 @@ export interface TaskInput {
   readonly estimate?: number | null;
   readonly labels?: readonly string[];
   readonly touches?: readonly string[];
+  readonly verify?: readonly PlanVerify[];
+  readonly outOfScope?: readonly string[];
+  readonly stopIf?: readonly string[];
+  readonly exemplar?: string;
   readonly assignee?: 'claude' | 'me';
   /** A task for you: what you're asked when it's ready (see PlanDecision). */
   readonly decision?: PlanDecision;
@@ -190,6 +197,13 @@ function task(input: TaskInput, id: string, keep?: PlanTask): PlanTask {
   const estimate = input.estimate && (ESTIMATES as readonly number[]).includes(input.estimate) ? input.estimate : undefined;
   const labels = [...new Set((input.labels ?? []).map((l) => oneLine(l, 32).toLowerCase()).filter(Boolean))].slice(0, 8);
   const touches = [...new Set((input.touches ?? []).map((t) => oneLine(t, 200)).filter(Boolean))].slice(0, MAX_TOUCHES);
+  const verify = (input.verify ?? [])
+    .map((v) => ({ run: oneLine(v?.run ?? '', 400), expect: oneLine(v?.expect ?? '', 200) }))
+    .filter((v) => v.run)
+    .slice(0, MAX_VERIFY);
+  const outOfScope = [...new Set((input.outOfScope ?? []).map((t) => oneLine(t, 200)).filter(Boolean))].slice(0, MAX_OUT_OF_SCOPE);
+  const stopIf = [...new Set((input.stopIf ?? []).map((t) => oneLine(t, 300)).filter(Boolean))].slice(0, MAX_STOP_IF);
+  const exemplar = oneLine(input.exemplar ?? '', 200);
   const goal = block(input.goal, MAX_GOAL);
   const context = block(input.context, MAX_CONTEXT);
   const decision = input.assignee === 'me' ? decisionOf(input.decision) : undefined;
@@ -205,6 +219,10 @@ function task(input: TaskInput, id: string, keep?: PlanTask): PlanTask {
     ...(estimate ? { estimate } : {}),
     ...(labels.length ? { labels } : {}),
     ...(touches.length ? { touches } : {}),
+    ...(verify.length ? { verify } : {}),
+    ...(outOfScope.length ? { outOfScope } : {}),
+    ...(stopIf.length ? { stopIf } : {}),
+    ...(exemplar ? { exemplar } : {}),
     ...(input.assignee === 'me' ? { assignee: 'me' as const } : {}),
     ...(decision ? { decision } : {}),
     ...((input.issueId ?? keep?.issueId) ? { issueId: (input.issueId ?? keep?.issueId)! } : {}),
@@ -339,6 +357,10 @@ function applyOp(body: PlanBody, op: PlanOp): PlanBody {
         estimate: p.estimate === null ? null : (p.estimate ?? t.estimate),
         ...((p.labels ?? t.labels) ? { labels: (p.labels ?? t.labels)! } : {}),
         ...((p.touches ?? t.touches) ? { touches: (p.touches ?? t.touches)! } : {}),
+        ...((p.verify ?? t.verify) ? { verify: (p.verify ?? t.verify)! } : {}),
+        ...((p.outOfScope ?? t.outOfScope) ? { outOfScope: (p.outOfScope ?? t.outOfScope)! } : {}),
+        ...((p.stopIf ?? t.stopIf) ? { stopIf: (p.stopIf ?? t.stopIf)! } : {}),
+        ...((p.exemplar ?? t.exemplar) ? { exemplar: (p.exemplar ?? t.exemplar)! } : {}),
         ...((p.assignee ?? t.assignee) ? { assignee: (p.assignee ?? t.assignee)! } : {}),
         ...((p.decision ?? t.decision) ? { decision: (p.decision ?? t.decision)! } : {}),
         ...(p.issueId ? { issueId: p.issueId } : {}),

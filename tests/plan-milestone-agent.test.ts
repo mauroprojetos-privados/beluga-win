@@ -4,7 +4,8 @@ import { BoardWork } from '../src/core/board/work.js';
 import type { BodyInput } from '../src/core/plans/edit.js';
 import type { PlanGit } from '../src/core/plans/plan-git.js';
 import { Plans } from '../src/core/plans/plans.js';
-import { taskOrder } from '../src/core/plans/progress.js';
+import { agentTasks, taskOrder } from '../src/core/plans/progress.js';
+import { driftedPaths, stallOf } from '../src/core/plans/pilot.js';
 import { PlansWork, type PlansWorkDeps } from '../src/core/plans/work.js';
 import { Store, initialState } from '../src/core/store.js';
 import type { WorkspaceController, WorktreeEvent } from '../src/core/workspace-controller.js';
@@ -27,7 +28,7 @@ const BODY: BodyInput = {
       criteria: ['401 without a session', 'A replayed webhook charges once'],
       tasks: [
         { id: 'receipts', title: 'Receipts once', blockedBy: ['retries'], touches: ['src/email'] },
-        { id: 'auth', title: 'Auth on payment routes', goal: 'Only signed-in users pay.', context: 'Routes live in src/routes/pay.ts.', acceptance: ['401 without session'], touches: ['src/auth'] },
+        { id: 'auth', title: 'Auth on payment routes', goal: 'Only signed-in users pay.', context: 'Routes live in src/routes/pay.ts.', acceptance: ['401 without session'], touches: ['src/auth'], verify: [{ run: 'npx vitest run tests/auth.test.ts', expect: '401 passes' }], outOfScope: ['src/billing'], stopIf: ['the session store is not in src/auth'], exemplar: 'src/routes/pay.ts' },
         { id: 'retries', title: 'Idempotent webhooks', acceptance: '- [ ] each event once\n- [ ] backoff', touches: ['src/webhooks'] },
       ],
     },
@@ -148,6 +149,18 @@ describe('one Claude per milestone (BLG-7)', () => {
     expect(p).toContain('No pull requests');
     // The other milestone's Claude works beside it.
     expect(p).toContain('“Admin page”: src/admin');
+  });
+
+  it('its brief tells the task how to prove it, what not to touch, when to stop and what to copy', async () => {
+    const t = await running();
+    const p = t.toAgent('safe')[0]!.prompt;
+    expect(p).toContain('Prove it:');
+    expect(p).toContain('- npx vitest run tests/auth.test.ts → 401 passes');
+    expect(p).toContain("Don't touch: src/billing");
+    expect(p).toContain('Stop and say why if:');
+    expect(p).toContain('- the session store is not in src/auth');
+    expect(p).toContain('Follow the pattern in: src/routes/pay.ts');
+    expect(p).toContain('run each of its "Prove it" commands');
   });
 
   it('the plan’s limit counts milestones at work', async () => {
@@ -357,5 +370,175 @@ describe('Pass Anyway is instant (BLG-16)', () => {
     for (let n = 0; n < 100 && !t.plans.need(t.plan.id).runs.admin?.passedAt; n++) await tick(5);
     expect(g.merged).toHaveLength(2);
     expect(t.plans.need(t.plan.id).runs.admin?.passedAt).toBeDefined();
+  });
+});
+
+describe('its agent stops a task with why (task_stop)', () => {
+  const REASON = 'the webhook table has no event id column';
+
+  it('the task gets the note and the plan the record; the plan’s agent is told once, and a second stop sends nothing more', async () => {
+    const t = await running({ autonomy: 'autopilot' });
+    const key = t.issue('Idempotent webhooks').key;
+    t.tools('safe').tools!.stop(key, REASON);
+    await tick(10);
+    expect(t.issue('Idempotent webhooks').activity.map((a) => JSON.stringify(a))).toEqual(expect.arrayContaining([expect.stringContaining(`Stopped: ${REASON}`)]));
+    expect(t.plans.need(t.plan.id).runs.safe?.stopped?.retries).toMatchObject({ reason: REASON, told: true });
+    // The plan's activity says it in words, whitespace folded and nothing else changed.
+    expect(t.plans.need(t.plan.id).activity.map((a) => a.text)).toContain(`${key} stopped: ${REASON}`);
+    const toPlanner = t.asked.filter((a) => a.channel === 'ws:main');
+    expect(toPlanner).toHaveLength(1);
+    expect(toPlanner[0]!.prompt).toContain("was stopped by its milestone's agent");
+    expect(toPlanner[0]!.prompt).toContain(REASON);
+    expect(toPlanner[0]!.prompt).toContain("Don't stop to ask");
+    // Again, nothing rewritten in between: no second message.
+    t.tools('safe').tools!.stop(key, REASON);
+    await tick(10);
+    expect(t.asked.filter((a) => a.channel === 'ws:main')).toHaveLength(1);
+  });
+
+  it('a task of a plan’s milestone is left out of its agent’s queue; the others carry on; a stop on a task that isn’t a plan’s does nothing', async () => {
+    const t = await running({ autonomy: 'autopilot' });
+    const w = `ws:${t.agent('safe')!.worktree}`;
+    const run = t.tools('safe');
+    t.run(w, 'started', 'm-1');
+    t.board.update(t.issue('Auth on payment routes').id, { status: 'in_review' }, t.claude);
+    run.tools!.stop(t.issue('Idempotent webhooks').key, REASON);
+    t.run(w, 'done', 'm-1');
+    await tick(10);
+    await tick(10);
+    // Only the stopped task is left (Receipts waits on it): its agent isn't sent on because of it.
+    expect(t.toAgent('safe')).toHaveLength(1);
+    const m = t.view().milestones.find((x) => x.milestone.id === 'safe')!;
+    expect(agentTasks(m).map((x) => x.task.id)).toEqual(['auth', 'receipts']);
+    // A task nobody planned: no record, no message.
+    const own = t.board.create({ projectId: 'api', title: 'Loose task' }, t.me);
+    run.tools!.stop(own.key, 'x');
+    await tick(10);
+    expect(t.asked.filter((a) => a.channel === 'ws:main')).toHaveLength(1);
+  });
+
+  it('only the stopped task left: the milestone is stuck on it (the ladder asks the plan’s agent, then you)', async () => {
+    const t = await running({ autonomy: 'autopilot' });
+    const w = `ws:${t.agent('safe')!.worktree}`;
+    t.run(w, 'started', 'm-1');
+    t.board.update(t.issue('Auth on payment routes').id, { status: 'in_review' }, t.claude);
+    t.tools('safe').tools!.stop(t.issue('Idempotent webhooks').key, REASON);
+    t.run(w, 'done', 'm-1');
+    await tick(10);
+    const m = t.view().milestones.find((x) => x.milestone.id === 'safe')!;
+    expect(m.state).toBe('running');
+    expect(stallOf(t.view(), m)).toBe('working');
+  });
+
+  it('the plan’s agent rewriting it on Autopilot brings it back to its agent; on Check-ins only once the user approves', async () => {
+    for (const autonomy of ['autopilot', 'gated'] as const) {
+      const t = await running({ autonomy });
+      const w = `ws:${t.agent('safe')!.worktree}`;
+      t.run(w, 'started', 'm-1');
+      t.board.update(t.issue('Auth on payment routes').id, { status: 'in_review' }, t.claude);
+      t.tools('safe').tools!.stop(t.issue('Idempotent webhooks').key, REASON);
+      t.run(w, 'done', 'm-1');
+      await tick(10);
+      expect(t.toAgent('safe')).toHaveLength(1);
+      const head = t.work.forRun('ws:main', 'p-me')!.tools!;
+      head.update([{ op: 'update_task', id: 'retries', patch: { context: 'The events table is in src/db/events.ts and has no event id column: add it first.' } }]);
+      await tick(10);
+      await tick(10);
+      if (autonomy === 'autopilot') {
+        expect(t.plans.need(t.plan.id).runs.safe?.stopped).toBeUndefined();
+        expect(t.toAgent('safe').at(-1)!.prompt).toContain(`1. ${t.issue('Idempotent webhooks').key}`);
+      } else {
+        // Only a draft so far: still stopped.
+        expect(t.plans.need(t.plan.id).runs.safe?.stopped?.retries).toBeDefined();
+        expect(t.toAgent('safe')).toHaveLength(1);
+        t.work.approve(t.plan.id);
+        await tick(10);
+        await tick(10);
+        expect(t.plans.need(t.plan.id).runs.safe?.stopped).toBeUndefined();
+        expect(t.toAgent('safe').at(-1)!.prompt).toContain(`1. ${t.issue('Idempotent webhooks').key}`);
+      }
+    }
+  });
+
+  it('one already In Progress goes back to To Do: its agent goes on with the others, and Start can take it again once it’s rewritten', async () => {
+    const t = await running({ autonomy: 'autopilot' });
+    const w = `ws:${t.agent('safe')!.worktree}`;
+    t.run(w, 'started', 'm-1');
+    expect(t.issue('Auth on payment routes').status).toBe('in_progress');
+    t.tools('safe').tools!.stop(t.issue('Auth on payment routes').key, REASON);
+    t.run(w, 'done', 'm-1');
+    await tick(10);
+    await tick(10);
+    expect(t.issue('Auth on payment routes').status).toBe('todo');
+    expect(t.toAgent('safe').at(-1)!.prompt).toContain(`1. ${t.issue('Idempotent webhooks').key}`);
+    expect(t.toAgent('safe').at(-1)!.prompt).not.toContain(t.issue('Auth on payment routes').key);
+    await t.work.startTask(t.plan.id, 'auth');
+    expect(t.plans.need(t.plan.id).runs.safe?.stopped).toBeUndefined();
+  });
+
+  it('starting it again brings it back to its agent too', async () => {
+    const t = await running({ autonomy: 'gated' });
+    t.tools('safe').tools!.stop(t.issue('Idempotent webhooks').key, REASON);
+    await tick(10);
+    expect(t.plans.need(t.plan.id).runs.safe?.stopped?.retries).toBeDefined();
+    await t.work.startTask(t.plan.id, 'retries');
+    expect(t.plans.need(t.plan.id).runs.safe?.stopped).toBeUndefined();
+  });
+
+  it('the agent’s instructions say how to stop and what to report at the end', async () => {
+    const t = await running();
+    const p = t.toAgent('safe')[0]!.prompt;
+    expect(p).toContain('task_stop');
+    expect(p).toContain('STATUS: COMPLETE | STOPPED');
+    expect(p).toContain('STOPPED BECAUSE:');
+    expect(p).toContain('Report only what a tool result in this run shows');
+  });
+});
+
+describe('what changed outside the plan before a milestone starts', () => {
+  const git = (opts: { head?: string; changed?: string[] | null } = {}): PlanGit => ({
+    ensureBranch: async () => ({ made: true }),
+    mergeInto: async (_p, into) => ({ ok: true, branch: into }),
+    inMain: async () => false,
+    retire: async () => undefined,
+    findPr: async () => undefined,
+    openPr: async () => {
+      throw new Error('no');
+    },
+    push: async () => undefined,
+    mainRef: async () => 'origin/main',
+    mergePr: async () => undefined,
+    mergeLocal: async () => ({ ok: true }),
+    head: async () => opts.head ?? 'abc',
+    ...(opts.changed === null ? {} : { changedFiles: async () => opts.changed ?? ['src/webhooks/retry.ts'] }),
+  });
+
+  it('driftedPaths counts what the milestone touches (a folder too), not what the plan changes itself', () => {
+    expect(driftedPaths(['src/webhooks/a.ts', 'src/email/x.ts', 'README.md'], ['src/webhooks', 'src/email/x.ts'], [])).toEqual(['src/email/x.ts', 'src/webhooks/a.ts']);
+    expect(driftedPaths(['src/webhooks/a.ts'], ['src/webhooks'], ['src/webhooks/a.ts'])).toEqual([]);
+    expect(driftedPaths(['src/other.ts'], ['src/webhooks'], [])).toEqual([]);
+    expect(driftedPaths([], ['src/webhooks'], [])).toEqual([]);
+  });
+
+  it('the plan keeps the commit it was written at, and the milestone’s agent is told what changed since', async () => {
+    const t = await running({ git: git() });
+    expect(t.plans.need(t.plan.id).plannedAt).toBe('abc');
+    const first = t.toAgent('safe')[0]!;
+    expect(first.prompt).toContain('changed outside the plan');
+    expect(first.prompt).toContain('src/webhooks/retry.ts');
+    expect(t.plans.need(t.plan.id).activity.some((e) => e.text.includes('changed outside the plan'))).toBe(true);
+  });
+
+  it('a second save does not move plannedAt', async () => {
+    const t = await running({ git: git() });
+    expect(t.plans.need(t.plan.id).plannedAt).toBe('abc');
+    t.plans.setPlannedAt(t.plan.id, 'def');
+    expect(t.plans.need(t.plan.id).plannedAt).toBe('abc');
+  });
+
+  it('a git that cannot list files says nothing', async () => {
+    const t = await running({ git: git({ changed: null }) });
+    expect(t.toAgent('safe')[0]!.prompt).not.toContain('changed outside the plan');
+    expect(t.plans.need(t.plan.id).activity.some((e) => e.text.includes('changed outside the plan'))).toBe(false);
   });
 });

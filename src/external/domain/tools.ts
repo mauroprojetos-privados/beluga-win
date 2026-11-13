@@ -1002,6 +1002,8 @@ export const NOT_EXPOSED: Readonly<Record<string, 'chat_only' | 'checker_only'>>
   show: 'chat_only',
   show_block: 'chat_only',
   task_define: 'chat_only',
+  // A milestone's agent stops one of its own plan tasks: an external agent runs no milestone.
+  task_stop: 'chat_only',
   sentinel_stop: 'chat_only',
   sentinel_measure: 'chat_only',
   read_earlier: 'chat_only',
