@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Board } from '../src/core/board/board.js';
 import { BoardWork } from '../src/core/board/work.js';
 import type { BodyInput } from '../src/core/plans/edit.js';
@@ -523,6 +523,7 @@ describe('what changed outside the plan before a milestone starts', () => {
   it('the plan keeps the commit it was written at, and the milestone’s agent is told what changed since', async () => {
     const t = await running({ git: git() });
     expect(t.plans.need(t.plan.id).plannedAt).toBe('abc');
+    await vi.waitFor(() => expect(t.toAgent('safe')[0]).toBeDefined());
     const first = t.toAgent('safe')[0]!;
     expect(first.prompt).toContain('changed outside the plan');
     expect(first.prompt).toContain('src/webhooks/retry.ts');
@@ -538,6 +539,8 @@ describe('what changed outside the plan before a milestone starts', () => {
 
   it('a git that cannot list files says nothing', async () => {
     const t = await running({ git: git({ changed: null }) });
+    // A slow runner may not have asked yet after running()'s tick.
+    await vi.waitFor(() => expect(t.toAgent('safe')[0]).toBeDefined());
     expect(t.toAgent('safe')[0]!.prompt).not.toContain('changed outside the plan');
     expect(t.plans.need(t.plan.id).activity.some((e) => e.text.includes('changed outside the plan'))).toBe(false);
   });
