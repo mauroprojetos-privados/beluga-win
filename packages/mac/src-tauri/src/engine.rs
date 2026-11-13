@@ -8,6 +8,11 @@
 //! 127.0.0.1:<port>. The engine listens on the distro's 127.0.0.1 only, so the distro's own IP
 //! would never reach it: with `networkingMode=mirrored` in .wslconfig that 127.0.0.1 is this PC's;
 //! with NAT networking WSL's localhost forwarding carries it. No SSH, P2P or relay.
+//!
+//! Off Windows the engine always runs here, so most of this module (WSL's distros, its networking,
+//! the choice file) has no caller there: allowed, so `clippy -D warnings` passes on Linux and macOS
+//! while Windows still flags anything really left unused.
+#![cfg_attr(not(windows), allow(dead_code))]
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
