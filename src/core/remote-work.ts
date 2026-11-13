@@ -18,6 +18,7 @@ import type { WorkspaceController } from './workspace-controller.js';
 import type { WorkspaceSharing } from './workspace-sharing.js';
 import type { Workspace } from '../workspaces/types.js';
 import type { Intent } from './intents.js';
+import { t } from '../shared/i18n/index.js';
 
 export interface RemoteWorkDeps {
   readonly store: Store;
@@ -54,7 +55,7 @@ export interface RemoteWorkDeps {
 type Waiter = { peer: string; resolve: (v: unknown) => void; reject: (e: Error) => void; timer: NodeJS.Timeout };
 
 const OUTBOX_TTL_MS = 15 * 60_000;
-const NO_REMOTE = 'This project has no origin remote, so the other computer could not find the same repository';
+const NO_REMOTE = (): string => t('toasts.remoteWork.noRemote');
 /** A handoff's branch waits longer: a friend outside the room may be offline when it's offered (BLG-341). */
 const HANDOFF_TTL_MS = 60 * 60_000;
 const AUTO_ACCEPT_BYTES = 50 * 1024 * 1024;
@@ -114,15 +115,15 @@ export function handoffProblem(reason: HandoffReason | undefined, error: string 
   const { who, project } = what;
   switch (reason ?? legacyReason(error)) {
     case 'no_repo':
-      return `${who} doesn't have ${project || 'this repository'} on their Mac. Ask them to clone ${what.remote || 'it'} and add it to Beluga, then hand it off again`;
+      return t('toasts.remoteWork.problemNoRepo', { who, project: project || t('toasts.remoteWork.thisRepository'), remote: what.remote || t('toasts.remoteWork.it') });
     case 'off':
-      return `${who} has turned off work from friends (Settings › Workspaces › Friends may start work here)`;
+      return t('toasts.remoteWork.problemOff', { who });
     case 'bad_branch':
-      return `${who}'s Beluga didn't accept this branch's name. Rename the branch, then hand it off again`;
+      return t('toasts.remoteWork.problemBadBranch', { who });
     case 'declined':
-      return `${who} said no to taking it over`;
+      return t('toasts.remoteWork.problemDeclined', { who });
     default:
-      return `${who}'s Beluga couldn't set it up${error?.trim() ? `: ${error.trim()}` : ''}`;
+      return error?.trim() ? t('toasts.remoteWork.problemFailedWhy', { who, error: error.trim() }) : t('toasts.remoteWork.problemFailed', { who });
   }
 }
 
@@ -298,7 +299,7 @@ export class RemoteWork {
     await fs.mkdir(dir, { recursive: true });
     const target = await uniquePath(dir, safeFileName(res.name ?? res.path));
     await fs.writeFile(target, bytes);
-    this.deps.toast(`Saved ${path.basename(target)} from ${from}`, 'success');
+    this.deps.toast(t('toasts.remoteWork.saved', { file: path.basename(target), from }), 'success');
     return target;
   }
 
@@ -326,7 +327,7 @@ export class RemoteWork {
     const who = this.name(from);
     const offer = await this.offerFile(abs, from);
     reply({ ok: true, ...offer });
-    this.deps.toast(`Sending ${offer.name} to ${who}`, 'success');
+    this.deps.toast(t('toasts.remoteWork.sending', { file: offer.name, who }), 'success');
   }
 
   onFileRequestResult(from: string, body: BodyOf<'file_request_result'>): void {
@@ -356,7 +357,7 @@ export class RemoteWork {
       const saved = await downloadFile({ owner: from, share: body.share, path: body.path }, who, this.deps.request, this.deps.store, this.deps.downloadDir);
       this.deps.notify({ kind: 'people', title: `${who} sent you ${path.basename(saved)}`, body: tilde(saved) });
     } catch (err) {
-      this.deps.toast(`Couldn't get ${clean(body.name)} from ${who}: ${err instanceof Error ? err.message : String(err)}`, 'error');
+      this.deps.toast(t('toasts.remoteWork.getFailed', { file: clean(body.name), who, error: err instanceof Error ? err.message : String(err) }), 'error');
     }
   }
 
@@ -368,13 +369,13 @@ export class RemoteWork {
     const answer = this.wait<BodyOf<'ws_request_result'>>(reqId, peerId);
     if (!this.deps.send({ kind: 'ws_request', reqId, project, task, plan }, { to: peerId })) {
       this.cancelWait(reqId);
-      return this.deps.toast('Not connected', 'error');
+      return this.deps.toast(t('toasts.remoteWork.notConnected'), 'error');
     }
-    this.deps.toast(`Asked ${this.name(peerId)} to start a worktree in ${project}. Waiting for them…`);
+    this.deps.toast(t('toasts.remoteWork.askedWorktree', { who: this.name(peerId), project }));
     try {
       const res = await answer;
       if (!res.ok || !res.wsId) {
-        this.deps.toast(`${this.name(peerId)} didn't start it: ${res.error ?? 'declined'}`, 'warn');
+        this.deps.toast(t('toasts.remoteWork.didntStart', { who: this.name(peerId), why: res.error ?? t('toasts.remoteWork.declined') }), 'warn');
         return;
       }
       this.deps.store.dispatch({ type: 'chat', id: randomUUID(), from: this.deps.selfId(), text: task, ts: Date.now(), byAgent: false, channel: `ws:${res.wsId}` });
@@ -391,7 +392,7 @@ export class RemoteWork {
       if (!this.opening.has(w.id)) continue;
       this.opening.delete(w.id);
       this.deps.intend({ type: 'navigate', view: { kind: 'shared', owner: w.owner, id: w.id, tab: 'chat' } });
-      this.deps.toast(`${w.name} is running on ${this.name(w.owner)}'s computer. You're in it together`, 'success');
+      this.deps.toast(t('toasts.remoteWork.runningThere', { name: w.name, who: this.name(w.owner) }), 'success');
     }
   }
 
@@ -434,7 +435,7 @@ export class RemoteWork {
     const ws = ctl?.manager.find(wsId);
     const to = this.name(peerId);
     if (!ctl || !ws || ws.kind !== 'worktree' || !ws.branch) {
-      this.deps.toast('Only worktrees can be handed off', 'warn');
+      this.deps.toast(t('toasts.remoteWork.onlyWorktrees'), 'warn');
       return false;
     }
     const why = this.cannotHandOff(peerId);
@@ -444,7 +445,7 @@ export class RemoteWork {
     }
     const remote = await ctl.manager.remoteOf(ws.projectId);
     if (!remote) {
-      this.deps.toast(NO_REMOTE, 'warn');
+      this.deps.toast(NO_REMOTE(), 'warn');
       return false;
     }
     const channel = `ws:${wsId}`;
@@ -458,7 +459,7 @@ export class RemoteWork {
       return false;
     }
     ctl.open(wsId);
-    this.deps.toast(`${agentName(defaultAgentOf(this.deps.store.getState().self))} is writing a handoff note for ${to}…`);
+    this.deps.toast(t('toasts.remoteWork.writingNote', { agent: agentName(defaultAgentOf(this.deps.store.getState().self)), who: to }));
     let note: string;
     try {
       note = (await this.deps.askAndWait(handoffNotePrompt(to), channel, NOTE_TIMEOUT_MS)).trim();
@@ -470,7 +471,7 @@ export class RemoteWork {
       await ctl.manager.commitAll(wsId, `WIP: hand off to ${to}`);
     } catch (err) {
       // A hook or signing setup refused: hand over what's committed, and say so.
-      this.deps.toast(`Couldn't commit the uncommitted changes (${err instanceof Error ? err.message.split('\n')[0] : String(err)}). Only committed work goes to ${to}`, 'warn');
+      this.deps.toast(t('toasts.remoteWork.commitFailed', { error: err instanceof Error ? (err.message.split('\n')[0] ?? '') : String(err), who: to }), 'warn');
     }
     const fresh = ctl.manager.find(wsId) ?? ws;
     const hid = randomUUID();
@@ -479,7 +480,7 @@ export class RemoteWork {
       try {
         bundle = await this.makeBundle(fresh, hid, peerId);
       } catch (err) {
-        this.deps.toast(`Couldn't pack the branch: ${err instanceof Error ? err.message : String(err)}`, 'error');
+        this.deps.toast(t('toasts.remoteWork.packFailed', { error: err instanceof Error ? err.message : String(err) }), 'error');
         return false;
       }
     }
@@ -493,7 +494,7 @@ export class RemoteWork {
       { to: peerId },
     );
     if (!sent) {
-      this.deps.toast('Not connected', 'error');
+      this.deps.toast(t('toasts.remoteWork.notConnected'), 'error');
       return false;
     }
     this.deps.store.dispatch({ type: 'system', text: `Offered ${ws.name} to ${to}. Waiting for them to accept…`, channel });
@@ -512,7 +513,7 @@ export class RemoteWork {
     const why = this.cannotHandOff(peerId);
     if (why) return { ok: false, why };
     const remote = await ctl.manager.remoteOf(ws.projectId);
-    if (!remote) return { ok: false, why: NO_REMOTE };
+    if (!remote) return { ok: false, why: NO_REMOTE() };
     const checked = await this.checkHandoff(peerId, remote);
     if (!checked || checked.ok) return { ok: true };
     const project = ctl.manager.list.find((p) => p.id === ws.projectId);
@@ -553,8 +554,8 @@ export class RemoteWork {
   private cannotHandOff(peerId: string): string | undefined {
     if (this.state.peers.some((p) => p.peerId === peerId)) return undefined;
     const friend = this.state.network.friends.find((f) => f.peerId === peerId);
-    if (!friend) return `${this.name(peerId)} isn't in your room or your friends`;
-    if (!this.deps.sharing.friends) return 'Handing off to a friend outside your room needs the Beluga network: turn it on in Settings › Network';
+    if (!friend) return t('toasts.remoteWork.notInRoom', { who: this.name(peerId) });
+    if (!this.deps.sharing.friends) return t('toasts.remoteWork.needsNetwork');
     return cannotTake(friend.name, friend.beluga, 'share.handoff', friend.online);
   }
 
@@ -592,9 +593,9 @@ export class RemoteWork {
     // Without the repository there's nothing to approve: say so, to you and to them, before asking.
     const project = await ctl.manager.projectForRemote(body.remote);
     if (!project) {
-      const what = clean(body.ws.project) || 'that repository';
+      const what = clean(body.ws.project) || t('toasts.remoteWork.thatRepository');
       this.deps.notify({ kind: 'people', title: `${who} wanted to hand you ${clean(body.ws.name)}`, body: `You don't have ${what} here. Clone ${clean(body.remote)} and add it to Beluga, then ask ${who} to hand it off again` });
-      this.deps.toast(`${who} wanted to hand you ${clean(body.ws.name)}, but you don't have ${what} here. Clone ${clean(body.remote)}, then ask them again`, 'warn');
+      this.deps.toast(t('toasts.remoteWork.noRepoHere', { who, name: clean(body.ws.name), what, remote: clean(body.remote) }), 'warn');
       return void reply(false, 'no_repo', `${this.state.self?.name ?? 'they'} don't have that repository cloned`);
     }
     const note = clean(body.note);
@@ -645,7 +646,7 @@ export class RemoteWork {
       const message = err instanceof Error ? err.message : String(err);
       // Don't leave a half-made branch behind.
       if (branch && !ctl.manager.list.some((p) => p.workspaces.some((w) => w.branch === branch))) await git(project.root, ['branch', '-D', branch]).catch(() => undefined);
-      this.deps.toast(`Couldn't take over ${clean(body.ws.name)}: ${message}`, 'error');
+      this.deps.toast(t('toasts.remoteWork.takeOverFailed', { name: clean(body.ws.name), error: message }), 'error');
       reply(false, 'failed', message.slice(0, 400));
     }
   }

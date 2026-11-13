@@ -6,23 +6,25 @@ import { kindOf, NeedsStack } from '../components/Needs';
 import { Header, Screen, useScrolled } from '../components/Screen';
 import { Card, Row, T } from '../components/ui';
 import { ago, useView, useAllNeeds } from '../lib/hooks';
+import { useT } from '../lib/language';
 import type { HomeView } from '../lib/link/protocol';
 
 /** Everything that needs you: the stack to swipe through, and the list of all of it. */
 export default function Needs() {
+  const t = useT();
   const { scrolled, onScroll } = useScrolled();
   const insets = useSafeAreaInsets();
   const home = useView<HomeView>('home');
   const needs = useAllNeeds(home?.data.needsYou);
   return (
     <Screen>
-      <Header scrolled={scrolled} back title="Needs you" at={home?.at} />
+      <Header scrolled={scrolled} back title={t('phone.home.needsYou')} at={home?.at} />
       <ScrollView onScroll={onScroll} scrollEventThrottle={32} contentContainerStyle={{ paddingTop: 16, paddingBottom: insets.bottom + 40 }}>
         <NeedsStack items={needs} />
         {needs.length > 1 ? (
           <Animated.View layout={LinearTransition.duration(180)} style={{ marginTop: 24 }}>
             <T v="eyebrow" style={{ paddingHorizontal: 20, marginBottom: 10 }}>
-              All {needs.length}
+              {t('phone.needs.all', { count: needs.length })}
             </T>
             <Card style={{ marginHorizontal: 16 }}>
               {needs.map((n, i) => {

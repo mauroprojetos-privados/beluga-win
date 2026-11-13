@@ -6,6 +6,7 @@
  * "<endpoint id>/<model>". Browser-safe: the daemon, the Mac app and the phone import it.
  */
 import type { RuntimeModel } from './agent-runtimes.js';
+import { t } from './i18n/index.js';
 
 /** The runtime id local endpoints run under (see agent-runtimes.ts KNOWN_RUNTIMES). */
 export const LOCAL_RUNTIME = 'local';
@@ -33,8 +34,18 @@ export interface EndpointView {
   readonly builtIn?: boolean;
 }
 
-/** What a picker needs of an endpoint (no URL, no key). */
-export type EndpointChoice = Pick<EndpointView, 'id' | 'label' | 'models' | 'found' | 'reachable' | 'builtIn'>;
+/** What a picker needs of an endpoint (no URL, no key; whether it's on this computer, for a combo's privacy). */
+export type EndpointChoice = Pick<EndpointView, 'id' | 'label' | 'models' | 'found' | 'reachable' | 'builtIn'> & { readonly onThisMac?: boolean };
+
+/** Whether an endpoint's URL is on this computer (loopback), so work sent there stays here. */
+export function onThisComputer(baseUrl: string): boolean {
+  try {
+    const host = new URL(baseUrl).hostname.replace(/^\[|\]$/g, '').toLowerCase();
+    return host === 'localhost' || host.endsWith('.localhost') || host === '::1' || /^127(\.\d{1,3}){3}$/.test(host);
+  } catch {
+    return false;
+  }
+}
 
 /** "<endpoint id>/<model>" for the picker and a workspace's model. */
 export const localModelValue = (id: string, model: string): string => `${id}/${model}`;
@@ -84,6 +95,7 @@ export function localModels(endpoints: readonly EndpointChoice[]): RuntimeModel[
       description: why ?? 'Runs on your endpoint; answers depend on the model',
       efforts: [],
       ...(why ? { why } : {}),
+      ...(e.onThisMac ? { onThisMac: true } : {}),
     }));
   });
 }
@@ -102,4 +114,4 @@ export function tokensPerSecond(tokens: number, ms: number): number | undefined 
 }
 
 /** "free · 42 tok/s": what a local model shows where Claude shows plan limits. */
-export const speedWords = (tps: number | undefined): string => (tps ? `free · ${tps} tok/s` : 'free');
+export const speedWords = (tps: number | undefined): string => (tps ? t('shared.local.freeSpeed', { tps }) : t('shared.local.free'));

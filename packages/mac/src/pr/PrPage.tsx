@@ -8,6 +8,7 @@ import { showGitTrouble } from '../lib/git-trouble.js';
 import { ItemCard, ThreadCard, WriteBox } from './PrConversation.js';
 import { conversationCounts, timeline, usePrConversation } from './use-pr-conversation.js';
 import s from './pr-conversation.module.css';
+import { useT } from '../lib/i18n.js';
 
 type Post = Parameters<ReturnType<typeof useApi>['workbench']['prPost']>[1];
 
@@ -32,18 +33,19 @@ function PageThread({ wsId, thread, posted }: { wsId: string; thread: PrThread; 
   const post = usePost(wsId, posted);
   const [replying, setReplying] = useState(false);
   const [busy, setBusy] = useState(false);
+  const t = useT();
   return (
     <ThreadCard wsId={wsId} thread={thread}>
       {replying ? (
-        <WriteBox autoFocus placeholder="Reply…" label="Reply" busyLabel="Replying…" onCancel={() => setReplying(false)} onSend={async (body) => (await post({ kind: 'reply', thread: thread.id, body })) && (setReplying(false), true)} />
+        <WriteBox autoFocus placeholder={t('github.pr.replyDots')} label={t('github.pr.reply')} busyLabel={t('github.pr.replying')} onCancel={() => setReplying(false)} onSend={async (body) => (await post({ kind: 'reply', thread: thread.id, body })) && (setReplying(false), true)} />
       ) : (
         <div className={s.threadActions}>
           <Button size="small" icon="chat" onClick={() => setReplying(true)}>
-            Reply
+            {t('github.pr.reply')}
           </Button>
-          <Tip label="Back in the chat, your agent reads the code there and addresses this comment">
+          <Tip label={t('github.pr.askHint')}>
             <Button size="small" icon="claude" onClick={() => void api.workbench.addressPrComments(wsId, thread.id)}>
-              Ask Your Agent
+              {t('github.pr.askAgent')}
             </Button>
           </Tip>
           <span className={s.grow} />
@@ -57,7 +59,7 @@ function PageThread({ wsId, thread, posted }: { wsId: string; thread: PrThread; 
               void post({ kind: thread.resolved ? 'unresolve' : 'resolve', thread: thread.id }).finally(() => setBusy(false));
             }}
           >
-            {thread.resolved ? 'Reopen' : 'Resolve'}
+            {thread.resolved ? t('github.pr.reopen') : t('github.pr.resolve')}
           </Button>
         </div>
       )}
@@ -77,7 +79,8 @@ export function PrPage({ wsId }: { wsId: string }) {
   const pr = useApp((st) => st.prs[wsId]);
   const { data, error, loading, refresh } = usePrConversation(wsId, { live: true });
   const [all, setAll] = useState(false);
-  if (!pr) return <div className={s.empty}>This worktree has no pull request.</div>;
+  const tr = useT();
+  if (!pr) return <div className={s.empty}>{tr('github.pr.noPr')}</div>;
   const counts = conversationCounts(data);
   const items = data ? timeline(data) : [];
   const resolved = items.filter((i) => i.kind === 'thread' && i.thread.resolved).length;
@@ -92,14 +95,14 @@ export function PrPage({ wsId }: { wsId: string }) {
             <span className={s.pageNumber}>#{pr.number}</span>
           </div>
           <div className={s.pageMeta}>
-            <span>{data ? `${counts.said} ${counts.said === 1 ? 'comment' : 'comments'}${counts.open ? ` · ${counts.open} open ${counts.open === 1 ? 'thread' : 'threads'}` : ''}` : loading ? 'Reading GitHub…' : ''}</span>
+            <span>{data ? `${tr('github.comments', { count: counts.said })}${counts.open ? tr('github.pr.openThreads', { count: counts.open }) : ''}` : loading ? tr('github.pr.reading') : ''}</span>
             <span className={s.grow} />
-            <IconButton icon="refresh" label="Read GitHub again" disabled={loading} onClick={refresh} />
-            <IconButton icon="external" label="Open on GitHub" onClick={() => actions.openLink({ kind: 'url', url: pr.url })} />
+            <IconButton icon="refresh" label={tr('github.pr.readAgain')} disabled={loading} onClick={refresh} />
+            <IconButton icon="external" label={tr('github.openOnGitHub')} onClick={() => actions.openLink({ kind: 'url', url: pr.url })} />
             {counts.open ? (
-              <Tip label="Back in the chat, your agent works through every open comment: changes the code or says why not, then commits">
+              <Tip label={tr('github.pr.addressAllHint')}>
                 <Button size="small" variant="primary" icon="claude" onClick={() => void api.workbench.addressPrComments(wsId)}>
-                  Address All With Your Agent
+                  {tr('github.pr.addressAll')}
                 </Button>
               </Tip>
             ) : null}
@@ -112,26 +115,27 @@ export function PrPage({ wsId }: { wsId: string }) {
               {error}
             </div>
           ) : null}
-          {data && !items.length ? <div className={s.empty}>Nobody has said anything on #{pr.number} yet.</div> : null}
+          {data && !items.length ? <div className={s.empty}>{tr('github.pr.nobodySaid', { number: pr.number })}</div> : null}
           {shown.map((item) => (
             <ItemCard key={item.id} wsId={wsId} item={item} thread={(t) => <PageThread wsId={wsId} thread={t} posted={refresh} />} />
           ))}
           {resolved ? (
             <button type="button" className={s.more} onClick={() => setAll(!all)}>
-              {all ? 'Hide resolved threads' : `Show ${resolved} resolved ${resolved === 1 ? 'thread' : 'threads'}`}
+              {all ? tr('github.pr.hideResolved') : tr('github.pr.showResolved', { count: resolved })}
             </button>
           ) : null}
           {data?.more ? (
             <button type="button" className={s.more} onClick={() => actions.openLink({ kind: 'url', url: pr.url })}>
-              Older comments are on GitHub <Icon name="external" size={11} />
+              {tr('github.pr.older')} <Icon name="external" size={11} />
             </button>
           ) : null}
           {data && pr.state === 'OPEN' ? (
             <div className={s.pageComment}>
               <WriteBox
-                placeholder={`Comment on #${pr.number}…`}
-                label="Comment"
-                busyLabel="Posting…"
+                placeholder={tr('github.pr.commentOn', { number: pr.number })}
+                label={tr('github.pr.comment')}
+                busyLabel={tr('github.pr.posting')}
+
                 onSend={async (body) => {
                   const out = await api.workbench.prPost(wsId, { kind: 'comment', body });
                   if (!out?.ok) {

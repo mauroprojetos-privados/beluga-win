@@ -1,5 +1,6 @@
 import { shortVersion } from '../../../../src/net/mesh/features.js';
 import type { FriendOfferView, FriendView, GroupView, InvitationView, MemberView, MessageView, NetworkState, PersonView, Presence, PresenceState } from '../../../../src/net/mesh/views.js';
+import { t } from '../../../../src/shared/i18n/index.js';
 
 /**
  * What the Mac app's friends, groups and status screens say and decide, as plain functions
@@ -23,10 +24,11 @@ export function shownState(p: Pick<PersonView, 'online' | 'presence'>): Presence
   return p.online && p.presence.state !== 'offline' ? p.presence.state : 'offline';
 }
 
-export const STATE_LABEL: Record<PresenceState, string> = { online: 'Online', away: 'Away', dnd: 'Do Not Disturb', offline: 'Offline' };
+/** Someone's state in a word ("Online", "Away"), in the app's language. */
+export const stateLabel = (state: PresenceState): string => t(`network.state.${state}`);
 
 /** Your own choice reads differently: "offline" is something you appear as. */
-export const CHOICE_LABEL: Record<PresenceState, string> = { online: 'Online', away: 'Away', dnd: 'Do Not Disturb', offline: 'Appear Offline' };
+export const choiceLabel = (state: PresenceState): string => (state === 'offline' ? t('network.state.appearOffline') : stateLabel(state));
 
 const clock = (ts: number): string => new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
@@ -34,9 +36,9 @@ const clock = (ts: number): string => new Date(ts).toLocaleTimeString([], { hour
 export function untilLabel(until: number | undefined, now = Date.now()): string {
   if (!until || until <= now) return '';
   const day = startOfDay(until) - startOfDay(now);
-  if (day === 0) return `until ${clock(until)}`;
-  if (day <= DAY_MS + 3_600_000) return `until tomorrow, ${clock(until)}`;
-  return `until ${new Date(until).toLocaleDateString([], { weekday: 'long' })}`;
+  if (day === 0) return t('network.model.until', { when: clock(until) });
+  if (day <= DAY_MS + 3_600_000) return t('network.model.untilTomorrow', { when: clock(until) });
+  return t('network.model.until', { when: new Date(until).toLocaleDateString([], { weekday: 'long' }) });
 }
 
 /** A status's emoji and note together ("🌮 at lunch"), or '' when it has neither. */
@@ -46,35 +48,35 @@ export function statusText(p: Pick<Presence, 'emoji' | 'note'>): string {
 
 /** "Away · 🌮 at lunch", "Online", "Offline"; "Needs a Beluga update" when your Macs can't link because of it. */
 export function presenceLine(p: Pick<PersonView, 'online' | 'presence' | 'update'>): string {
-  if (p.update === 'them') return 'Offline to you · their Beluga needs an update';
-  if (p.update === 'you') return 'Update Beluga to reach them';
+  if (p.update === 'them') return t('network.model.theyNeedUpdate');
+  if (p.update === 'you') return t('network.model.youNeedUpdate');
   const state = shownState(p);
   const status = state !== 'offline' ? statusText(p.presence) : '';
-  return [STATE_LABEL[state], status].filter(Boolean).join(' · ');
+  return [stateLabel(state), status].filter(Boolean).join(' · ');
 }
 
 /** Their Beluga in words: "1.2.0", "1.1.0 · update needed", or "An older version" for Macs that don't say. */
 export function belugaLine(p: Pick<PersonView, 'beluga' | 'update'>): string {
   const version = p.beluga ? shortVersion(p.beluga.version) : undefined;
-  if (p.update === 'them') return `${version ?? 'An older version'} · they need to update to reach you`;
-  if (p.update === 'you') return `${version ?? 'A newer version'} · update yours to reach them`;
-  return version && version !== 'unknown' ? version : 'An older version (it doesn’t say)';
+  if (p.update === 'them') return t('network.model.theyUpdate', { version: version ?? t('network.model.olderVersion') });
+  if (p.update === 'you') return t('network.model.youUpdate', { version: version ?? t('network.model.newerVersion') });
+  return version && version !== 'unknown' ? version : t('network.model.olderUnknown');
 }
 
 /** Your status in words, as your sidebar and the menu bar say it ("Do Not Disturb until 3:30 PM"). */
 export function selfLine(presence: Presence, now = Date.now()): string {
   const until = untilLabel(presence.until, now);
-  return [CHOICE_LABEL[presence.state] + (until ? ` ${until}` : ''), statusText(presence)].filter(Boolean).join(' · ');
+  return [choiceLabel(presence.state) + (until ? ` ${until}` : ''), statusText(presence)].filter(Boolean).join(' · ');
 }
 
 // ---- how long a status lasts
 
 export type Duration = 'hour' | 'tomorrow' | 'forever';
 
-export const DURATIONS: ReadonlyArray<{ readonly id: Duration; readonly label: string }> = [
-  { id: 'hour', label: 'For 1 Hour' },
-  { id: 'tomorrow', label: 'Until Tomorrow' },
-  { id: 'forever', label: 'Until I Change It' },
+export const durations = (): ReadonlyArray<{ readonly id: Duration; readonly label: string }> => [
+  { id: 'hour', label: t('network.model.forHour') },
+  { id: 'tomorrow', label: t('network.model.untilTomorrowChoice') },
+  { id: 'forever', label: t('network.model.untilChange') },
 ];
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -135,22 +137,26 @@ export function findInvitation(text: string): FoundInvitation | undefined {
   return undefined;
 }
 
+/** How long is left, in words ("12 minutes", "23 hours", "3 days"), or undefined once it's over. */
+function leftWords(until: number, now: number): string | undefined {
+  const left = until - now;
+  if (left <= 0) return undefined;
+  const minutes = Math.ceil(left / 60_000);
+  if (minutes < 60) return t('network.model.minutes', { count: minutes });
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return t('network.model.hours', { count: hours });
+  return t('network.model.days', { count: Math.round(hours / 24) });
+}
+
 /** "Expires in 23 hours", "Expires in 12 minutes", "Expired". */
 export function expiryLabel(expiresAt: number, now = Date.now()): string {
-  const left = expiresAt - now;
-  if (left <= 0) return 'Expired';
-  const minutes = Math.ceil(left / 60_000);
-  if (minutes < 60) return `Expires in ${minutes} minute${minutes === 1 ? '' : 's'}`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 48) return `Expires in ${hours} hour${hours === 1 ? '' : 's'}`;
-  const days = Math.round(hours / 24);
-  return `Expires in ${days} days`;
+  const left = leftWords(expiresAt, now);
+  return left ? t('network.model.expiresIn', { left }) : t('network.model.expired');
 }
 
 /** "12 minutes", "23 hours", "3 days" (how long something still lasts). */
 export function timeLeft(until: number, now = Date.now()): string {
-  const label = expiryLabel(until, now);
-  return label === 'Expired' ? 'no longer' : label.replace(/^Expires in /, '');
+  return leftWords(until, now) ?? t('network.model.noLonger');
 }
 
 /** The friend invitation still worth showing (the newest unexpired one), if any. One made for someone in your room isn't yours to hand out. */
@@ -218,10 +224,10 @@ export function openGroupInvitation(invitations: readonly InvitationView[], id: 
 
 /** Errors from accepting an invitation, said for people (the core's own words when they're already clear). */
 export function acceptError(message: string): string {
-  if (/Nobody is waiting/i.test(message)) return 'That invitation expired or was already used. Ask for a new one.';
-  if (/own invitation/i.test(message)) return 'That’s your own invitation. Send it to a friend instead.';
-  if (/isn.t a (?:beluga|klaud) invitation/i.test(message)) return 'That doesn’t look like a Beluga invitation. Paste the link or type the code (like K7QM-4XPA-R2TD).';
-  if (/network is off/i.test(message)) return 'Turn on talking with friends first.';
+  if (/Nobody is waiting/i.test(message)) return t('network.model.inviteExpired');
+  if (/own invitation/i.test(message)) return t('network.model.ownInvite');
+  if (/isn.t a (?:beluga|klaud) invitation/i.test(message)) return t('network.model.notInvite');
+  if (/network is off/i.test(message)) return t('network.model.networkOff');
   return message.replace(/^Something went wrong: /, '');
 }
 
@@ -237,11 +243,11 @@ export const sortGroups = (groups: readonly GroupView[]): GroupView[] => [...gro
 export function membersLine(members: readonly MemberView[], max = 3): string {
   const others = members.filter((m) => !m.self).map((m) => m.name);
   const you = members.some((m) => m.self);
-  const names = [...others.slice(0, max), ...(you && others.length <= max ? ['you'] : [])];
+  const names = [...others.slice(0, max), ...(you && others.length <= max ? [t('network.notes.you')] : [])];
   const rest = others.length - Math.min(others.length, max) + (you && others.length > max ? 1 : 0);
-  if (rest > 0) return `${names.join(', ')} and ${rest} other${rest === 1 ? '' : 's'}`;
-  if (names.length <= 1) return names[0] ?? 'Nobody yet';
-  return `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
+  if (rest > 0) return t('network.model.andOthers', { names: names.join(', '), count: rest });
+  if (names.length <= 1) return names[0] ?? t('network.model.nobodyYet');
+  return t('network.model.andLast', { names: names.slice(0, -1).join(', '), last: names.at(-1) ?? '' });
 }
 
 /** Members in the order a group's info shows them: you, admins, then by name. */
@@ -259,8 +265,8 @@ export const totalUnread = (net: Pick<NetworkState, 'friends' | 'groups'>): numb
 /** "Today", "Yesterday", "Monday", or a date. */
 export function dayLabel(ts: number, now = Date.now()): string {
   const days = Math.round((startOfDay(now) - startOfDay(ts)) / DAY_MS);
-  if (days <= 0) return 'Today';
-  if (days === 1) return 'Yesterday';
+  if (days <= 0) return t('network.model.today');
+  if (days === 1) return t('network.model.yesterday');
   if (days < 7) return new Date(ts).toLocaleDateString([], { weekday: 'long' });
   return new Date(ts).toLocaleDateString([], { month: 'long', day: 'numeric', ...(new Date(ts).getFullYear() !== new Date(now).getFullYear() ? { year: 'numeric' } : {}) });
 }

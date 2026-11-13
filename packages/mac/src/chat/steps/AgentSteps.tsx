@@ -26,6 +26,7 @@ import { agentOfToolUse, allSubAgents } from '../../claude-code/subagents-model.
 import { openSubAgent } from '../../layout/SubAgents.js';
 import { waitState, waitTone, waitedLabel, waitingFor } from './waiting.js';
 import c from '../chat.module.css';
+import { useT } from '../../lib/i18n.js';
 import s from './steps.module.css';
 
 type AgentItem = Extract<LogItem, { type: 'agent' }>;
@@ -75,6 +76,7 @@ function spanOf(steps: readonly StepSummary[]): string | undefined {
  * a tool's name or an id; your own Claude's steps open to show what ran and what came back.
  */
 export const AgentSteps = memo(function AgentSteps({ item, running, part, subs: which }: { item: AgentItem; running: boolean; part?: TurnPart | undefined; subs?: 'running' | 'settled' | undefined }) {
+  const t = useT();
   const selfId = useApp((st) => st.selfId);
   const detail = useApp((st) => st.prefs.subagents);
   const mine = item.owner === selfId;
@@ -177,7 +179,7 @@ export const AgentSteps = memo(function AgentSteps({ item, running, part, subs: 
 
   return (
     <>
-      <div className={s.list} role="list" aria-label="The agent's steps">
+      <div className={s.list} role="list" aria-label={t('chat.steps.aria')}>
         {/* One keyed list with the step Claude is on: when it finishes it stays the same row (no
             remount, so nothing blinks or restarts) and only changes how it reads. A row leaving the
             last few closes up into the fold above it, whose count ticks up (KLD-51). */}
@@ -186,14 +188,14 @@ export const AgentSteps = memo(function AgentSteps({ item, running, part, subs: 
             <Slot key="fold" still={still}>
               <div className={s.bar}>
                 {earlier ? (
-                  <button type="button" className={s.fold} onClick={() => setEarlier(false)} aria-expanded="true" aria-label={`Hide ${split.older.length} earlier steps`}>
+                  <button type="button" className={s.fold} onClick={() => setEarlier(false)} aria-expanded="true" aria-label={t('chat.steps.hideEarlierN', { count: split.older.length })}>
                     <span className={cx(s.chev, s.chevOpen)}>
                       <Icon name="chevronRight" size={9} />
                     </span>
-                    Hide earlier steps
+                    {t('chat.steps.hideEarlier')}
                   </button>
                 ) : (
-                  <button type="button" className={s.fold} onClick={() => setEarlier(true)} aria-expanded="false" aria-label={`Show ${olderWork} earlier steps`} data-folded-count={olderWork}>
+                  <button type="button" className={s.fold} onClick={() => setEarlier(true)} aria-expanded="false" aria-label={t('chat.steps.showEarlierN', { count: olderWork })} data-folded-count={olderWork}>
                     <span className={s.chev}>
                       <Icon name="chevronRight" size={9} />
                     </span>
@@ -205,7 +207,7 @@ export const AgentSteps = memo(function AgentSteps({ item, running, part, subs: 
                         {olderWork}
                       </span>
                     </span>
-                    {olderWork === 1 ? 'step' : 'steps'}{span ? ` · ${span}` : ''}
+                    {t('chat.steps.stepWord', { count: olderWork })}{span ? ` · ${span}` : ''}
                   </button>
                 )}
               </div>
@@ -225,7 +227,7 @@ export const AgentSteps = memo(function AgentSteps({ item, running, part, subs: 
         {detail === 'hidden' && item.subagents.length && part?.side !== 'head' ? (
           <div className={c.step}>
             <Icon name="claude" size={11} />
-            {item.subagents.length} sub-agent{item.subagents.length === 1 ? '' : 's'}
+            {t('chat.steps.subAgents', { count: item.subagents.length })}
           </div>
         ) : null}
       </div>
@@ -285,18 +287,19 @@ function useStill(): boolean {
  * answers (Settings › Chat), it shows them again; kept showing, it opens or closes every step.
  */
 export function StepsToggle({ item }: { item: AgentItem }) {
+  const t = useT();
   const prefs = usePrefs();
   const open = useDisclosure(`${item.channel}/${item.id}`);
   if (prefs.doneSteps === 'fold') {
     return (
       <Button size="small" variant="quiet" icon={open.shown ? 'chevronUp' : 'chevronDown'} onClick={() => open.setShown(!open.shown)}>
-        {open.shown ? 'Hide Steps' : 'Show Steps'}
+        {open.shown ? t('chat.items.hideSteps') : t('chat.items.showSteps')}
       </Button>
     );
   }
   return (
     <Button size="small" variant="quiet" icon={open.any ? 'chevronUp' : 'chevronDown'} onClick={() => open.setAllOpen(!open.any)}>
-      {open.any ? 'Collapse all' : 'Expand all'}
+      {open.any ? t('chat.steps.collapseAll') : t('chat.steps.expandAll')}
     </Button>
   );
 }
@@ -335,6 +338,7 @@ export function StepsFold({ folded, children }: { folded: boolean; children: Rea
 function WaitingRow({ step, task, now }: { step: StepSummary; task: TaskView | undefined; now: number }) {
   const { client } = useBeluga();
   const api = useApi();
+  const t = useT();
   const person = task?.peerName ?? step.person;
   const personId = usePersonId(person);
   const tone = waitTone(task);
@@ -344,13 +348,13 @@ function WaitingRow({ step, task, now }: { step: StepSummary; task: TaskView | u
       <span className={s.waitAvatar}>{person ? <Avatar name={person} id={personId} size={22} /> : <Icon name="clock" size={14} />}</span>
       <span className={s.waitText}>
         <span className={s.waitTitle}>{waitingFor(task)}</span>
-        <span className={s.waitState}>{task ? waitState(task) : 'Their answer comes back here'}</span>
+        <span className={s.waitState}>{task ? waitState(task) : t('chat.steps.answerComesBack')}</span>
       </span>
       <span className={s.waitEnd}>
         <span className={s.time}>{formatDuration(Math.max(0, now - since))}</span>
         {task && !isFinal(task.state) ? (
           <button type="button" className={s.waitCancel} onClick={() => void api.gateway.cancel(task.id).catch((err: unknown) => toast(client, err instanceof Error ? err.message : String(err), 'error'))}>
-            Cancel
+            {t('common.cancel')}
           </button>
         ) : null}
       </span>
@@ -362,6 +366,7 @@ function WaitingRow({ step, task, now }: { step: StepSummary; task: TaskView | u
 function WatchAgent({ id }: { id: string }) {
   const { client } = useBeluga();
   const actions = useActions();
+  const t = useT();
   const sessions = useApp((st) => st.claudeCode.sessions);
   // The chat knows a sub-agent by the call that started it (or, in the background, by its agent id).
   const sub = useMemo(() => agentOfToolUse(sessions, id) ?? allSubAgents(sessions).find((x) => x.agent.id === id), [sessions, id]);
@@ -372,7 +377,7 @@ function WatchAgent({ id }: { id: string }) {
       role="button"
       tabIndex={0}
       className={s.watch}
-      aria-label={`Watch ${sub.agent.description} live`}
+      aria-label={t('chat.steps.watchLive', { name: sub.agent.description })}
       onClick={(e) => (e.stopPropagation(), openSubAgent(client, actions, sub))}
       onKeyDown={(e) => {
         if (e.key !== 'Enter' && e.key !== ' ') return;
@@ -382,7 +387,7 @@ function WatchAgent({ id }: { id: string }) {
       }}
     >
       <Icon name="eye" size={11} />
-      Watch
+      {t('chat.steps.watch')}
     </span>
   );
 }
@@ -408,6 +413,7 @@ interface SubAgentRowProps {
  */
 const SubAgentRow = memo(function SubAgentRow({ sub, own, detail, toggle, load, live, open: isOpen, opened, now }: SubAgentRowProps) {
   countRender(`sub:${sub.id}`);
+  const t = useT();
   const key = `sub:${sub.id}`;
   const running = sub.status === 'running';
   const canOpen = own.length > 0;
@@ -419,8 +425,8 @@ const SubAgentRow = memo(function SubAgentRow({ sub, own, detail, toggle, load, 
         </span>
       ) : null}
       {running ? <Dot tone={sub.kind === 'background' ? 'claude' : 'subagent'} live /> : <Icon name={sub.status === 'failed' ? 'x' : 'check'} size={11} className={sub.status === 'failed' ? c.subFailed : c.subDone} />}
-      <span className={c.subTitle}>{sub.kind === 'background' ? `Background · ${sub.title}` : sub.title}</span>
-      {sub.steps.length ? <span className={c.time}>{sub.steps.length} steps</span> : null}
+      <span className={c.subTitle}>{sub.kind === 'background' ? t('chat.steps.background', { title: sub.title }) : sub.title}</span>
+      {sub.steps.length ? <span className={c.time}>{t('chat.steps.nSteps', { count: sub.steps.length })}</span> : null}
       <WatchAgent id={sub.id} />
     </>
   );

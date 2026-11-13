@@ -11,6 +11,7 @@ import { goToCode } from '../../lib/go-to-code.js';
 import { CodeLines } from './CodeLines.js';
 import s from './code.module.css';
 import { openCodeThere } from '../../lib/remote-open.js';
+import { useT } from '../../lib/i18n.js';
 
 /** "src/a.ts:12-18" for lines `from`…`to`. */
 export const where = (path: string, from?: number, to?: number): string => (from ? `${path}:${from}${to && to !== from ? `-${to}` : ''}` : path);
@@ -44,6 +45,7 @@ export function CodeRefBlock({ code }: { code: string }) {
 }
 
 export function CodeRefView({ ref_: ref, wsId }: { ref_: CodeRef; wsId: string | undefined }) {
+  const t = useT();
   const api = useApi();
   const { client, ui } = useBeluga();
   const [excerpt, setExcerpt] = useState<Excerpt>();
@@ -53,7 +55,7 @@ export function CodeRefView({ ref_: ref, wsId }: { ref_: CodeRef; wsId: string |
   const win = refWindow(ref);
   useEffect(() => {
     if (!wsId) {
-      setProblem('Lines from a worktree show in its own conversation');
+      setProblem(t('components.code.onlyInWorktree'));
       return;
     }
     let alive = true;
@@ -101,17 +103,17 @@ export function CodeRefView({ ref_: ref, wsId }: { ref_: CodeRef; wsId: string |
   const say = (text: string): void => toast(client, text, 'success');
   const all = excerpt ? excerpt.lines.join('\n') : '';
   const items: ActionItem[] = [
-    { label: 'Go to File', icon: 'file', disabled: !wsId, onSelect: goTo },
-    { label: 'Open in Editor', icon: 'external', disabled: !wsId, onSelect: open },
-    { label: 'Copy Code', icon: 'copy', separate: true, onSelect: () => void copyText(all).then(() => say('Copied the code')) },
-    { label: 'Copy Path', onSelect: () => void copyText(where(ref.path, first)).then(() => say('Copied the path')) },
-    { label: 'Quote in Reply', icon: 'chat', separate: true, disabled: !excerpt, onSelect: () => quote(excerpt ? rows.map((r) => r.n) : []) },
+    { label: t('components.code.goToFile'), icon: 'file', disabled: !wsId, onSelect: goTo },
+    { label: t('components.preview.openInEditor'), icon: 'external', disabled: !wsId, onSelect: open },
+    { label: t('components.code.copyCode'), icon: 'copy', separate: true, onSelect: () => void copyText(all).then(() => say(t('components.code.copiedCode'))) },
+    { label: t('components.code.copyPath'), onSelect: () => void copyText(where(ref.path, first)).then(() => say(t('components.code.copiedPath'))) },
+    { label: t('components.code.quoteInReply'), icon: 'chat', separate: true, disabled: !excerpt, onSelect: () => quote(excerpt ? rows.map((r) => r.n) : []) },
   ];
   return (
     <ActionsContext items={items}>
       <figure className={s.ref} data-code-ref={ref.path}>
         <figcaption className={s.refHead}>
-          <Tip label={wsId ? 'Go to this line in the file' : ref.path}>
+          <Tip label={wsId ? t('components.code.goToLine') : ref.path}>
             <button type="button" className={s.refPath} data-go-to-code={ref.path} onClick={goTo} disabled={!wsId}>
               <Icon name="file" size={12} />
               <span>{ref.path}</span>
@@ -119,8 +121,8 @@ export function CodeRefView({ ref_: ref, wsId }: { ref_: CodeRef; wsId: string |
             </button>
           </Tip>
           <span className={s.grow} />
-          <IconButton icon="copy" label="Copy the code" disabled={!excerpt} onClick={() => void copyText(all).then(() => say('Copied the code'))} />
-          <IconButton icon="external" label="Open in Editor" disabled={!wsId} onClick={open} />
+          <IconButton icon="copy" label={t('components.code.copyTheCode')} disabled={!excerpt} onClick={() => void copyText(all).then(() => say(t('components.code.copiedCode')))} />
+          <IconButton icon="external" label={t('components.preview.openInEditor')} disabled={!wsId} onClick={open} />
         </figcaption>
         {ref.note ? <div className={s.refNote}>{ref.note}</div> : null}
         {problem ? (
@@ -132,17 +134,17 @@ export function CodeRefView({ ref_: ref, wsId }: { ref_: CodeRef; wsId: string |
             <CodeLines rows={rows} {...(lang ? { lang } : {})} picked={new Set(picked)} onPick={pick} />
           </div>
         ) : (
-          <div className={s.refProblem}>Reading {where(ref.path, win.from, win.to)}…</div>
+          <div className={s.refProblem}>{t('components.code.reading', { where: where(ref.path, win.from, win.to) })}</div>
         )}
         {picked.length ? (
           <div className={s.refPicked}>
-            {picked.length === 1 ? `Line ${picked[0]}` : `${picked.length} lines`} picked
+            {picked.length === 1 ? t('components.code.linePicked', { n: picked[0]! }) : t('components.code.linesPicked', { count: picked.length })}
             <span className={s.grow} />
             <Button size="small" variant="quiet" onClick={() => setPicked([])}>
-              Clear
+              {t('components.code.clear')}
             </Button>
             <Button size="small" icon="chat" onClick={() => quote(picked)}>
-              Quote in Reply
+              {t('components.code.quoteInReply')}
             </Button>
           </div>
         ) : null}

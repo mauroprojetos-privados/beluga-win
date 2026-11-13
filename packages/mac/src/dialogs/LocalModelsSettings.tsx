@@ -5,6 +5,8 @@ import { useApi } from '../lib/beluga.js';
 import { Group, Row } from './settings-controls.js';
 import s from './settings.module.css';
 import { thisComputer } from '../lib/os-words.js';
+import { t } from '@beluga/shared/i18n/index.js';
+import { say, useT } from '../lib/i18n.js';
 
 interface Draft {
   readonly id?: string;
@@ -17,14 +19,15 @@ interface Draft {
   readonly hasKey: boolean;
 }
 
+// i18n-ignore: a product name
 const blank: Draft = { label: 'Ollama', baseUrl: OLLAMA_URL, key: '', clearKey: false, models: '', hasKey: false };
 const errorText = (err: unknown): string => (err instanceof Error ? err.message.replace(/^Bad arguments for [\w.]+: /, '') : String(err));
 
 function statusOf(e: EndpointView): { tone: 'ok' | 'warn' | 'error' | 'muted'; words: string } {
-  if (e.reachable === undefined) return { tone: 'muted', words: 'Not looked at yet' };
-  if (!e.reachable) return { tone: 'error', words: e.builtIn ? `Not running on ${thisComputer()}` : 'Not answering' };
+  if (e.reachable === undefined) return { tone: 'muted', words: t('prefs.localModels.notLooked') };
+  if (!e.reachable) return { tone: 'error', words: e.builtIn ? t('prefs.localModels.notRunning', { computer: thisComputer() }) : t('prefs.localModels.notAnswering') };
   const models = modelsOfEndpoint(e);
-  return models.length ? { tone: 'ok', words: `${models.length} model${models.length === 1 ? '' : 's'}: ${models.slice(0, 3).join(', ')}${models.length > 3 ? '…' : ''}` } : { tone: 'warn', words: 'Answering, no models yet' };
+  return models.length ? { tone: 'ok', words: t('prefs.localModels.models', { count: models.length, list: models.slice(0, 3).join(', '), more: models.length > 3 ? '…' : '' }) } : { tone: 'warn', words: t('prefs.localModels.noModels') };
 }
 
 /**
@@ -33,6 +36,7 @@ function statusOf(e: EndpointView): { tone: 'ok' | 'warn' | 'error' | 'muted'; w
  * kept on this Mac with your other secrets; its key is never shown again, only whether it has one.
  */
 export function LocalModelsSettings() {
+  const t = useT();
   const api = useApi();
   const [list, setList] = useState<readonly EndpointView[] | undefined>(undefined);
   const [draft, setDraft] = useState<Draft | undefined>(undefined);
@@ -82,51 +86,51 @@ export function LocalModelsSettings() {
       }}
     >
       <label className={s.endpointField}>
-        <span>Name</span>
-        <input className={s.text} aria-label="Name" value={draft.label} onChange={(ev) => setDraft({ ...draft, label: ev.target.value })} autoFocus />
+        <span>{t('prefs.localModels.name')}</span>
+        <input className={s.text} aria-label={t('prefs.localModels.name')} value={draft.label} onChange={(ev) => setDraft({ ...draft, label: ev.target.value })} autoFocus />
       </label>
       <label className={s.endpointField}>
-        <span>Address</span>
-        <input className={s.text} aria-label="Address" value={draft.baseUrl} spellCheck={false} placeholder={OLLAMA_URL} onChange={(ev) => setDraft({ ...draft, baseUrl: ev.target.value })} />
+        <span>{t('prefs.localModels.address')}</span>
+        <input className={s.text} aria-label={t('prefs.localModels.address')} value={draft.baseUrl} spellCheck={false} placeholder={OLLAMA_URL} onChange={(ev) => setDraft({ ...draft, baseUrl: ev.target.value })} />
       </label>
       <label className={s.endpointField}>
-        <span>Key</span>
+        <span>{t('prefs.localModels.key')}</span>
         <input
           className={s.text}
-          aria-label="Key"
+          aria-label={t('prefs.localModels.key')}
           type="password"
           autoComplete="off"
           value={draft.key}
-          placeholder={draft.hasKey && !draft.clearKey ? 'Saved (type to replace)' : 'None (Ollama needs none)'}
+          placeholder={draft.hasKey && !draft.clearKey ? t('prefs.localModels.keySavedPlaceholder') : t('prefs.localModels.keyNonePlaceholder')}
           onChange={(ev) => setDraft({ ...draft, key: ev.target.value })}
         />
         {draft.hasKey && !draft.key ? (
           <Button size="small" variant="quiet" onClick={() => setDraft({ ...draft, clearKey: !draft.clearKey })}>
-            {draft.clearKey ? 'Keep Key' : 'Remove Key'}
+            {draft.clearKey ? t('prefs.localModels.keepKey') : t('prefs.localModels.removeKey')}
           </Button>
         ) : null}
       </label>
       <label className={s.endpointField}>
-        <span>Models</span>
-        <input className={s.text} aria-label="Models" value={draft.models} spellCheck={false} placeholder="Empty: the ones it lists" onChange={(ev) => setDraft({ ...draft, models: ev.target.value })} />
+        <span>{t('prefs.localModels.modelsField')}</span>
+        <input className={s.text} aria-label={t('prefs.localModels.modelsField')} value={draft.models} spellCheck={false} placeholder={t('prefs.localModels.modelsPlaceholder')} onChange={(ev) => setDraft({ ...draft, models: ev.target.value })} />
       </label>
       {error ? <div className={s.endpointError}>{error}</div> : null}
       <div className={s.endpointBar}>
         <Button size="small" variant="quiet" onClick={() => setDraft(undefined)}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button size="small" variant="primary" type="submit" disabled={busy || !draft.label.trim() || !draft.baseUrl.trim()}>
-          {busy ? 'Saving…' : 'Save'}
+          {busy ? t('prefs.localModels.saving') : t('common.save')}
         </Button>
       </div>
     </form>
   ) : null;
 
   return (
-    <Group title="Local models">
-      <Row label="Run on your own models" detail={`Ollama on ${thisComputer()}, or any Anthropic-compatible address (LiteLLM, a company proxy). Same tools and features; how good the answers are depends on the model. Pick Local model in the agent box you type in.`}>
+    <Group title={say('Local models')}>
+      <Row label={say('Run on your own models')} detail={t('prefs.localModels.runDetail', { computer: thisComputer() })}>
         <Button variant="quiet" icon="refresh" disabled={busy} onClick={() => void run(() => api.env.checkEndpoints())}>
-          Check Again
+          {t('prefs.localModels.checkAgain')}
         </Button>
         <Button
           icon="plus"
@@ -136,25 +140,25 @@ export function LocalModelsSettings() {
             setDraft(list?.some((e) => !e.builtIn && e.baseUrl === OLLAMA_URL) ? { ...blank, label: '', baseUrl: '' } : blank);
           }}
         >
-          Add Endpoint
+          {t('prefs.localModels.addEndpoint')}
         </Button>
       </Row>
       {draft && !draft.id ? form : null}
       {list === undefined ? (
-        <div className={s.note}>Looking…</div>
+        <div className={s.note}>{t('prefs.localModels.looking')}</div>
       ) : (
         list.map((e) => {
           const status = statusOf(e);
           if (draft?.id === e.id && !e.builtIn) return <div key={e.id}>{form}</div>;
           return (
-            <Row key={e.id} label={e.builtIn ? `Ollama on ${thisComputer()}` : e.label} detail={e.builtIn && !e.reachable ? 'Install it from ollama.com, start it with OLLAMA_CONTEXT_LENGTH=32768 ollama serve, and pull a model (ollama pull qwen3-coder).' : `${e.baseUrl}${e.hasKey ? ' · key saved' : ''} · ${status.words}`}>
+            <Row key={e.id} label={e.builtIn ? t('prefs.localModels.ollamaOn', { computer: thisComputer() }) : e.label} detail={e.builtIn && !e.reachable ? t('prefs.localModels.install') : t('prefs.localModels.rowDetail', { url: e.baseUrl, key: e.hasKey ? t('prefs.localModels.keySaved') : '', status: status.words })}>
               <Dot tone={status.tone} />
               <Button size="small" variant="quiet" disabled={busy} onClick={() => edit(e)}>
-                {e.builtIn ? 'Set Up…' : 'Edit…'}
+                {e.builtIn ? t('prefs.localModels.setUp') : t('prefs.localModels.edit')}
               </Button>
               {e.builtIn ? null : (
                 <Button size="small" variant="quiet" disabled={busy} onClick={() => void run(() => api.env.removeEndpoint(e.id))}>
-                  Remove
+                  {t('prefs.localModels.remove')}
                 </Button>
               )}
             </Row>

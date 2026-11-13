@@ -7,18 +7,20 @@ import { Icon } from './Icon.js';
 import { PixelBurst } from './PixelBurst.js';
 import { Tip, cx } from './ui.js';
 import s from './earnings.module.css';
+import { useT } from '../lib/i18n.js';
 
 /**
  * What a project's tooltip says: its total in the currency earnings are shown in, what it earned in
  * each currency when that's another (or several), how fresh, what went wrong.
  */
 export function EarningsTipBody({ earnings }: { earnings: CombinedEarnings }) {
+  const t = useT();
   const { fx } = useMoney();
   const totals = earnings.totals ?? [];
   const money = useConverted(totals);
   const breakdown = money.converted || money.missing.length > 0;
   const note = missingNote(money.missing);
-  const head = earnings.refreshing && !earnings.totals ? `Counting all-time earnings from ${sourcesOf([earnings])}…` : `All-time earnings · ${earnings.refreshing ? 'updating…' : `updated ${updatedAgo(earnings.updatedAt)}`}`;
+  const head = earnings.refreshing && !earnings.totals ? t('components.earnings.counting', { sources: sourcesOf([earnings]) }) : earnings.refreshing ? t('components.earnings.updating') : t('components.earnings.updated', { ago: updatedAgo(earnings.updatedAt) });
   const newest = newestPaid(earnings);
   // With both sources, what each one counted (the total above is the two added).
   const stripeMoney = useConverted(earnings.stripe?.totals);
@@ -28,7 +30,7 @@ export function EarningsTipBody({ earnings }: { earnings: CombinedEarnings }) {
     source ? (
       <span key={name} className={s.tipLine}>
         <span>{name}</span>
-        <span className={s.num}>{source.totals ? `${m.converted ? '≈ ' : ''}${formatMoney(m.amount, m.currency)}` : 'counting…'}</span>
+        <span className={s.num}>{source.totals ? `${m.converted ? '≈ ' : ''}${formatMoney(m.amount, m.currency)}` : t('components.earnings.countingShort')}</span>
       </span>
     ) : null;
   const errors = [
@@ -40,10 +42,10 @@ export function EarningsTipBody({ earnings }: { earnings: CombinedEarnings }) {
       <span>{head}</span>
       {breakdown ? <span className={s.tipTotal}>≈ {formatMoney(money.amount, money.currency)}</span> : totals.length ? <span className={s.tipTotal}>{formatMoney(money.amount, money.currency)}</span> : null}
       {breakdown
-        ? totals.map((t) => (
-            <span key={t.currency} className={s.tipLine}>
-              <span>{t.currency.toUpperCase()}</span>
-              <span className={s.num}>{formatMoney(t.amount, t.currency)}</span>
+        ? totals.map((tot) => (
+            <span key={tot.currency} className={s.tipLine}>
+              <span>{tot.currency.toUpperCase()}</span>
+              <span className={s.num}>{formatMoney(tot.amount, tot.currency)}</span>
             </span>
           ))
         : null}
@@ -51,11 +53,11 @@ export function EarningsTipBody({ earnings }: { earnings: CombinedEarnings }) {
       {note ? <span className={s.tipDim}>{note}</span> : null}
       {newest ? (
         <span className={s.tipDim}>
-          Last payment {updatedAgo(newest.at)}: {formatMoney(newest.amount, newest.currency)}
+          {t('components.earnings.lastPayment', { ago: updatedAgo(newest.at), amount: formatMoney(newest.amount, newest.currency) })}
         </span>
       ) : null}
-      {money.converted && fx ? <span className={s.tipDim}>Converted at the European Central Bank’s rates, updated {ratesWhen(fx.at)}; approximate.</span> : null}
-      {earnings.mode === 'test' && !earnings.revenuecat ? <span className={s.tipDim}>Test mode</span> : null}
+      {money.converted && fx ? <span className={s.tipDim}>{t('components.earnings.converted', { when: ratesWhen(fx.at) })}</span> : null}
+      {earnings.mode === 'test' && !earnings.revenuecat ? <span className={s.tipDim}>{t('components.earnings.testMode')}</span> : null}
       {errors.map(([name, error]) => (error ? <span key={name} className={s.tipError}>{both ? `${name}: ` : ''}{brandText(error.message)}</span> : null))}
     </span>
   );
@@ -67,8 +69,8 @@ function usePulse(arrivals: number): boolean {
   useEffect(() => {
     if (!arrivals) return;
     setPulse(true);
-    const t = setTimeout(() => setPulse(false), 1200);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setPulse(false), 1200);
+    return () => clearTimeout(timer);
   }, [arrivals]);
   return pulse;
 }
@@ -82,6 +84,7 @@ function usePulse(arrivals: number): boolean {
  * Clicking it opens the project's Earnings sheet. Nothing when neither Stripe nor RevenueCat is connected.
  */
 export function EarningsPill({ root, projectId, celebrate }: { root: string | undefined; projectId: string; celebrate?: boolean }) {
+  const t = useT();
   const earnings = useProjectEarnings(root);
   const ref = useRef<HTMLButtonElement>(null);
   const arrivals = usePaymentArrivals(earnings);
@@ -106,7 +109,7 @@ export function EarningsPill({ root, projectId, celebrate }: { root: string | un
         ref={ref}
         type="button"
         className={cx(s.pill, earnings.refreshing && s.shimmer, earnings.mode === 'test' && !earnings.revenuecat && s.test, failed && s.failed, earnings.error && shown && s.stale, !shown && !failed && !earnings.totals && s.pending, pulse && s.pulse)}
-        aria-label={shown ? `All-time earnings ${money.converted ? 'about ' : ''}${formatMoney(shown.amount, shown.currency)}` : failed ? 'Earnings: a problem' : 'Counting earnings'}
+        aria-label={shown ? (money.converted ? t('components.earnings.allTimeAbout', { amount: formatMoney(shown.amount, shown.currency) }) : t('components.earnings.allTime', { amount: formatMoney(shown.amount, shown.currency) })) : failed ? t('components.earnings.problem') : t('components.earnings.countingAria')}
         data-earnings-pill={projectId}
         onClick={(e) => {
           e.stopPropagation();

@@ -8,6 +8,7 @@ import { useBeluga } from '../../lib/beluga.js';
 import { loadImage } from '../../chat/images.js';
 import type { ViewData } from './use-view-data.js';
 import { alignOf, formatCell, formatNumber, headingOf, isNumeric, parseColor, toneOf } from './format.js';
+import { useT } from '../../lib/i18n.js';
 import v from './views.module.css';
 
 /**
@@ -21,6 +22,7 @@ import v from './views.module.css';
 export type DrawCell = (cell: Cell, col: Column, row: Row, full: boolean) => ReactNode | undefined;
 
 export function DataTable({ view, data, full, cell }: { view: View; data: ViewData; full: boolean; cell?: DrawCell }) {
+  const t = useT();
   const actions = useActions();
   const [open, setOpen] = useState<number>();
   const columns = data.columns.filter((c) => !c.hidden);
@@ -28,6 +30,7 @@ export function DataTable({ view, data, full, cell }: { view: View; data: ViewDa
   const from = data.page * data.pageSize;
   const shown = data.rows.length;
   const total = data.total;
+  const rangeText = shown ? `${formatNumber(from + 1)}–${formatNumber(from + shown)}` : '0';
   const canSearch = view.search && (data.mode === 'live' || view.rows.length > 5);
   // A heading sorts (numbers and dates biggest first), then the other way, then as they came.
   const sortBy = (c: Column): void => {
@@ -49,11 +52,11 @@ export function DataTable({ view, data, full, cell }: { view: View; data: ViewDa
         <div className={v.toolbar}>
           <label className={v.search}>
             <Icon name="search" size={12} />
-            <input type="search" placeholder={data.mode === 'live' ? 'Search all rows' : 'Search'} value={data.search} onChange={(e) => data.setSearch(e.target.value)} aria-label="Search the rows" />
+            <input type="search" placeholder={data.mode === 'live' ? t('components.views.table.searchAll') : t('common.search')} value={data.search} onChange={(e) => data.setSearch(e.target.value)} aria-label={t('components.views.table.searchRows')} />
           </label>
           {data.sort ? (
             <button type="button" className={v.chipButton} onClick={() => data.setSort(undefined)}>
-              Sorted by {headingOf(columns.find((c) => c.key === data.sort!.key) ?? { key: data.sort.key })} {data.sort.dir === 'asc' ? '↑' : '↓'}
+              {t('components.views.table.sortedBy', { column: headingOf(columns.find((c) => c.key === data.sort!.key) ?? { key: data.sort.key }), dir: data.sort.dir === 'asc' ? '↑' : '↓' })}
               <Icon name="x" size={10} />
             </button>
           ) : null}
@@ -97,31 +100,29 @@ export function DataTable({ view, data, full, cell }: { view: View; data: ViewDa
             ))}
           </tbody>
         </table>
-        {!data.rows.length && !data.loading ? <div className={v.empty}>{data.search ? `Nothing matches “${data.search}”` : data.needsApproval ? 'Press Load to see the rows' : 'No rows'}</div> : null}
-        {!data.rows.length && data.loading ? <div className={v.empty}>Loading…</div> : null}
+        {!data.rows.length && !data.loading ? <div className={v.empty}>{data.search ? t('components.views.table.noMatch', { search: data.search }) : data.needsApproval ? t('components.views.table.pressLoad') : t('components.views.table.noRows')}</div> : null}
+        {!data.rows.length && data.loading ? <div className={v.empty}>{t('common.loading')}</div> : null}
       </div>
       {data.page > 0 || data.hasMore || (total !== undefined && total > shown) ? (
         <div className={v.pager}>
           <span className={v.count}>
-            {shown ? `${formatNumber(from + 1)}–${formatNumber(from + shown)}` : '0'}
-            {total !== undefined ? ` of ${formatNumber(total)}` : data.hasMore ? ' of many' : ''}
+            {total !== undefined ? t('components.views.table.rangeOf', { range: rangeText, total: formatNumber(total) }) : data.hasMore ? t('components.views.table.rangeOfMany', { range: rangeText }) : rangeText}
           </span>
           <span className={v.grow} />
-          <button type="button" className={v.pageButton} disabled={data.page === 0 || data.loading} onClick={() => data.setPage(data.page - 1)} aria-label="Previous Page">
+          <button type="button" className={v.pageButton} disabled={data.page === 0 || data.loading} onClick={() => data.setPage(data.page - 1)} aria-label={t('components.views.table.previousPage')}>
             <Icon name="back" size={11} />
           </button>
           <span className={v.pageNo}>
-            Page {data.page + 1}
-            {total !== undefined ? ` of ${Math.max(1, Math.ceil(total / data.pageSize))}` : ''}
+            {total !== undefined ? t('components.views.table.pageOf', { page: data.page + 1, pages: Math.max(1, Math.ceil(total / data.pageSize)) }) : t('components.views.table.page', { page: data.page + 1 })}
           </span>
-          <button type="button" className={v.pageButton} disabled={!data.hasMore || data.loading} onClick={() => data.setPage(data.page + 1)} aria-label="Next Page">
+          <button type="button" className={v.pageButton} disabled={!data.hasMore || data.loading} onClick={() => data.setPage(data.page + 1)} aria-label={t('components.views.table.nextPage')}>
             <Icon name="forward" size={11} />
           </button>
         </div>
       ) : shown > 0 ? (
         <div className={v.pager}>
           <span className={v.count}>
-            {formatNumber(shown)} {shown === 1 ? 'row' : 'rows'}
+            {t('components.views.table.rows', { count: shown, n: formatNumber(shown) })}
           </span>
         </div>
       ) : null}

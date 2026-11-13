@@ -10,6 +10,7 @@ import {
   type AssignMode,
   BUILT_IN,
   SECTIONS,
+  sectionTitle,
   SHORTCUTS,
   type ShortcutDef,
   type ShortcutOverrides,
@@ -35,6 +36,8 @@ import { Group } from './settings-controls.js';
 import s from './settings.module.css';
 import k from './keyboard.module.css';
 import { osName } from '../lib/os-words.js';
+import { useT } from '../lib/i18n.js';
+import { rich } from './native/parts.js';
 
 /** The most keys one shortcut keeps. */
 const MAX_KEYS = 3;
@@ -65,6 +68,7 @@ const noMods = (e: KeyboardEvent): boolean => !e.metaKey && !e.ctrlKey && !e.alt
  * macOS's. Find a shortcut by its name, or by pressing its keys (and see what's free).
  */
 export function KeyboardSettings() {
+  const t = useT();
   const { ui } = useBeluga();
   const prefs = usePrefs();
   const bindings = useBindings();
@@ -134,7 +138,7 @@ export function KeyboardSettings() {
     stop();
     setClash(undefined);
     lit(changed.map((d) => d.id));
-    showUndo('Every shortcut is back to how it came', () => setPrefs(before));
+    showUndo(t('prefs.keyboard.allReset'), () => setPrefs(before));
   };
 
   // The recorder: the next keys pressed. Capture, so nothing else in the window hears them.
@@ -236,10 +240,10 @@ export function KeyboardSettings() {
     const bad = problem?.id === d.id ? problem.text : undefined;
     const note = keys.map((c) => caveat(d.id, c)).find(Boolean);
     const isChangedRow = d.id === TALK_ID ? prefs.voiceShortcut !== DEFAULT_SHORTCUT : isChanged(prefs.shortcuts, d.id);
-    const detail = bad ?? (recording ? (rec.slot < keys.length ? 'Press the new keys · ⌫ takes this one away · esc stops' : 'Press the keys · esc stops') : (note ?? d.hint));
+    const detail = bad ?? (recording ? (rec.slot < keys.length ? t('prefs.keyboard.pressNewOrRemove') : t('prefs.keyboard.pressStop')) : (note ?? d.hint));
     const live = (
       <span key={`rec-${shake}`} className={cx(k.chip, k.recording, bad && k.shake)} aria-live="polite">
-        {held ? `${held}…` : 'Press keys'}
+        {held ? `${held}…` : t('prefs.keyboard.pressKeys')}
       </span>
     );
     return (
@@ -255,10 +259,10 @@ export function KeyboardSettings() {
                 live
               ) : (
                 <span key={c} className={k.chipWrap}>
-                  <button type="button" className={k.chip} title="Click, then press the new keys" aria-label={`${d.label}: ${chordLabel(c)}. Change`} onClick={() => start(d.id, i)}>
+                  <button type="button" className={k.chip} title={t('prefs.keyboard.chipTitle')} aria-label={t('prefs.keyboard.chipAria', { label: d.label, keys: chordLabel(c) })} onClick={() => start(d.id, i)}>
                     {chordLabel(c)}
                   </button>
-                  <button type="button" className={k.remove} aria-label={`Remove ${chordLabel(c)}`} title="Remove" onClick={() => remove(d.id, i)}>
+                  <button type="button" className={k.remove} aria-label={t('prefs.keyboard.removeAria', { keys: chordLabel(c) })} title={t('prefs.keyboard.remove')} onClick={() => remove(d.id, i)}>
                     <Icon name="x" size={8} />
                   </button>
                 </span>
@@ -267,11 +271,11 @@ export function KeyboardSettings() {
             {recording && rec.slot >= keys.length ? (
               live
             ) : keys.length < MAX_KEYS ? (
-              <button type="button" className={cx(k.add, !keys.length && k.addEmpty)} aria-label={keys.length ? `Another key for ${d.label}` : `Add a shortcut for ${d.label}`} title={keys.length ? 'Another key' : undefined} onClick={() => start(d.id, keys.length)}>
-                {keys.length ? <Icon name="plus" size={11} /> : 'Add Shortcut'}
+              <button type="button" className={cx(k.add, !keys.length && k.addEmpty)} aria-label={keys.length ? t('prefs.keyboard.anotherFor', { label: d.label }) : t('prefs.keyboard.addFor', { label: d.label })} title={keys.length ? t('prefs.keyboard.another') : undefined} onClick={() => start(d.id, keys.length)}>
+                {keys.length ? <Icon name="plus" size={11} /> : t('prefs.keyboard.add')}
               </button>
             ) : null}
-            <button type="button" className={cx(k.reset, !isChangedRow && k.hidden)} tabIndex={isChangedRow ? 0 : -1} aria-label={`${d.label} back to its own keys`} title={`Back to ${d.keys.map(chordLabel).join(', ') || 'none'}`} onClick={() => reset(d.id)}>
+            <button type="button" className={cx(k.reset, !isChangedRow && k.hidden)} tabIndex={isChangedRow ? 0 : -1} aria-label={t('prefs.keyboard.resetAria', { label: d.label })} title={t('prefs.keyboard.resetTitle', { keys: d.keys.map(chordLabel).join(', ') || t('prefs.keyboard.none') })} onClick={() => reset(d.id)}>
               <Icon name="refresh" size={11} />
             </button>
           </div>
@@ -280,29 +284,31 @@ export function KeyboardSettings() {
           <div id="kb-clash" className={k.clash} role="alert">
             <Icon name="info" size={13} className={k.clashIcon} />
             <span className={k.clashText}>
-              <kbd className={k.inline}>{chordLabel(clash.chord)}</kbd> is{' '}
-              {clash.others.map((o, i) => (
-                <span key={o}>
-                  {i ? ' and ' : ''}
-                  <button type="button" className={k.link} onClick={() => reveal(o)}>
-                    {shortcutDef(o)?.label ?? o}
-                  </button>
-                </span>
-              ))}
+              {rich(t('prefs.keyboard.clashIs'), {
+                keys: <kbd className={k.inline}>{chordLabel(clash.chord)}</kbd>,
+                names: clash.others.map((o, i) => (
+                  <span key={o}>
+                    {i ? ` ${t('common.and')} ` : ''}
+                    <button type="button" className={k.link} onClick={() => reveal(o)}>
+                      {shortcutDef(o)?.label ?? o}
+                    </button>
+                  </span>
+                )),
+              })}
               {/* "Pull Request…" ends its own sentence. */}
               {shortcutDef(clash.others[clash.others.length - 1]!)?.label.endsWith('…') ? ' ' : '. '}
-              {clash.slot < keys.length ? 'Swap them, or take it?' : 'Take it from there?'}
+              {clash.slot < keys.length ? t('prefs.keyboard.swapOrTake') : t('prefs.keyboard.takeIt')}
             </span>
             {clash.slot < keys.length ? (
               <Button size="small" onClick={() => commit(clash.id, clash.slot, clash.chord, 'swap', clash.others)}>
-                Swap
+                {t('prefs.keyboard.swap')}
               </Button>
             ) : null}
             <Button size="small" variant="primary" onClick={() => commit(clash.id, clash.slot, clash.chord, 'replace', clash.others)}>
-              Use Here
+              {t('prefs.keyboard.useHere')}
             </Button>
             <Button size="small" variant="quiet" onClick={() => setClash(undefined)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
           </div>
         ) : null}
@@ -318,19 +324,19 @@ export function KeyboardSettings() {
           {keyQuery ? (
             <span className={k.queryChip}>
               {chordLabel(keyQuery)}
-              <button type="button" aria-label="Show every shortcut" onClick={() => setKeyQuery(undefined)}>
+              <button type="button" aria-label={t('prefs.keyboard.showEvery')} onClick={() => setKeyQuery(undefined)}>
                 <Icon name="x" size={8} />
               </button>
             </span>
           ) : null}
           {byKeys ? (
-            <span className={k.searchHint}>{held ? `${held}…` : 'Press the keys to look for · esc stops'}</span>
+            <span className={k.searchHint}>{held ? `${held}…` : t('prefs.keyboard.lookFor')}</span>
           ) : (
             <input
               className={k.searchInput}
               value={query}
-              placeholder={keyQuery ? '' : 'Search shortcuts'}
-              aria-label="Search shortcuts"
+              placeholder={keyQuery ? '' : t('prefs.keyboard.search')}
+              aria-label={t('prefs.keyboard.search')}
               onChange={(e) => {
                 setKeyQuery(undefined);
                 setQuery(e.target.value);
@@ -345,39 +351,35 @@ export function KeyboardSettings() {
               }}
             />
           )}
-          <button type="button" className={cx(k.byKeys, byKeys && k.byKeysOn)} aria-pressed={byKeys} title="Find by pressing the keys" aria-label="Find by pressing the keys" onClick={() => (stop(), setClash(undefined), setHeld(''), setByKeys((v) => !v))}>
+          <button type="button" className={cx(k.byKeys, byKeys && k.byKeysOn)} aria-pressed={byKeys} title={t('prefs.keyboard.byKeys')} aria-label={t('prefs.keyboard.byKeys')} onClick={() => (stop(), setClash(undefined), setHeld(''), setByKeys((v) => !v))}>
             <Icon name="command" size={12} />
           </button>
         </div>
-        <span className={k.count}>{changed.length ? `${changed.length} changed` : null}</span>
+        <span className={k.count}>{changed.length ? t('prefs.keyboard.changed', { count: changed.length }) : null}</span>
         <Button size="small" variant="quiet" icon="refresh" disabled={!changed.length} onClick={resetAll}>
-          Reset All
+          {t('prefs.keyboard.resetAll')}
         </Button>
       </div>
 
       {keyQuery && !shown.length ? (
         <div className={k.free}>
           {builtIn ? (
-            <>
-              <kbd className={k.inline}>{chordLabel(keyQuery)}</kbd> is {builtIn}: {osName()} keeps it.
-            </>
+            rich(t('prefs.keyboard.builtInKeeps', { what: builtIn, os: osName() }), { keys: <kbd className={k.inline}>{chordLabel(keyQuery)}</kbd> })
           ) : (
-            <>
-              Nothing uses <kbd className={k.inline}>{chordLabel(keyQuery)}</kbd>: it’s free.
-            </>
+            rich(t('prefs.keyboard.free'), { keys: <kbd className={k.inline}>{chordLabel(keyQuery)}</kbd> })
           )}
         </div>
       ) : null}
-      {!keyQuery && !shown.length && !builtInRows.length ? <div className={k.free}>No shortcut is called that.</div> : null}
+      {!keyQuery && !shown.length && !builtInRows.length ? <div className={k.free}>{t('prefs.keyboard.noMatch')}</div> : null}
 
       {shown.map(([section, list]) => (
-        <Group key={section} title={section}>
+        <Group key={section} title={sectionTitle(section)}>
           {list.map(row)}
         </Group>
       ))}
 
       {builtInRows.length ? (
-        <Group title={`Built into ${osName()}`}>
+        <Group title={t('prefs.keyboard.builtInto', { os: osName() })}>
           {builtInRows.map(([chord, label]) => (
             <div key={chord} className={cx(s.row, k.row)}>
               <div className={s.rowText}>
@@ -388,16 +390,16 @@ export function KeyboardSettings() {
               </div>
             </div>
           ))}
-          {!keyQuery && (!query.trim() || 'send message'.includes(query.trim().toLowerCase())) ? (
+          {!keyQuery && (!query.trim() || 'send message'.includes(query.trim().toLowerCase()) || t('prefs.keyboard.sendMessage').toLowerCase().includes(query.trim().toLowerCase())) ? (
             <div className={cx(s.row, k.row)}>
               <div className={s.rowText}>
-                <div className={s.rowLabel}>Send a Message</div>
-                <div className={s.rowDetail}>{`${chordLabel(prefs.sendWith === 'enter' ? 'Shift+Enter' : 'Enter')} makes a new line`}</div>
+                <div className={s.rowLabel}>{t('prefs.keyboard.sendMessage')}</div>
+                <div className={s.rowDetail}>{t('prefs.keyboard.newLine', { keys: chordLabel(prefs.sendWith === 'enter' ? 'Shift+Enter' : 'Enter') })}</div>
               </div>
               <div className={k.keys}>
                 <span className={cx(k.chip, k.fixed)}>{chordLabel(prefs.sendWith === 'enter' ? 'Enter' : 'Cmd+Enter')}</span>
                 <Button size="small" variant="quiet" onClick={() => ui.patch({ settings: 'general' })}>
-                  Change…
+                  {t('prefs.keyboard.change')}
                 </Button>
               </div>
             </div>

@@ -11,6 +11,8 @@ import { toast, useBeluga } from '../lib/beluga.js';
 import { type CategoryEntry, conversationEntries, nextActive, wakeWords } from './attention-model.js';
 import { hereOf, openEntry } from './EntryRow.js';
 import s from './Sidebar.module.css';
+import { useT } from '../lib/i18n.js';
+import { t } from '@beluga/shared/i18n/index.js';
 
 /**
  * Changing a chat's category: the buttons on its row, the same in its right-click menu, and the
@@ -38,34 +40,36 @@ export function triageItems(state: AppState, channel: string, run: Run, client: 
   const refusal = settleRefusal(record, facts, 'you');
   const auto = record?.autoSettle !== false;
   return [
-    { label: 'Work Again', icon: 'chat', separate: true, onSelect: () => workAgain(client, run, channel) },
+    { label: t('layout.triage.workAgain'), icon: 'chat', separate: true, onSelect: () => workAgain(client, run, channel) },
     category === 'snoozed' ? showAgainItem(state, channel, client) : laterItem(state, channel, run, client),
     ...(category === 'settled'
-      ? [{ label: 'Un-settle', icon: 'inbox' as const, onSelect: () => unsettle(client, channel) }]
-      : [{ label: 'Settle', icon: 'check' as const, ...(refusal ? { disabled: true, hint: refusal } : {}), onSelect: () => settle(client, run, channel) }]),
-    { label: `Auto-settle: ${auto ? 'on' : 'off'}`, onSelect: () => call(client, () => client.api.triage.setAutoSettle(channel, !auto)) },
+      ? [{ label: t('layout.triage.unsettle'), icon: 'inbox' as const, onSelect: () => unsettle(client, channel) }]
+      : [{ label: t('layout.triage.settle'), icon: 'check' as const, ...(refusal ? { disabled: true, hint: refusal } : {}), onSelect: () => settle(client, run, channel) }]),
+    { label: t(auto ? 'layout.triage.autoSettleOn' : 'layout.triage.autoSettleOff'), onSelect: () => call(client, () => client.api.triage.setAutoSettle(channel, !auto)) },
   ];
 }
 
 export function RowTriageTools({ e }: { e: CategoryEntry }) {
+  const tl = useT();
   const actions = useActions();
   const { client } = useBeluga();
   return (
     <span className={s.hoverTools}>
       {toolsOf(e.category).includes('snooze') ? (
         <ActionsDropdown items={snoozeItems(client, actions.run, e.channel)}>
-          <IconButton icon="clock" label={`Remind me later about ${e.name}`} onClick={(ev) => ev.stopPropagation()} />
+          <IconButton icon="clock" label={tl('layout.triage.remindAbout', { name: e.name })} onClick={(ev) => ev.stopPropagation()} />
         </ActionsDropdown>
       ) : null}
-      {toolsOf(e.category).includes('settle') ? <IconButton icon="check" label={`Settle ${e.name}`} onClick={(ev) => (ev.stopPropagation(), settle(client, actions.run, e.channel))} /> : null}
-      {toolsOf(e.category).includes('wake') ? <IconButton icon="eye" label={`Show ${e.name} again now`} onClick={(ev) => (ev.stopPropagation(), wake(client, e.channel))} /> : null}
-      {toolsOf(e.category).includes('unsettle') ? <IconButton icon="inbox" label={`Un-settle ${e.name}`} onClick={(ev) => (ev.stopPropagation(), unsettle(client, e.channel))} /> : null}
+      {toolsOf(e.category).includes('settle') ? <IconButton icon="check" label={tl('layout.triage.settleName', { name: e.name })} onClick={(ev) => (ev.stopPropagation(), settle(client, actions.run, e.channel))} /> : null}
+      {toolsOf(e.category).includes('wake') ? <IconButton icon="eye" label={tl('layout.triage.showAgainName', { name: e.name })} onClick={(ev) => (ev.stopPropagation(), wake(client, e.channel))} /> : null}
+      {toolsOf(e.category).includes('unsettle') ? <IconButton icon="inbox" label={tl('layout.triage.unsettleName', { name: e.name })} onClick={(ev) => (ev.stopPropagation(), unsettle(client, e.channel))} /> : null}
     </span>
   );
 }
 
 /** Custom…: a date and a time, from any menu that offers it. */
 export function SnoozeCustomSheet() {
+  const tl = useT();
   const actions = useActions();
   const { client } = useBeluga();
   const [channel, setChannel] = useState<string>();
@@ -88,20 +92,20 @@ export function SnoozeCustomSheet() {
   };
   return (
     <Sheet
-      title="Remind me at"
+      title={tl('layout.triage.remindAt')}
       icon="clock"
       close={() => setChannel(undefined)}
       onReturn={confirm}
       footer={
         <>
-          <Button onClick={() => setChannel(undefined)}>Cancel</Button>
+          <Button onClick={() => setChannel(undefined)}>{tl('common.cancel')}</Button>
           <Button variant="primary" disabled={!ok} onClick={confirm}>
-            Remind Me
+            {tl('layout.triage.remindMe')}
           </Button>
         </>
       }
     >
-      <input type="datetime-local" aria-label="Date and time" autoFocus value={value} onChange={(e) => setValue(e.target.value)} />
+      <input type="datetime-local" aria-label={tl('layout.triage.dateTime')} autoFocus value={value} onChange={(e) => setValue(e.target.value)} />
     </Sheet>
   );
 }
@@ -124,20 +128,20 @@ function laterItem(state: AppState, channel: string, run: Run, client: Client): 
   const until = laterUntil(state, channel);
   // Woken by a question while put off: it still says when, and asking again sets a new time.
   if (until !== undefined && !state.prefs.chatCategories) return showAgainItem(state, channel, client);
-  return { label: 'Remind Me Later', icon: 'clock', submenu: snoozeItems(client, run, channel), onSelect: () => undefined };
+  return { label: t('layout.triage.remindLater'), icon: 'clock', submenu: snoozeItems(client, run, channel), onSelect: () => undefined };
 }
 
 /** Show Again Now: the reminder is called off, and the chat is back in place. */
 function showAgainItem(state: AppState, channel: string, client: Client): ActionItem {
   const until = laterUntil(state, channel);
-  return { label: 'Show Again Now', icon: 'eye', ...(until !== undefined ? { hint: remindLabel(until) } : {}), onSelect: () => void wake(client, channel) };
+  return { label: t('layout.triage.showAgain'), icon: 'eye', ...(until !== undefined ? { hint: remindLabel(until) } : {}), onSelect: () => void wake(client, channel) };
 }
 
 function snoozeItems(client: Client, run: Run, channel: string): ActionItem[] {
   const now = Date.now();
   return [
     ...remindPresets(now).map((p) => ({ label: p.label, keys: wakeWords(p.at, now), onSelect: () => snooze(client, run, channel, p.at) })),
-    { label: 'Custom…', separate: true, onSelect: () => document.dispatchEvent(new CustomEvent(CUSTOM_SNOOZE, { detail: channel })) },
+    { label: t('layout.triage.custom'), separate: true, onSelect: () => document.dispatchEvent(new CustomEvent(CUSTOM_SNOOZE, { detail: channel })) },
   ];
 }
 

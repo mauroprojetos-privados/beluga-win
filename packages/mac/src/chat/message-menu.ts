@@ -3,6 +3,7 @@ import type { ActionItem } from '../components/SpecMenu.js';
 import { copyText } from '../lib/copy.js';
 import type { UiStore } from '../lib/beluga.js';
 import { chordLabel } from '../lib/shortcuts-model.js';
+import { t } from '../../../../src/shared/i18n/index.js';
 
 /**
  * What right-clicking a message offers: copy it (as you read it, or as Markdown), quote it in
@@ -65,10 +66,10 @@ export interface MessageMenuOptions {
 }
 
 export function messageItems(o: MessageMenuOptions): ActionItem[] {
-  const copy = (text: string, what: string): void => {
+  const copy = (text: string, said: string): void => {
     copyText(text).then(
-      () => o.toast(`Copied ${what}`),
-      () => o.toast("Couldn't copy"),
+      () => o.toast(said),
+      () => o.toast(t('chat.menu.couldntCopy')),
     );
   };
   const hasText = Boolean(o.text.trim());
@@ -77,12 +78,12 @@ export function messageItems(o: MessageMenuOptions): ActionItem[] {
     ...(o.lead ?? []),
     ...(hasText
       ? [
-          { label: picked ? 'Copy Selection' : 'Copy', icon: 'copy' as const, ...(picked ? { keys: chordLabel('Cmd+C') } : {}), separate: Boolean(o.lead?.length), onSelect: () => copy(picked || plainText(o.text), picked ? 'the selection' : 'the message') },
-          { label: 'Copy as Markdown', onSelect: () => copy(o.text, 'as Markdown') },
-          { label: 'Quote in Reply', icon: 'chat' as const, separate: true, onSelect: () => quoteInBox(o.ui, picked || o.text) },
-          ...(o.askPrefix !== undefined ? [{ label: 'Ask Your Agent About This', icon: 'claude' as const, onSelect: () => quoteInBox(o.ui, picked || o.text, o.askPrefix) }] : []),
+          { label: picked ? t('chat.menu.copySelection') : t('chat.items.copy'), icon: 'copy' as const, ...(picked ? { keys: chordLabel('Cmd+C') } : {}), separate: Boolean(o.lead?.length), onSelect: () => copy(picked || plainText(o.text), picked ? t('chat.menu.copiedSelection') : t('chat.step.copiedMessage')) },
+          { label: t('chat.md.copyMarkdown'), onSelect: () => copy(o.text, t('chat.md.copiedMarkdown')) },
+          { label: t('chat.md.quote'), icon: 'chat' as const, separate: true, onSelect: () => quoteInBox(o.ui, picked || o.text) },
+          ...(o.askPrefix !== undefined ? [{ label: t('chat.menu.askAgent'), icon: 'claude' as const, onSelect: () => quoteInBox(o.ui, picked || o.text, o.askPrefix) }] : []),
         ]
       : []),
-    ...(o.images ?? []).map((img, i) => ({ label: o.images!.length > 1 ? `Open ${img.label}` : 'Open Image', icon: 'image' as const, separate: i === 0 && hasText, onSelect: () => o.openImage?.(img) })),
+    ...(o.images ?? []).map((img, i) => ({ label: o.images!.length > 1 ? t('chat.step.openPath', { path: img.label }) : t('chat.menu.openImage'), icon: 'image' as const, separate: i === 0 && hasText, onSelect: () => o.openImage?.(img) })),
   ];
 }

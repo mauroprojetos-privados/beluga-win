@@ -35,11 +35,17 @@ const ENTRIES = [
   'src/companion/open-on-mac.ts',
   // Its rules also run in the Mac and in the phone's views.
   'src/core/triage/model.ts',
+  // Combos (docs/routing.md): the pickers and Settings resolve them as the daemon does.
+  'src/core/routing/model.ts',
+  'src/core/routing/outcomes.ts',
   'src/core/triage/facts.ts',
   // How a computer of yours is said and drawn, on the Mac and in the phone's bundle.
   'src/machines/words.ts',
   'src/machines/look.ts',
   'src/shared/machine-kinds.ts',
+  // Beluga's words and formats in your language (docs/i18n.md): every screen says them.
+  'src/shared/i18n/index.ts',
+  'src/shared/i18n/format.ts',
 ];
 // Pure packages that run anywhere (string-width measures text the same way in both clients).
 const ALLOWED_PACKAGES = new Set(['zod', 'string-width']);

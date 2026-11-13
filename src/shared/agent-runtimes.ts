@@ -13,6 +13,8 @@ export interface RuntimeModel {
   readonly efforts?: readonly string[];
   /** Can't be picked now, and why (a local endpoint that isn't answering). */
   readonly why?: string;
+  /** A local endpoint's model: the endpoint is on this computer (a combo's privacy reads it, core/routing). */
+  readonly onThisMac?: boolean;
 }
 
 /** A runtime as a picker shows it: its models when it runs here, why not when it doesn't. */

@@ -1,6 +1,7 @@
 import { CircleCheck, CircleX, Clock } from 'lucide-react-native';
 import { View } from 'react-native';
 import { type Send, sends } from '../lib/sends';
+import { t } from '../lib/language';
 import { color } from '../lib/theme';
 import { Press, T } from './ui';
 
@@ -11,22 +12,22 @@ export function SendStatus({ s }: { s: Send }) {
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4, marginRight: 4 }}>
         <CircleX color={color.error} size={12} />
         <T v="caption" c={color.error} numberOfLines={2} style={{ flexShrink: 1 }}>
-          Not sent{s.error ? ` · ${s.error}` : ''}
+          {s.error ? t('phoneParts.send.notSentWhy', { why: s.error }) : t('phoneParts.send.notSent')}
         </T>
-        <Press onPress={() => sends.retry(s.id)} hitSlop={8} accessibilityLabel="Try again">
+        <Press onPress={() => sends.retry(s.id)} hitSlop={8} accessibilityLabel={t('phoneParts.screen.tryAgain')}>
           <T v="caption" c={color.text} style={{ fontWeight: '700' }}>
-            Retry
+            {t('phoneParts.screen.retry')}
           </T>
         </Press>
-        <Press onPress={() => sends.remove(s.id)} hitSlop={8} accessibilityLabel="Remove">
+        <Press onPress={() => sends.remove(s.id)} hitSlop={8} accessibilityLabel={t('phoneParts.send.remove')}>
           <T v="caption" c={color.text2} style={{ fontWeight: '700' }}>
-            Remove
+            {t('phoneParts.send.remove')}
           </T>
         </Press>
       </View>
     );
   }
-  const words = s.state === 'waiting' ? 'Waits for your Mac' : s.state === 'unsure' ? 'Checking it got there…' : s.state === 'sent' ? 'Sent' : 'Sending…';
+  const words = s.state === 'waiting' ? t('phoneParts.send.waits') : s.state === 'unsure' ? t('phoneParts.send.checking') : s.state === 'sent' ? t('phone.needs.sent') : t('phoneParts.send.sending');
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4, marginRight: 4 }}>
       {s.state === 'sent' ? <CircleCheck color={color.text2} size={12} /> : <Clock color={color.text2} size={12} />}

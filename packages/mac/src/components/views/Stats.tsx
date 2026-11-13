@@ -2,6 +2,7 @@ import type { Cell, Stat, View } from '@beluga/shared/view-spec.js';
 import { Icon } from '../Icon.js';
 import type { ViewData } from './use-view-data.js';
 import { formatCell, formatNumber, isNumeric } from './format.js';
+import { useT } from '../../lib/i18n.js';
 import v from './views.module.css';
 
 /**
@@ -12,8 +13,9 @@ import v from './views.module.css';
  */
 
 export function StatTiles({ view, data }: { view: View; data: ViewData }) {
+  const t = useT();
   const items = view.items.length && !data.switched ? view.items : statsFromRows(data);
-  if (!items.length) return <div className={v.empty}>{data.loading ? 'Loading…' : 'Nothing to show'}</div>;
+  if (!items.length) return <div className={v.empty}>{data.loading ? t('common.loading') : t('components.views.stats.empty')}</div>;
   return (
     <div className={v.stats} data-count={Math.min(items.length, 4)}>
       {items.map((s, i) => (

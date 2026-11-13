@@ -1,5 +1,6 @@
 import type { GhIssue, GhIssueState } from '../../../../src/core/issues/model.js';
 import type { LogItem } from '../../../../src/core/store.js';
+import { t } from '../../../../src/shared/i18n/index.js';
 import { ago } from '../tasks/tasks-model.js';
 
 /**
@@ -11,10 +12,10 @@ export type StateTone = 'open' | 'done' | 'muted';
 
 /** An issue's state as its icon shows it: open (green), closed as done (purple), closed otherwise (grey). */
 export function stateOf(issue: Pick<GhIssue, 'state' | 'reason'>): { readonly label: string; readonly tone: StateTone } {
-  if (issue.state === 'open') return { label: 'Open', tone: 'open' };
-  if (issue.reason === 'not_planned') return { label: 'Not planned', tone: 'muted' };
-  if (issue.reason === 'duplicate') return { label: 'Duplicate', tone: 'muted' };
-  return { label: 'Closed', tone: 'done' };
+  if (issue.state === 'open') return { label: t('github.state.open'), tone: 'open' };
+  if (issue.reason === 'not_planned') return { label: t('github.state.notPlanned'), tone: 'muted' };
+  if (issue.reason === 'duplicate') return { label: t('github.state.duplicate'), tone: 'muted' };
+  return { label: t('github.state.closed'), tone: 'done' };
 }
 
 /** A GitHub label's color as a CSS color ("#d73a4a"), or undefined (it's drawn grey). */
@@ -42,7 +43,7 @@ export function issuesProject(projects: ReadonlyArray<{ readonly id: string; rea
 }
 
 /** "3 comments", "1 comment". */
-export const comments = (n: number): string => `${n} comment${n === 1 ? '' : 's'}`;
+export const comments = (n: number): string => t('github.comments', { count: n });
 
 /** Text to search GitHub with: words only, trimmed (empty: none). */
 export const searchWords = (raw: string): string => raw.replace(/\s+/g, ' ').trim().slice(0, 200);

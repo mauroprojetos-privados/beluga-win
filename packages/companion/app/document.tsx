@@ -12,6 +12,7 @@ import { calls } from '../lib/link/calls';
 import { store } from '../lib/store';
 import { color, radius, tint } from '../lib/theme';
 import { documentLook, kindWords, quietHtml } from '../../../src/shared/typed-cells';
+import { useT } from '../lib/language';
 
 /** The most of a page or an SVG fetched to show it (a piece is 192 KB; more than this opens on the Mac). */
 const PAGE_MAX = 4 * 1024 * 1024;
@@ -26,6 +27,7 @@ const PAGE_MAX = 4 * 1024 * 1024;
  */
 export default function DocumentScreen() {
   const insets = useSafeAreaInsets();
+  const t = useT();
   // A table's cell (sentinelId, metric, column, value), or a run's file (run, file: BLG-392).
   const p = useLocalSearchParams<{ ref: string; name: string; mime: string; sentinelId?: string; metric?: string; column?: string; value?: string; storage?: string; run?: string; file?: string }>();
   const look = documentLook(p.mime ?? '');
@@ -46,7 +48,7 @@ export default function DocumentScreen() {
   }, [page, svg, text?.status, text?.text, more]);
   const openOnMac = () =>
     void store.call(p.run ? calls.runFileOpen(p.run, p.file ?? p.name, p.name) : calls.documentOpen(p.sentinelId ?? '', p.metric ?? '', p.column ?? '', p.value ?? '', p.storage === '1', p.name)).then(
-      () => store.toast({ text: `${p.name} is open on your Mac`, tone: 'ok' }),
+      () => store.toast({ text: t('phoneApp.document.opened', { name: p.name }), tone: 'ok' }),
       (e: Error) => store.toast({ text: e.message, tone: 'error' }),
     );
   // A link in the page opens in the browser; the page itself never goes anywhere.
@@ -56,13 +58,13 @@ export default function DocumentScreen() {
     return false;
   };
   const got = page ? text : pdf ? full : undefined;
-  const failed = got?.status === 'error' ? (got.error ?? 'It didn’t come') : undefined;
+  const failed = got?.status === 'error' ? (got.error ?? t('phoneApp.document.didntCome')) : undefined;
   const shown = html !== undefined || (pdf && full?.status === 'ready' && full.uri);
   const loading = (page || pdf) && !shown && !failed;
   const kind = kindWords(p.name ?? '', p.mime ?? '');
   return (
     <Screen>
-      <Header title={p.name ?? 'Document'} subtitle={kind} back />
+      <Header title={p.name ?? t('phoneApp.document.document')} subtitle={kind} back />
       {shown ? (
         <View style={{ flex: 1, paddingBottom: insets.bottom }}>
           {Platform.OS === 'web' && html !== undefined ? (
@@ -86,7 +88,7 @@ export default function DocumentScreen() {
       ) : loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
           <ActivityIndicator color={color.text3} />
-          <T v="caption">{p.storage === '1' ? 'Fetching it from Storage on your Mac…' : 'Getting it from your Mac…'}</T>
+          <T v="caption">{p.storage === '1' ? t('phoneApp.document.fetchingStorage') : t('phoneApp.document.getting')}</T>
         </View>
       ) : (
         <View style={{ padding: 16, gap: 14 }}>
@@ -95,17 +97,17 @@ export default function DocumentScreen() {
               <FileText size={22} color={color.info} />
             </View>
             <View style={{ gap: 4 }}>
-              <Meta label="Kind" value={kind} />
-              {got?.size ? <Meta label="Size" value={sizeOf(got.size)} /> : null}
-              {p.storage === '1' && p.value ? <Meta label="In Storage" value={p.value} /> : null}
+              <Meta label={t('phoneApp.document.kind')} value={kind} />
+              {got?.size ? <Meta label={t('phoneApp.document.size')} value={sizeOf(got.size)} /> : null}
+              {p.storage === '1' && p.value ? <Meta label={t('phoneApp.document.inStorage')} value={p.value} /> : null}
             </View>
             <T v="callout" c={color.text2}>
-              {failed ?? (text?.status === 'ready' && (text.size ?? 0) > PAGE_MAX ? 'It’s too big to show on the phone: open it on your Mac.' : 'The phone can’t show this kind of file: open it on your Mac.')}
+              {failed ?? (text?.status === 'ready' && (text.size ?? 0) > PAGE_MAX ? t('phoneApp.document.tooBig') : t('phoneApp.document.cantShow'))}
             </T>
-            <Press onPress={openOnMac} accessibilityLabel="Open on your Mac" style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 36, paddingHorizontal: 14, borderRadius: 18, backgroundColor: color.primary, alignSelf: 'flex-start' }}>
+            <Press onPress={openOnMac} accessibilityLabel={t('phone.needs.openOnMac')} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 36, paddingHorizontal: 14, borderRadius: 18, backgroundColor: color.primary, alignSelf: 'flex-start' }}>
               <Laptop size={15} color={color.onPrimary} />
               <T v="callout" c={color.onPrimary} style={{ fontWeight: '600' }}>
-                Open on your Mac
+                {t('phone.needs.openOnMac')}
               </T>
             </Press>
           </Card>

@@ -2,6 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '../components/Icon.js';
 import { type EmojiCategory, type PickerEmoji, loadEmojiCategories, searchEmojis } from './emoji-data.js';
 import r from './reactions.module.css';
+import { useLocale, useT } from '../lib/i18n.js';
+
+/** The picker's categories (emoji-data.ts), said in the app's language. */
+const CATEGORIES = ['smileys', 'people', 'nature', 'food', 'travel', 'activities', 'objects', 'symbols', 'flags'] as const;
+const isCategory = (key: string): key is (typeof CATEGORIES)[number] => (CATEGORIES as readonly string[]).includes(key);
 
 /**
  * Every emoji, to react with one (BLG-702): a search field, the categories as icons to jump to,
@@ -9,6 +14,8 @@ import r from './reactions.module.css';
  * Recent. Return picks the first search result, Esc closes (the popover's own).
  */
 export function EmojiPicker({ recent, onPick }: { recent: readonly string[]; onPick: (emoji: string) => void }) {
+  const t = useT();
+  const locale = useLocale();
   const [categories, setCategories] = useState<readonly EmojiCategory[] | undefined>();
   const [failed, setFailed] = useState(false);
   const [query, setQuery] = useState('');
@@ -30,10 +37,10 @@ export function EmojiPicker({ recent, onPick }: { recent: readonly string[]; onP
   const sections = useMemo<readonly EmojiCategory[]>(() => {
     if (!categories) return [];
     const found = searchEmojis(categories, query);
-    if (query.trim()) return [{ key: 'found', label: found.length ? 'Results' : 'No emoji by that name', icon: 'search', emojis: found }];
+    if (query.trim()) return [{ key: 'found', label: found.length ? t('network.emoji.results') : t('network.emoji.noResults'), icon: 'search', emojis: found }];
     const mine = recent.map((e) => byEmoji.get(e) ?? { emoji: e, label: e, words: '' });
-    return [{ key: 'recent', label: 'Recent', icon: 'clock', emojis: mine }, ...categories];
-  }, [categories, query, recent, byEmoji]);
+    return [{ key: 'recent', label: t('network.emoji.recent'), icon: 'clock', emojis: mine }, ...categories.map((c) => (isCategory(c.key) ? { ...c, label: t(`network.emoji.${c.key}`) } : c))];
+  }, [categories, query, recent, byEmoji, locale]);
 
   const jump = (key: string): void => {
     setQuery('');
@@ -47,8 +54,8 @@ export function EmojiPicker({ recent, onPick }: { recent: readonly string[]; onP
         <input
           autoFocus
           value={query}
-          placeholder="Search emoji"
-          aria-label="Search emoji"
+          placeholder={t('network.emoji.search')}
+          aria-label={t('network.emoji.search')}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             const first = sections[0]?.emojis[0];
@@ -60,7 +67,7 @@ export function EmojiPicker({ recent, onPick }: { recent: readonly string[]; onP
         />
       </div>
       {query.trim() ? null : (
-        <div className={r.pickerTabs} role="tablist" aria-label="Emoji categories">
+        <div className={r.pickerTabs} role="tablist" aria-label={t('network.emoji.categories')}>
           {sections.map((c) => (
             <button key={c.key} type="button" role="tab" aria-selected={false} className={r.pickerTab} title={c.label} aria-label={c.label} onClick={() => jump(c.key)}>
               <Icon name={c.icon} size={14} />
@@ -69,7 +76,7 @@ export function EmojiPicker({ recent, onPick }: { recent: readonly string[]; onP
         </div>
       )}
       <div ref={grid} className={r.pickerGrid} onMouseLeave={() => setHover(undefined)}>
-        {failed ? <div className={r.pickerNote}>Couldn’t load the emojis. Close this and try again.</div> : !categories ? <div className={r.pickerNote}>Loading emojis…</div> : null}
+        {failed ? <div className={r.pickerNote}>{t('network.emoji.failed')}</div> : !categories ? <div className={r.pickerNote}>{t('network.emoji.loading')}</div> : null}
         {sections.map((c) => (
           <section key={c.key} data-section={c.key} className={r.pickerSection}>
             <div className={r.pickerHead}>{c.label}</div>
@@ -90,7 +97,7 @@ export function EmojiPicker({ recent, onPick }: { recent: readonly string[]; onP
             <span className={r.pickerFootName}>{hover.label}</span>
           </>
         ) : (
-          <span className={r.pickerFootHint}>Pick an emoji to react with</span>
+          <span className={r.pickerFootHint}>{t('network.emoji.hint')}</span>
         )}
       </div>
     </div>

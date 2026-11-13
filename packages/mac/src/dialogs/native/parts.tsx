@@ -1,5 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { Fragment, type ReactNode, useEffect, useRef, useState } from 'react';
 import type { AppState } from '@beluga/core/store.js';
 import { type MenuKind, menuSpec } from '@beluga/ui/menus.js';
 import { Icon, type IconName } from '../../components/Icon.js';
@@ -7,6 +7,7 @@ import { Button, cx } from '../../components/ui.js';
 import { tildePath } from '../../lib/brand.js';
 import s from './sharing.module.css';
 import { primaryKey } from '../../lib/shortcuts-model.js';
+import { useT } from '../../lib/i18n.js';
 
 /**
  * The pieces the sharing sheets and popovers are built from: a sheet with a header and a
@@ -29,6 +30,7 @@ export interface SheetProps {
 }
 
 export function Sheet({ title, subtitle, icon, badge, close, footer, children, wide, onReturn }: SheetProps) {
+  const say = useT();
   return (
     <Dialog.Root open onOpenChange={(v) => (v ? undefined : close())}>
       <Dialog.Portal>
@@ -49,7 +51,7 @@ export function Sheet({ title, subtitle, icon, badge, close, footer, children, w
               <Dialog.Title className={s.title}>{title}</Dialog.Title>
               {subtitle ? <div className={s.subtitle}>{subtitle}</div> : null}
             </div>
-            <Dialog.Close className={s.close} aria-label="Close">
+            <Dialog.Close className={s.close} aria-label={say('common.close')}>
               <Icon name="x" size={11} />
             </Dialog.Close>
           </header>
@@ -143,6 +145,7 @@ export function Choice<T extends string>({ value, options, onChange, label, tone
 
 /** "Are you sure?" the Mac way: what happens, Cancel, and the button that does it. */
 export function Alert({ title, message, confirm, onConfirm, onCancel }: { title: string; message: string; confirm: string; onConfirm: () => void; onCancel: () => void }) {
+  const t = useT();
   return (
     <Dialog.Root open onOpenChange={(v) => (v ? undefined : onCancel())}>
       <Dialog.Portal>
@@ -157,7 +160,7 @@ export function Alert({ title, message, confirm, onConfirm, onCancel }: { title:
           </p>
           <div className={s.alertButtons}>
             <Button onClick={onCancel} autoFocus>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button variant="danger" className={s.alertDanger} onClick={onConfirm}>
               {confirm}
@@ -195,4 +198,23 @@ export const tilde = tildePath;
 /** A small pill: "can prompt", "Host", "Guest". */
 export function Tag({ children, tone }: { children: ReactNode; tone?: 'accent' | 'claude' | 'warn' | 'muted' }) {
   return <span className={cx(s.tag, tone && s[`tag_${tone}`])}>{children}</span>;
+}
+
+/**
+ * A translated sentence with one part drawn as an element: `slotted(t('…'), 'branch', <code>…</code>)`
+ * puts the element where the sentence says `{branch}` (word order differs between languages).
+ */
+export function slotted(text: string, slot: string, node: ReactNode): ReactNode {
+  return rich(text, { [slot]: node });
+}
+
+/** The same with several elements: `rich(t('…'), { branch: <code>…</code>, n: <strong>…</strong> })`. */
+export function rich(text: string, nodes: Readonly<Record<string, ReactNode>>): ReactNode {
+  const parts = text.split(/\{(\w+)\}/);
+  if (parts.length === 1) return text;
+  return (
+    <>
+      {parts.map((part, i) => (i % 2 ? (Object.hasOwn(nodes, part) ? <Fragment key={i}>{nodes[part]}</Fragment> : `{${part}}`) : part))}
+    </>
+  );
 }

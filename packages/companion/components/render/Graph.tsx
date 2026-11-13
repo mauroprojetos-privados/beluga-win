@@ -6,6 +6,7 @@ import { GestureDetector, usePanGesture, usePinchGesture, useSimultaneousGesture
 import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import Svg, { Defs, G, Marker, Path, Rect, Text as SvgText } from 'react-native-svg';
 import { type ElkInput, type ElkOutput, type Graph, type GraphNode, KIND_ICON, KIND_NAME, STATUS_INFO, backEdges, connections, elkGraph, neighborhood, nodeBoxes, placeLabels, placesOf, roundedPath, routesOf, stepFocus } from '../../lib/render';
+import { t as say } from '../../lib/language';
 import { color, elevation, spring, svgFont, type } from '../../lib/theme';
 import { Sheet } from '../Sheet';
 import { haptic, Pill, Press, T, type Tone, toneBg, toneInk } from '../ui';
@@ -56,7 +57,7 @@ async function layoutFor(g: Graph): Promise<Laid> {
   const turned: Graph['direction'] = g.direction === 'right' || g.direction === 'left' ? 'down' : 'right';
   const tries = await Promise.all(([g.direction, turned] as const).map((d) => e.layout(JSON.parse(JSON.stringify(elkGraph(g, sizes, d))) as ElkInput).catch(() => undefined)));
   const laid = tries.flatMap((o, i) => (o ? [{ out: o, width: o.width ?? 300, height: o.height ?? 200, preferred: i === 0 }] : []));
-  if (!laid.length) throw new Error('This graph couldn’t be laid out');
+  if (!laid.length) throw new Error(say('phoneParts.graph.cantLayOut'));
   const fit = (l: (typeof laid)[number]) => Math.min(1, PHONE_FRAME.width / l.width, PHONE_FRAME.height / l.height) * (l.preferred ? 1 : 0.9);
   return laid.sort((a, b) => fit(b) - fit(a))[0]!;
 }
@@ -158,7 +159,7 @@ export function GraphCard({ graph, full }: { readonly graph: Graph; /** Full scr
           </T>
         ) : !laid || !w ? (
           <T v="caption" style={{ padding: 14 }}>
-            Drawing the graph…
+            {say('phoneParts.graph.drawing')}
           </T>
         ) : (
           <GestureDetector gesture={gestures}>
@@ -239,12 +240,12 @@ export function GraphCard({ graph, full }: { readonly graph: Graph; /** Full scr
           </GestureDetector>
         )}
         {laid ? (
-          <Press onPress={reset} accessibilityLabel="Fit the graph" style={{ position: 'absolute', right: 8, top: 8, width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: color.card, borderWidth: 1, borderColor: color.hairline }}>
+          <Press onPress={reset} accessibilityLabel={say('phoneParts.graph.fit')} style={{ position: 'absolute', right: 8, top: 8, width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: color.card, borderWidth: 1, borderColor: color.hairline }}>
             <Maximize2 color={color.text2} size={14} />
           </Press>
         ) : null}
         {laid && !full ? (
-          <Press onPress={() => openFull({ kind: 'graph', graph })} accessibilityLabel="Full screen" style={{ position: 'absolute', right: 44, top: 8, width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: color.card, borderWidth: 1, borderColor: color.hairline }}>
+          <Press onPress={() => openFull({ kind: 'graph', graph })} accessibilityLabel={say('phoneParts.view.fullScreen')} style={{ position: 'absolute', right: 44, top: 8, width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: color.card, borderWidth: 1, borderColor: color.hairline }}>
             <Expand color={color.text2} size={14} />
           </Press>
         ) : null}
@@ -264,17 +265,17 @@ function Steps({ graph, step, setStep }: { readonly graph: Graph; readonly step:
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Footprints color={color.text2} size={15} />
         <T v="callout" c={color.text} style={{ flex: 1, fontWeight: '700' }} numberOfLines={1}>
-          {s ? s.title : `Walk through it · ${n} steps`}
+          {s ? s.title : say('phoneParts.graph.walk', { count: n })}
         </T>
         {step !== undefined ? (
           <T v="caption" style={{ fontVariant: ['tabular-nums'] }}>
             {step + 1}/{n}
           </T>
         ) : null}
-        <Press disabled={step === undefined} onPress={() => setStep(step! > 0 ? step! - 1 : undefined)} accessibilityLabel="Previous step" style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: color.sunken, opacity: step === undefined ? 0.4 : 1 }}>
+        <Press disabled={step === undefined} onPress={() => setStep(step! > 0 ? step! - 1 : undefined)} accessibilityLabel={say('phoneParts.graph.previous')} style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: color.sunken, opacity: step === undefined ? 0.4 : 1 }}>
           <ChevronLeft color={color.text} size={16} />
         </Press>
-        <Press disabled={step === n - 1} onPress={() => setStep(step === undefined ? 0 : step + 1)} accessibilityLabel="Next step" style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: color.primary, opacity: step === n - 1 ? 0.4 : 1 }}>
+        <Press disabled={step === n - 1} onPress={() => setStep(step === undefined ? 0 : step + 1)} accessibilityLabel={say('phoneParts.graph.next')} style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: color.primary, opacity: step === n - 1 ? 0.4 : 1 }}>
           <ChevronRight color={color.onPrimary} size={16} />
         </Press>
       </View>
@@ -305,7 +306,7 @@ function NodeSheet({ graph, node, byId, onClose }: { readonly graph: Graph; read
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <T v="caption" style={{ flex: 1 }}>
                 {KIND_NAME[n.type]}
-                {n.group && byId.get(n.group) ? ` · in ${byId.get(n.group)!.label}` : ''}
+                {n.group && byId.get(n.group) ? ` · ${say('phoneParts.graph.inGroup', { name: byId.get(n.group)!.label })}` : ''}
               </T>
               {st ? <Pill label={st.label} tone={GRAPH_TONE[st.tone] ?? 'plain'} /> : null}
               {n.tag ? <Pill label={n.tag} /> : null}

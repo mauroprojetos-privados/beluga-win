@@ -12,6 +12,7 @@ import m from './menubar-settings.module.css';
 import { powerSaving } from '../lib/power.js';
 import { trayName } from '../lib/os-words.js';
 import { keyPlatform } from '../lib/shortcuts-model.js';
+import { say, useT } from '../lib/i18n.js';
 
 /** The sliders' track: the water's soft blues. */
 const WATER = ['#bfdcf7', '#7fb6ea'] as const;
@@ -61,6 +62,7 @@ function Preview({ look, title, still, kick }: { look: MenuBarLook; title: strin
  * preview at the top.
  */
 export function MenuBarSettings() {
+  const t = useT();
   const prefs = usePrefs();
   const look = prefs.menuBar;
   const counts = useApp((st) => menuBarCounts(st), (a, b) => JSON.stringify(a) === JSON.stringify(b));
@@ -78,11 +80,11 @@ export function MenuBarSettings() {
     <>
       <Preview look={look} title={title} still={still} kick={kick} />
       <p className={m.means}>
-        {look.count === 'none' ? means.means : `The number is ${means.label.toLowerCase()}: ${means.means.charAt(0).toLowerCase()}${means.means.slice(1)}`}
-        {look.count !== 'none' && !live ? ' Nothing right now, so it’s hidden; the preview shows 3.' : ''}
+        {look.count === 'none' ? means.means : t('prefs.menubar.numberIs', { label: means.label.toLowerCase(), means: `${means.means.charAt(0).toLowerCase()}${means.means.slice(1)}` })}
+        {look.count !== 'none' && !live ? t('prefs.menubar.hiddenNow') : ''}
       </p>
-      <Group title="Start from">
-        <div className={f.presets} role="radiogroup" aria-label={`${trayName()} presets`}>
+      <Group title={say('Start from')}>
+        <div className={f.presets} role="radiogroup" aria-label={t('prefs.menubar.presetsAria', { tray: trayName() })}>
           {MENU_BAR_PRESETS.map((p) => (
             <button key={p.id} type="button" role="radio" aria-checked={look.preset === p.id} className={cx(f.preset, look.preset === p.id && f.on)} onClick={() => set(p.look)}>
               <span className={f.presetName}>{p.name}</span>
@@ -91,20 +93,20 @@ export function MenuBarSettings() {
           ))}
           {look.preset === 'custom' ? (
             <div className={cx(f.preset, f.on)} role="radio" aria-checked>
-              <span className={f.presetName}>Your Own</span>
-              <span className={f.presetBlurb}>Tuned by you</span>
+              <span className={f.presetName}>{t('prefs.menubar.yourOwn')}</span>
+              <span className={f.presetBlurb}>{t('prefs.menubar.tunedByYou')}</span>
             </div>
           ) : null}
         </div>
       </Group>
-      <Group title="The number">
-        <Row label="Counts">
-          <Select label="Counts" value={look.count} onChange={(count: MenuBarCount) => set({ count })} options={COUNTS.map((c) => ({ value: c.id, label: c.label }))} />
+      <Group title={say('The number')}>
+        <Row label={say('Counts')}>
+          <Select label={say('Counts')} value={look.count} onChange={(count: MenuBarCount) => set({ count })} options={COUNTS.map((c) => ({ value: c.id, label: c.label }))} />
         </Row>
         {look.count === 'none' ? null : (
-          <Row label="Reads as" detail="It hides at zero.">
+          <Row label={say('Reads as')} detail={t('prefs.menubar.hidesAtZero')}>
             <Segmented
-              label="Reads as"
+              label={say('Reads as')}
               radio
               value={look.words ? 'words' : 'number'}
               onChange={(v) => set({ words: v === 'words' })}
@@ -116,25 +118,25 @@ export function MenuBarSettings() {
           </Row>
         )}
       </Group>
-      <Group title="The spout">
-        <Row label="When the whale spouts" detail={powerSaving() ? 'Low Power mode is saving power (Appearance), so the whale keeps still.' : prefs.reduceMotion ? 'Reduce Motion is on (Appearance), so the whale keeps still.' : look.spout === 'working' ? 'Every few seconds while an agent of yours is at work.' : look.spout === 'done' ? 'Once, each time an agent of yours finishes.' : 'The whale keeps still.'}>
+      <Group title={say('The spout')}>
+        <Row label={say('When the whale spouts')} detail={powerSaving() ? t('prefs.menubar.spoutPower') : prefs.reduceMotion ? t('prefs.menubar.spoutReduce') : look.spout === 'working' ? t('prefs.menubar.spoutWorking') : look.spout === 'done' ? t('prefs.menubar.spoutDone') : t('prefs.menubar.spoutOff')}>
           <Segmented
-            label="When the whale spouts"
+            label={say('When the whale spouts')}
             radio
             value={look.spout}
             onChange={(spout) => set({ spout })}
             options={[
-              { value: 'done', label: 'When an Agent Finishes' },
-              { value: 'working', label: 'While an Agent Works' },
-              { value: 'off', label: 'Never' },
+              { value: 'done', label: t('prefs.menubar.whenFinishes') },
+              { value: 'working', label: t('prefs.menubar.whileWorks') },
+              { value: 'off', label: t('prefs.menubar.never') },
             ]}
           />
         </Row>
         {look.spout === 'off' ? null : (
           <>
-            <Dial label="Splash" low="A small puff" high="A big splash" value={look.splash} colors={WATER} onChange={(splash) => set({ splash })} />
-            <Dial label="Speed" low="Slow" high="Quick" value={look.speed} colors={WATER} onChange={(speed) => set({ speed })} />
-            <Row label="Try it" detail={`The whale ${keyPlatform() === 'mac' ? 'up in your menu bar' : `in your ${trayName().toLowerCase()}`} spouts once.`}>
+            <Dial label={say('Splash')} low={t('prefs.menubar.smallPuff')} high={t('prefs.menubar.bigSplash')} value={look.splash} colors={WATER} onChange={(splash) => set({ splash })} />
+            <Dial label={say('Speed')} low={t('prefs.menubar.slow')} high={t('prefs.menubar.quick')} value={look.speed} colors={WATER} onChange={(speed) => set({ speed })} />
+            <Row label={say('Try it')} detail={keyPlatform() === 'mac' ? t('prefs.menubar.tryMac') : t('prefs.menubar.tryTray', { tray: trayName().toLowerCase() })}>
               <Button
                 size="small"
                 disabled={prefs.reduceMotion}
@@ -143,7 +145,7 @@ export function MenuBarSettings() {
                   playTraySpout();
                 }}
               >
-                Spout Now
+                {t('prefs.menubar.spoutNow')}
               </Button>
             </Row>
           </>
@@ -152,7 +154,7 @@ export function MenuBarSettings() {
       {look.preset !== DEFAULT_MENU_BAR.preset ? (
         <div className={f.reset}>
           <Button size="small" onClick={() => setPrefs({ menuBar: DEFAULT_MENU_BAR })}>
-            Back to the Default
+            {t('prefs.menubar.backToDefault')}
           </Button>
         </div>
       ) : null}

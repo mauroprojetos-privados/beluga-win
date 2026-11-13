@@ -20,6 +20,7 @@ import { copilotFailure, copilotModel, httpServers, instructionsDir, modeValue }
 import { copilotSessionsDir } from './sessions.js';
 import { copilotStatus } from './status.js';
 import { COPILOT_DIALECT, belugaToolOf, copilotCalls } from './tools.js';
+import { acpHttpServers } from '../place-mcp.js';
 
 export interface CopilotBackendOptions {
   readonly cwd: string;
@@ -166,7 +167,8 @@ export function createCopilotBackend(opts: CopilotBackendOptions): AgentBackend 
           return undefined;
         };
 
-        const servers = httpServers(mounted.http);
+        // A bot’s own HTTP servers too (docs/bots.md); Copilot turns started ones down, so the bot is warned of those.
+        const servers = [...httpServers(mounted.http), ...acpHttpServers(place?.mcp)];
         const resume = place ? place.resume : sessionId;
         let opened: SessionResponse | undefined;
         if (resume && !place?.forkSession) {

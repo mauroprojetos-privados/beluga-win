@@ -2,6 +2,7 @@ import { pillOf } from '../lib/update-model.js';
 import { openUpdateSheet, useUpdates } from '../lib/updates.js';
 import { cx } from './ui.js';
 import s from './update.module.css';
+import { useT } from '../lib/i18n.js';
 
 /**
  * "Beluga 0.5 is ready": a small pill at the bottom of the sidebar once an update has
@@ -9,15 +10,16 @@ import s from './update.module.css';
  * Nothing at all the rest of the time. `floating`: no sidebar to sit in, so a corner.
  */
 export function UpdatePill({ floating = false }: { floating?: boolean }) {
+  const t = useT();
   const { state } = useUpdates();
   const pill = pillOf(state);
   if (!pill) return null;
   const idle = pill.kind === 'ready' && state.choice === 'idle' && state.phase !== 'installing';
   return (
-    <button type="button" className={cx(s.pill, pill.kind === 'news' && s.news, floating && s.floating)} onClick={openUpdateSheet} data-update-pill={pill.kind} title={idle ? 'Installs when you step away' : undefined}>
+    <button type="button" className={cx(s.pill, pill.kind === 'news' && s.news, floating && s.floating)} onClick={openUpdateSheet} data-update-pill={pill.kind} title={idle ? t('components.update.installsAway') : undefined}>
       <span className={s.dot} aria-hidden />
       <span className={s.label}>{pill.label}</span>
-      {idle ? <span className={s.hint}>when idle</span> : null}
+      {idle ? <span className={s.hint}>{t('components.update.whenIdle')}</span> : null}
     </button>
   );
 }

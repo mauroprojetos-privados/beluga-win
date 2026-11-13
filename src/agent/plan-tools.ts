@@ -31,6 +31,14 @@ const TASK = z.object({
   estimate: ESTIMATE.optional().describe('1 an hour, 2 half a day, 3 a day, 5 a few days, 8 a week (split it)'),
   labels: z.array(z.string().max(32)).max(6).optional().describe(`From the board's set only: ${DEFAULT_LABELS.map((l) => l.name).join(', ')}, and any the project added`),
   touches: z.array(z.string().max(200)).max(20).optional().describe('Files or folders it changes (parallel tasks shouldn’t share them)'),
+  verify: z
+    .array(z.object({ run: z.string().min(1).max(400), expect: z.string().min(1).max(200) }))
+    .max(8)
+    .optional()
+    .describe('How to prove each acceptance criterion: the exact command and what it prints when it works'),
+  out_of_scope: z.array(z.string().min(1).max(200)).max(10).optional().describe('Files or areas that look related but must not be changed'),
+  stop_if: z.array(z.string().min(1).max(300)).max(6).optional().describe('When to stop this task and say why instead of improvising: what you could not confirm by reading the code'),
+  exemplar: z.string().max(200).optional().describe('A file in this repository that already follows the pattern to copy'),
   assignee: z.enum(['claude', 'me']).optional().describe('claude (default), or me: only the user can do it'),
   decision: z
     .object({
@@ -99,6 +107,10 @@ export function taskInput(t: Partial<Task>): Partial<TaskInput> & { readonly iss
     ...(t.estimate ? { estimate: t.estimate } : {}),
     ...(t.labels ? { labels: t.labels } : {}),
     ...(t.touches ? { touches: t.touches } : {}),
+    ...(t.verify ? { verify: t.verify } : {}),
+    ...(t.out_of_scope ? { outOfScope: t.out_of_scope } : {}),
+    ...(t.stop_if ? { stopIf: t.stop_if } : {}),
+    ...(t.exemplar !== undefined ? { exemplar: t.exemplar } : {}),
     ...(t.assignee ? { assignee: t.assignee } : {}),
     ...(t.decision ? { decision: { question: t.decision.question, options: t.decision.options, ...(t.decision.multi ? { multi: true } : {}) } } : {}),
     ...(t.issue ? { issue: t.issue } : {}),

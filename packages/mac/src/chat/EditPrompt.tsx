@@ -3,6 +3,7 @@ import { Button, Segmented, Tip, cx } from '../components/ui.js';
 import { toast, useBeluga } from '../lib/beluga.js';
 import { usePrefs } from '../lib/prefs.js';
 import { chordLabel } from '../lib/shortcuts-model.js';
+import { useT } from '../lib/i18n.js';
 import s from './edit-prompt.module.css';
 
 type Mode = 'here' | 'fork';
@@ -18,6 +19,7 @@ let lastMode: Mode = 'here';
  */
 export function EditPrompt({ wsId, lineId, text, worktree, onClose }: { wsId: string; lineId: string; text: string; worktree: boolean; onClose: () => void }) {
   const { client } = useBeluga();
+  const t = useT();
   const prefs = usePrefs();
   const [draft, setDraft] = useState(text);
   const [mode, setMode] = useState<Mode>(lastMode);
@@ -64,18 +66,18 @@ export function EditPrompt({ wsId, lineId, text, worktree, onClose }: { wsId: st
   const note =
     mode === 'here'
       ? worktree
-        ? 'What came after this goes, and the files go back to how they were then.'
-        : 'What came after this goes, and your agent forgets it.'
+        ? t('chat.edit.noteHereWorktree')
+        : t('chat.edit.noteHere')
       : worktree
-        ? 'Goes on in a new worktree from this point. This one stays as it is.'
-        : 'Goes on in a new chat from this point. This one stays as it is.';
+        ? t('chat.edit.noteForkWorktree')
+        : t('chat.edit.noteFork');
   const keys = prefs.sendWith === 'enter' ? '↩' : chordLabel('Cmd+Enter');
   return (
     <div className={cx(s.edit, busy && s.busy)} data-edit-prompt="">
       <textarea
         ref={box}
         className={cx(s.input, 'selectable')}
-        aria-label="Edit your message"
+        aria-label={t('chat.edit.aria')}
         value={draft}
         rows={1}
         onChange={(e) => setDraft(e.target.value)}
@@ -85,27 +87,27 @@ export function EditPrompt({ wsId, lineId, text, worktree, onClose }: { wsId: st
       />
       <div className={s.bar}>
         <Segmented<Mode>
-          label="Where the edit goes"
+          label={t('chat.edit.where')}
           value={mode}
           onChange={(m) => {
             setMode(m);
             box.current?.focus();
           }}
           options={[
-            { value: 'here', label: 'Rewind Here', icon: 'back', hint: worktree ? 'This conversation goes back to this message, and its files too' : 'This conversation goes back to this message' },
-            { value: 'fork', label: 'New Fork', icon: 'branch', hint: worktree ? 'A new worktree from this point, files as they were then' : 'A new chat from this point' },
+            { value: 'here', label: t('chat.edit.rewindHere'), icon: 'back', hint: worktree ? t('chat.edit.rewindHereHintWorktree') : t('chat.edit.rewindHereHint') },
+            { value: 'fork', label: t('chat.edit.newFork'), icon: 'branch', hint: worktree ? t('chat.edit.newForkHintWorktree') : t('chat.edit.newForkHint') },
           ]}
         />
         <span className={s.note}>{note}</span>
         <span className={s.actions}>
-          <Tip label="Keep the message as it was" keys="esc">
+          <Tip label={t('chat.edit.keep')} keys="esc">
             <Button size="small" variant="quiet" onClick={onClose} disabled={busy}>
-              Cancel
+              {t('common.cancel')}
             </Button>
           </Tip>
-          <Tip label={mode === 'here' ? 'Rewind and send' : 'Fork and send'} keys={keys}>
+          <Tip label={mode === 'here' ? t('chat.edit.rewindSend') : t('chat.edit.forkSend')} keys={keys}>
             <Button size="small" variant="primary" icon="send" onClick={() => void send()} disabled={busy || !draft.trim()}>
-              {mode === 'here' ? 'Rewind' : 'Fork'}
+              {mode === 'here' ? t('chat.edit.rewind') : t('chat.edit.fork')}
             </Button>
           </Tip>
         </span>

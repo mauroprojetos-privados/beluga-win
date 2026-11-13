@@ -1,4 +1,6 @@
 import { hhmm } from './clock.js';
+import { formatDateWith } from './i18n/format.js';
+import { type Key, t } from './i18n/index.js';
 
 // Remind Me Later on one conversation (BLG-748, BLG-770), as data: it stays quiet until then, then
 // Beluga reminds you once. The core keeps the time (core/triage) and reminds; the screens offer it
@@ -6,11 +8,19 @@ import { hhmm } from './clock.js';
 
 export type RemindChoice = 'hour' | 'hours' | 'tomorrow' | 'week';
 
+const choice = (value: RemindChoice, key: Key): { readonly value: RemindChoice; readonly label: string } => ({
+  value,
+  get label() {
+    return t(key);
+  },
+});
+
+/** The times a screen offers, their labels in the app's language (read when they're said). */
 export const REMIND_CHOICES: ReadonlyArray<{ readonly value: RemindChoice; readonly label: string }> = [
-  { value: 'hour', label: 'In 1 Hour' },
-  { value: 'hours', label: 'In 3 Hours' },
-  { value: 'tomorrow', label: 'Tomorrow Morning' },
-  { value: 'week', label: 'Next Week' },
+  choice('hour', 'shared.remind.hour'),
+  choice('hours', 'shared.remind.hours'),
+  choice('tomorrow', 'shared.remind.tomorrow'),
+  choice('week', 'shared.remind.week'),
 ];
 
 /** The hour a day starts (8 in the morning, local time), as Do Not Disturb's "tomorrow" (quiet.ts). */
@@ -34,14 +44,20 @@ export const remindPresets = (now = Date.now()): ReadonlyArray<{ readonly label:
 /** Put off until later right now: quiet until it reminds you. */
 export const remindPending = (until: number | undefined, now = Date.now()): until is number => until !== undefined && until > now;
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
-
-/** "Reminds you at 14:30", "… tomorrow at 08:00", "… Mon at 08:00"; '' when nothing is put off. */
-export function remindLabel(until: number | undefined, now = Date.now()): string {
+/** When it reminds you, in the app's language: "at 14:30", "tomorrow at 08:00", "Mon at 08:00"; '' when nothing is put off. */
+export function remindWhen(until: number | undefined, now = Date.now()): string {
   if (!remindPending(until, now)) return '';
   const end = new Date(until);
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
-  const day = end.toDateString() === new Date(now).toDateString() ? '' : end.toDateString() === tomorrow.toDateString() ? 'tomorrow ' : `${WEEKDAYS[end.getDay()]} `;
-  return `Reminds you ${day}at ${hhmm(until)}`;
+  const time = hhmm(until);
+  if (end.toDateString() === new Date(now).toDateString()) return t('shared.remind.at', { time });
+  if (end.toDateString() === tomorrow.toDateString()) return t('shared.remind.tomorrowAt', { time });
+  return t('shared.remind.dayAt', { day: formatDateWith(end, { weekday: 'short' }), time });
+}
+
+/** "Reminds you at 14:30", "… tomorrow at 08:00", "… Mon at 08:00"; '' when nothing is put off. */
+export function remindLabel(until: number | undefined, now = Date.now()): string {
+  const when = remindWhen(until, now);
+  return when ? t('shared.remind.label', { when }) : '';
 }

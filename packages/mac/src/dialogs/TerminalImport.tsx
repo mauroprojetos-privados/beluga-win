@@ -6,8 +6,9 @@ import { type UiPrefs, getPrefs, setPrefs, usePrefs } from '../lib/prefs.js';
 import { colorsFor, foundLabel, hasLook, importPatch, importSummary } from '../lib/terminal-import-model.js';
 import { fontStack, hasFont, looksDark } from '../lib/terminal-look.js';
 import { Group, Row, Select } from './settings-controls.js';
-import t from './terminal-settings.module.css';
+import tc from './terminal-settings.module.css';
 import { thisComputer } from '../lib/os-words.js';
+import { say, useT } from '../lib/i18n.js';
 
 /**
  * Bringing another terminal's look into Beluga's (BLG-212): Settings › Terminal › Import from…,
@@ -60,9 +61,9 @@ export const withImport = (p: UiPrefs, found: TerminalFound): UiPrefs => (found.
 /** The 16 colours, in two rows of eight. */
 export function Swatches({ colors, size = 11 }: { readonly colors: TermColors; readonly size?: number }) {
   return (
-    <span className={t.swatches} aria-hidden>
+    <span className={tc.swatches} aria-hidden>
       {colors.ansi.map((c, i) => (
-        <i key={i} className={t.sw} style={{ width: size, height: size, ...(c ? { background: c } : { opacity: 0.25 }) }} />
+        <i key={i} className={tc.sw} style={{ width: size, height: size, ...(c ? { background: c } : { opacity: 0.25 }) }} />
       ))}
     </span>
   );
@@ -73,36 +74,42 @@ export function TermPreview({ prefs, compact = false }: { readonly prefs: UiPref
   const c = colorsFor(prefs.termTheme, looksDark());
   const a = (i: number): string | undefined => c?.ansi[i] ?? undefined;
   const fg = c?.foreground;
+  // The preview is a sample of a terminal (a shell prompt, a dev server's output): never translated.
   return (
-    <div className={cx(t.preview, compact && t.previewCompact)} aria-hidden style={{ fontFamily: fontStack(prefs.termFont), fontSize: `${compact ? 10.5 : prefs.termFontSize}px`, lineHeight: prefs.termLineHeight, ...(c?.background ? { background: c.background } : {}), ...(fg ? { color: fg } : {}) }}>
+    <div className={cx(tc.preview, compact && tc.previewCompact)} aria-hidden style={{ fontFamily: fontStack(prefs.termFont), fontSize: `${compact ? 10.5 : prefs.termFontSize}px`, lineHeight: prefs.termLineHeight, ...(c?.background ? { background: c.background } : {}), ...(fg ? { color: fg } : {}) }}>
       <div>
-        <span className={t.dim} style={a(8) ? { color: a(8) } : undefined}>
+        <span className={tc.dim} style={a(8) ? { color: a(8) } : undefined}>
+          {/* i18n-ignore */}
           ~/Projects/
         </span>
+        {/* i18n-ignore */}
         Beluga{' '}
-        <span className={t.branch} style={a(2) ? { color: a(2) } : undefined}>
+        <span className={tc.branch} style={a(2) ? { color: a(2) } : undefined}>
           main
         </span>
       </div>
       <div>
-        <span className={t.prompt} style={a(5) ?? a(4) ? { color: a(5) ?? a(4) } : undefined}>
+        <span className={tc.prompt} style={a(5) ?? a(4) ? { color: a(5) ?? a(4) } : undefined}>
           ❯
         </span>{' '}
+        {/* i18n-ignore */}
         npm run dev
       </div>
       <div>
+        {/* i18n-ignore */}
         <span style={a(4) ? { color: a(4) } : undefined}>  ready</span> in 312 ms{compact ? <br /> : ' · '}
         {compact ? '  ' : ''}
         <span style={a(6) ? { color: a(6) } : undefined}>http://localhost:5173</span>
         {compact ? <br /> : ' '}
         {compact ? '  ' : ''}
+        {/* i18n-ignore */}
         <span style={a(3) ? { color: a(3) } : undefined}>1 warning</span> <span style={a(1) ? { color: a(1) } : undefined}>0 errors</span>
       </div>
       <div>
-        <span className={t.prompt} style={a(5) ?? a(4) ? { color: a(5) ?? a(4) } : undefined}>
+        <span className={tc.prompt} style={a(5) ?? a(4) ? { color: a(5) ?? a(4) } : undefined}>
           ❯
         </span>{' '}
-        <span className={cx(t.cursor, t[`cursor_${prefs.termCursor}`], prefs.termCursorBlink && t.blink)} style={c?.cursor ? { background: c.cursor } : fg ? { background: fg } : undefined}>
+        <span className={cx(tc.cursor, tc[`cursor_${prefs.termCursor}`], prefs.termCursorBlink && tc.blink)} style={c?.cursor ? { background: c.cursor } : fg ? { background: fg } : undefined}>
           {prefs.termCursor === 'block' ? ' ' : ''}
         </span>
       </div>
@@ -112,37 +119,46 @@ export function TermPreview({ prefs, compact = false }: { readonly prefs: UiPref
 
 /** What a terminal brings, before you apply it: its look drawn, and the list in words. */
 function Pending({ found, onApply, onCancel }: { readonly found: TerminalFound; readonly onApply: () => void; readonly onCancel: () => void }) {
+  const t = useT();
   const prefs = usePrefs();
   const look = found.look!;
   const words = importSummary(look, hasFont);
   return (
-    <div className={t.pending}>
+    <div className={tc.pending}>
       <TermPreview prefs={withImport(prefs, found)} />
-      <div className={t.pendingText}>
-        <div className={t.brings}>
+      <div className={tc.pendingText}>
+        <div className={tc.brings}>
           {look.theme ? <Swatches colors={colorsFor(look.theme, looksDark())!} size={9} /> : null}
           <span>{words.join(' · ')}</span>
         </div>
         {found.notes.map((n) => (
-          <div key={n} className={t.noteLine}>
+          <div key={n} className={tc.noteLine}>
             {n}
           </div>
         ))}
       </div>
-      <div className={t.pendingButtons}>
+      <div className={tc.pendingButtons}>
         <Button variant="quiet" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button variant="primary" icon="download" onClick={onApply}>
-          Bring It In
+          {t('prefs.terminal.bringIn')}
         </Button>
       </div>
     </div>
   );
 }
 
+/** The theme you have, in words: its name, where it came from, and whether it has a light side. */
+function themeWords(t: ReturnType<typeof useT>, theme: { readonly name: string; readonly from?: string; readonly light?: unknown }): string {
+  const { name, from } = theme;
+  if (from) return theme.light ? t('prefs.terminal.themeFromLight', { name, from }) : t('prefs.terminal.themeFrom', { name, from });
+  return theme.light ? t('prefs.terminal.themeOnlyLight', { name }) : t('prefs.terminal.themeOnly', { name });
+}
+
 /** Settings › Terminal › Import from…: pick a terminal, see what comes, bring it in (and Undo). */
 export function ImportGroup() {
+  const t = useT();
   const prefs = usePrefs();
   const { found, again } = useTerminals();
   const choices = importable(found);
@@ -151,23 +167,23 @@ export function ImportGroup() {
   const pick = choices.find((f) => f.app === picked);
   const others = (found ?? []).filter((f) => !hasLook(f));
   return (
-    <Group title="Bring your terminal’s look">
+    <Group title={say('Bring your terminal’s look')}>
       <Row
-        label="Import from"
+        label={say('Import from')}
         detail={
           found === undefined
-            ? `Looking for other terminals on ${thisComputer()}…`
+            ? t('prefs.terminal.lookingOn', { computer: thisComputer() })
             : choices.length
-              ? 'Colours, font, cursor and the rest, from a terminal you use. You see it before it changes anything.'
+              ? t('prefs.terminal.importDetail')
               : others.length
-                ? `${others.map((f) => f.name).join(', ')}: on their standard settings, nothing to bring.`
-                : `No other terminal’s settings on ${thisComputer()} (Ghostty, iTerm2, Terminal, Alacritty, kitty, WezTerm, Warp).`
+                ? t('prefs.terminal.nothingToBring', { names: others.map((f) => f.name).join(', ') })
+                : t('prefs.terminal.noOthers', { computer: thisComputer() })
         }
       >
         <Select
-          label="Import from"
+          label={t('prefs.terminal.importFrom')}
           value={picked ?? ''}
-          placeholder={found === undefined ? 'Looking…' : choices.length ? 'Choose…' : 'None found'}
+          placeholder={found === undefined ? t('prefs.terminal.looking') : choices.length ? t('prefs.terminal.choose') : t('prefs.terminal.noneFound')}
           disabled={!choices.length}
           onChange={(v) => {
             setPicked(v as TerminalAppId);
@@ -177,7 +193,7 @@ export function ImportGroup() {
             ...choices.map((f) => ({ value: f.app, label: foundLabel(f), icon: 'terminal' as const, ...(f.file ? { description: f.file } : {}) })),
           ]}
         />
-        <IconButton icon="refresh" label="Look again" onClick={again} />
+        <IconButton icon="refresh" label={t('prefs.terminal.lookAgain')} onClick={again} />
       </Row>
       {pick ? (
         <Pending
@@ -190,7 +206,7 @@ export function ImportGroup() {
         />
       ) : null}
       {undo ? (
-        <Row label={`Brought in from ${undo.from}`} detail="Your terminals changed right away. Undo puts back what you had.">
+        <Row label={t('prefs.terminal.broughtFrom', { from: undo.from })} detail={t('prefs.terminal.broughtDetail')}>
           <Button
             variant="quiet"
             onClick={() => {
@@ -198,16 +214,16 @@ export function ImportGroup() {
               setUndo(undefined);
             }}
           >
-            Undo
+            {t('prefs.terminal.undo')}
           </Button>
         </Row>
       ) : null}
-      <Row label="Colours" detail={prefs.termTheme ? `${prefs.termTheme.name}${prefs.termTheme.from ? `, from ${prefs.termTheme.from}` : ''}${prefs.termTheme.light ? ' (light and dark)' : ''}.` : 'Beluga’s own, following light and dark.'}>
+      <Row label={say('Colours')} detail={prefs.termTheme ? themeWords(t, prefs.termTheme) : t('prefs.terminal.belugaOwn')}>
         {prefs.termTheme ? (
           <>
             <Swatches colors={colorsFor(prefs.termTheme, looksDark())!} size={10} />
             <Button variant="quiet" onClick={() => setPrefs({ termTheme: null })}>
-              Use Beluga’s
+              {t('prefs.terminal.useBeluga')}
             </Button>
           </>
         ) : null}

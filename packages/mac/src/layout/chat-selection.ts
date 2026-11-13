@@ -1,3 +1,5 @@
+import { t } from '../../../../src/shared/i18n/index.js';
+
 export interface ChatSelection {
   readonly anchor?: string;
   readonly ids: readonly string[];
@@ -22,12 +24,12 @@ export const emptyChatSelection: ChatSelection = { ids: [] };
 
 /** Actions that apply independently to many chats. Each asks once for the whole batch. */
 export const chatBulkActions = [
-  { id: 'archive', label: 'Archive', done: 'Archived', icon: 'archive', message: 'Archive these chats. Their conversations stay available in Archived.' },
-  { id: 'delete', label: 'Delete', done: 'Deleted', icon: 'x', message: 'Permanently delete these chats and their conversations. You cannot undo this action.' },
+  { id: 'archive', icon: 'archive' },
+  { id: 'delete', icon: 'x' },
 ] as const;
 
 /** "1 chat", "3 chats"; `word` "Chat" for menu titles. */
-export const chatCount = (n: number, word = 'chat'): string => `${n} ${word}${n === 1 ? '' : 's'}`;
+export const chatCount = (n: number, word: 'chat' | 'Chat' = 'chat'): string => t(word === 'Chat' ? 'layout.chatsel.countTitle' : 'layout.chatsel.count', { count: n });
 
 const selectionOf = (anchor: string | undefined, ids: readonly string[]): ChatSelection => (anchor === undefined ? { ids } : { anchor, ids });
 
@@ -85,7 +87,7 @@ export async function runChatBatch<T extends BatchChat>(chats: readonly T[], app
   for (const chat of chats) {
     try {
       if (await apply(chat)) succeeded.push(chat.id);
-      else failed.push({ id: chat.id, name: chat.name, reason: 'The action did not complete.' });
+      else failed.push({ id: chat.id, name: chat.name, reason: t('layout.chatsel.didNotComplete') });
     } catch (error) {
       failed.push({ id: chat.id, name: chat.name, reason: error instanceof Error ? error.message : String(error) });
     }

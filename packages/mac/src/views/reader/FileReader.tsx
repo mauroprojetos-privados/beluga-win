@@ -23,6 +23,7 @@ import { doneRevealing, scrollToLine, useReveal } from './reveal.js';
 import { peekFirst, useRest } from './streamed.js';
 import r from './reader.module.css';
 import { useFirstPaintMark } from '../../lib/first-paint.js';
+import { useT } from '../../lib/i18n.js';
 
 /**
  * One open file, read the right way: Markdown formatted (or as source), code with line numbers and
@@ -62,6 +63,7 @@ const ZOOMS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
  * zoom), not the small preview Beluga decoded for the terminal.
  */
 function ImageView({ viewer, controls, version }: { viewer: ViewerState; controls: boolean; version?: string | number | undefined }) {
+  const t = useT();
   const { url, error } = useImageUrl({ owner: viewer.owner, share: viewer.share, path: viewer.path }, version);
   // Written again (a live screenshot): the new picture is decoded first, the old one shown meanwhile.
   const pic = useDecoded(url);
@@ -86,7 +88,7 @@ function ImageView({ viewer, controls, version }: { viewer: ViewerState; control
     e.preventDefault();
     setZoom(zoom === 'fit' ? 1 : 'fit');
   };
-  if (error && !viewer.image) return <Empty icon="alert" title="Can’t show this picture" detail={error} />;
+  if (error && !viewer.image) return <Empty icon="alert" title={t('views.reader.cantShowPicture')} detail={error} />;
   const sized = zoom !== 'fit' && natural ? { width: natural.w * zoom, height: natural.h * zoom, maxWidth: 'none' } : undefined;
   return (
     <div className={r.imageView}>
@@ -98,12 +100,12 @@ function ImageView({ viewer, controls, version }: { viewer: ViewerState; control
         ) : null}
       </div>
       {controls ? (
-        <div className={r.zoomBar} role="toolbar" aria-label="Zoom">
-          <IconButton icon="minus" label="Zoom out" onClick={() => step(-1)} />
-          <button type="button" className={r.zoomValue} onClick={() => setZoom(zoom === 'fit' ? 1 : 'fit')} aria-label={zoom === 'fit' ? 'Actual size' : 'Fit to window'}>
-            {zoom === 'fit' ? 'Fit' : `${Math.round(zoom * 100)}%`}
+        <div className={r.zoomBar} role="toolbar" aria-label={t('views.reader.zoom')}>
+          <IconButton icon="minus" label={t('views.reader.zoomOut')} onClick={() => step(-1)} />
+          <button type="button" className={r.zoomValue} onClick={() => setZoom(zoom === 'fit' ? 1 : 'fit')} aria-label={zoom === 'fit' ? t('views.reader.actualSize') : t('views.reader.fitToWindow')}>
+            {zoom === 'fit' ? t('views.reader.fit') : `${Math.round(zoom * 100)}%`}
           </button>
-          <IconButton icon="plus" label="Zoom in" onClick={() => step(1)} />
+          <IconButton icon="plus" label={t('views.reader.zoomIn')} onClick={() => step(1)} />
           {natural ? <span className={r.zoomSize}>{`${natural.w} × ${natural.h}`}</span> : null}
         </div>
       ) : null}
@@ -113,9 +115,10 @@ function ImageView({ viewer, controls, version }: { viewer: ViewerState; control
 
 /** A video, played from its bytes (read like a picture, up to MAX_DOC_VIDEO_BYTES). */
 function VideoFile({ viewer, version, fallback }: { viewer: ViewerState; version?: string | number | undefined; fallback?: ReactNode }) {
+  const t = useT();
   const { url, error } = useImageUrl({ owner: viewer.owner, share: viewer.share, path: viewer.path }, version);
-  if (error) return <Empty icon="play" title="Can’t play this video here" detail={/too large/i.test(error) ? 'It’s too big to play here (up to 64 MB).' : error} action={fallback ? <EmptyActions>{fallback}</EmptyActions> : undefined} />;
-  if (!url) return <div className={r.opening}>Opening…</div>;
+  if (error) return <Empty icon="play" title={t('views.reader.cantPlay')} detail={/too large/i.test(error) ? t('views.reader.videoTooBig') : error} action={fallback ? <EmptyActions>{fallback}</EmptyActions> : undefined} />;
+  if (!url) return <div className={r.opening}>{t('views.reader.opening')}</div>;
   return <VideoPlayer url={url} name={viewer.path} fallback={fallback} />;
 }
 
@@ -138,6 +141,7 @@ export interface FileContentProps {
 
 /** The file itself, under whatever header the place showing it has. */
 export function FileContent({ viewer, variant, mode, onMode, wrap, onOpenInEditor, onSaveCopy, nav, version, editable = false }: FileContentProps) {
+  const t = useT();
   // A big file opened by its first piece isn't all here, so it isn't edited here.
   const editing = useEditSession(editable && viewer.next === undefined ? viewer : undefined);
   const rest = useRest(useApi(), viewer);
@@ -165,44 +169,44 @@ export function FileContent({ viewer, variant, mode, onMode, wrap, onOpenInEdito
   if (isVideoFile(viewer.path)) {
     const out = onOpenInEditor ? (
       <Button size="small" variant="quiet" icon="external" onClick={onOpenInEditor}>
-        Open in Editor
+        {t('views.reader.openInEditor')}
       </Button>
     ) : onSaveCopy ? (
       <Button size="small" variant="quiet" icon="download" onClick={onSaveCopy}>
-        Save a Copy…
+        {t('views.reader.saveCopy')}
       </Button>
     ) : undefined;
     return <VideoFile viewer={viewer} fallback={out} version={fresh} />;
   }
   if (viewer.image || (isImageFile(viewer.path) && !viewer.error)) return <ImageView viewer={viewer} controls={variant !== 'panel'} version={fresh} />;
-  if (viewer.loading && !content) return <div className={r.opening}>Opening…</div>;
-  if (viewer.error) return <Empty icon="alert" title="Can’t open this file" detail={viewer.error} />;
+  if (viewer.loading && !content) return <div className={r.opening}>{t('views.reader.opening')}</div>;
+  if (viewer.error) return <Empty icon="alert" title={t('views.reader.cantOpen')} detail={viewer.error} />;
   const escape = onOpenInEditor ? (
     <Button size="small" variant="quiet" icon="external" onClick={onOpenInEditor}>
-      Open in Editor
+      {t('views.reader.openInEditor')}
     </Button>
   ) : onSaveCopy ? (
     <Button size="small" variant="quiet" icon="download" onClick={onSaveCopy}>
-      Save a Copy…
+      {t('views.reader.saveCopy')}
     </Button>
   ) : undefined;
   if (viewer.content === BINARY_TEXT) {
-    return <Empty icon="file" title="No preview for this kind of file" detail="It isn’t text, a picture, a PDF or a video. Open it with its app instead." action={escape ? <EmptyActions>{escape}</EmptyActions> : undefined} />;
+    return <Empty icon="file" title={t('views.reader.noPreview')} detail={t('views.reader.noPreviewDetail')} action={escape ? <EmptyActions>{escape}</EmptyActions> : undefined} />;
   }
   const large = markdown && content.length > LARGE_MARKDOWN;
   const json = mode === 'rendered' ? prettyJson(viewer.path, content) : undefined;
   return (
     <div ref={box} className={cx(r.content, r[`v_${variant}`])}>
-      {viewer.truncated || rest.capped ? <Notice action={escape}>Only the first {formatBytes(rest.capped ? MAX_STREAM_BYTES : MAX_FILE_BYTES)} of this file is shown.</Notice> : null}
+      {viewer.truncated || rest.capped ? <Notice action={escape}>{t('views.reader.onlyFirst', { size: formatBytes(rest.capped ? MAX_STREAM_BYTES : MAX_FILE_BYTES) })}</Notice> : null}
       {large && mode === 'source' ? (
         <Notice
           action={
             <Button size="small" variant="quiet" onClick={() => onMode('rendered')}>
-              Format It Anyway
+              {t('views.reader.formatAnyway')}
             </Button>
           }
         >
-          This file is large ({formatBytes(viewer.total ?? content.length)}), so it opens as source.
+          {t('views.reader.large', { size: formatBytes(viewer.total ?? content.length) })}
         </Notice>
       ) : null}
       {editing ? (
@@ -219,7 +223,7 @@ export function FileContent({ viewer, variant, mode, onMode, wrap, onOpenInEdito
         </div>
       )}
       {rest.more && !editing ? <MoreWhenNear onNear={rest.more} /> : null}
-      {rest.error ? <Notice>The rest of this file couldn’t be read: {rest.error}</Notice> : null}
+      {rest.error ? <Notice>{t('views.reader.restFailed', { error: rest.error })}</Notice> : null}
     </div>
   );
 }

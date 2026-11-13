@@ -18,6 +18,7 @@ import { FilesTab } from './panel/FilesTab.js';
 import { TerminalPane } from './panel/TerminalPane.js';
 import { HistoryTab } from './panel/HistoryTab.js';
 import { type ScratchOf, ScratchTab, useScratchNewest } from './panel/ScratchTab.js';
+import { useT } from '../lib/i18n.js';
 
 /** Your Mac's scratch folder (one, whichever of its chats is open). */
 const MAC_SCRATCH: ScratchOf = { assistant: true };
@@ -101,6 +102,7 @@ let dragged: PanelTab | undefined;
  * (or right-click it: Move to Bottom / Top). Changes opens on the view you used last (History).
  */
 function TabStrip({ pane, tabs, tab, open, badges, dock = false }: { pane: PaneId; tabs: readonly PanelTab[]; tab: PanelTab | undefined; open: boolean; badges: Badges; dock?: boolean }) {
+  const tl = useT();
   const view = useApp((st) => st.view);
   const projects = useApp((st) => st.projects);
   // Changes' last view, per page and computer (BLG-784).
@@ -151,7 +153,7 @@ function TabStrip({ pane, tabs, tab, open, badges, dock = false }: { pane: PaneI
       ref={list}
       className={cx(s.tabs, dock && s.dockTabs, drop !== undefined && s.tabsDrop)}
       role="tablist"
-      aria-label={pane === 'top' ? 'Panel' : 'Panel bottom'}
+      aria-label={pane === 'top' ? tl('layout.panel.panel') : tl('layout.panel.panelBottom')}
       onKeyDown={onKey}
       onDragOver={onDragOver}
       onDragLeave={(e) => {
@@ -167,12 +169,12 @@ function TabStrip({ pane, tabs, tab, open, badges, dock = false }: { pane: PaneI
             key={t}
             items={[
               {
-                label: other === 'bottom' ? 'Move to Bottom' : 'Move to Top',
+                label: other === 'bottom' ? tl('layout.panel.moveToBottom') : tl('layout.panel.moveToTop'),
                 icon: other === 'bottom' ? 'panelBottom' : 'panelRight',
                 onSelect: () => placeTab({ view, projects }, t, other),
               },
               {
-                label: 'Reset Panel Layout',
+                label: tl('layout.panel.reset'),
                 separate: true,
                 onSelect: resetPanelLayout,
               },
@@ -186,7 +188,7 @@ function TabStrip({ pane, tabs, tab, open, badges, dock = false }: { pane: PaneI
               aria-controls={`panel-body-${pane}`}
               aria-selected={on}
               aria-label={PANEL_LABELS[t]}
-              title={`${PANEL_LABELS[t]}${shortcutKeys(`panel-${t}`) ? ` (${shortcutKeys(`panel-${t}`)})` : ''} · drag it to the other half, or right-click to move it`}
+              title={tl('layout.panel.tabTip', { name: `${PANEL_LABELS[t]}${shortcutKeys(`panel-${t}`) ? ` (${shortcutKeys(`panel-${t}`)})` : ''}` })}
               tabIndex={slotOf(t) === shown ? 0 : -1}
               draggable
               className={cx(s.tab, on && s.tabOn, drop === i && s.dropBefore)}
@@ -217,6 +219,7 @@ function TabStrip({ pane, tabs, tab, open, badges, dock = false }: { pane: PaneI
 
 /** Changes' second view, switched at its top: what changed, or the branch's History. */
 function ViewSwitch({ views, tab, pane }: { views: readonly PanelTab[]; tab: PanelTab; pane: PaneId }) {
+  const tl = useT();
   const view = useApp((st) => st.view);
   const lastKey = useScopedKey(paneKey(view, pane));
   if (views.length < 2) return null;
@@ -224,7 +227,7 @@ function ViewSwitch({ views, tab, pane }: { views: readonly PanelTab[]; tab: Pan
     <div className={s.views}>
       <Segmented
         radio
-        label={`${PANEL_LABELS[views[0]!]} views`}
+        label={tl('layout.panel.views', { name: PANEL_LABELS[views[0]!] })}
         value={tab}
         onChange={(v) => {
           changesView.set(lastKey, v);
@@ -245,6 +248,7 @@ function ViewSwitch({ views, tab, pane }: { views: readonly PanelTab[]; tab: Pan
  * its tabs (the chevron, ⌘J for the terminal) and opens again from any of them.
  */
 function Pane({ pane, lead, style, badges, settled }: { pane: PaneId; lead: boolean; style?: React.CSSProperties; badges: Badges; settled: boolean }) {
+  const tl = useT();
   const prefs = usePrefs();
   const view = useApp((st) => st.view);
   const projects = useApp((st) => st.projects);
@@ -272,16 +276,16 @@ function Pane({ pane, lead, style, badges, settled }: { pane: PaneId; lead: bool
   // folded it's a slim bar: never read as more tabs of what's above it.
   const dock = pane === 'bottom' && !lead;
   return (
-    <section className={cx(s.pane, !open && s.paneClosed, dock && s.dock, dock && !open && s.dockClosed)} style={open ? style : undefined} aria-label={pane === 'top' ? undefined : 'Bottom of the panel'} data-pane={pane}>
+    <section className={cx(s.pane, !open && s.paneClosed, dock && s.dock, dock && !open && s.dockClosed)} style={open ? style : undefined} aria-label={pane === 'top' ? undefined : tl('layout.panel.bottomOf')} data-pane={pane}>
       <header
         className={lead ? s.head : cx(s.paneHead, dock && s.dockHead)}
         {...(lead ? { 'data-tauri-drag-region': true } : {})}
-        {...(dock && !open ? { onClick: (e: React.MouseEvent) => e.target === e.currentTarget && setPrefs({ bottomOpen: true }), title: `Show the terminal dock${shortcutKeys('toggle-dock') ? ` (${shortcutKeys('toggle-dock')})` : ''}` } : {})}
+        {...(dock && !open ? { onClick: (e: React.MouseEvent) => e.target === e.currentTarget && setPrefs({ bottomOpen: true }), title: shortcutKeys('toggle-dock') ? tl('layout.panel.showDockKeys', { keys: shortcutKeys('toggle-dock') ?? '' }) : tl('layout.panel.showDock') } : {})}
       >
         {dock ? <Icon name="terminal" size={12} className={s.dockMark} /> : null}
         <TabStrip pane={pane} tabs={tabs} tab={tab} open={open} badges={badges} dock={dock} />
         {dock ? (
-          <IconButton icon={open ? 'chevronDown' : 'chevronUp'} label={open ? 'Hide the terminal dock' : 'Show the terminal dock'} className={s.paneToggle} onClick={() => setPrefs({ bottomOpen: !open })} />
+          <IconButton icon={open ? 'chevronDown' : 'chevronUp'} label={open ? tl('layout.panel.hideDock') : tl('layout.panel.showDock')} className={s.paneToggle} onClick={() => setPrefs({ bottomOpen: !open })} />
         ) : null}
       </header>
       {open ? (
@@ -404,6 +408,7 @@ function useSlide(open: boolean, mounted: boolean, inner: React.RefObject<HTMLDi
  * (⌥⌘0), is as wide as you drag it, and remembers each pane's tab in each workspace.
  */
 export function RightPanel() {
+  const tl = useT();
   const { client } = useBeluga();
   useWorkspaceTabBridge(client);
   usePhoneTabBridge();
@@ -428,12 +433,12 @@ export function RightPanel() {
   const both = hasTop && hasBottom && paneShowing(state, 'bottom', prefs);
   const badges = useBadges();
   return (
-    <aside className={cx(s.panel, presence.closing && s.leaving)} style={{ width: open ? width : 0 }} aria-label="Panel" aria-hidden={!open} inert={!open}>
+    <aside className={cx(s.panel, presence.closing && s.leaving)} style={{ width: open ? width : 0 }} aria-label={tl('layout.panel.panel')} aria-hidden={!open} inert={!open}>
       {presence.mounted ? (
         <div ref={inner} className={cx(s.inner, !slide.in && s.innerOut, slide.moving && s.sliding, slide.settled && s.settled)} style={{ width }}>
           <ResizeHandle
             axis="x"
-            label="Resize the panel"
+            label={tl('layout.panel.resizePanel')}
             className={s.edge}
             onMove={(x) => setDrag(window.innerWidth - x)}
             onEnd={() => {
@@ -454,7 +459,7 @@ export function RightPanel() {
           {both ? (
             <ResizeHandle
               axis="y"
-              label="Resize the panes"
+              label={tl('layout.panel.resizePanes')}
               onMove={(y) => {
                 const r = inner.current?.getBoundingClientRect();
                 if (r)

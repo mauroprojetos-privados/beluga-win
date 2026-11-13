@@ -36,6 +36,7 @@ import {
   type TaskWatch,
   TESTS_AT,
   type TestsAt,
+  allTasks,
   diffBodies,
   isEmptyDiff,
   planById,
@@ -230,7 +231,16 @@ export class Plans {
     const first = !plan.body;
     const at = this.now();
     const open = body.milestones.some((m) => !plan.runs[m.id]?.passedAt);
-    return this.change(plan, { body, draft: undefined, draftRev: plan.draftRev + 1, status: open ? 'active' : 'done', ...(first ? { approvedAt: at } : {}), ...(open ? { doneAt: undefined } : {}) }, [event(by, first ? 'approved' : 'changed', first ? `approved the plan: ${summary}` : `applied changes: ${summary}`, at)]);
+    // A stopped task comes back to its agent once its rewrite is approved (or it left the plan): a draft doesn't do it.
+    const before = new Map(allTasks(plan.body).map((t) => [t.task.id, JSON.stringify(t.task)] as const));
+    const after = new Map(allTasks(body).map((t) => [t.task.id, JSON.stringify(t.task)] as const));
+    let runs = plan.runs;
+    for (const [m, run] of Object.entries(plan.runs)) {
+      const kept = Object.entries(run.stopped ?? {}).filter(([taskId]) => after.has(taskId) && after.get(taskId) === before.get(taskId));
+      if (kept.length === Object.keys(run.stopped ?? {}).length) continue;
+      runs = { ...runs, [m]: { ...run, stopped: kept.length ? Object.fromEntries(kept) : undefined } };
+    }
+    return this.change(plan, { body, runs, draft: undefined, draftRev: plan.draftRev + 1, status: open ? 'active' : 'done', ...(first ? { approvedAt: at } : {}), ...(open ? { doneAt: undefined } : {}) }, [event(by, first ? 'approved' : 'changed', first ? `approved the plan: ${summary}` : `applied changes: ${summary}`, at)]);
   }
 
   // ------------------------------------------------------------------ running
@@ -293,6 +303,38 @@ export class Plans {
     return this.change(plan, { runs: { ...plan.runs, [milestone]: rest } }, [], false);
   }
 
+  /** A milestone's agent stopped a task with why (task_stop): it leaves that agent's queue until it's rewritten or started again. */
+  stopTask(id: string, milestone: string, taskId: string, reason: string, label?: string): Plan {
+    const plan = this.need(id);
+    const at = this.now();
+    const text = reason.replace(/\s+/g, ' ').trim().slice(0, 160);
+    const stopped = { ...(plan.runs[milestone]?.stopped ?? {}), [taskId]: { at, reason } };
+    return this.change(plan, { runs: withRun(plan, milestone, { stopped }) }, [event({ kind: 'beluga' }, 'note', `${label ?? 'a task'} stopped: ${text}`, at)]);
+  }
+
+  /** A stopped task is back in its agent's queue (rewritten, started again or gone): no event when it wasn't stopped. */
+  clearStopped(id: string, taskId: string): Plan {
+    const plan = this.need(id);
+    const runs: Record<string, MilestoneRun> = {};
+    let any = false;
+    for (const [m, run] of Object.entries(plan.runs)) {
+      if (run.stopped?.[taskId]) {
+        const { [taskId]: _gone, ...rest } = run.stopped;
+        runs[m] = { ...run, stopped: Object.keys(rest).length ? rest : undefined };
+        any = true;
+      } else runs[m] = run;
+    }
+    return any ? this.change(plan, { runs }, []) : plan;
+  }
+
+  /** The plan's agent was told about a stopped task (once per stop). */
+  markStopTold(id: string, milestone: string, taskId: string): Plan {
+    const plan = this.need(id);
+    const was = plan.runs[milestone]?.stopped?.[taskId];
+    if (!was || was.told) return plan;
+    return this.change(plan, { runs: withRun(plan, milestone, { stopped: { ...plan.runs[milestone]!.stopped, [taskId]: { ...was, told: true } } }) }, []);
+  }
+
   recordCheck(id: string, milestone: string, check: Omit<GateCheck, 'at'>): Plan {
     const plan = this.need(id);
     if (!(plan.body?.milestones ?? []).some((m) => m.id === milestone)) throw new PlanError(`There's no milestone "${milestone}" in the approved plan`);
@@ -301,7 +343,7 @@ export class Plans {
     // Checked without being asked (the user asked in the conversation): it's this round's check.
     const asked = plan.runs[milestone]?.checkAsked ?? at;
     const notes = check.notes.trim().slice(0, 8000);
-    return this.change(plan, { runs: withRun(plan, milestone, { check: { ...check, notes, at }, checkAsked: asked }) }, [event(check.by, check.verdict === 'pass' ? 'checked' : 'failed', `${check.verdict === 'pass' ? 'checked' : 'didn’t pass'} ${milestoneName(plan, milestone)}${notes ? `: ${notes.split('\n')[0]!.slice(0, 160)}` : ''}`, at)]);
+    return this.change(plan, { runs: withRun(plan, milestone, { check: { ...check, notes, at }, checkAsked: asked, ...(check.verdict === 'fail' ? { fails: (plan.runs[milestone]?.fails ?? 0) + 1 } : {}) }) }, [event(check.by, check.verdict === 'pass' ? 'checked' : 'failed', `${check.verdict === 'pass' ? 'checked' : 'didn’t pass'} ${milestoneName(plan, milestone)}${notes ? `: ${notes.split('\n')[0]!.slice(0, 160)}` : ''}`, at)]);
   }
 
   pass(id: string, milestone: string, by: Actor): Plan {
@@ -388,6 +430,13 @@ export class Plans {
     const plan = this.need(id);
     if (plan.branch === branch) return plan;
     return this.change(plan, { branch }, [event({ kind: 'beluga' }, 'note', made ? `made the plan’s branch ${branch} from main` : `collects the plan’s work on ${branch}`, this.now())]);
+  }
+
+  /** The commit the planner read the code at: kept once (the oldest), with no line in the activity. */
+  setPlannedAt(id: string, sha: string): Plan {
+    const plan = this.need(id);
+    if (plan.plannedAt) return plan;
+    return this.change(plan, { plannedAt: sha }, []);
   }
 
   /** A passed milestone being merged into the plan's branch (undefined: no longer). */

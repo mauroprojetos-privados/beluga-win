@@ -2,7 +2,9 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { Icon, type IconName } from '../../components/Icon.js';
 import { ViewBlock } from '../../components/views/ViewBlock.js';
+import { t } from '@beluga/shared/i18n/index.js';
 import { usePrefs } from '../../lib/prefs.js';
+import { useT } from '../../lib/i18n.js';
 import { SPRING } from '../fx.js';
 import s from './scenes.module.css';
 
@@ -13,21 +15,23 @@ import s from './scenes.module.css';
  * headings sort, it turns into a chart, it opens in a full window. It plays once, then it's yours.
  */
 
+// Product names.
 const PROTOCOLS: ReadonlyArray<{ id: string; label: string }> = [
-  { id: 'postgres', label: 'Postgres' },
-  { id: 'sqlite', label: 'SQLite' },
-  { id: 'mysql', label: 'MySQL' },
+  { id: 'postgres', label: 'Postgres' }, // i18n-ignore
+  { id: 'sqlite', label: 'SQLite' }, // i18n-ignore
+  { id: 'mysql', label: 'MySQL' }, // i18n-ignore
 ];
 
-const VIEW = JSON.stringify({
+/** The agent's answer, in the app's language as an agent would answer (its rows are the data). */
+const VIEW = (): string => JSON.stringify({
   type: 'table',
-  title: 'Churned last month',
-  summary: 'subscriptions · 5 rows',
+  title: t('components.onboarding.scene.tables.title'),
+  summary: t('components.onboarding.scene.tables.summary'),
   columns: [
-    { key: 'customer', label: 'Customer' },
-    { key: 'plan', label: 'Plan', type: 'badge' },
-    { key: 'mrr', label: 'MRR', type: 'currency', currency: 'USD' },
-    { key: 'left', label: 'Left on', type: 'date' },
+    { key: 'customer', label: t('components.onboarding.scene.tables.customer') },
+    { key: 'plan', label: t('components.onboarding.scene.tables.plan'), type: 'badge' },
+    { key: 'mrr', label: 'MRR', type: 'currency', currency: 'USD' }, // i18n-ignore
+    { key: 'left', label: t('components.onboarding.scene.tables.leftOn'), type: 'date' },
   ],
   data: [
     { customer: 'Northwind', plan: 'Team', mrr: 480, left: '2026-09-04' },
@@ -44,10 +48,10 @@ interface Line {
   readonly code: string;
 }
 
-const LINES: readonly Line[] = [
-  { icon: 'file', text: 'Found', code: 'DATABASE_URL in .env' },
-  { icon: 'link', text: 'Connected to', code: 'localhost:5432/shop' },
-  { icon: 'terminal', text: 'Queried', code: 'SELECT … FROM subscriptions' },
+const LINES = (): readonly Line[] => [
+  { icon: 'file', text: t('components.onboarding.scene.tables.found'), code: 'DATABASE_URL in .env' },
+  { icon: 'link', text: t('components.onboarding.scene.tables.connected'), code: 'localhost:5432/shop' },
+  { icon: 'terminal', text: t('components.onboarding.scene.tables.queried'), code: 'SELECT … FROM subscriptions' },
 ];
 
 // Beats (ms each): the question, finding the database, picking the protocol, connecting,
@@ -62,8 +66,8 @@ function useOnce(): number {
   useEffect(() => {
     if (still) return setBeat(LAST);
     if (beat >= LAST) return;
-    const t = setTimeout(() => setBeat(beat + 1), BEATS[beat]);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setBeat(beat + 1), BEATS[beat]);
+    return () => clearTimeout(timer);
   }, [beat, still]);
   return beat;
 }
@@ -72,7 +76,8 @@ function useOnce(): number {
  * `view`: another table to answer with (the README's has more rows, a filter and pages);
  * `extra`: drawn over the window (the README's pointer trying the table out); `tip`: the line under it.
  */
-export function Tables({ view = VIEW, extra, tip }: { readonly view?: string; readonly extra?: ReactNode; readonly tip?: ReactNode } = {}) {
+export function Tables({ view, extra, tip }: { readonly view?: string; readonly extra?: ReactNode; readonly tip?: ReactNode } = {}) {
+  const t = useT();
   const beat = useOnce();
   const picking = beat >= 1;
   const picked = beat >= 2;
@@ -89,30 +94,30 @@ export function Tables({ view = VIEW, extra, tip }: { readonly view?: string; re
             <i />
             <i />
           </span>
-          <span className={s.mono}>shop · main</span>
+          <span className={s.mono}>shop · main</span>{/* i18n-ignore */}
           {working ? (
             <span className={s.live}>
-              <span className={s.liveDot} /> Working
+              <span className={s.liveDot} /> {t('components.onboarding.scene.tables.working')}
             </span>
           ) : null}
         </div>
         <div className={s.tablesChat}>
-          <div className={s.ask}>Which customers churned last month?</div>
+          <div className={s.ask}>{t('components.onboarding.scene.tables.ask')}</div>
           <AnimatePresence mode="wait" initial={false}>
             {table ? (
               // Once Claude answers, its steps fold away (as they do in a conversation).
               <motion.div key="folded" className={s.folded} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={SPRING}>
                 <Icon name="check" size={12} className={s.done} />
-                <span>3 steps</span>
+                <span>{t('components.onboarding.scene.tables.steps', { count: 3 })}</span>
                 <span className={s.protocol} data-on>
-                  <Icon name="grid" size={10} /> Postgres
+                  <Icon name="grid" size={10} /> Postgres{/* i18n-ignore */}
                 </span>
                 <span className={s.dim}>localhost:5432/shop</span>
               </motion.div>
             ) : (
               <motion.div key="steps" className={s.steps} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.25 }}>
                 <AnimatePresence initial={false}>
-                  {LINES.slice(0, lines).map((l, i) => {
+                  {LINES().slice(0, lines).map((l, i) => {
                     const busy = i === lines - 1 && !(i === 0 && picked);
                     return (
                       <motion.div key={l.text} className={s.step} initial={{ opacity: 0, x: -10, filter: 'blur(4px)' }} animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }} transition={SPRING}>
@@ -126,7 +131,7 @@ export function Tables({ view = VIEW, extra, tip }: { readonly view?: string; re
                 <AnimatePresence initial={false}>
                   {picking ? (
                     <motion.div key="protocols" className={s.protocols} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={SPRING}>
-                      <span className={s.dim}>{picked ? 'Protocol' : 'Picking a protocol'}</span>
+                      <span className={s.dim}>{picked ? t('components.onboarding.scene.tables.protocol') : t('components.onboarding.scene.tables.picking')}</span>
                       {PROTOCOLS.map((p, i) => {
                         const chosen = picked && p.id === 'postgres';
                         return (
@@ -145,11 +150,11 @@ export function Tables({ view = VIEW, extra, tip }: { readonly view?: string; re
           <AnimatePresence>
             {table ? (
               <motion.div key="table" className={s.weave} initial={{ opacity: 0, y: 16, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 200, damping: 22 }}>
-                <ViewBlock code={view} type="table" />
+                <ViewBlock code={view ?? VIEW()} type="table" />
                 <div className={s.weaveTry}>
                   {tip ?? (
                     <>
-                      <Icon name="hand" size={11} /> It’s the real table: click a heading to sort, or turn it into a chart.
+                      <Icon name="hand" size={11} /> {t('components.onboarding.scene.tables.tip')}
                     </>
                   )}
                 </div>

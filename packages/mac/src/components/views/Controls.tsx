@@ -6,6 +6,7 @@ import { Select } from '../Select.js';
 import { cx } from '../ui.js';
 import type { ViewData } from './use-view-data.js';
 import { formatCell, headingOf } from './format.js';
+import { useT } from '../../lib/i18n.js';
 import v from './views.module.css';
 
 /**
@@ -14,9 +15,10 @@ import v from './views.module.css';
  * change shows its rows at once: worked out here, or asked of the source, never of Claude.
  */
 export function ControlsBar({ view, data }: { view: View; data: ViewData }) {
+  const t = useT();
   if (!view.controls.length) return null;
   return (
-    <div className={v.controls} role="toolbar" aria-label="Controls">
+    <div className={v.controls} role="toolbar" aria-label={t('components.views.controls.label')}>
       {view.controls.map((c) => (
         <ControlView key={c.id} control={c} view={view} data={data} />
       ))}
@@ -60,6 +62,7 @@ function ControlView({ control: c, view, data }: { control: Control; view: View;
 }
 
 function Menu({ control: c, label, value, set, rows, data }: { control: Control; label: string | undefined; value: Cell | undefined; set: (x: Cell | undefined) => void; rows: ViewData['rows']; data: ViewData }) {
+  const t = useT();
   const withOptions = Boolean(c.options?.length);
   // A menu of a column's values: the ones there are (kept as they grow, so a choice doesn't vanish).
   const [seen, setSeen] = useState<Cell[]>([]);
@@ -69,8 +72,8 @@ function Menu({ control: c, label, value, set, rows, data }: { control: Control;
   // Beluga's own menu (no native pop-ups): '' is "All", an option by its index, a value by its text.
   const ALL = '\u0000all';
   const options = withOptions
-    ? [...(c.type === 'select' && c.default === undefined ? [{ value: ALL, label: c.placeholder ?? 'All' }] : []), ...c.options!.map((o, i) => ({ value: String(i), label: o.label }))]
-    : [{ value: ALL, label: c.placeholder ?? 'All' }, ...seen.map((x) => ({ value: String(x), label: col ? formatCell(x, col) : String(x) }))];
+    ? [...(c.type === 'select' && c.default === undefined ? [{ value: ALL, label: c.placeholder ?? t('components.views.controls.all') }] : []), ...c.options!.map((o, i) => ({ value: String(i), label: o.label }))]
+    : [{ value: ALL, label: c.placeholder ?? t('components.views.controls.all') }, ...seen.map((x) => ({ value: String(x), label: col ? formatCell(x, col) : String(x) }))];
   const now = value === undefined || value === null || value === '' ? ALL : String(value);
   return (
     <span className={v.control}>
@@ -91,13 +94,14 @@ function Menu({ control: c, label, value, set, rows, data }: { control: Control;
 }
 
 function NumberControl({ control: c, label, value, set }: { control: Control; label: string | undefined; value: Cell | undefined; set: (x: Cell | undefined) => void }) {
+  const t = useT();
   const [text, setText] = useState(value === undefined || value === null ? '' : String(value));
   useEffect(() => {
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       const n = text.trim() === '' ? undefined : Number(text);
       if (n === undefined || Number.isFinite(n)) set(n);
     }, c.type === 'range' ? 60 : 300);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [text]);
   return (
     <label className={v.control}>
@@ -108,22 +112,23 @@ function NumberControl({ control: c, label, value, set }: { control: Control; la
           <span className={v.rangeValue}>{text || '—'}</span>
         </>
       ) : (
-        <input type="number" className={v.numberInput} min={c.min} max={c.max} step={c.step} placeholder={c.placeholder ?? (c.as === 'top' ? 'All' : '')} value={text} onChange={(e) => setText(e.target.value)} />
+        <input type="number" className={v.numberInput} min={c.min} max={c.max} step={c.step} placeholder={c.placeholder ?? (c.as === 'top' ? t('components.views.controls.all') : '')} value={text} onChange={(e) => setText(e.target.value)} />
       )}
     </label>
   );
 }
 
 function SearchControl({ control: c, label, value, set }: { control: Control; label: string | undefined; value: Cell | undefined; set: (x: Cell | undefined) => void }) {
+  const t = useT();
   const [text, setText] = useState(typeof value === 'string' ? value : '');
   useEffect(() => {
-    const t = setTimeout(() => set(text), 250);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => set(text), 250);
+    return () => clearTimeout(timer);
   }, [text]);
   return (
     <label className={cx(v.search, v.controlSearch)}>
       <Icon name="search" size={12} />
-      <input type="search" placeholder={c.placeholder ?? label ?? 'Search'} value={text} onChange={(e) => setText(e.target.value)} aria-label={label ?? 'Search'} />
+      <input type="search" placeholder={c.placeholder ?? label ?? t('common.search')} value={text} onChange={(e) => setText(e.target.value)} aria-label={label ?? t('common.search')} />
     </label>
   );
 }

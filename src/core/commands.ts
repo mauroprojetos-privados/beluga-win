@@ -6,6 +6,7 @@ import { type InvitePlace, friendNamed, inviteRoute, namesLine, parseInvite } fr
 import { defaultAgentOf } from '../protocol.js';
 import { agentLabel, agentName } from '../shared/agent-label.js';
 import { builtInInstead } from '../shared/skills.js';
+import { t } from '../shared/i18n/index.js';
 
 /**
  * "~/x" (or "~\\x" on Windows) from your home folder. No node:os here (the screens load this file):
@@ -105,7 +106,7 @@ function inviteCommand(session: Session, args: readonly string[], channel: strin
   const place: InvitePlace = ws && wsId ? { kind: 'workspace', workspaceId: wsId, projectId: ws.projectId, name: ws.name } : { kind: 'none' };
   const route = inviteRoute(place, parsed.names, state.network.friends);
   if (route.kind === 'error') return session.toast(route.text, 'warn');
-  if (route.kind !== 'share' || !route.workspaceId) return session.toast('Type it in the Mac app’s message box there', 'info');
+  if (route.kind !== 'share' || !route.workspaceId) return session.toast(t('toasts.commands.typeInMac'), 'info');
   const workspaceId = route.workspaceId;
   if (session.sharing.friends) {
     for (const f of route.friends) session.sharing.shareWithFriend({ peerId: f.peerId, workspaceId, ...(route.projectId ? { projectId: route.projectId } : {}), role: 'contribute' });
@@ -114,7 +115,7 @@ function inviteCommand(session: Session, args: readonly string[], channel: strin
   const inRoom = route.friends.filter((f) => state.peers.some((p) => p.peerId === f.peerId && !p.guest));
   for (const f of inRoom) session.sharing.invite(workspaceId, f.peerId, 'contribute');
   const away = route.friends.filter((f) => !inRoom.includes(f));
-  if (away.length) session.toast(`Turn on the Beluga network in Settings › Network to share ${route.where} with ${namesLine(away.map((f) => f.name))}`, 'warn');
+  if (away.length) session.toast(t('toasts.commands.networkOff', { where: route.where, names: namesLine(away.map((f) => f.name)) }), 'warn');
 }
 
 /**
@@ -140,7 +141,7 @@ export function runCommand(session: Session, name: string, args: readonly string
       return inviteCommand(session, args, channel);
     case 'btw': {
       const question = args.join(' ').trim();
-      if (!question) return session.toast('Usage: /btw <question>', 'warn');
+      if (!question) return session.toast(t('toasts.commands.usageBtw'), 'warn');
       session.btw(channel, question).catch((err: unknown) => session.toast(err instanceof Error ? err.message : String(err), 'warn'));
       return;
     }
@@ -156,7 +157,7 @@ export function runCommand(session: Session, name: string, args: readonly string
     case 'run':
       if (arg?.startsWith('@')) {
         const command = args.slice(1).join(' ').trim();
-        if (!command) return session.toast('Usage: /run @name <command>', 'warn');
+        if (!command) return session.toast(t('toasts.commands.usageRun'), 'warn');
         session.runOnPeerByHand(arg.slice(1), command, channel);
         return;
       }
@@ -227,12 +228,12 @@ export function runCommand(session: Session, name: string, args: readonly string
       return;
     case 'open':
     case 'e':
-      if (!arg) return session.toast('Usage: /open <name>:<folder>/<file>', 'warn');
+      if (!arg) return session.toast(t('toasts.commands.usageOpen'), 'warn');
       session.openSpec(arg);
       return;
     case 'get':
     case 'download':
-      if (!arg) return session.toast('Usage: /get <name>:<folder>/<file>', 'warn');
+      if (!arg) return session.toast(t('toasts.commands.usageGet'), 'warn');
       session.downloadSpec(arg);
       return;
     case 'close':
@@ -256,25 +257,25 @@ export function runCommand(session: Session, name: string, args: readonly string
       session.stopAgent();
       return;
     case 'share': {
-      if (!arg) return session.toast('Usage: /share <folder> [rw]', 'warn');
+      if (!arg) return session.toast(t('toasts.commands.usageShare'), 'warn');
       session.shareFolder(fromHome(arg), args[1] === 'rw');
       return;
     }
     case 'unshare':
-      if (!arg) return session.toast('Usage: /unshare <name>', 'warn');
+      if (!arg) return session.toast(t('toasts.commands.usageUnshare'), 'warn');
       session.unshareFolder(arg);
       return;
     case 'policy':
-      if (!arg || !POLICIES.includes(arg as Policy)) return session.toast(`Policy is "${state.policy}". Use /policy ask, auto or deny`);
+      if (!arg || !POLICIES.includes(arg as Policy)) return session.toast(t('toasts.commands.policyIs', { policy: state.policy }));
       session.setClaudeSharing(arg as Policy);
-      session.toast(`Friends' requests for ${agentLabel(session.agentRef, undefined, true)}: ${arg}`, 'success');
+      session.toast(t('toasts.commands.policySet', { agent: agentLabel(session.agentRef, undefined, true), policy: arg }), 'success');
       return;
     case 'trust':
     case 'untrust': {
       const peer = arg ? session.findPeer(arg) : undefined;
-      if (!peer) return session.toast(`Usage: /${name} <name>`, 'warn');
+      if (!peer) return session.toast(t('toasts.commands.usageName', { command: name }), 'warn');
       session.store.dispatch({ type: 'trust', peerId: peer.peerId, trusted: name === 'trust' });
-      session.toast(name === 'trust' ? `${peer.name}'s requests are auto-approved` : `${peer.name}'s requests need approval again`, 'success');
+      session.toast(name === 'trust' ? t('toasts.commands.trusted', { name: peer.name }) : t('toasts.commands.untrusted', { name: peer.name }), 'success');
       return;
     }
     case 'y':
@@ -284,7 +285,7 @@ export function runCommand(session: Session, name: string, args: readonly string
     case 'a':
     case 'always': {
       const answer = name.startsWith('y') ? 'yes' : name.startsWith('n') ? 'no' : 'always';
-      if (!session.answerApproval(answer)) session.toast('Nothing to approve');
+      if (!session.answerApproval(answer)) session.toast(t('toasts.commands.nothingToApprove'));
       return;
     }
     case 'clear':
@@ -308,8 +309,8 @@ export function runCommand(session: Session, name: string, args: readonly string
     }
     case 'remove': {
       const target = state.peers.find((p) => p.name.toLowerCase() === (arg ?? '').toLowerCase());
-      if (!session.isHost) return session.toast('Only the host can remove people', 'warn');
-      if (!target) return session.toast(`Nobody called "${arg}" is here`, 'warn');
+      if (!session.isHost) return session.toast(t('toasts.commands.hostOnlyRemove'), 'warn');
+      if (!target) return session.toast(t('toasts.commands.nobodyCalled', { name: arg ?? '' }), 'warn');
       session.removePerson(target.peerId);
       return;
     }
@@ -333,9 +334,9 @@ export function runCommand(session: Session, name: string, args: readonly string
       return;
     }
     case 'theme':
-      if (!arg || !THEMES.includes(arg as ThemeName)) return session.toast(`Themes: ${THEMES.join(', ')}`);
+      if (!arg || !THEMES.includes(arg as ThemeName)) return session.toast(t('toasts.commands.themes', { themes: THEMES.join(', ') }));
       session.setPrefs({ theme: arg as ThemeName });
-      session.toast(`Theme: ${arg}`, 'success');
+      session.toast(t('toasts.commands.theme', { theme: arg }), 'success');
       return;
     default: {
       // Claude Code's own commands (/context, /rewind…) do nothing as a message: say what Beluga has instead.
@@ -352,7 +353,7 @@ export function runCommand(session: Session, name: string, args: readonly string
         session.askOwnClaude(raw.trim().replace(/^:/, '/'), channel);
         return;
       }
-      session.toast(`Unknown command /${name}. Type /help (or // to send a message starting with /)`, 'warn');
+      session.toast(t('toasts.commands.unknown', { name }), 'warn');
     }
   }
 }
@@ -365,33 +366,33 @@ export function isBelugaCommand(name: string): boolean {
 /** Workspace commands act on the workspace you're looking at (or its project). */
 function runWorkspaceCommand(session: Session, name: string, args: readonly string[], channel: string): void {
   const ctl = session.workspaces;
-  if (!ctl) return session.toast('Projects are not available in this mode', 'warn');
+  if (!ctl) return session.toast(t('toasts.commands.noProjects'), 'warn');
   const text = args.join(' ').trim();
   const ws = ctl.inChannel(channel);
   if (name === 'project') {
     const [sub, ...rest] = args;
     if (sub === 'setup' || sub === 'run') {
       const project = ws ? ctl.manager.list.find((p) => p.id === ws.projectId && p.root) : undefined;
-      if (!project) return session.toast('Open a workspace in the project first, or use the project ⋯ menu', 'warn');
+      if (!project) return session.toast(t('toasts.commands.openWorkspaceFirstMenu'), 'warn');
       session.workbench?.setScript(project.id, sub, rest.join(' '));
       return;
     }
     const dir = fromHome(rest.join(' '));
-    if (!dir || (sub !== 'add' && sub !== 'folder')) return session.toast('Usage: /project add <path>, /project folder <path>, /project setup <command> or /project run <command>', 'warn');
+    if (!dir || (sub !== 'add' && sub !== 'folder')) return session.toast(t('toasts.commands.usageProject'), 'warn');
     void (sub === 'add' ? ctl.addProject(dir) : ctl.addFolder(dir));
     return;
   }
   const repos = ctl.manager.list.filter((p) => p.root);
   const project = ws ? ctl.manager.list.find((p) => p.id === ws.projectId) : repos.length === 1 ? repos[0] : undefined;
   if (name === 'new' || name === 'worktree' || name === 'chat') {
-    if (!project) return session.toast('Open a workspace in the project first (or use + New worktree under it)', 'warn');
-    if (!text) return session.toast(`Usage: /${name} <${name === 'chat' ? 'title' : 'name'}>`, 'warn');
+    if (!project) return session.toast(t('toasts.commands.openWorkspaceFirstNew'), 'warn');
+    if (!text) return session.toast(name === 'chat' ? t('toasts.commands.usageTitle', { command: name }) : t('toasts.commands.usageName', { command: name }), 'warn');
     void (name === 'chat' ? ctl.newChat(project.id, text) : ctl.newWorktree(project.id, text));
     return;
   }
   // Outside a workspace, /terminal opens your own shell (the Terminal tab).
   if (!ws && name === 'terminal') return session.intend({ type: 'navigate', view: { kind: 'terminal' } });
-  if (!ws) return session.toast(ctl.isMaking(channel) ? 'This worktree is still being made: a moment' : 'Open a workspace first (Projects on the left)', 'warn');
+  if (!ws) return session.toast(ctl.isMaking(channel) ? t('toasts.commands.stillMaking') : t('toasts.commands.openWorkspaceFirst'), 'warn');
   switch (name) {
     case 'pr':
       session.workbench?.createPr(ws.id, text);
@@ -427,7 +428,7 @@ function runWorkspaceCommand(session: Session, name: string, args: readonly stri
       void ctl.commit(ws.id, text || undefined);
       return;
     case 'fork':
-      if (!text) return session.toast('Usage: /fork <name>', 'warn');
+      if (!text) return session.toast(t('toasts.commands.usageFork'), 'warn');
       void ctl.fork(ws.id, text);
       return;
     case 'finder':

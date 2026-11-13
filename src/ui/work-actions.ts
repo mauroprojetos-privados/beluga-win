@@ -11,6 +11,7 @@ import type { WorkspaceAction } from './workspace-models.js';
 import { NOTICE_FILTERS } from './notice-models.js';
 import { nextDnd } from '../shared/quiet.js';
 import { toggledSound } from '../shared/notify-sound.js';
+import { t } from '../shared/i18n/index.js';
 
 const SECTIONS: readonly SettingsSection[] = ['claude', 'notify', 'workspaces', 'people', 'display', 'buttons', 'terminal', 'env'];
 type NotifyKey = 'desktop' | 'sound' | 'done' | 'needsYou' | 'problems' | 'people' | 'pr' | 'mentions' | 'background' | 'onlyAway';
@@ -69,13 +70,13 @@ export function runWorkOption(ctx: MenuContext, menu: MenuKind, id: string, inde
   }
   if (id.startsWith('sh:')) {
     setPrefs({ shell: id.slice(3) });
-    toast(`New shells use ${id.slice(3)}`);
+    toast(t('toasts.terminal.shellSet', { shell: id.slice(3) }));
     reopen();
     return true;
   }
   if (id.startsWith('env:')) {
     typeInto(`/env ${id.slice(4)}=`);
-    toast('Type the new value, or leave it empty to remove it, then Enter');
+    toast(t('toasts.ui.typeValue'));
     return true;
   }
   if (id.startsWith('btn:')) {
@@ -156,7 +157,7 @@ export function runWorkOption(ctx: MenuContext, menu: MenuKind, id: string, inde
   if (id.startsWith('rws:') && menu.kind === 'remote_ws') {
     patchUi({ focus: 'chat', buffer: '', cursor: 0, pending: { kind: 'remote', projectId: id.slice(4), peerId: menu.peerId } });
     const peer = latest.peers.find((p) => p.peerId === menu.peerId);
-    toast(`Describe the task for ${peer ? `${peer.name}'s` : 'their'} agent in ${id.slice(4)}, then Enter`);
+    toast(peer ? t('toasts.ui.describeTaskFor', { name: peer.name, project: id.slice(4) }) : t('toasts.ui.describeTask', { project: id.slice(4) }));
     return true;
   }
   const wsId = menu.kind === 'pr' ? menu.id : undefined;
@@ -265,7 +266,7 @@ export function runWorkOption(ctx: MenuContext, menu: MenuKind, id: string, inde
       if (wsId) void bench.openPr(wsId);
       return true;
     case 'pr-refresh':
-      if (wsId) void bench.refreshPrs(wsId).then(() => toast('Pull request status refreshed'));
+      if (wsId) void bench.refreshPrs(wsId).then(() => toast(t('toasts.ui.prRefreshed')));
       return true;
     case 's-setup':
     case 's-run': {
@@ -273,7 +274,7 @@ export function runWorkOption(ctx: MenuContext, menu: MenuKind, id: string, inde
       const kind = id === 's-setup' ? 'setup' : 'run';
       const current = latest.projects.find((p) => p.id === projectId)?.scripts?.[kind]?.command ?? '';
       patchUi({ focus: 'chat', buffer: current, cursor: current.length, suggestHidden: true, pending: { kind, projectId } });
-      toast(`Type the ${kind} command (empty to clear), then Enter`);
+      toast(kind === 'setup' ? t('toasts.ui.typeSetup') : t('toasts.ui.typeRun'));
       return true;
     }
     case 's-team':

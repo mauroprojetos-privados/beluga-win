@@ -324,6 +324,13 @@ export const PHONE: Record<Method, Side> = {
 
   // ---- supporting Beluga: the star and coffee asks are the Mac's (they open web pages there)
   'support.answer': 'mac',
+  // The language (docs/i18n.md): Settings stay the Mac's; the phone has its own picker, in the app.
+  'settings.language': 'mac',
+  // Your stack (docs/stack.md): Check Again is its Needs You card's button, a look (the phone reads it);
+  // setting a project up writes files in it, so it's the Mac's.
+  'stack.check': 'phone',
+  'stack.setupProject': 'mac',
+  'settings.commitLanguage': 'mac',
   // ---- your stats: the Usage tab's charts and what the composer saw (the phone keeps its plan meters)
   'stats.get': 'mac',
   'stats.note': 'mac',
@@ -716,6 +723,56 @@ export const PHONE: Record<Method, Side> = {
   'external.stopAll': 'phone',
   'external.setPaused': 'mac',
   'external.activity': 'phone',
+
+  // ---- combos (docs/routing.md): reading them and which one a run used is the phone's; changing them is Settings on the Mac
+  'routing.combos': 'phone',
+  'routing.runRoute': 'phone',
+  'routing.setCombos': 'mac',
+  'routing.resetCombos': 'mac',
+  // Needs You's Try Again for a used-up combo: like Continue, phone-sized.
+  'routing.retry': 'phone',
+  'routing.usage': 'phone',
+  // A preset for Settings › Agents › Combos: settings stay the Mac's.
+  'routing.useClaudeByKind': 'mac',
+
+  // ---- bots (docs/bots.md): seeing them and what they do is the phone's (chatting is session.submit in
+  // their conversation); making, editing, knowledge, tools, versions, export and import are Bot Studio's, on the Mac
+  'bots.list': 'phone',
+  'bots.status': 'phone',
+  // A bot's chats, like Your Mac's: the phone starts and deletes them (chatting); which is open is the Mac's tabs.
+  'bots.newChat': 'phone',
+  'bots.openChat': 'mac',
+  'bots.deleteChat': 'phone',
+  'bots.get': 'mac',
+  'bots.create': 'mac',
+  'bots.delete': 'mac',
+  'bots.edit.bot': 'mac',
+  'bots.edit.persona': 'mac',
+  'bots.edit.mcp': 'mac',
+  'bots.edit.addMcp': 'mac',
+  'bots.edit.secret': 'mac',
+  'bots.edit.skill': 'mac',
+  'bots.edit.copySkill': 'mac',
+  'bots.edit.agent': 'mac',
+  'bots.edit.memory': 'mac',
+  'bots.installed': 'mac',
+  'bots.knowledge.addFile': 'mac',
+  'bots.knowledge.addText': 'mac',
+  'bots.knowledge.addUrl': 'mac',
+  'bots.knowledge.addRepo': 'mac',
+  'bots.knowledge.remove': 'mac',
+  'bots.knowledge.reindex': 'mac',
+  'bots.knowledge.search': 'mac',
+  'bots.validate': 'mac',
+  // Run Now of a trigger is Bot Studio's (the phone shows the next run on the bot's row).
+  'bots.triggers.run': 'mac',
+  'bots.versions': 'mac',
+  'bots.undo': 'mac',
+  'bots.restore': 'mac',
+  'bots.export': 'mac',
+  'bots.import': 'mac',
+  'bots.draft': 'mac',
+  'bots.applyDraft': 'mac',
 };
 
 /** A method the phone may call (unknown names are not). */

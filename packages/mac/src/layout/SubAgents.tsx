@@ -13,12 +13,14 @@ import { type Residue, type SubAgent, agentResidue, agentTitle, cappedAgents, is
 import { setPrefs, usePrefs } from '../lib/prefs.js';
 import { useNow } from '../chat/Items.js';
 import { agoText } from '../views/project/home-model.js';
-import { type FoldRow, type ThreadChild, THREAD_WORDS, agentFamilyRow, capFold, foldNoun, foldRows, foldRunning, foldSummary, openPath, threadNesting, threadStateOf, threadsShownUnder } from '../threads/threads-model.js';
+import { type FoldRow, type ThreadChild, agentFamilyRow, capFold, foldNoun, foldRows, foldRunning, foldSummary, openPath, threadNesting, threadStateOf, threadsShownUnder, threadWord } from '../threads/threads-model.js';
 import { FamilyEnd, FamilyMark, FamilyTitle } from '../threads/FamilyRow.js';
 import { sameDeep } from '../lib/stable.js';
 import { Row } from './sidebar-parts.js';
 import { WorkspaceRow, type WorkspaceFold } from './workspace-row.js';
 import s from './subagents.module.css';
+import { useT } from '../lib/i18n.js';
+import { t as tr } from '@beluga/shared/i18n/index.js';
 
 /**
  * Sub-agents in the sidebar: Claude's helpers, not your work. They sit under the conversation
@@ -61,6 +63,7 @@ function AgentMark({ status }: { status: SubAgent['agent']['status'] }) {
 }
 
 function AgentRow({ s: sub, indent, worktree, residue, menu }: { s: SubAgent; indent: number; worktree?: Workspace; residue?: Residue; menu?: readonly ActionItem[] }) {
+  const t = useT();
   const { client } = useBeluga();
   const actions = useActions();
   const selected = useSelectedAgent();
@@ -68,7 +71,7 @@ function AgentRow({ s: sub, indent, worktree, residue, menu }: { s: SubAgent; in
   const a = sub.agent;
   const on = selected.agent === a.id || (worktree !== undefined && selected.ws === worktree.id);
   // Finished a while ago: when, and who started it (Beluga no longer follows it live).
-  const facts = sub.past ? [typeLabel(a.type), `Finished ${agoText(a.lastAt, now)}`, `started by “${sub.session.title}”`].join(' · ') : [typeLabel(a.type), modelLabel(a.model), agentLabel(a), agentElapsed(a, now)].filter(Boolean).join(' · ');
+  const facts = sub.past ? [typeLabel(a.type), t('layout.sub.finished', { when: agoText(a.lastAt, now) }), t('layout.sub.startedBy', { title: sub.session.title })].join(' · ') : [typeLabel(a.type), modelLabel(a.model), agentLabel(a), agentElapsed(a, now)].filter(Boolean).join(' · ');
   // Done: what it left behind, plainly (running: how it's doing).
   const left = residue && a.status !== 'running' && residue.short ? residue : undefined;
   const row = (
@@ -78,9 +81,9 @@ function AgentRow({ s: sub, indent, worktree, residue, menu }: { s: SubAgent; in
       selected={on}
       className={cx(s.row, a.status !== 'running' && s.quiet)}
       icon={<Icon name="bot" size={13} className={s.bot} />}
-      aria-label={`Sub-agent ${agentTitle(a)}, ${agentLabel(a)}${left ? `, ${left.short}` : ''}`}
+      aria-label={left ? t('layout.sub.ariaLeft', { title: agentTitle(a), agent: agentLabel(a), left: left.short }) : t('layout.sub.aria', { title: agentTitle(a), agent: agentLabel(a) })}
       label={<span className={s.label}>{agentTitle(a)}</span>}
-      detail={`Sub-agent: ${agentTitle(a)} · ${facts}${a.worktree ? ' · in its own worktree' : ''}${left ? `\n${left.long}` : ''}`}
+      detail={`${t(a.worktree ? 'layout.sub.detailWorktree' : 'layout.sub.detail', { title: agentTitle(a), facts })}${left ? `\n${left.long}` : ''}`}
       onClick={() => openSubAgent(client, actions, sub)}
       trailing={left ? <span className={cx(s.left, left.kind === 'some' && s.leftSome)}>{left.short}</span> : <AgentMark status={a.status} />}
     />
@@ -93,13 +96,14 @@ function AgentRow({ s: sub, indent, worktree, residue, menu }: { s: SubAgent; in
  * with its parent's harness and a quiet "sub-agent" word. No Stop: it runs inside its parent's session.
  */
 function FamilyAgentRow({ sub, parent, indent, worktree }: { sub: SubAgent; parent: Workspace; indent: number; worktree?: Workspace }) {
+  const t = useT();
   const { client } = useBeluga();
   const actions = useActions();
   const selected = useSelectedAgent();
   const row = useApp((st) => agentFamilyRow(st, parent, sub), sameDeep);
   const now = useNow(row.state === 'running');
   const on = selected.agent === sub.agent.id || (worktree !== undefined && selected.ws === worktree.id);
-  const word = THREAD_WORDS[row.state];
+  const word = threadWord(row.state);
   return (
     <Row
       data-subagent={sub.agent.id}
@@ -107,9 +111,9 @@ function FamilyAgentRow({ sub, parent, indent, worktree }: { sub: SubAgent; pare
       selected={on}
       className={s.row}
       icon={<FamilyMark row={row} />}
-      aria-label={`Sub-agent ${row.title}, ${word}`}
+      aria-label={t('layout.sub.aria', { title: row.title, agent: word })}
       label={<FamilyTitle row={row} />}
-      detail={[`Sub-agent: ${row.title}`, row.agent, row.model, word].filter(Boolean).join(' · ')}
+      detail={[t('layout.sub.named', { title: row.title }), row.agent, row.model, word].filter(Boolean).join(' · ')}
       onClick={() => openSubAgent(client, actions, sub)}
       trailing={<FamilyEnd row={row} now={now} />}
     />
@@ -172,6 +176,7 @@ function useOpenThreads(): ReadonlySet<string> {
 
 /** Under a conversation's row, unfolded: what it started, the newest few and "N earlier". */
 function FoldedRows({ ws, list, noun, indent }: { ws: Workspace; list: readonly FoldRow[]; noun: string; indent: number }) {
+  const t = useT();
   const actions = useActions();
   const projects = useApp((st) => st.projects);
   const key = `subagents-more:${ws.id}`;
@@ -187,14 +192,14 @@ function FoldedRows({ ws, list, noun, indent }: { ws: Workspace; list: readonly 
   // Threads on: what the chat started draws as one kind of row, whatever started it.
   const unified = useApp((st) => st.prefs.agentThreads);
   return (
-    <div role="group" aria-label={onlyAgents ? `Sub-agents of ${ws.name}` : `Threads of ${ws.name}`}>
+    <div role="group" aria-label={onlyAgents ? t('layout.sub.subAgentsOf', { name: ws.name }) : t('layout.sub.threadsOf', { name: ws.name })}>
       {/* The tucked-away ones are the earlier ones: the toggle sits above the rows, where they unfold. */}
       {hidden > 0 || expanded ? (
         <Row
           indent={indent}
           className={cx(s.row, s.more)}
           icon={<span className={s.moreDot} />}
-          label={expanded && hidden === 0 ? 'Show Fewer' : onlyAgents ? `${hidden} earlier sub-agent${hidden === 1 ? '' : 's'}` : `${hidden} earlier`}
+          label={expanded && hidden === 0 ? t('layout.sub.showFewer') : onlyAgents ? t('layout.sub.earlierAgents', { count: hidden }) : t('layout.sub.earlier', { count: hidden })}
           onClick={() => actions.run({ type: 'toggle_fold', key })}
         />
       ) : null}
@@ -219,6 +224,7 @@ const clearedKey = (sub: SubAgent): string => `cleared-agent:${sub.session.id}:$
  * removed when it has no commits or changes (its branch is kept). Anything with work in it stays.
  */
 export function ProjectAgents({ p, ws, indent }: { p: Project; ws: Workspace; indent: number }) {
+  const t = useT();
   const api = useApi();
   const { client, ui } = useBeluga();
   const actions = useActions();
@@ -248,20 +254,20 @@ export function ProjectAgents({ p, ws, indent }: { p: Project; ws: Workspace; in
     const hide = list.filter((r) => !r.wt).map((r) => clearedKey(r.sub));
     if (hide.length) {
       ui.patch({ collapsed: [...ui.get().collapsed, ...hide] });
-      showUndo(`Cleared ${hide.length === 1 ? 'a sub-agent' : `${hide.length} sub-agents`}`, () => ui.patch({ collapsed: ui.get().collapsed.filter((k) => !hide.includes(k)) }));
+      showUndo(tr('layout.sub.cleared', { count: hide.length }), () => ui.patch({ collapsed: ui.get().collapsed.filter((k) => !hide.includes(k)) }));
     }
     // A worktree with nothing in it: removed (git refuses if anything changed meanwhile; its branch stays).
     for (const r of list) if (r.wt) void api.workspaces.removeOther(r.wt.id, false).catch((err: unknown) => toast(client, `${agentTitle(r.sub.agent)}: ${err instanceof Error ? err.message : String(err)}`, 'error'));
   };
   const menuOf = (r: (typeof rows)[number]): ActionItem[] => [
-    { label: 'Open', icon: 'forward', onSelect: () => openSubAgent(client, actions, r.sub) },
+    { label: t('common.open'), icon: 'forward', onSelect: () => openSubAgent(client, actions, r.sub) },
     // What it left is archived (kept) or cleaned up where every worktree is: the Worktrees page.
-    ...(r.wt ? [{ label: r.residue.kind === 'some' ? 'Archive or Clean Up in Worktrees…' : 'Show in Worktrees', icon: 'branch' as const, onSelect: () => actions.run({ type: 'view', view: { kind: 'worktrees', projectId: p.id } }) }] : []),
-    ...(r.residue.clearable ? [{ label: 'Clear', icon: 'x' as const, separate: true, hint: r.wt ? 'Removes its empty worktree; the branch stays' : 'Nothing of its own to lose', onSelect: () => clear([r]) }] : []),
+    ...(r.wt ? [{ label: r.residue.kind === 'some' ? t('layout.sub.archiveOrClean') : t('layout.sub.showInWorktrees'), icon: 'branch' as const, onSelect: () => actions.run({ type: 'view', view: { kind: 'worktrees', projectId: p.id } }) }] : []),
+    ...(r.residue.clearable ? [{ label: t('layout.sub.clear'), icon: 'x' as const, separate: true, hint: r.wt ? t('layout.sub.clearWorktreeHint') : t('layout.sub.clearNothingHint'), onSelect: () => clear([r]) }] : []),
   ];
-  const tip = [`${list.length} sub-agent${list.length === 1 ? '' : 's'} started from ${p.name}’s main folder`, running ? `${running} working` : '', withWork ? `${withWork} left work behind` : '', clearable.length ? `${clearable.length} can be cleared` : ''].filter(Boolean).join(' · ');
+  const tip = [t('layout.sub.startedFrom', { count: list.length, name: p.name }), running ? t('layout.sub.working', { count: running }) : '', withWork ? t('layout.sub.leftWork', { count: withWork }) : '', clearable.length ? t('layout.sub.canClear', { count: clearable.length }) : ''].filter(Boolean).join(' · ');
   return (
-    <div role="group" aria-label={`Sub-agents in ${p.name}`}>
+    <div role="group" aria-label={t('layout.sub.subAgentsIn', { name: p.name })}>
       <Row
         indent={indent}
         className={cx(s.row, s.group)}
@@ -269,7 +275,7 @@ export function ProjectAgents({ p, ws, indent }: { p: Project; ws: Workspace; in
         icon={<Icon name="bot" size={13} className={s.bot} />}
         label={
           <span className={s.label}>
-            Agents <span className={s.count}>· {list.length}</span>
+            {t('layout.sub.agents')} <span className={s.count}>· {list.length}</span>
           </span>
         }
         detail={tip}
@@ -284,8 +290,8 @@ export function ProjectAgents({ p, ws, indent }: { p: Project; ws: Workspace; in
           indent={indent + 1}
           className={cx(s.row, s.more)}
           icon={<Icon name="check" size={11} />}
-          label={`Clear ${clearable.length} done that left nothing`}
-          detail="Only agents with nothing to lose: no commits, no uncommitted files. Their branches stay. Anything with work in it is kept."
+          label={t('layout.sub.clearDone', { count: clearable.length })}
+          detail={t('layout.sub.clearDoneDetail')}
           onClick={() => clear(clearable)}
         />
       ) : null}

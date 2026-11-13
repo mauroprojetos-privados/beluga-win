@@ -3,6 +3,7 @@ import { type BoardState, type Issue, isArchived, isOpen, showsOn } from '../../
 import { activityOf } from '../../../../../src/ui/workspace-models.js';
 import { worktreeOrigin } from '../../../../../src/workspaces/origin.js';
 import type { Project, ProjectSync, Workspace } from '../../../../../src/workspaces/types.js';
+import { t } from '../../../../../src/shared/i18n/index.js';
 
 /**
  * What a project's home shows (ProjectHome.tsx draws it): how its main folder compares with
@@ -40,35 +41,36 @@ export interface HomeModel {
   readonly stats: { readonly active: number; readonly ready: number; readonly archived: number };
 }
 
-const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
-
 /**
  * How the project's default branch (main or master) compares with its remote, as of the last
  * fetch, and where the main folder is when it's on another branch.
  */
 export function defaultLineOf(sync: ProjectSync): MainLine {
-  const where = sync.onDefault ? 'main' : 'the main folder';
-  const dirty = sync.dirty ? `${plural(sync.dirty, 'uncommitted change')} in ${where}` : undefined;
-  const extra = { branch: sync.branch, ...(dirty ? { dirty } : {}), ...(sync.onDefault ? {} : { elsewhere: `The main folder is on ${sync.current ?? 'a detached HEAD'}` }) };
+  const dirty = sync.dirty ? t(sync.onDefault ? 'project.home.dirtyInMain' : 'project.home.dirtyInFolder', { count: sync.dirty }) : undefined;
+  const extra = { branch: sync.branch, ...(dirty ? { dirty } : {}), ...(sync.onDefault ? {} : { elsewhere: t('project.home.elsewhere', { branch: sync.current ?? t('project.home.detachedHead') }) }) };
   const up = sync.upstream;
-  if (!up) return { label: 'Not tracking a remote branch', tone: 'muted', ...extra };
-  if (!sync.local) return { label: `Only on ${up} so far`, tone: 'info', canUpdate: true, ...extra };
-  if (!sync.ahead && !sync.behind) return { label: `Up to date with ${up}`, tone: 'ok', ...extra };
-  const label = sync.ahead && sync.behind ? `${sync.ahead} ahead, ${sync.behind} behind ${up}` : sync.ahead ? `${sync.ahead} ahead of ${up}` : `${sync.behind} behind ${up}`;
+  if (!up) return { label: t('project.home.notTracking'), tone: 'muted', ...extra };
+  if (!sync.local) return { label: t('project.home.onlyOn', { up }), tone: 'info', canUpdate: true, ...extra };
+  if (!sync.ahead && !sync.behind) return { label: t('project.home.upToDate', { up }), tone: 'ok', ...extra };
+  const label = aheadBehind(sync.ahead, sync.behind, up);
   return { label, tone: sync.ahead ? 'warn' : 'info', ...(sync.behind ? { canUpdate: true } : {}), ...extra };
 }
+
+/** "2 ahead, 3 behind origin/main", "2 ahead of origin/main", "3 behind origin/main". */
+const aheadBehind = (ahead: number, behind: number, up: string): string =>
+  ahead && behind ? t('project.home.aheadBehind', { ahead, behind, up }) : ahead ? t('project.home.ahead', { ahead, up }) : t('project.home.behind', { behind, up });
 
 /** How the main checkout compares with the branch it tracks (as of the last fetch). */
 export function mainLineOf(main: Workspace | undefined, sync?: ProjectSync): MainLine {
   if (sync) return defaultLineOf(sync);
   const st = main?.status;
-  const dirty = st?.changed ? `${plural(st.changed, 'uncommitted change')} in main` : undefined;
+  const dirty = st?.changed ? t('project.home.dirtyInMain', { count: st.changed }) : undefined;
   const extra = dirty ? { dirty } : {};
   const up = st?.upstream;
-  if (!st) return { label: 'Main folder', tone: 'muted', ...extra };
-  if (!up) return { label: 'Not tracking a remote branch', tone: 'muted', ...extra };
-  if (!up.ahead && !up.behind) return { label: `Up to date with ${up.name}`, tone: 'ok', ...extra };
-  const label = up.ahead && up.behind ? `${up.ahead} ahead, ${up.behind} behind ${up.name}` : up.ahead ? `${up.ahead} ahead of ${up.name}` : `${up.behind} behind ${up.name}`;
+  if (!st) return { label: t('project.home.mainFolder'), tone: 'muted', ...extra };
+  if (!up) return { label: t('project.home.notTracking'), tone: 'muted', ...extra };
+  if (!up.ahead && !up.behind) return { label: t('project.home.upToDate', { up: up.name }), tone: 'ok', ...extra };
+  const label = aheadBehind(up.ahead, up.behind, up.name);
   // Commits on main that aren't on origin are unusual here (work happens in worktrees): worth a look.
   return { label, tone: up.ahead ? 'warn' : 'info', ...extra };
 }
@@ -127,8 +129,8 @@ export function homeTasks(board: Pick<BoardState, 'issues'>, projectId: string, 
 /** "just now", "5 min ago", "3 h ago", "2 d ago". */
 export function agoText(ts: number, now = Date.now()): string {
   const s = Math.max(0, Math.round((now - ts) / 1000));
-  if (s < 60) return 'just now';
-  if (s < 3600) return `${Math.round(s / 60)} min ago`;
-  if (s < 86_400) return `${Math.round(s / 3600)} h ago`;
-  return `${Math.round(s / 86_400)} d ago`;
+  if (s < 60) return t('project.phoneModel.justNow');
+  if (s < 3600) return t('project.phoneModel.minAgo', { m: Math.round(s / 60) });
+  if (s < 86_400) return t('project.phoneModel.hAgo', { h: Math.round(s / 3600) });
+  return t('project.home.dAgo', { d: Math.round(s / 86_400) });
 }

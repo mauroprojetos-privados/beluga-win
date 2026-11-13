@@ -6,6 +6,8 @@ import { Segmented, Tip, cx } from '../components/ui.js';
 import { usePrefs } from '../lib/prefs.js';
 import { chordLabel } from '../lib/shortcuts-model.js';
 import { useIssueActions } from './use-issues.js';
+import { t as tr } from '@beluga/shared/i18n/index.js';
+import { useT } from '../lib/i18n.js';
 import h from '../views/project-home.module.css';
 import d from '../chat/draft.module.css';
 import s from './issues.module.css';
@@ -29,39 +31,41 @@ interface WayInfo {
   readonly go: string;
 }
 
-const WAYS: Readonly<Record<Way, WayInfo>> = {
+const WAYS = (): Readonly<Record<Way, WayInfo>> => ({
   investigate: {
-    label: 'Investigate',
+    label: tr('github.menu.investigate'),
     icon: 'search',
-    hint: 'The agent finds out why it happens and reproduces it; nothing is fixed yet',
-    placeholder: 'Anything to look at first? “It only fails behind the proxy”',
-    what: () => 'In a new worktree: why it happens, and a reproduction. Nothing is fixed yet.',
+    hint: tr('github.composer.investigateHint'),
+    placeholder: tr('github.composer.investigatePlaceholder'),
+    what: () => tr('github.composer.investigateWhat'),
     whatIcon: 'branch',
-    go: 'Investigate',
+    go: tr('github.menu.investigate'),
   },
   fix: {
-    label: 'Fix It',
+    label: tr('github.fixIt'),
     icon: 'wrench',
-    hint: 'The agent fixes it and opens a pull request that closes the issue',
-    placeholder: 'Anything the fix should do or avoid? “Keep the public API as it is”',
-    what: (n) => `In a new worktree, with a pull request that closes #${n}.`,
+    hint: tr('github.composer.fixHint'),
+    placeholder: tr('github.composer.fixPlaceholder'),
+    what: (n) => tr('github.composer.fixWhat', { number: n }),
     whatIcon: 'pr',
-    go: 'Fix It',
+    go: tr('github.fixIt'),
   },
   task: {
-    label: 'Make a Task',
+    label: tr('github.menu.makeTask'),
     icon: 'task',
-    hint: 'On the board, written up by the agent, for later',
-    placeholder: 'Anything to add to the task?',
-    what: () => 'On the board as Ready, written up by the agent.',
+    hint: tr('github.composer.taskHint'),
+    placeholder: tr('github.composer.taskPlaceholder'),
+    what: () => tr('github.composer.taskWhat'),
     whatIcon: 'task',
-    go: 'Make Task',
+    go: tr('github.composer.makeTask'),
   },
-};
+});
 
 export function IssueComposer({ projectId, number, task }: { projectId: string; number: number; task?: Issue }) {
   const a = useIssueActions();
   const prefs = usePrefs();
+  const t = useT();
+  const all = WAYS();
   const ways: readonly Way[] = task ? ['investigate', 'fix'] : ['investigate', 'fix', 'task'];
   const [way, setWay] = useState<Way>('investigate');
   const [note, setNote] = useState('');
@@ -69,7 +73,7 @@ export function IssueComposer({ projectId, number, task }: { projectId: string; 
   const [busy, setBusy] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null);
   const shown = ways.includes(way) ? way : 'investigate';
-  const info = WAYS[shown];
+  const info = all[shown];
   // Claude still writing the task (Make a Task): working on it waits for its words, so not yet.
   const writing = Boolean(task?.drafting);
   const ready = !busy && !writing;
@@ -91,24 +95,24 @@ export function IssueComposer({ projectId, number, task }: { projectId: string; 
   };
 
   return (
-    <section className={cx(h.composer, s.composer)} aria-label={`Hand #${number} to your agent`}>
+    <section className={cx(h.composer, s.composer)} aria-label={t('github.composer.label', { number })}>
       <div className={h.composerHead}>
-        <h2 className={cx(h.prompt, s.composerPrompt)}>{task ? `${task.key} is on the board. What should your agent do?` : 'What should your agent do?'}</h2>
+        <h2 className={cx(h.prompt, s.composerPrompt)}>{task ? t('github.composer.onBoard', { key: task.key }) : t('github.composer.what')}</h2>
         <Segmented<Way>
-          label="What the agent does"
+          label={t('github.composer.whatAgentDoes')}
           value={shown}
           onChange={(w) => {
             setWay(w);
             box.current?.focus();
           }}
-          options={ways.map((w) => ({ value: w, label: WAYS[w].label, icon: WAYS[w].icon, hint: WAYS[w].hint }))}
+          options={ways.map((w) => ({ value: w, label: all[w].label, icon: all[w].icon, hint: all[w].hint }))}
         />
       </div>
       <div className={cx(h.box, busy && h.busy)}>
         <textarea
           ref={box}
           className={cx(h.input, s.composerInput, 'selectable')}
-          aria-label="Anything the agent should know (optional)"
+          aria-label={t('github.composer.note')}
           placeholder={info.placeholder}
           value={note}
           rows={2}
@@ -125,18 +129,19 @@ export function IssueComposer({ projectId, number, task }: { projectId: string; 
         <div className={h.bar}>
           <span className={h.note}>
             <Icon name={writing ? 'pencil' : info.whatIcon} size={12} />
-            {writing ? `The agent is still writing ${task!.key} up; then it can start.` : info.what(number)}
+            {writing ? t('github.composer.stillWriting', { key: task!.key }) : info.what(number)}
           </span>
           <span className={h.flex} />
           {shown === 'task' ? (
             <span className={s.composerCheck}>
-              <Checkbox checked={look} onChange={setLook} label="Look at the code first" />
+              <Checkbox checked={look} onChange={setLook} label={t('github.composer.lookFirst')} />
             </span>
           ) : null}
-          <Tip label={shown === 'task' && look ? 'The agent reads the code first (read-only), then writes the task with where it is and the likely cause' : info.hint} keys={sendKeys}>
+          <Tip label={shown === 'task' && look ? t('github.composer.lookHint') : info.hint} keys={sendKeys}>
             <button type="button" className={cx(d.create, ready && d.createReady)} aria-disabled={!ready} onClick={() => void go()} data-testid="issue-go">
               <Icon name={info.icon} size={12} />
-              {busy ? 'Starting…' : info.go}
+              {busy ? t('github.starting') : info.go}
+
               <span className={d.createKey}>{sendKeys}</span>
             </button>
           </Tip>

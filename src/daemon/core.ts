@@ -25,7 +25,9 @@ import { launchDialogues } from '../core/dialogues/launch.js';
 import { launchSentinel } from '../core/sentinel/launch.js';
 import { launchTriage, sendAutomatic } from '../core/triage/launch.js';
 import { AutoContinue } from '../core/auto-continue.js';
+import { ComboFailover } from '../core/routing/failover.js';
 import { launchAssistant } from '../core/assistant/launch.js';
+import { launchStack, watchClaudeByKind } from '../core/stack/launch.js';
 import { launchThreads, threadsOf } from '../core/threads/launch.js';
 import { launchChat } from '../core/chat/launch.js';
 import { launchCalls } from '../core/calls/launch.js';
@@ -56,6 +58,7 @@ import { loadDismissedNeeds } from '../core/dismissed-needs.js';
 import { claudeCodeReady } from '../agent/claude-code.js';
 import { updateClaudeCode } from '../agent/claude-code-updates.js';
 import { claudeCodeWorks } from '../agent/runtime/claude/probe.js';
+import { t } from '../shared/i18n/index.js';
 
 /**
  * Everything Beluga is apart from its screens: your identity, the room (hosted or joined),
@@ -220,7 +223,7 @@ async function publish(config: Config, room: Room, session: Session, isClosing: 
       onDied: (reason) => {
         if (isClosing()) return;
         store.dispatch({ type: 'hosting', hosting: { phase: 'failed', detail: `${reason}. Restart Beluga to get a new invite.` } });
-        session.toast('Remote access stopped: the tunnel closed', 'error');
+        session.toast(t('toasts.daemon.tunnelClosed'), 'error');
       },
     });
     if (!tunnel || isClosing()) return;
@@ -393,6 +396,8 @@ export async function buildCore(input: Config, hooks: CoreHooks, opts: { readonl
   let stopTriage = (): void => undefined;
   let stopAutoContinue = (): void => undefined;
   let stopAssistant = (): void => undefined;
+  let stopStack = (): void => undefined;
+  let stopClaudeByKind = (): void => undefined;
   let stopThreads = (): void => undefined;
   let stopCompanion = async (): Promise<void> => undefined;
   let stopExternal = async (): Promise<void> => undefined;
@@ -437,10 +442,25 @@ export async function buildCore(input: Config, hooks: CoreHooks, opts: { readonl
         skip: (channel) => threadsOf(session)?.skipsContinue(channel) ?? false,
         sent: (channel, requestId) => threadsOf(session)?.limitContinued(channel, requestId),
       });
-      stopAutoContinue = () => auto.stop();
+      // A run on a combo that stops on its limit goes on with the combo's next target (docs/routing.md).
+      const failover = new ComboFailover({
+        store,
+        ask: (prompt, channel) => sendAutomatic(session, () => session.askOwnClaude(prompt, channel, true)),
+        carry: (channel, from) => session.workspaces?.carryOnCombo(channel, from),
+        notify: (e) => session.notifier.notify(e),
+        skip: (channel) => threadsOf(session)?.skipsContinue(channel) ?? false,
+        warn: (text) => console.warn(text),
+      });
+      stopAutoContinue = () => {
+        auto.stop();
+        failover.stop();
+      };
     }
     // "Your Mac": one conversation with your Claude for the whole Mac, from the phone and the sidebar (core/assistant).
     if (opts.network) stopAssistant = launchAssistant({ session, store, demo: Boolean(demo) });
+    // Your stack (docs/stack.md): Ollama, OpenViking, hooktop and the agents' tools, looked at and started; new projects set up for it.
+    if (opts.network && !demo) stopStack = launchStack({ session, store });
+    if (!demo) stopClaudeByKind = watchClaudeByKind(session, store);
     // Child threads your agents start (core/threads): the tools show only with prefs.agentThreads on.
     if (opts.network) stopThreads = launchThreads(session);
     if (opts.network) stopClaudeCode = launchClaudeCode({ session, store, demo: Boolean(demo), notify: (e) => session.notifier.notify(e) });
@@ -488,6 +508,8 @@ export async function buildCore(input: Config, hooks: CoreHooks, opts: { readonl
     stopChat();
     stopFriendShares();
     stopAssistant();
+    stopStack();
+    stopClaudeByKind();
     stopThreads();
     stopSentinel();
     stopTriage();

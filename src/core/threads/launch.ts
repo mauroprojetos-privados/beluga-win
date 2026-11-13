@@ -1,6 +1,7 @@
 import { assistantOf } from '../assistant/registry.js';
 import type { Session } from '../session.js';
 import { ThreadService } from './service.js';
+import { t } from '../../shared/i18n/index.js';
 
 /** Which service serves a session (the daemon's), so its runs reach the thread tools. */
 const all = new WeakMap<object, ThreadService>();
@@ -20,8 +21,8 @@ export function stopChat(session: Session, channel: string): ReturnType<Session[
 /** A person's Stop All Running on a chat: the threads under it stop, as with stopChat, and its own turn goes on. */
 export function stopThreadsUnder(session: Session, id: string): { readonly stopped: number } {
   const stopped = threadsOf(session)?.stopUnder(`ws:${id}`) ?? 0;
-  if (stopped) session.toast(`Stopped ${stopped} thread${stopped === 1 ? '' : 's'}`, 'success');
-  else session.toast('No thread is running here');
+  if (stopped) session.toast(t('toasts.threads.stopped', { count: stopped }), 'success');
+  else session.toast(t('toasts.threads.none'));
   return { stopped };
 }
 

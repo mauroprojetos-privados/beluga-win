@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import { resetWords } from '../../../../src/shared/run-failure';
+import { resetWhen } from '../../../../src/shared/run-failure';
 import { KeyboardLift } from '../../components/KeyboardLift';
 import { Activity, Bot, Camera, ChevronRight, Map as MapIcon, CircleCheck, CircleX, Clock, Cpu, FolderTree, GitMerge, History, Images, Laptop, MessagesSquare, Monitor, Network, OctagonX, Plus, Send, Square, SquareTerminal, Trash2, Undo2 } from 'lucide-react-native';
 import { AgentList, Breathe, LivePanel, StepList, StepsFold, ToolBadge, TypingDots } from '../../components/Live';
@@ -36,6 +36,7 @@ import { store } from '../../lib/store';
 import { upload } from '../../lib/pick';
 import { color } from '../../lib/theme';
 import { router } from 'expo-router';
+import { useT } from '../../lib/language';
 
 /**
  * One conversation: your messages, Claude's answers as cards (code folded into chips), the live
@@ -45,17 +46,18 @@ import { router } from 'expo-router';
 
 /** An empty Your Mac: three first things to ask, one tap each (the composer is there too). */
 function MacStarters({ topic, on }: { readonly topic: Topic; readonly on?: string }) {
+  const say = useT();
   const starters = [
-    { label: 'Send me a screenshot', Icon: Camera, tone: 'sky' as Tone, text: 'Take a screenshot of my screen and send it to me.' },
-    { label: 'What’s using my CPU?', Icon: Cpu, tone: 'peach' as Tone, text: 'What’s using my CPU and memory right now?' },
-    { label: 'What’s running?', Icon: Activity, tone: 'mint' as Tone, text: 'What’s running in Beluga right now, across my projects?' },
+    { label: say('phoneApp.conv.starterShot'), Icon: Camera, tone: 'sky' as Tone, text: say('phoneApp.conv.starterShotText') },
+    { label: say('phoneApp.conv.starterCpu'), Icon: Cpu, tone: 'peach' as Tone, text: say('phoneApp.conv.starterCpuText') },
+    { label: say('phoneApp.conv.starterRunning'), Icon: Activity, tone: 'mint' as Tone, text: say('phoneApp.conv.starterRunningText') },
   ];
   return (
     <Animated.View entering={FadeIn.duration(260)} style={{ alignItems: 'center', gap: 14, marginTop: 40 }}>
       <IconBadge Icon={Laptop} tone="sky" size={56} />
-      <T v="heading">Ask your Mac</T>
+      <T v="heading">{say('phone.home.askYourMac')}</T>
       <T v="callout" style={{ textAlign: 'center', paddingHorizontal: 24 }}>
-        Your agent for the whole Mac, not one project. The same conversation as on your Mac.
+        {say('phoneApp.conv.macIntro')}
       </T>
       <View style={{ gap: 8, alignSelf: 'stretch', marginTop: 6 }}>
         {starters.map((s) => (
@@ -86,8 +88,9 @@ function Conversation() {
   const { id } = useLocalSearchParams<{ id: string }>();
   // One of your computers': its calls go over its link, nothing waits for it, and what only your Mac does is left out.
   const on = useOn();
+  const say = useT();
   const computer = useComputer(on);
-  const away = on && computer?.phase !== 'open' ? `${computer?.computer.name ?? 'That computer'} is away: this is what your phone kept.` : undefined;
+  const away = on && computer?.phase !== 'open' ? say('phoneApp.conv.away', { name: computer?.computer.name ?? say('phoneApp.conv.thatComputer') }) : undefined;
   const { call, where } = scoped(store, on);
   const topic = `conv:${decodeURIComponent(id ?? '')}` as Topic;
   const conv = useView<ConvView>(topic);
@@ -151,11 +154,11 @@ function Conversation() {
   return (
     <OutputsTopic.Provider value={topic}>
       <Screen>
-        <Header scrolled={scrolled} back eyebrow={c?.project} title={c?.title ?? 'Conversation'} at={conv?.at} lead={isMacTopic(topic) ? <IconBadge Icon={Laptop} tone="sky" size={30} /> : c?.project ? <ProjectMark name={c.project} icon={c.icon} size={30} /> : undefined} right={
+        <Header scrolled={scrolled} back eyebrow={c?.project} title={c?.title ?? say('phoneApp.conv.title')} at={conv?.at} lead={isMacTopic(topic) ? <IconBadge Icon={Laptop} tone="sky" size={30} /> : c?.project ? <ProjectMark name={c.project} icon={c.icon} size={30} /> : undefined} right={
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              {c?.working && !all.length ? <Pill label="Working" tone="peach" /> : null}
+              {c?.working && !all.length ? <Pill label={say('phone.home.workingStep')} tone="peach" /> : null}
               {all.length ? (
-                <Press onPress={() => setOutputsOpen(true)} accessibilityLabel={`Outputs, ${all.length}`} hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height: 34, paddingHorizontal: 10, borderRadius: 17, backgroundColor: color.sunken }}>
+                <Press onPress={() => setOutputsOpen(true)} accessibilityLabel={say('phoneApp.conv.outputsCount', { count: all.length })} hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height: 34, paddingHorizontal: 10, borderRadius: 17, backgroundColor: color.sunken }}>
                   <Images color={color.text2} size={16} />
                   <T v="caption" c={color.text2} style={{ fontWeight: '700' }}>
                     {all.length}
@@ -163,7 +166,7 @@ function Conversation() {
                 </Press>
               ) : null}
               {macChats ? (
-                <Press onPress={() => setChatsOpen(true)} accessibilityLabel={`Your Mac’s chats, ${chatCount}`} hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height: 34, paddingHorizontal: 10, borderRadius: 17, backgroundColor: color.sunken }}>
+                <Press onPress={() => setChatsOpen(true)} accessibilityLabel={say('phone.home.macChats', { count: chatCount })} hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, height: 34, paddingHorizontal: 10, borderRadius: 17, backgroundColor: color.sunken }}>
                   <MessagesSquare color={color.text2} size={16} />
                   {chatCount > 1 ? (
                     <T v="caption" c={color.text2} style={{ fontWeight: '700' }}>
@@ -172,7 +175,7 @@ function Conversation() {
                   ) : null}
                 </Press>
               ) : null}
-              <More onPress={() => setMenu(true)} label="Conversation options" />
+              <More onPress={() => setMenu(true)} label={say('phoneApp.conv.options')} />
             </View>
           }
         />
@@ -191,7 +194,7 @@ function Conversation() {
           {/* The plan this chat writes and runs (1.15): its milestones and map are a tap away. */}
           {c?.plan ? (
             <View style={{ paddingHorizontal: 14, paddingBottom: 10, paddingTop: c.merge || c.branch ? 0 : 10 }}>
-              <Press scaleTo={0.985} onPress={() => router.push(`/plan/${c.plan!.topic.slice('plan:'.length)}`)} accessibilityLabel={`Open the plan ${c.plan.title}`}>
+              <Press scaleTo={0.985} onPress={() => router.push(`/plan/${c.plan!.topic.slice('plan:'.length)}`)} accessibilityLabel={say('phoneApp.conv.openPlan', { title: c.plan.title })}>
                 <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 12 }}>
                   <IconBadge Icon={MapIcon} tone="lavender" size={28} />
                   <View style={{ flex: 1 }}>
@@ -199,7 +202,7 @@ function Conversation() {
                       {c.plan.title}
                     </T>
                     <T v="caption" numberOfLines={1}>
-                      {c.plan.milestones ? `${c.plan.milestones} ${c.plan.milestones === 1 ? 'milestone' : 'milestones'} · ${c.plan.done} of ${c.plan.total} tasks` : 'Your agent is writing the plan'}
+                      {c.plan.milestones ? say('phoneApp.conv.planLine', { count: c.plan.milestones, done: c.plan.done, total: c.plan.total }) : say('phoneApp.conv.writingPlan')}
                     </T>
                   </View>
                   <Pill label={c.plan.state} tone={toneOf(c.plan.state)} />
@@ -228,11 +231,11 @@ function Conversation() {
                 style={{ alignSelf: 'center', paddingHorizontal: 14, height: 30, borderRadius: 15, justifyContent: 'center', backgroundColor: color.sunken }}
               >
                 <T v="caption" c={color.text2}>
-                  {olderBusy ? 'Loading…' : 'Earlier messages'}
+                  {olderBusy ? say('common.loading') : say('phoneApp.conv.earlier')}
                 </T>
               </Press>
             ) : null}
-            {!c ? <T v="callout" style={{ textAlign: 'center', marginTop: 40 }}>Opening the conversation…</T> : null}
+            {!c ? <T v="callout" style={{ textAlign: 'center', marginTop: 40 }}>{say('phoneApp.conv.opening')}</T> : null}
             {c && isMacTopic(topic) && !turns.length && !pending.length ? <MacStarters topic={topic} {...where} /> : null}
             {turns.map((t, i) => (
               <Animated.View key={t.id} entering={i > turns.length - 3 ? FadeIn.duration(180) : undefined}>
@@ -266,11 +269,11 @@ function Conversation() {
           {c?.terminal ? <TerminalBand label={c.terminal.label} onTakeOver={() => void call(calls.takeOver(topic)).catch((e: Error) => store.toast({ text: e.message, tone: 'error' }))} /> : null}
           <Composer
             {...(refill ? { refill } : {})}
-            placeholder={c?.waiting ?? (c?.working ? 'What’s next for your agent…' : 'Reply to your agent…')}
+            placeholder={c?.waiting ?? (c?.working ? say('phoneApp.conv.whatsNext') : say('phoneApp.conv.reply'))}
             working={c?.working}
             // The room: "@codex", "@bob:codex" as you type @ (BLG-520).
             {...(c?.tags?.length ? { tags: c.tags } : {})}
-            disabled={away ?? (c?.terminal ? `${c.terminal.label}’s terminal on your Mac has this conversation: Take Over to write here.` : c && !c.canSend ? 'You can read this conversation, not write in it.' : undefined)}
+            disabled={away ?? (c?.terminal ? say('phoneApp.conv.terminalHas', { label: c.terminal.label }) : c && !c.canSend ? say('phoneApp.conv.readOnly') : undefined)}
             photos={!on}
             onSend={(text, photos) => {
               atEnd.current = true;
@@ -311,9 +314,9 @@ function Conversation() {
               <IconBadge Icon={Images} tone="sky" size={32} />
               <View style={{ flex: 1 }}>
                 <T v="title" style={{ fontSize: 20 }}>
-                  Outputs
+                  {say('phoneApp.conv.outputs')}
                 </T>
-                <T v="caption">Screenshots, logs, reports and scratch files from this worktree</T>
+                <T v="caption">{say('phoneApp.conv.outputsSub')}</T>
               </View>
             </View>
           }
@@ -347,12 +350,12 @@ function Conversation() {
         <Options
           visible={Boolean(unread)}
           onClose={() => setUnread(undefined)}
-          title="Your agent hasn't read this yet"
+          title={say('phoneApp.conv.unread')}
           options={[
             {
               Icon: Send,
-              label: 'Send now',
-              sub: 'Stops your agent’s current step so it reads this next',
+              label: say('phoneApp.conv.sendNow'),
+              sub: say('phoneApp.conv.sendNowSub'),
               tone: 'peach',
               onPress: () => {
                 const request = unread?.steer?.request;
@@ -361,8 +364,8 @@ function Conversation() {
             },
             {
               Icon: Undo2,
-              label: 'Cancel',
-              sub: 'Takes it back before your agent reads it; its words go back in the box',
+              label: say('common.cancel'),
+              sub: say('phoneApp.conv.cancelSub'),
               tone: 'rose',
               hidden: !supportsCancel,
               onPress: () => {
@@ -383,21 +386,21 @@ function Conversation() {
           onClose={() => setMenu(false)}
           title={c?.title}
           options={[
-            { Icon: c?.agent ? markIcon(runtimeMark(c.agent.runtime)) : Bot, label: `Agent · ${c?.agent?.label ?? ''}`, sub: 'Pick the agent and model for this conversation', tone: 'lavender', hidden: !can.agentPicker, onPress: () => setPicking(true) },
-            { Icon: Plus, label: 'New chat', sub: 'A fresh chat with your Mac, a new tab there too', tone: 'sky', hidden: !macChats, onPress: () => newMacChat((h) => router.replace(h as never)) },
-            { Icon: Square, label: askedTask ? 'Stop asking' : 'Stop the agent', tone: 'rose', hidden: !c?.working, onPress: () => void call(askedTask ? calls.cancelTask(askedTask) : calls.stop(topic)) },
-            { Icon: Network, label: 'Threads', sub: threadsSummary(c?.threadFamily), tone: 'lavender', hidden: !c?.threadFamily, onPress: () => setThreadsOpen(true) },
-            { Icon: Images, label: 'Outputs', sub: all.length ? `${all.length} from this worktree` : 'Nothing yet', tone: 'sky', hidden: !all.length, onPress: () => setOutputsOpen(true) },
-            { Icon: GitMerge, label: 'Merge…', sub: 'Into your main folder, checked first', tone: 'lavender', hidden: !can.merge, onPress: () => setMergeOpen(true) },
-            { Icon: FolderTree, label: 'Files', sub: 'Browse and read this worktree, read only', tone: 'sky', hidden: !can.files, onPress: () => router.push({ pathname: '/files', params: { topic, name: c?.title ?? 'Worktree' } }) },
-            { Icon: SquareTerminal, label: 'Terminal', sub: 'The same terminal as on your Mac', tone: 'lavender', hidden: !can.terminal, onPress: () => router.push({ pathname: '/terminal', params: { topic, title: c?.title ?? '' } }) },
-            { Icon: History, label: 'Earlier messages', tone: 'sky', hidden: !c?.more, onPress: () => void older() },
-            { Icon: Monitor, label: 'Open on your Mac', sub: 'Code, changes and the full history', tone: 'plain', hidden: !can.openOnMac, onPress: () => void openOnMac({ topic }) },
-            { Icon: Trash2, label: 'Delete this chat', sub: 'For good, here and on your Mac', tone: 'rose', hidden: !macChats, onPress: () => setDeleting(true) },
+            { Icon: c?.agent ? markIcon(runtimeMark(c.agent.runtime)) : Bot, label: say('phoneApp.conv.agent', { label: c?.agent?.label ?? '' }), sub: say('phoneApp.conv.agentSub'), tone: 'lavender', hidden: !can.agentPicker, onPress: () => setPicking(true) },
+            { Icon: Plus, label: say('phoneApp.conv.newChat'), sub: say('phoneApp.conv.newChatSub'), tone: 'sky', hidden: !macChats, onPress: () => newMacChat((h) => router.replace(h as never)) },
+            { Icon: Square, label: askedTask ? say('phoneApp.conv.stopAsking') : say('phoneApp.conv.stopAgent'), tone: 'rose', hidden: !c?.working, onPress: () => void call(askedTask ? calls.cancelTask(askedTask) : calls.stop(topic)) },
+            { Icon: Network, label: say('phoneApp.conv.threads'), sub: threadsSummary(c?.threadFamily), tone: 'lavender', hidden: !c?.threadFamily, onPress: () => setThreadsOpen(true) },
+            { Icon: Images, label: say('phoneApp.conv.outputs'), sub: all.length ? say('phoneApp.conv.fromWorktree', { count: all.length }) : say('phoneApp.conv.nothingYet'), tone: 'sky', hidden: !all.length, onPress: () => setOutputsOpen(true) },
+            { Icon: GitMerge, label: say('phoneApp.conv.merge'), sub: say('phoneApp.conv.mergeSub'), tone: 'lavender', hidden: !can.merge, onPress: () => setMergeOpen(true) },
+            { Icon: FolderTree, label: say('phoneApp.conv.files'), sub: say('phoneApp.conv.filesSub'), tone: 'sky', hidden: !can.files, onPress: () => router.push({ pathname: '/files', params: { topic, name: c?.title ?? say('phoneApp.conv.worktree') } }) },
+            { Icon: SquareTerminal, label: say('phoneApp.conv.terminal'), sub: say('phoneApp.conv.terminalSub'), tone: 'lavender', hidden: !can.terminal, onPress: () => router.push({ pathname: '/terminal', params: { topic, title: c?.title ?? '' } }) },
+            { Icon: History, label: say('phoneApp.conv.earlier'), tone: 'sky', hidden: !c?.more, onPress: () => void older() },
+            { Icon: Monitor, label: say('phone.needs.openOnMac'), sub: say('phoneApp.conv.openOnMacSub'), tone: 'plain', hidden: !can.openOnMac, onPress: () => void openOnMac({ topic }) },
+            { Icon: Trash2, label: say('phoneApp.conv.deleteChat'), sub: say('phoneApp.conv.deleteChatSub'), tone: 'rose', hidden: !macChats, onPress: () => setDeleting(true) },
             {
               Icon: Trash2,
-              label: 'Remove',
-              sub: c?.working ? 'Stops asking, then takes it off your lists' : 'Takes it off your lists, here and on your Mac',
+              label: say('phoneApp.conv.remove'),
+              sub: c?.working ? say('phoneApp.conv.removeWorkingSub') : say('phoneApp.conv.removeSub'),
               tone: 'rose',
               hidden: !can.forget,
               onPress: () => void call(calls.forgetTask(askedTask!)).then(() => (router.canGoBack() ? router.back() : router.replace('/' as never))),
@@ -418,11 +421,12 @@ function Conversation() {
 /** Your message. Steered into Claude's turn and not read yet: dimmed, with a clock (long-press: Send now, or Cancel from 1.43); else long-press edits it (1.28). */
 function YourTurn({ t, onLongPress, chips }: { t: TurnView; onLongPress?: (() => void) | undefined; chips?: React.ReactNode }) {
   const waiting = t.steer?.waiting;
+  const say = useT();
   return (
     <Press onLongPress={onLongPress} disabled={!onLongPress} scaleTo={0.99} style={{ alignItems: 'flex-end', paddingLeft: 48 }}>
       {t.via ? (
         <T v="caption" style={{ marginBottom: 4, marginRight: 4 }}>
-          {`Sent by ${t.via}`}
+          {say('phoneApp.conv.sentBy', { who: t.via })}
         </T>
       ) : null}
       <View style={{ backgroundColor: color.card, borderRadius: 20, borderBottomRightRadius: 6, paddingVertical: 10, paddingHorizontal: 14, opacity: waiting ? 0.6 : 1 }}>
@@ -432,7 +436,7 @@ function YourTurn({ t, onLongPress, chips }: { t: TurnView; onLongPress?: (() =>
       {waiting ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4, marginRight: 4 }}>
           <Clock color={color.text2} size={12} />
-          <T v="caption">{waiting === 'stopping' ? 'Sent · your agent is stopping its step to read it' : 'Sent · your agent reads it after its current step'}</T>
+          <T v="caption">{waiting === 'stopping' ? say('phoneApp.conv.sentStopping') : say('phoneApp.conv.sentAfter')}</T>
         </View>
       ) : (
         <T v="caption" style={{ marginTop: 4, marginRight: 4 }}>
@@ -445,11 +449,12 @@ function YourTurn({ t, onLongPress, chips }: { t: TurnView; onLongPress?: (() =>
 
 /** Yours, before the Mac's view has it: sending, waiting for the Mac, or not sent (Retry, Remove). */
 function PendingTurn({ s }: { s: Pending }) {
+  const say = useT();
   return (
     <View style={{ alignItems: 'flex-end', paddingLeft: 48 }}>
       <View style={{ backgroundColor: color.card, borderRadius: 20, borderBottomRightRadius: 6, paddingVertical: 10, paddingHorizontal: 14, opacity: s.state === 'failed' ? 1 : 0.6, borderWidth: s.state === 'failed' ? 1 : 0, borderColor: color.error }}>
         <T v="body" style={{ fontSize: 15 }}>
-          {s.text || 'Photo'}
+          {s.text || say('phoneApp.conv.photo')}
         </T>
       </View>
       <SendStatus s={s} />
@@ -459,6 +464,7 @@ function PendingTurn({ s }: { s: Pending }) {
 
 /** 1.34 (BLG-466): where a dialogue between agents begins: what it's about, how far it is, and Stop / Continue. */
 function DialogueTurn({ d }: { d: NonNullable<TurnView['dialogue']> }) {
+  const say = useT();
   const act = (call: ReturnType<typeof calls.dialogueStop>): void => void store.call(call).catch((e: Error) => store.toast({ text: e.message, tone: 'error' }));
   return (
     <Card style={{ padding: 14, gap: 8 }}>
@@ -480,7 +486,7 @@ function DialogueTurn({ d }: { d: NonNullable<TurnView['dialogue']> }) {
           {d.canContinue ? (
             <Press onPress={() => act(calls.dialogueContinue(d.id))} style={{ paddingHorizontal: 14, height: 32, borderRadius: 16, justifyContent: 'center', backgroundColor: color.sunken }}>
               <T v="caption" c={color.text} style={{ fontWeight: '600' }}>
-                Continue
+                {say('phoneApp.conv.continue')}
               </T>
             </Press>
           ) : null}
@@ -488,7 +494,7 @@ function DialogueTurn({ d }: { d: NonNullable<TurnView['dialogue']> }) {
             <Press onPress={() => act(calls.dialogueStop(d.id))} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, height: 32, borderRadius: 16, backgroundColor: color.sunken }}>
               <OctagonX color={color.text2} size={14} />
               <T v="caption" c={color.text} style={{ fontWeight: '600' }}>
-                Stop
+                {say('common.stop')}
               </T>
             </Press>
           ) : null}
@@ -503,6 +509,7 @@ function ClaudeTurn({ t, all, onAgent, topic, runtime, chips }: { t: TurnView; a
   const working = t.status === 'working';
   const outs = t.outputs ?? [];
   const mins = t.endTs ? Math.max(1, Math.round((t.endTs - t.ts) / 60000)) : undefined;
+  const say = useT();
   // No card around Claude's answer: it takes the screen's full width, your bubbles sit on the right.
   return (
     <View style={{ gap: 12, paddingTop: 2 }}>
@@ -512,9 +519,9 @@ function ClaudeTurn({ t, all, onAgent, topic, runtime, chips }: { t: TurnView; a
           {t.name}
         </T>
         <T v="caption" style={{ flex: 1 }} numberOfLines={1}>
-          {t.via ? `Sent by ${t.via}${t.steps || mins ? ' · ' : ''}` : ''}
-          {t.steps ? `${t.steps} ${t.steps === 1 ? 'step' : 'steps'}` : ''}
-          {mins ? ` · ${mins} min` : ''}
+          {t.via ? `${say('phoneApp.conv.sentBy', { who: t.via })}${t.steps || mins ? ' · ' : ''}` : ''}
+          {t.steps ? say('phoneApp.conv.steps', { count: t.steps }) : ''}
+          {mins ? ` · ${say('phoneApp.conv.minutes', { count: mins })}` : ''}
         </T>
         <T v="caption">{ago(t.ts)}</T>
       </View>
@@ -527,7 +534,7 @@ function ClaudeTurn({ t, all, onAgent, topic, runtime, chips }: { t: TurnView; a
         ) : (
           <View style={{ gap: 8 }}>
             <T v="caption" style={{ fontWeight: '600' }}>
-              {t.subagents.length} sub-agents
+              {say('phoneApp.conv.subagents', { count: t.subagents.length })}
             </T>
             <AgentChips agents={t.subagents} onOpen={onAgent} />
           </View>
@@ -542,7 +549,7 @@ function ClaudeTurn({ t, all, onAgent, topic, runtime, chips }: { t: TurnView; a
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           {t.status === 'failed' ? <CircleX color={color.error} size={14} /> : <OctagonX color={color.text2} size={14} />}
           <T v="caption" c={t.status === 'failed' ? color.error : color.text2}>
-            {t.status === 'failed' ? 'Failed' : 'Stopped'}
+            {t.status === 'failed' ? say('phoneApp.conv.failed') : say('phoneApp.conv.stopped')}
           </T>
         </View>
       ) : null}
@@ -551,7 +558,7 @@ function ClaudeTurn({ t, all, onAgent, topic, runtime, chips }: { t: TurnView; a
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Clock color={color.text2} size={14} />
           <T v="caption" c={color.text2}>
-            Continues on its own at {resetWords(t.resumesAt)}
+            {say('phoneApp.conv.resumesAt', { when: resetWhen(t.resumesAt) })}
           </T>
         </View>
       ) : null}
@@ -564,12 +571,13 @@ function ClaudeTurn({ t, all, onAgent, topic, runtime, chips }: { t: TurnView; a
  * and Take Over gives it back to the chat (the terminal on the Mac closes, what was said there is here).
  */
 function TerminalBand({ label, onTakeOver }: { readonly label: string; readonly onTakeOver: () => void }) {
+  const say = useT();
   return (
     <Card tone="lavender" style={{ marginHorizontal: 16, marginBottom: 8, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
       <IconBadge Icon={SquareTerminal} tone="lavender" size={30} />
-      <T v="caption" style={{ flex: 1 }}>{`${label}’s terminal on your Mac is driving this conversation.`}</T>
-      <Press onPress={onTakeOver} accessibilityRole="button" accessibilityLabel="Take over" style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9, backgroundColor: color.card }}>
-        <T v="caption" style={{ fontWeight: '600' }}>Take Over</T>
+      <T v="caption" style={{ flex: 1 }}>{say('phoneApp.conv.terminalDriving', { label })}</T>
+      <Press onPress={onTakeOver} accessibilityRole="button" accessibilityLabel={say('phoneApp.conv.takeOverA11y')} style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9, backgroundColor: color.card }}>
+        <T v="caption" style={{ fontWeight: '600' }}>{say('phoneApp.conv.takeOver')}</T>
       </Press>
     </Card>
   );

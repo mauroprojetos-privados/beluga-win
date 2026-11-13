@@ -2,6 +2,7 @@ import { ChevronUp, Copy, SquareTerminal } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { ScrollView, Text, type TextStyle, View } from 'react-native';
 import { type AnsiName, type Span, TERMINAL_FOLD, type TermLine, readTerminal } from '../../lib/render';
+import { t as tx } from '../../lib/language';
 import { alpha, color, ink, radius, scheme, tint, type } from '../../lib/theme';
 import { Press, T } from '../ui';
 import { copy, SmallChip } from './parts';
@@ -86,13 +87,13 @@ export function TerminalView({ text }: { readonly text: string }) {
   const [all, setAll] = useState(false);
   const earlier = all ? 0 : Math.max(0, term.lines.length - TERMINAL_FOLD);
   const shown = earlier ? term.lines.slice(earlier) : term.lines;
-  const copyCommands = () => (term.commands.length ? copy(term.commands.join('\n'), term.commands.length === 1 ? 'Copied the command' : `Copied ${term.commands.length} commands`) : copy(term.copy));
+  const copyCommands = () => (term.commands.length ? copy(term.commands.join('\n'), term.commands.length === 1 ? tx('phoneParts.term.copiedOne') : tx('phoneParts.term.copiedMany', { count: term.commands.length })) : copy(term.copy));
   return (
     <View style={{ gap: 8 }}>
-      <Press haptics={false} scaleTo={1} onLongPress={copyCommands} delayLongPress={380} accessibilityHint="Long-press to copy the commands" style={{ borderRadius: radius.m - 2, backgroundColor: color.code, overflow: 'hidden', paddingVertical: 10 }}>
+      <Press haptics={false} scaleTo={1} onLongPress={copyCommands} delayLongPress={380} accessibilityHint={tx('phoneParts.term.longPress')} style={{ borderRadius: radius.m - 2, backgroundColor: color.code, overflow: 'hidden', paddingVertical: 10 }}>
         {earlier ? (
           <View style={{ paddingHorizontal: 10, paddingBottom: 8, alignSelf: 'flex-start' }}>
-            <SmallChip label={`Show ${earlier} earlier ${earlier === 1 ? 'line' : 'lines'}`} Icon={ChevronUp} onPress={() => setAll(true)} />
+            <SmallChip label={tx('phoneParts.term.earlier', { count: earlier })} Icon={ChevronUp} onPress={() => setAll(true)} />
           </View>
         ) : null}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ minWidth: '100%' }}>
@@ -104,10 +105,10 @@ export function TerminalView({ text }: { readonly text: string }) {
         </ScrollView>
       </Press>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <SmallChip label="Copy" Icon={Copy} onPress={() => copy(term.copy)} />
+        <SmallChip label={tx('phoneParts.copy')} Icon={Copy} onPress={() => copy(term.copy)} />
         <View style={{ flex: 1 }} />
         <SquareTerminal color={color.text3} size={13} />
-        <T v="caption">{term.commands.length ? `${term.commands.length} ${term.commands.length === 1 ? 'command' : 'commands'}` : `${term.lines.length} ${term.lines.length === 1 ? 'line' : 'lines'}`}</T>
+        <T v="caption">{term.commands.length ? tx('phoneParts.term.commands', { count: term.commands.length }) : tx('phoneParts.term.lines', { count: term.lines.length })}</T>
       </View>
     </View>
   );

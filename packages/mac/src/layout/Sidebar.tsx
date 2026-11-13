@@ -31,6 +31,7 @@ import { RequestsNav } from '../gateway/RequestsNav.js';
 import { WorkNav } from '../work/WorkNav.js';
 import { SentinelNav } from '../sentinel/SentinelNav.js';
 import { AssistantNav } from './AssistantNav.js';
+import { BotsSection, useHasBots } from '../bots/BotsNav.js';
 import { LaterRows, laterOf, notLater, useLater } from './later-rows.js';
 import { footerStatus } from '../views/room/connection-model.js';
 import { WorktreesNav } from '../views/worktrees/WorktreesNav.js';
@@ -40,6 +41,7 @@ import s from './Sidebar.module.css';
 import { shortcutKeys } from '../lib/shortcuts.js';
 import { CallPill } from '../call/CallLayer.js';
 import { AppMenu } from './AppMenu.js';
+import { useT } from '../lib/i18n.js';
 
 /**
  * The sidebar's top: Overview, then Work, Sentinel and Files. The rest are a click away without a row of their
@@ -92,7 +94,9 @@ function useFolderDrop(): { ref: React.RefObject<HTMLElement | null>; over: bool
 }
 
 export function Sidebar() {
+  const t = useT();
   const actions = useActions();
+  const hasBots = useHasBots();
   const drop = useFolderDrop();
   // Only what the sidebar itself shows: drawn again when that changes, not on every streamed event (KLD-48).
   const { tabs, liveChats, view, badges, categories } = useApp((state) => {
@@ -113,11 +117,11 @@ export function Sidebar() {
   const later = useLater();
   // A child thread sits under its parent's row (SubAgents.tsx); put off till later, it is in Later.
   const { nested } = useApp(threadNesting);
-  const overview = tabs.find((t) => t.kind === 'overview');
-  const files = tabs.find((t) => t.kind === 'files');
+  const overview = tabs.find((tab) => tab.kind === 'overview');
+  const files = tabs.find((tab) => tab.kind === 'files');
   return (
     <SidebarChatSelection>
-    <nav ref={drop.ref} className={cx(s.sidebar, drop.over && s.dropping)} aria-label="Sidebar">
+    <nav ref={drop.ref} className={cx(s.sidebar, drop.over && s.dropping)} aria-label={t('sidebar.label')}>
       <div className={s.titlebar} data-tauri-drag-region>
         {/* The traffic lights' place; in a browser, which has no menu bar, the menu bar's button (Settings and the rest). */}
         {inApp() ? (
@@ -128,15 +132,16 @@ export function Sidebar() {
           </span>
         )}
         <UsageButton />
-        <IconButton icon="sidebar" label="Hide sidebar" keys={shortcutKeys('toggle-sidebar')} onClick={() => setPrefs({ sidebar: false })} />
+        <IconButton icon="sidebar" label={t('sidebar.hide')} keys={shortcutKeys('toggle-sidebar')} onClick={() => setPrefs({ sidebar: false })} />
       </div>
       <SidebarSearch>
       <div className={s.scroll}>
         <section className={s.section}>
-          <AssistantNav />
+          {/* With bots of your own, Your Mac leads the Bots section instead (docs/bots.md). */}
+          {hasBots ? null : <AssistantNav />}
           <Row
             icon={<Icon name="grid" size={14} />}
-            label={overview?.label ?? 'Overview'}
+            label={overview?.label ?? t('sidebar.overview')}
             detail={overview?.hint}
             selected={view.kind === 'overview'}
             onClick={() => actions.run({ type: 'view', view: { kind: 'overview' } })}
@@ -148,8 +153,8 @@ export function Sidebar() {
           {/* Files: folders friends share with you (over the network), and the room's (BLG-205). */}
           <Row
             icon={<Icon name="folder" size={14} />}
-            label="Files"
-            detail={files?.hint ?? 'Folders friends share with you'}
+            label={t('sidebar.files')}
+            detail={files?.hint ?? t('sidebar.filesHint')}
             selected={view.kind === 'files'}
             onClick={() => actions.run({ type: 'view', view: { kind: 'files' } })}
             trailing={badges.files?.count ? <Badge count={badges.files.count} /> : null}
@@ -157,6 +162,9 @@ export function Sidebar() {
           <ActivityRow whenLive />
           <RequestsNav whenAny />
         </section>
+
+        {/* Your bots besides Your Mac (docs/bots.md): above the projects, each with what it's doing. */}
+        <BotsSection />
 
         {categories ? (
           <CategorySections />
@@ -166,11 +174,11 @@ export function Sidebar() {
 
             <Section
               id="chats"
-              title="Chats"
+              title={t('sidebar.chats')}
               action={
                 <>
                   <ChatsMenu />
-                  <IconButton icon="plus" label="New chat (not tied to a project)" onClick={() => actions.run({ type: 'new_chat', projectId: 'chats' })} />
+                  <IconButton icon="plus" label={t('sidebar.newChat')} onClick={() => actions.run({ type: 'new_chat', projectId: 'chats' })} />
                 </>
               }
             >
@@ -179,12 +187,12 @@ export function Sidebar() {
               ))}
               {/* Put off till later (Remind Me Later): folded at the bottom. */}
               <LaterRows list={laterOf(later, liveChats)} indent={0} foldKey="later:chats" />
-              {liveChats.length ? null : <Row className={s.hintRow} icon={<Icon name="plus" size={13} />} label="Talk to your agent about anything" onClick={() => actions.run({ type: 'new_chat', projectId: 'chats' })} />}
+              {liveChats.length ? null : <Row className={s.hintRow} icon={<Icon name="plus" size={13} />} label={t('sidebar.talkToAgent')} onClick={() => actions.run({ type: 'new_chat', projectId: 'chats' })} />}
             </Section>
           </>
         )}
 
-        <Section id="projects" title="Projects" action={<ProjectsAddMenu />}>
+        <Section id="projects" title={t('sidebar.projects')} action={<ProjectsAddMenu />}>
           <Projects />
           {/* Housekeeping for every project's worktrees: after the projects, out of the daily places above. */}
           <WorktreesNav />
@@ -216,6 +224,7 @@ export function Sidebar() {
  * default agent's, Codex's when it's Codex: its week, else its tightest window), and the Usage page.
  */
 function UsageButton() {
+  const t = useT();
   const actions = useActions();
   const week = useApp((st) => {
     const u = usageFor(st.self, myRuntime(st.prefs));
@@ -226,12 +235,13 @@ function UsageButton() {
   const selected = useApp((st) => st.view.kind === 'usage');
   return (
     <span className={s.usage} data-level={week === undefined ? undefined : week >= 90 ? 'high' : week >= 70 ? 'mid' : 'low'}>
-      <IconButton icon="gauge" label="Usage" keys={shortcutKeys('go-usage')} active={selected} onClick={() => actions.run({ type: 'view', view: { kind: 'usage' } })} />
+      <IconButton icon="gauge" label={t('sidebar.usage')} keys={shortcutKeys('go-usage')} active={selected} onClick={() => actions.run({ type: 'view', view: { kind: 'usage' } })} />
     </span>
   );
 }
 
 function SidebarFooter() {
+  const t = useT();
   const status = useApp((st) => st.status);
   const people = useApp((st) => st.peers.length);
   const room = useApp((st) => st.room);
@@ -243,7 +253,7 @@ function SidebarFooter() {
       <RoomStatus label={label} tone={tone} />
       <PhoneMark />
       <button type="button" className={s.invite} onClick={() => document.dispatchEvent(new CustomEvent('beluga:invite'))}>
-        Invite
+        {t('sidebar.invite')}
       </button>
     </div>
   );

@@ -12,6 +12,7 @@ import { calls } from '../lib/link/calls';
 import type { VoiceMacView } from '../lib/link/protocol';
 import { store } from '../lib/store';
 import { color } from '../lib/theme';
+import { useT } from '../lib/language';
 import { getPhoneModel, phoneGB, phoneModelReady, removePhoneModel, setVoiceSetting, voiceChoice, voiceSetting } from '../lib/voice';
 import { suggestVoice, VOICE_LANGUAGES, VOICE_MODEL_IDS, VOICE_MODELS, VOICE_PRESETS, type VoiceModelId, type VoicePresetId, type VoiceSetting, type VoiceWhere, voiceKnows, voiceSize } from '../../../src/shared/voice-models';
 
@@ -32,6 +33,7 @@ export default function Voice() {
   const { scrolled, onScroll } = useScrolled();
   const insets = useSafeAreaInsets();
   const link = useLink();
+  const t = useT();
   const macVoice = useSupports('voice');
   const [set, setSet] = useState<VoiceSetting>(voiceSetting());
   const [advanced, setAdvanced] = useState(set.preset === 'custom');
@@ -70,8 +72,8 @@ export default function Voice() {
     setGetting((g) => ({ ...g, [id]: 0 }));
     void getPhoneModel(id, (p) => setGetting((g) => ({ ...g, [id]: p })))
       .then(
-        () => store.toast({ text: `${VOICE_MODELS[id].label} is on this phone`, tone: 'ok' }),
-        (e: unknown) => store.toast({ text: e instanceof Error ? e.message : 'Couldn’t get it', tone: 'warn' }),
+        () => store.toast({ text: t('phoneApp.voice.onPhoneNow', { model: VOICE_MODELS[id].label }), tone: 'ok' }),
+        (e: unknown) => store.toast({ text: e instanceof Error ? e.message : t('phoneApp.voice.couldntGet'), tone: 'warn' }),
       )
       .finally(() =>
         setGetting((g) => {
@@ -91,11 +93,11 @@ export default function Voice() {
 
   return (
     <Screen>
-      <Header scrolled={scrolled} back title="Voice" />
+      <Header scrolled={scrolled} back title={t('phoneApp.settings.voice')} />
       <ScrollView onScroll={onScroll} scrollEventThrottle={32} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 40, gap: 20 }}>
         <Animated.View entering={FadeIn.duration(300)} style={{ gap: 8 }}>
           <T v="caption" c={color.text3} style={{ paddingHorizontal: 6 }}>
-            The microphone in Ask writes down what you say, here or on your Mac. Your words go into the field to read over before you send.
+            {t('phoneApp.voice.intro')}
           </T>
           <Card>
             {VOICE_PRESETS.map((p, i) => {
@@ -109,10 +111,10 @@ export default function Voice() {
                   Icon={PRESET_LOOK[p.id].Icon}
                   tone={off ? 'plain' : PRESET_LOOK[p.id].tone}
                   label={p.label}
-                  sub={off ? 'Needs Beluga on your Mac to be updated' : !knows ? `Doesn’t know ${language}: Whisper writes it instead` : p.sub}
+                  sub={off ? t('phoneApp.voice.needsUpdate') : !knows ? t('phoneApp.voice.doesntKnowWhisper', { language }) : p.sub}
                   right={
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      {p.id === suggested ? <Pill label="Suggested" tone="mint" /> : null}
+                      {p.id === suggested ? <Pill label={t('phoneApp.voice.suggested')} tone="mint" /> : null}
                       {on ? <Check color={color.primary} size={20} strokeWidth={2} /> : null}
                     </View>
                   }
@@ -124,36 +126,36 @@ export default function Voice() {
             })}
           </Card>
           <T v="caption" c={color.text3} style={{ paddingHorizontal: 6 }}>
-            {macVoice ? 'Suggested: your Mac’s GPU writes it down best and fastest, and this phone downloads nothing. Away from your Mac, the phone writes it down itself.' : (phoneGB() ?? 0) >= 8 ? 'Suggested: this phone has the memory for the larger model.' : 'Suggested: the small model suits this phone.'}
+            {macVoice ? t('phoneApp.voice.suggestMac') : (phoneGB() ?? 0) >= 8 ? t('phoneApp.voice.suggestLarge') : t('phoneApp.voice.suggestSmall')}
           </T>
         </Animated.View>
 
         <Card>
-          <Row first Icon={Languages} tone="butter" label="Language" sub={set.language === 'auto' ? 'It tells which you speak' : 'Only this one: a little more exact'} right={<T v="callout">{language}</T>} onPress={() => setLangSheet(true)} />
+          <Row first Icon={Languages} tone="butter" label={t('phoneApp.voice.language')} sub={set.language === 'auto' ? t('phoneApp.voice.languageAuto') : t('phoneApp.voice.languageOne')} right={<T v="callout">{language}</T>} onPress={() => setLangSheet(true)} />
         </Card>
 
         <Card>
-          <Row first Icon={SlidersHorizontal} tone="lavender" label="Choose it yourself" sub={set.preset === 'custom' ? `${set.where === 'mac' ? 'On your Mac' : 'On this phone'} · ${VOICE_MODELS[choice.model].label}` : 'Where, which model, what’s downloaded'} onPress={() => setAdvanced((a) => !a)} chevron={false} right={advanced ? <ChevronUp color={color.text3} size={18} /> : <ChevronDown color={color.text3} size={18} />} />
+          <Row first Icon={SlidersHorizontal} tone="lavender" label={t('phoneApp.voice.custom')} sub={set.preset === 'custom' ? t('phoneApp.settings.voiceSub', { where: set.where === 'mac' ? t('phoneApp.settings.voiceOnMac') : t('phoneApp.settings.voiceOnPhone'), model: VOICE_MODELS[choice.model].label }) : t('phoneApp.voice.customSub')} onPress={() => setAdvanced((a) => !a)} chevron={false} right={advanced ? <ChevronUp color={color.text3} size={18} /> : <ChevronDown color={color.text3} size={18} />} />
         </Card>
 
         {advanced ? (
           <Animated.View entering={FadeIn.duration(250)} style={{ gap: 20 }}>
             <View style={{ gap: 8 }}>
               <T v="eyebrow" style={{ paddingHorizontal: 6 }}>
-                Where
+                {t('phoneApp.voice.where')}
               </T>
               <Segments<VoiceWhere>
                 value={choice.where}
                 onChange={(where) => save({ preset: 'custom', where, model: VOICE_MODELS[choice.model].files[where] ? choice.model : 'whisper-turbo', language: set.language })}
                 options={[
-                  { key: 'phone', label: 'This phone', Icon: Smartphone },
-                  ...(macVoice ? [{ key: 'mac' as const, label: 'Your Mac', Icon: Laptop }] : []),
+                  { key: 'phone', label: t('phoneApp.voice.thisPhone'), Icon: Smartphone },
+                  ...(macVoice ? [{ key: 'mac' as const, label: t('phone.home.yourMac'), Icon: Laptop }] : []),
                 ]}
               />
             </View>
             <View style={{ gap: 8 }}>
               <T v="eyebrow" style={{ paddingHorizontal: 6 }}>
-                Model
+                {t('phoneApp.voice.model')}
               </T>
               <Card>
                 {VOICE_MODEL_IDS.filter((id) => VOICE_MODELS[id].files[choice.where]).map((id, i) => {
@@ -166,7 +168,7 @@ export default function Voice() {
                       Icon={m.kind === 'parakeet' ? Zap : Gauge}
                       tone={knows ? (m.kind === 'parakeet' ? 'lavender' : 'peach') : 'plain'}
                       label={m.label}
-                      sub={!knows ? `Doesn’t know ${language}` : `${voiceSize(m.files[choice.where]!.bytes)} · ${m.languages === 'all' ? 'every language' : 'English and 24 European languages'}`}
+                      sub={!knows ? t('phoneApp.voice.doesntKnow', { language }) : t('phoneApp.voice.modelSub', { size: voiceSize(m.files[choice.where]!.bytes), languages: m.languages === 'all' ? t('phoneApp.voice.everyLanguage') : t('phoneApp.voice.european') })}
                       right={choice.model === id ? <Check color={color.primary} size={20} strokeWidth={2} /> : null}
                       onPress={knows ? () => save({ preset: 'custom', where: choice.where, model: id, language: set.language }) : undefined}
                       chevron={false}
@@ -178,7 +180,7 @@ export default function Voice() {
 
             <View style={{ gap: 8 }}>
               <T v="eyebrow" style={{ paddingHorizontal: 6 }}>
-                On this phone
+                {t('phoneApp.settings.voiceOnPhone')}
               </T>
               <Card>
                 {VOICE_MODEL_IDS.filter((id) => VOICE_MODELS[id].files.phone).map((id, i) => {
@@ -192,7 +194,7 @@ export default function Voice() {
                       Icon={here ? Trash2 : Download}
                       tone={here ? 'rose' : 'sky'}
                       label={m.label}
-                      sub={g !== undefined ? `Getting it · ${Math.round(g * 100)}%` : here ? `${voiceSize(m.files.phone!.bytes)} here · tap to take it off` : `${voiceSize(m.files.phone!.bytes)} · tap to get it now`}
+                      sub={g !== undefined ? t('phoneApp.voice.getting', { percent: Math.round(g * 100) }) : here ? t('phoneApp.voice.here', { size: voiceSize(m.files.phone!.bytes) }) : t('phoneApp.voice.getNow', { size: voiceSize(m.files.phone!.bytes) })}
                       onPress={g !== undefined ? undefined : here ? () => removeHere(id) : () => getHere(id)}
                       chevron={false}
                     />
@@ -204,14 +206,14 @@ export default function Voice() {
             {macVoice ? (
               <View style={{ gap: 8 }}>
                 <T v="eyebrow" style={{ paddingHorizontal: 6 }}>
-                  On your Mac
+                  {t('phoneApp.settings.voiceOnMac')}
                 </T>
                 <Card>
                   {link.phase !== 'open' ? (
-                    <Row first Icon={Laptop} tone="plain" label="Your Mac is away" sub="Its models show when it’s linked" chevron={false} />
+                    <Row first Icon={Laptop} tone="plain" label={t('phoneApp.voice.macAway')} sub={t('phoneApp.voice.macAwaySub')} chevron={false} />
                   ) : (
                     !mac ? (
-                    <Row first Icon={Laptop} tone="plain" label="Looking at your Mac…" chevron={false} />
+                    <Row first Icon={Laptop} tone="plain" label={t('phoneApp.voice.looking')} chevron={false} />
                   ) : (
                     mac.models.map((m, i) => (
                       <Row
@@ -220,7 +222,7 @@ export default function Voice() {
                         Icon={m.ready ? Check : Download}
                         tone={m.ready ? 'mint' : 'sky'}
                         label={VOICE_MODELS[m.model].label}
-                        sub={m.ready ? `${voiceSize(m.bytes)} on your Mac` : m.progress !== undefined ? `Getting it on your Mac · ${Math.round(m.progress * 100)}%` : (m.error ?? `${voiceSize(m.bytes)} · tap to get it on your Mac now`)}
+                        sub={m.ready ? t('phoneApp.voice.onMac', { size: voiceSize(m.bytes) }) : m.progress !== undefined ? t('phoneApp.voice.gettingMac', { percent: Math.round(m.progress * 100) }) : (m.error ?? t('phoneApp.voice.getMacNow', { size: voiceSize(m.bytes) }))}
                         onPress={m.ready || m.progress !== undefined ? undefined : () => (haptic.tap(), void store.call<VoiceMacView>(calls.voicePrepare(m.model), { queue: false }).then(setMac, () => {}))}
                         chevron={false}
                       />
@@ -232,7 +234,7 @@ export default function Voice() {
           </Animated.View>
         ) : null}
       </ScrollView>
-      <Options visible={langSheet} onClose={() => setLangSheet(false)} title="The language you speak" options={languageOptions} />
+      <Options visible={langSheet} onClose={() => setLangSheet(false)} title={t('phoneApp.voice.languageTitle')} options={languageOptions} />
     </Screen>
   );
 }

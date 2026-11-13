@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { CodeLines } from './CodeLines.js';
 import { type DocTheme, useDocTheme } from './use-doc-theme.js';
 import m from './markdown.module.css';
+import { useT } from '../../lib/i18n.js';
 
 /**
  * ```mermaid blocks, drawn. Mermaid loads the first time a document has one (it's big), runs in
@@ -48,13 +49,14 @@ const firstLine = (err: unknown): string => (err instanceof Error ? err.message 
 
 export function Diagram({ code }: { code: string }) {
   const theme = useDocTheme();
+  const t = useT();
   const [out, setOut] = useState<{ key: string; svg?: string; error?: string }>();
   const key = `${theme}\0${code}`;
   useEffect(() => {
     let alive = true;
     renderDiagram(code, theme).then(
       (svg) => alive && setOut({ key, svg }),
-      (err: unknown) => alive && setOut({ key, error: firstLine(err) || 'This diagram has a mistake' }),
+      (err: unknown) => alive && setOut({ key, error: firstLine(err) || t('components.markdown.diagramMistake') }),
     );
     return () => {
       alive = false;
@@ -64,15 +66,15 @@ export function Diagram({ code }: { code: string }) {
   if (now?.error) {
     return (
       <figure className={m.diagramError}>
-        <figcaption>Can’t draw this diagram: {now.error}</figcaption>
+        <figcaption>{t('components.markdown.cantDraw', { error: now.error })}</figcaption>
         <CodeLines text={code} lang="mermaid" />
       </figure>
     );
   }
   return (
-    <figure className={m.diagram} role="img" aria-label="Diagram" data-ready={now?.svg ? 'true' : 'false'}>
+    <figure className={m.diagram} role="img" aria-label={t('components.markdown.diagram')} data-ready={now?.svg ? 'true' : 'false'}>
       {/* Mermaid's strict mode sanitizes what it draws. */}
-      {now?.svg ? <div className={m.diagramSvg} dangerouslySetInnerHTML={{ __html: now.svg }} /> : <div className={m.diagramLoading}>Drawing…</div>}
+      {now?.svg ? <div className={m.diagramSvg} dangerouslySetInnerHTML={{ __html: now.svg }} /> : <div className={m.diagramLoading}>{t('components.markdown.drawing')}</div>}
     </figure>
   );
 }

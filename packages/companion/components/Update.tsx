@@ -3,6 +3,7 @@ import { ScrollView, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { appUpdate } from '../modules/app-update';
 import { installUpdate, type UpdateState, useUpdate } from '../lib/update';
+import { t } from '../lib/language';
 import { color, ink } from '../lib/theme';
 import { Sheet } from './Sheet';
 import { Button, Press, T } from './ui';
@@ -17,7 +18,7 @@ const shows = (u: UpdateState): boolean => !!u.release && ['found', 'downloading
 export function UpdatePill({ onPress }: { readonly onPress: () => void }) {
   const u = useUpdate();
   if (!shows(u)) return null;
-  const label = u.phase === 'downloading' ? `Getting Beluga ${u.release!.version}…` : u.phase === 'found' ? `Beluga ${u.release!.version} is out` : `Beluga ${u.release!.version} is ready`;
+  const label = t(u.phase === 'downloading' ? 'phoneParts.update.getting' : u.phase === 'found' ? 'phoneParts.update.out' : 'phoneParts.update.ready', { version: u.release!.version });
   return (
     <Animated.View entering={FadeIn.duration(200)} style={{ marginTop: 12, flexDirection: 'row' }}>
       <Press onPress={onPress} accessibilityLabel={label} hitSlop={6} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 30, paddingHorizontal: 12, borderRadius: 15, backgroundColor: color.sunken }}>
@@ -35,8 +36,8 @@ export function UpdateSheet({ visible, onClose }: { readonly visible: boolean; r
   const r = u.release;
   const pct = Math.round((u.progress ?? 0) * 100);
   const label =
-    u.phase === 'downloading' ? `Downloading ${pct}%` : u.phase === 'installing' ? 'Installing…' : u.phase === 'confirm' ? 'Waiting for Android' : 'Update Now';
-  const sub = u.phase === 'found' ? `${Math.round((r?.size ?? 0) / 1e6)} MB to download` : u.phase === 'ready' ? 'Downloaded and checked' : undefined;
+    u.phase === 'downloading' ? t('phoneParts.update.downloading', { pct }) : u.phase === 'installing' ? t('phoneParts.update.installing') : u.phase === 'confirm' ? t('phoneParts.update.waitingAndroid') : t('phoneParts.update.now');
+  const sub = u.phase === 'found' ? t('phoneParts.update.size', { mb: Math.round((r?.size ?? 0) / 1e6) }) : u.phase === 'ready' ? t('phoneParts.update.checked') : undefined;
   const busy = u.phase === 'downloading' || u.phase === 'installing' || u.phase === 'confirm';
   return (
     <Sheet window visible={visible && !!r} onDismiss={onClose}>
@@ -44,7 +45,7 @@ export function UpdateSheet({ visible, onClose }: { readonly visible: boolean; r
         <View style={{ paddingHorizontal: 20, paddingBottom: 12, gap: 14, flexShrink: 1 }}>
           <View style={{ gap: 2 }}>
             <T v="heading" style={{ fontSize: 19 }}>
-              Beluga {r.version}
+              {t('phoneParts.update.title', { version: r.version })}
             </T>
             {sub ? <T v="caption">{sub}</T> : null}
           </View>
@@ -66,12 +67,12 @@ export function UpdateSheet({ visible, onClose }: { readonly visible: boolean; r
             </T>
           ) : null}
           {!appUpdate.canInstall() ? (
-            <T v="caption">Android asks once to let Beluga install apps. After that, updates go in with one tap, or by themselves.</T>
+            <T v="caption">{t('phoneParts.update.androidAsks')}</T>
           ) : (
-            <T v="caption">Beluga closes while it updates. Open it again to link to your Mac.</T>
+            <T v="caption">{t('phoneParts.update.closes')}</T>
           )}
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <Button quiet label="Later" onPress={onClose} flex={1} />
+            <Button quiet label={t('phone.needs.later')} onPress={onClose} flex={1} />
             <Button label={label} Icon={busy ? undefined : ArrowDownToLine} disabled={busy} onPress={() => void installUpdate()} flex={2} />
           </View>
         </View>

@@ -1,4 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import { formatDateWith } from '../../../src/shared/i18n/format';
+import { sayNeed, t } from './language';
 import type { NeedsYou, OutputView, Topic } from './link/protocol';
 import { kv } from './kv';
 import type { ComputerLinkState } from './link/computers';
@@ -78,7 +80,8 @@ export function useVisibleNeeds(items: readonly NeedsYou[] | undefined): NeedsYo
     (fn) => store.subscribe('hidden', fn),
     () => store.snapshot('hidden', () => ({})),
   );
-  return (items ?? []).filter((n) => !store.isHidden(n.id));
+  // Said in this phone's language where the Mac sent keys (1.54, docs/i18n.md).
+  return (items ?? []).filter((n) => !store.isHidden(n.id)).map(sayNeed);
 }
 
 export function useFile(ref: string | undefined, variant: 'thumb' | 'full' | 'text'): FileState | undefined {
@@ -140,10 +143,10 @@ export function useSince(ts: number | undefined): number | undefined {
 /** "42s", "3m 05s", "1h 02m". */
 export const elapsed = (s: number | undefined): string => {
   if (s === undefined) return '';
-  if (s < 60) return `${s}s`;
+  if (s < 60) return t('shared.time.secs', { s });
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ${String(s % 60).padStart(2, '0')}s`;
-  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`;
+  if (m < 60) return t('shared.time.minSecs', { m, s: String(s % 60).padStart(2, '0') });
+  return t('shared.time.hourMins', { h: Math.floor(m / 60), m: String(m % 60).padStart(2, '0') });
 };
 
 export function useOutbox(): OutboxItem[] {
@@ -161,27 +164,27 @@ export function useToasts(): Toast[] {
 }
 
 /** "as of 10:42" for a view that didn't come from the Mac this session. */
-export const asOf = (at: number): string => `as of ${new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+export const asOf = (at: number): string => t('shared.time.asOf', { time: formatDateWith(at, { hour: '2-digit', minute: '2-digit' }) });
 
 export function ago(ts: number | undefined, now = Date.now()): string {
   if (!ts) return '';
   const s = Math.max(0, Math.round((now - ts) / 1000));
-  if (s < 45) return 'now';
+  if (s < 45) return t('helpers.ago.now');
   const m = Math.round(s / 60);
-  if (m < 60) return `${m}m`;
+  if (m < 60) return t('helpers.age.m', { n: m });
   const h = Math.round(m / 60);
-  if (h < 24) return `${h}h`;
-  return `${Math.round(h / 24)}d`;
+  if (h < 24) return t('helpers.age.h', { n: h });
+  return t('helpers.age.d', { n: Math.round(h / 24) });
 }
 
 export function until(ts: number | undefined, now = Date.now()): string {
   if (!ts) return '';
   const m = Math.max(0, Math.round((ts - now) / 60000));
-  if (m < 60) return `${m} min`;
+  if (m < 60) return t('shared.time.min', { m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h} h ${m % 60} min`;
+  if (h < 24) return t('shared.time.hMin', { h, m: m % 60 });
   const d = Math.floor(h / 24);
-  return `${d} d ${h % 24} h`;
+  return t('shared.time.dH', { d, h: h % 24 });
 }
 
 /**

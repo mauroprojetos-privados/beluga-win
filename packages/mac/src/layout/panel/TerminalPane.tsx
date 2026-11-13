@@ -15,6 +15,7 @@ import { TerminalTab } from '../../views/TerminalTab.js';
 import { Xterm } from '../../views/Xterm.js';
 import t from '../../views/terminal.module.css';
 import s from './panel.module.css';
+import { useT } from '../../lib/i18n.js';
 
 /** How recently ⌘J must have asked for the keyboard for a terminal that just appeared to take it. */
 const FOCUS_WINDOW_MS = 800;
@@ -66,40 +67,42 @@ function useWorkspaceTerminals(wsId: string): Tabbed {
 
 /** The window's Run and Setup for a workspace, small enough for the terminal's bar. */
 function WorkspaceScripts({ wsId }: { wsId: string }) {
+  const tl = useT();
   const actions = useActions();
   const project = useApp((st) => st.projects.find((p) => p.workspaces.some((w) => w.id === wsId)));
   const runOn = useApp((st) => runId(wsId) in st.terminals && !(runId(wsId) in st.termExits));
   if (!project?.scripts?.run) return null;
   return runOn ? (
-    <IconButton icon="stop" label="Stop running" keys={chordLabel('Cmd+R')} onClick={() => actions.run({ type: 'ws', id: wsId, action: 'stop_run' })} />
+    <IconButton icon="stop" label={tl('layout.term.stopRunning')} keys={chordLabel('Cmd+R')} onClick={() => actions.run({ type: 'ws', id: wsId, action: 'stop_run' })} />
   ) : (
-    <IconButton icon="play" label={`Run · ${project.scripts.run.command}`} keys={chordLabel('Cmd+R')} onClick={() => actions.run({ type: 'ws', id: wsId, action: 'run' })} />
+    <IconButton icon="play" label={tl('layout.term.run', { command: project.scripts.run.command })} keys={chordLabel('Cmd+R')} onClick={() => actions.run({ type: 'ws', id: wsId, action: 'run' })} />
   );
 }
 
 /** The terminal's ⋯: where ⌘J shows it, moving it there now, the full-size view, the project's commands. */
 function useMenuItems(where: 'drawer' | 'panel', wsId: string | undefined): ActionItem[] {
+  const tl = useT();
   const { client, ui } = useBeluga();
   const actions = useActions();
   const prefs = usePrefs();
   const project = useApp((st) => (wsId ? st.projects.find((p) => p.workspaces.some((w) => w.id === wsId)) : undefined));
   const other = where === 'drawer' ? 'panel' : 'drawer';
   return [
-    { label: other === 'panel' ? 'Move to the Right Panel' : 'Move to the Bottom Drawer', icon: other === 'panel' ? 'panelRight' : 'panelBottom', onSelect: () => moveTerminal(client.store.getState(), other) },
+    { label: other === 'panel' ? tl('layout.term.moveToPanel') : tl('layout.term.moveToDrawer'), icon: other === 'panel' ? 'panelRight' : 'panelBottom', onSelect: () => moveTerminal(client.store.getState(), other) },
     {
-      label: `${chordLabel('Cmd+J')} Opens the Terminal`,
+      label: tl('layout.term.opensTerminal', { keys: chordLabel('Cmd+J') }),
       separate: true,
       onSelect: () => undefined,
       submenu: [
-        { label: 'In the Bottom Drawer', checked: prefs.termIn === 'drawer', onSelect: () => setPrefs({ termIn: 'drawer' }) },
-        { label: 'In the Right Panel', checked: prefs.termIn === 'panel', onSelect: () => setPrefs({ termIn: 'panel' }) },
+        { label: tl('layout.term.inDrawer'), checked: prefs.termIn === 'drawer', onSelect: () => setPrefs({ termIn: 'drawer' }) },
+        { label: tl('layout.term.inPanel'), checked: prefs.termIn === 'panel', onSelect: () => setPrefs({ termIn: 'panel' }) },
       ],
     },
     wsId
-      ? { label: 'Show Full Size', icon: 'expand', separate: true, onSelect: () => openFocus('terminal', wsId) }
-      : { label: 'Open the Terminal View', icon: 'expand', separate: true, onSelect: () => actions.run({ type: 'view', view: { kind: 'terminal' } }) },
-    ...(project?.root ? [{ label: 'Commands…', icon: 'terminal' as const, onSelect: () => ui.openMenu({ kind: 'scripts', projectId: project.id }) }] : []),
-    { label: 'Terminal Settings…', icon: 'gear', onSelect: () => ui.patch({ settings: 'terminal' }) },
+      ? { label: tl('layout.term.showFullSize'), icon: 'expand', separate: true, onSelect: () => openFocus('terminal', wsId) }
+      : { label: tl('layout.term.openView'), icon: 'expand', separate: true, onSelect: () => actions.run({ type: 'view', view: { kind: 'terminal' } }) },
+    ...(project?.root ? [{ label: tl('layout.term.commands'), icon: 'terminal' as const, onSelect: () => ui.openMenu({ kind: 'scripts', projectId: project.id }) }] : []),
+    { label: tl('layout.term.settings'), icon: 'gear', onSelect: () => ui.patch({ settings: 'terminal' }) },
   ];
 }
 
@@ -126,6 +129,7 @@ function useTabbed(wsId: string | undefined): Tabbed {
  * your own) as tabs, + for another, and the terminal itself filling the rest.
  */
 export function TerminalPane({ where, onClose }: { where: 'drawer' | 'panel'; onClose?: () => void }) {
+  const tl = useT();
   const view = useApp((st) => st.view);
   const exits = useApp((st) => st.termExits);
   const prefs = usePrefs();
@@ -156,9 +160,9 @@ export function TerminalPane({ where, onClose }: { where: 'drawer' | 'panel'; on
   // Restarted with new variables: a fresh terminal on the new program.
   const stale = useEnvStale(key);
   return (
-    <section className={s.term} aria-label="Terminal">
+    <section className={s.term} aria-label={tl('layout.toolbar.title.terminal')}>
       <div className={s.termBar}>
-        <div className={s.termTabs} role="tablist" aria-label="Terminals">
+        <div className={s.termTabs} role="tablist" aria-label={tl('layout.term.terminals')}>
           {tabbed.tabs.map((x) => (
             <TerminalTab
               key={x.key}
@@ -171,26 +175,26 @@ export function TerminalPane({ where, onClose }: { where: 'drawer' | 'panel'; on
               onPick={() => tabbed.pick(x.key)}
               {...(x.closable ? { onClose: () => tabbed.close(x.key) } : {})}
               before={x.running ? <Dot tone="ok" /> : x.exit !== undefined ? <Dot tone={x.exit === 0 ? 'muted' : 'error'} /> : <Dot tone="muted" />}
-              after={x.exit !== undefined && !x.key.startsWith('shell:') ? <span className={t.exit}>{x.exit === 0 ? 'done' : `exit ${x.exit ?? '?'}`}</span> : null}
+              after={x.exit !== undefined && !x.key.startsWith('shell:') ? <span className={t.exit}>{x.exit === 0 ? tl('layout.term.done') : tl('layout.term.exit', { code: x.exit ?? '?' })}</span> : null}
             />
           ))}
-          <IconButton icon="plus" label="New shell" className={s.termAdd} onClick={tabbed.add} />
+          <IconButton icon="plus" label={tl('layout.term.newShell')} className={s.termAdd} onClick={tabbed.add} />
         </div>
         {wsId ? <WorkspaceScripts wsId={wsId} /> : null}
         <ActionsDropdown items={items}>
-          <IconButton icon="more" label="Terminal options" />
+          <IconButton icon="more" label={tl('layout.term.options')} />
         </ActionsDropdown>
-        {onClose ? <IconButton icon="x" label="Close the drawer" keys={chordLabel('Cmd+J')} onClick={onClose} /> : null}
+        {onClose ? <IconButton icon="x" label={tl('layout.term.closeDrawer')} keys={chordLabel('Cmd+J')} onClick={onClose} /> : null}
       </div>
       <div ref={body} className={s.termBody}>
         {elsewhere ? (
           <Empty
             icon={elsewhere === 'drawer' ? 'panelBottom' : 'expand'}
-            title={elsewhere === 'drawer' ? 'The terminal is in the drawer' : 'The terminal is showing full size'}
-            detail={elsewhere === 'drawer' ? 'It shows in one place at a time.' : undefined}
+            title={elsewhere === 'drawer' ? tl('layout.term.inTheDrawer') : tl('layout.term.fullSize')}
+            detail={elsewhere === 'drawer' ? tl('layout.term.onePlace') : undefined}
             action={
               <Button size="small" onClick={() => (elsewhere === 'drawer' ? setPrefs({ drawer: false }) : closeFocus())}>
-                Show It Here
+                {tl('layout.term.showHere')}
               </Button>
             }
           />
@@ -201,7 +205,7 @@ export function TerminalPane({ where, onClose }: { where: 'drawer' | 'panel'; on
             {key in exits && tabbed.restart ? (
               <div className={t.restart}>
                 <Button size="small" onClick={tabbed.restart}>
-                  Start It Again
+                  {tl('layout.term.startAgain')}
                 </Button>
               </div>
             ) : null}

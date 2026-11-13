@@ -1,5 +1,6 @@
 import { type ThreadChildren, type ThreadState, isThreadWorking, threadRank } from '../../../src/shared/threads';
 import type { ConvSummary, ThreadCountView, ThreadFamilyView } from './link/protocol';
+import { t } from '../../../src/shared/i18n/index';
 
 /** Child threads as the phone lists them and asks about them (1.47). Pure: no React. */
 
@@ -42,12 +43,9 @@ export function branchChildren(supported: boolean, family: ThreadCountView | und
 
 /** The one question about a chat's threads, in the Mac's words (ThreadsChoice.tsx). */
 export function threadsQuestion(action: 'archive' | 'delete', family: ThreadCountView): { readonly label: string; readonly detail: string } {
-  const them = `its ${family.count} ${family.count === 1 ? 'thread' : 'threads'}`;
-  const working = family.running ? ` ${family.running} ${family.running === 1 ? 'is' : 'are'} working now and would stop.` : '';
-  const keep = 'Unticked, they stay as chats of their own and keep working.';
-  return action === 'archive'
-    ? { label: `Also archive ${them}`, detail: `Restoring links them again.${working} ${keep}` }
-    : { label: `Also delete ${them}`, detail: `Deleting a thread loses its folder, its branch and its conversation for good.${working} ${keep}` };
+  const working = family.running ? t('shared.threads.working', { count: family.running }) : '';
+  const detail = [t(action === 'archive' ? 'shared.threads.archiveDetail' : 'shared.threads.deleteDetail'), working, t('shared.threads.keep')].filter(Boolean).join(' ');
+  return { label: t(action === 'archive' ? 'shared.threads.alsoArchive' : 'shared.threads.alsoDelete', { count: family.count }), detail };
 }
 
 /** One row of a chat's Threads sheet: a child thread, or a native sub-agent (read-only: no Stop, no page). */

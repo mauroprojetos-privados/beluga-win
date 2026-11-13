@@ -10,6 +10,8 @@ import { signalOf } from '../layout/attention-model.js';
 import { SignalMark } from '../layout/signal-marks.js';
 import s from './assistant-tabs.module.css';
 import { thisComputer } from '../lib/os-words.js';
+import { t } from '@beluga/shared/i18n/index.js';
+import { useT } from '../lib/i18n.js';
 
 /**
  * Your Mac's chats as tabs (BLG-102, core/assistant): several conversations at once, one open.
@@ -21,6 +23,7 @@ export function AssistantTabs() {
   const api = useApi();
   const actions = useActions();
   const { client } = useBeluga();
+  const t = useT();
   const all = useApp((st) => st.assistant.chats, sameDeep);
   const active = useApp((st) => st.assistant.active);
   const shown = useApp((st) => (st.view.kind === 'assistant' ? st.view.chat : undefined));
@@ -34,13 +37,13 @@ export function AssistantTabs() {
   if (!chats.length) return null;
   const fail = (err: unknown): void => toast(client, err instanceof Error ? err.message : String(err), 'error');
   return (
-    <div className={s.bar} role="tablist" aria-label={`${ASSISTANT_TITLE}’s chats`}>
+    <div className={s.bar} role="tablist" aria-label={t('chat.assistant.chats', { name: ASSISTANT_TITLE })}>
       <div className={s.tabs}>
         {chats.map((c) => (
           <ChatTab key={c.id} chat={c} open={c.id === open} only={chats.length === 1} onOpen={() => actions.run({ type: 'view', view: { kind: 'assistant', chat: c.id } })} onDelete={(title, last) => confirmDelete(title, last, () => api.assistant.deleteChat(c.id).catch(fail))} />
         ))}
       </div>
-      <IconButton icon="plus" label={`New chat with ${ASSISTANT_TITLE}`} className={s.add} onClick={() => api.assistant.newChat().catch(fail)} />
+      <IconButton icon="plus" label={t('chat.assistant.newChat', { name: ASSISTANT_TITLE })} className={s.add} onClick={() => api.assistant.newChat().catch(fail)} />
     </div>
   );
 }
@@ -49,6 +52,7 @@ function ChatTab({ chat, open, only, onOpen, onDelete }: { chat: AssistantChat; 
   const title = useApp((st) => assistantChatTitle(chat.channel, st.log));
   const said = useApp((st) => st.log.some((l) => l.channel === chat.channel));
   const signal = useApp((st) => signalOf(st, chat.channel), sameDeep);
+  const t = useT();
   // The only chat, still empty: nothing to delete.
   const deletable = !only || said;
   return (
@@ -60,7 +64,7 @@ function ChatTab({ chat, open, only, onOpen, onDelete }: { chat: AssistantChat; 
           {open ? null : <SignalMark signal={signal} />}
         </button>
       </Tip>
-      {deletable ? <IconButton icon="x" label={only ? 'Delete this chat and start over' : 'Delete this chat'} className={s.close} onClick={() => onDelete(title, only)} /> : null}
+      {deletable ? <IconButton icon="x" label={only ? t('chat.assistant.deleteOver') : t('chat.assistant.delete')} className={s.close} onClick={() => onDelete(title, only)} /> : null}
     </div>
   );
 }
@@ -68,9 +72,9 @@ function ChatTab({ chat, open, only, onOpen, onDelete }: { chat: AssistantChat; 
 function confirmDelete(title: string, last: boolean, run: () => void): void {
   openSheet({
     kind: 'confirm',
-    title: `Delete “${title}”?`,
-    message: `Its messages go from ${thisComputer()} and your phone for good, and your agent forgets the conversation. Files it made stay in ${ASSISTANT_TITLE}’s folder.${last ? ' A fresh chat takes its place.' : ''}`,
-    confirm: 'Delete Chat',
+    title: t('chat.assistant.deleteTitle', { title }),
+    message: t(last ? 'chat.assistant.deleteMessageLast' : 'chat.assistant.deleteMessage', { computer: thisComputer(), name: ASSISTANT_TITLE }),
+    confirm: t('chat.assistant.deleteConfirm'),
     destructive: true,
     run,
   });

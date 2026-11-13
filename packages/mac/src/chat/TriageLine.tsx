@@ -7,6 +7,7 @@ import { unsettle, wake } from '../layout/row-triage-actions.js';
 import { useApp, useBeluga } from '../lib/beluga.js';
 import { sameDeep } from '../lib/stable.js';
 import { useClock } from '../lib/window-active.js';
+import { useT } from '../lib/i18n.js';
 import s from './TriageLine.module.css';
 
 /**
@@ -16,6 +17,7 @@ import s from './TriageLine.module.css';
  */
 export function TriageLine({ channel }: { channel: string }) {
   const { client } = useBeluga();
+  const t = useT();
   const line = useApp((state) => {
     const key = triageKey(state, channel);
     if (!key) return undefined;
@@ -30,15 +32,15 @@ export function TriageLine({ channel }: { channel: string }) {
   const now = useClock(line !== undefined, 30_000);
   if (!line) return null;
   return (
-    <div className={s.line} role="status" aria-label="Chat category">
-      <span className={s.words}>{line.kind === 'settled' ? settledWords(line.settled, line.idleDays, now) : remindLabel(line.until, now) || 'Reminds you now'}</span>
+    <div className={s.line} role="status" aria-label={t('chat.triage.aria')}>
+      <span className={s.words}>{line.kind === 'settled' ? settledWords(line.settled, line.idleDays, now) : remindLabel(line.until, now) || t('chat.triage.remindsNow')}</span>
       {line.kind === 'settled' ? (
         <Button size="small" onClick={() => void unsettle(client, channel)}>
-          Un-settle
+          {t('chat.triage.unsettle')}
         </Button>
       ) : (
         <Button size="small" onClick={() => void wake(client, channel)}>
-          Show Again Now
+          {t('chat.triage.showAgain')}
         </Button>
       )}
     </div>

@@ -12,6 +12,7 @@ import { machineClientOf } from '../machines/pane-clients.js';
 import type { RemoteSource } from '../machines/remote-work.js';
 import { useRemoteSources } from '../machines/use-remote.js';
 import s from './SidebarSearch.module.css';
+import { useT } from '../lib/i18n.js';
 
 /**
  * The field at the top of the sidebar: finds a conversation by name, branch, PR or project at once,
@@ -19,6 +20,7 @@ import s from './SidebarSearch.module.css';
  * the place of `children`, which stay mounted, so their folds and scroll come back as they were.
  */
 export function SidebarSearch({ children }: { children: React.ReactNode }) {
+  const t = useT();
   const api = useApi();
   const actions = useActions();
   const { ui } = useBeluga();
@@ -43,11 +45,11 @@ export function SidebarSearch({ children }: { children: React.ReactNode }) {
   }, []);
   useEffect(() => {
     if (!searchesMessages(q)) return;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       void api.workbench.search(q);
       ui.patch({ searchQuery: q });
     }, MESSAGE_SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [q, api, ui]);
   useEffect(() => setSelected(0), [q]);
   useEffect(() => {
@@ -79,8 +81,8 @@ export function SidebarSearch({ children }: { children: React.ReactNode }) {
           ref={input}
           className={cx(s.input, 'selectable')}
           value={query}
-          placeholder="Search chats and messages"
-          aria-label="Search chats and messages"
+          placeholder={t('sidebar.search.placeholder')}
+          aria-label={t('sidebar.search.placeholder')}
           title={shortcutKeys('sidebar-search')}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
@@ -98,7 +100,7 @@ export function SidebarSearch({ children }: { children: React.ReactNode }) {
             }
           }}
         />
-        {query ? <IconButton icon="x" label="Clear search" className={s.clear} onClick={clear} /> : null}
+        {query ? <IconButton icon="x" label={t('sidebar.search.clear')} className={s.clear} onClick={clear} /> : null}
       </div>
       {q ? <Results list={list} results={results} selected={selected} looking={looking} open={open} /> : null}
       <div className={q ? s.kept : s.shown}>{children}</div>
@@ -110,15 +112,16 @@ function Results({ list, results, selected, looking, open }: { list: React.RefOb
   const firstMessage = results.findIndex((r) => r.type === 'message');
   const firstRemoteMessage = results.findIndex((r) => r.type === 'remote' && r.match.hit);
   const onlyAll = results.length === 1;
+  const t = useT();
   return (
-    <div ref={list} className={s.results} role="listbox" aria-label="Search results">
-      {onlyAll && !looking ? <div className={s.note}>No chats match.</div> : null}
+    <div ref={list} className={s.results} role="listbox" aria-label={t('sidebar.search.results')}>
+      {onlyAll && !looking ? <div className={s.note}>{t('sidebar.search.noChats')}</div> : null}
       {results.map((r, i) => (
         <div key={r.key}>
-          {i === firstMessage || (firstMessage < 0 && i === firstRemoteMessage) ? <div className={s.heading}>Messages</div> : null}
-          {r.type === 'all' && looking ? <div className={s.note}>Searching messages…</div> : null}
+          {i === firstMessage || (firstMessage < 0 && i === firstRemoteMessage) ? <div className={s.heading}>{t('sidebar.search.messages')}</div> : null}
+          {r.type === 'all' && looking ? <div className={s.note}>{t('sidebar.search.searching')}</div> : null}
           <div role="option" aria-selected={i === selected} className={cx(s.result, i === selected && s.resultOn)} onClick={() => open(r)}>
-            {r.type === 'chat' ? <ChatResult label={r.chat.label} detail={r.chat.detail} /> : r.type === 'message' ? <MessageResult result={r} /> : r.type === 'remote' ? <RemoteResult match={r.match} /> : <span className={s.all}>See All in Search</span>}
+            {r.type === 'chat' ? <ChatResult label={r.chat.label} detail={r.chat.detail} /> : r.type === 'message' ? <MessageResult result={r} /> : r.type === 'remote' ? <RemoteResult match={r.match} /> : <span className={s.all}>{t('sidebar.search.seeAll')}</span>}
           </div>
         </div>
       ))}

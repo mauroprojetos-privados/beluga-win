@@ -1,4 +1,5 @@
 import { editDiff } from './line-diff.js';
+import { type Key, type Params, t, translator } from './i18n/index.js';
 import { underPart } from './path-inside.js';
 
 /**
@@ -32,7 +33,6 @@ const base = (p: string): string => p.replace(/[\\/]+$/, '').split(/[\\/]/).pop(
 const rel = (p: string, cwd?: string): string => (cwd ? underPart(cwd, p) : undefined) ?? p;
 const both = (done: string, doing: string, extra: Omit<HumanStep, 'done' | 'doing'> = {}): HumanStep => ({ done, doing, ...extra });
 const same = (text: string, extra: Omit<HumanStep, 'done' | 'doing'> = {}): HumanStep => both(text, text, extra);
-const possessive = (name: string): string => `${name}’s`;
 
 /** "+12 −3" for an edit (from the text it replaced), or "" when it can't tell. */
 function editCounts(tool: string, input: Readonly<Record<string, unknown>>): string {
@@ -63,130 +63,135 @@ function commandOf(input: Readonly<Record<string, unknown>>): string {
 /** The words for an MCP tool's name: "query_docs" → "query docs". */
 const spaced = (name: string): string => name.replace(/[_-]+/g, ' ').trim();
 
+/** Words by key: English for the step records the core keeps (humanizeTool), the app's language on a screen (humanizeLine). */
+type Say = (key: Key, params?: Params) => string;
+const english: Say = translator('en');
+const pair = (w: Say, key: string, params?: Params, extra: Omit<HumanStep, 'done' | 'doing'> = {}): HumanStep => both(w(`shared.steps.${key}.done` as Key, params), w(`shared.steps.${key}.doing` as Key, params), extra);
+const one = (w: Say, key: string, params?: Params, extra: Omit<HumanStep, 'done' | 'doing'> = {}): HumanStep => same(w(`shared.steps.${key}` as Key, params), extra);
+
 /** Beluga's own tools (the room, and asking other people's Claudes). */
-function belugaTool(name: string, input: Readonly<Record<string, unknown>>): HumanStep | undefined {
+function belugaTool(name: string, input: Readonly<Record<string, unknown>>, w: Say): HumanStep | undefined {
   const person = str(input.person) || str(input.peer);
-  const who = person || 'someone';
+  const who = person || w('shared.steps.someone');
+  const them = person ? { person } : {};
+  const task = str(input.task) ? { task: str(input.task) } : {};
   switch (name) {
     case 'who_can':
-      return both('Looked for who can help', 'Looking for who can help');
+      return pair(w, 'whoCan');
     case 'ask_person':
     case 'ask_agent': {
       const ask = firstLine(str(input.ask) || str(input.prompt), 64);
-      return both(`Asked ${possessive(who)} agent${ask ? `: ${ask}` : ''}`, `Asking ${possessive(who)} agent${ask ? `: ${ask}` : ''}`, person ? { person } : {});
+      return pair(w, 'ask', { who, rest: ask ? `: ${ask}` : '' }, them);
     }
     case 'wait_for':
-      return both('Heard back', 'Waiting for an answer', { wait: true, ...(str(input.task) ? { task: str(input.task) } : {}) });
+      return pair(w, 'waitFor', undefined, { wait: true, ...task });
     case 'check':
-      return same('Checked how the task is going', str(input.task) ? { task: str(input.task) } : {});
+      return one(w, 'check', undefined, task);
     case 'cancel':
-      return same('Cancelled the task', str(input.task) ? { task: str(input.task) } : {});
+      return one(w, 'cancel', undefined, task);
     case 'answer_question':
-      return both(input.skip === true ? 'Let them decide' : 'Answered their agent’s question', 'Answering their agent’s question', str(input.task) ? { task: str(input.task) } : {});
+      return both(w(input.skip === true ? 'shared.steps.answerSkip' : 'shared.steps.answer.done'), w('shared.steps.answer.doing'), task);
     case 'run_on':
     case 'run_on_peer': {
       const cmd = clip(str(input.command), 56);
-      return both(`Ran on ${possessive(who)} Mac${cmd ? `: ${cmd}` : ''}`, `Running on ${possessive(who)} Mac${cmd ? `: ${cmd}` : ''}`, person ? { person } : {});
+      return pair(w, 'runOn', { who, rest: cmd ? `: ${cmd}` : '' }, them);
     }
     case 'get_file':
-    case 'get_peer_file': {
-      const file = base(str(input.path)) || 'a file';
-      return both(`Got ${file} from ${possessive(who)} Mac`, `Getting ${file} from ${possessive(who)} Mac`, person ? { person } : {});
-    }
+    case 'get_peer_file':
+      return pair(w, 'getFile', { file: base(str(input.path)) || w('shared.steps.aFile'), who }, them);
     case 'send_file':
-      return both(`Sent ${base(str(input.path)) || 'a file'} to ${who}`, `Sending ${base(str(input.path)) || 'a file'} to ${who}`, person ? { person } : {});
+      return pair(w, 'sendFile', { file: base(str(input.path)) || w('shared.steps.aFile'), who }, them);
     case 'list_peers':
-      return both('Looked at who’s here', 'Looking at who’s here');
+      return pair(w, 'listPeers');
     case 'list_peer_files':
-      return both(`Looked at ${possessive(who)} files`, `Looking at ${possessive(who)} files`, person ? { person } : {});
+      return pair(w, 'listPeerFiles', { who }, them);
     case 'read_peer_file':
-      return both(`Read ${base(str(input.path))} on ${possessive(who)} Mac`, `Reading ${base(str(input.path))} on ${possessive(who)} Mac`, person ? { person } : {});
+      return pair(w, 'readPeerFile', { file: base(str(input.path)), who }, them);
     case 'send_chat':
-      return same(`Posted in the chat${str(input.text) ? `: ${firstLine(str(input.text), 60)}` : ''}`);
+      return one(w, 'sendChat', { rest: str(input.text) ? `: ${firstLine(str(input.text), 60)}` : '' });
     case 'write_report':
-      return both(`Wrote the report${str(input.title) ? ` “${clip(str(input.title), 60)}”` : ''}`, 'Writing a report');
+      return both(w('shared.steps.writeReport.done', { rest: str(input.title) ? ` “${clip(str(input.title), 60)}”` : '' }), w('shared.steps.writeReport.doing'));
     case 'continue_in_worktree':
-      return both('Moved this to a new worktree', 'Moving this to a new worktree');
+      return pair(w, 'continueWorktree');
     case 'screenshot':
-      return both(str(input.app) ? `Looked at ${str(input.app)}` : 'Took a screenshot', 'Taking a screenshot');
+      return both(str(input.app) ? w('shared.steps.screenshotApp', { app: str(input.app) }) : w('shared.steps.screenshot.done'), w('shared.steps.screenshot.doing'));
     case 'device_info':
-      return both('Looked at this Mac’s details', 'Looking at this Mac’s details');
+      return pair(w, 'deviceInfo');
     default:
       return undefined;
   }
 }
 
-/** A tool call in words, from its name and input. Paths read relative to `cwd`. */
+/** A tool call in words, from its name and input. Paths read relative to `cwd`. English: the core keeps these on its step records. */
 export function humanizeTool(tool: string, input: Readonly<Record<string, unknown>> = {}, cwd?: string): HumanStep {
+  return toolWords(tool, input, cwd, english);
+}
+
+function toolWords(tool: string, input: Readonly<Record<string, unknown>>, cwd: string | undefined, w: Say): HumanStep {
   const file = rel(str(input.file_path) || str(input.notebook_path) || str(input.path), cwd);
+  const aFile = file || w('shared.steps.aFile');
   switch (tool) {
     case 'Read':
-      return both(`Read ${file || 'a file'}`, `Reading ${file || 'a file'}`);
-    case 'Write': {
-      const n = editCounts(tool, input);
-      return both(`Wrote ${file || 'a file'}${n ? ` (${n})` : ''}`, `Writing ${file || 'a file'}`);
-    }
+      return pair(w, 'read', { file: aFile });
+    case 'Write':
     case 'Edit':
     case 'MultiEdit': {
       const n = editCounts(tool, input);
-      return both(`Edited ${file || 'a file'}${n ? ` (${n})` : ''}`, `Editing ${file || 'a file'}`);
+      return pair(w, tool === 'Write' ? 'write' : 'edit', { file: aFile, rest: n ? ` (${n})` : '' });
     }
     case 'NotebookEdit':
-      return both(`Edited ${file || 'a notebook'}`, `Editing ${file || 'a notebook'}`);
+      return pair(w, 'edit', { file: file || w('shared.steps.aNotebook'), rest: '' });
     case 'Bash': {
       const cmd = commandOf(input);
-      return both(cmd ? `Ran ${cmd}` : 'Ran a command', cmd ? `Running ${cmd}` : 'Running a command');
+      return cmd ? pair(w, 'ran', { cmd }) : pair(w, 'ranAny');
     }
     case 'BashOutput':
-      return both('Checked a background command', 'Checking a background command');
+      return pair(w, 'bashOutput');
     case 'KillShell':
     case 'KillBash':
-      return same('Stopped a background command');
+      return one(w, 'killShell');
     case 'Grep': {
       const pattern = clip(str(input.pattern), 48);
-      const where = file ? ` in ${file}` : '';
-      return both(`Searched for ‘${pattern}’${where}`, `Searching for ‘${pattern}’${where}`);
+      return file ? pair(w, 'grepIn', { pattern, file }) : pair(w, 'grep', { pattern });
     }
     case 'Glob':
-      return both(`Found files matching ${clip(str(input.pattern), 48)}`, `Finding files matching ${clip(str(input.pattern), 48)}`);
+      return pair(w, 'glob', { pattern: clip(str(input.pattern), 48) });
     case 'LS':
-      return both(`Listed ${file || 'a folder'}`, `Listing ${file || 'a folder'}`);
+      return pair(w, 'ls', { file: file || w('shared.steps.aFolder') });
     case 'WebFetch': {
       const url = str(input.url).replace(/^https?:\/\//, '').replace(/\/$/, '');
-      return both(`Read ${clip(url, 60) || 'a web page'}`, `Reading ${clip(url, 60) || 'a web page'}`);
+      return pair(w, 'read', { file: clip(url, 60) || w('shared.steps.aWebPage') });
     }
     case 'WebSearch':
-      return both(`Searched the web for ‘${clip(str(input.query), 56)}’`, `Searching the web for ‘${clip(str(input.query), 56)}’`);
+      return pair(w, 'webSearch', { query: clip(str(input.query), 56) });
     case 'Task':
-    case 'Agent': {
-      const what = clip(str(input.description) || str(input.subagent_type) || 'a task', 60);
-      return both(`Started a sub-agent: ${what}`, `Starting a sub-agent: ${what}`);
-    }
+    case 'Agent':
+      return pair(w, 'subAgent', { what: clip(str(input.description) || str(input.subagent_type) || w('shared.steps.aTask'), 60) });
     case 'SendMessage': {
-      const to = str(input.to) || str(input.recipient) || 'an agent';
+      const to = str(input.to) || str(input.recipient) || w('shared.steps.anAgent');
       const about = firstLine(str(input.summary) || str(input.message), 56);
-      return both(`Messaged ${to}${about ? `: ${about}` : ''}`, `Messaging ${to}${about ? `: ${about}` : ''}`);
+      return pair(w, 'message', { to, rest: about ? `: ${about}` : '' });
     }
     case 'TodoWrite':
-      return both('Updated the plan', 'Updating the plan');
+      return pair(w, 'todo');
     case 'ToolSearch':
-      return both('Looked up its tools', 'Looking up its tools');
+      return pair(w, 'toolSearch');
     case 'Skill':
-      return both(`Used the ${str(input.skill) || 'a'} skill`, `Using the ${str(input.skill) || 'a'} skill`);
+      return str(input.skill) ? pair(w, 'skill', { skill: str(input.skill) }) : pair(w, 'skillAny');
     case 'AskUserQuestion':
-      return both('Asked you a question', 'Asking you a question');
+      return pair(w, 'askUser');
     case 'ExitPlanMode':
-      return both('Proposed a plan', 'Proposing a plan');
+      return pair(w, 'exitPlan');
     default: {
       const mcp = /^mcp__(.+?)__(.+)$/.exec(tool);
       if (mcp) {
         // Steps kept from before the rename name the servers klaud, klaud_task, klaud_board…
         const server = mcp[1]!.replace(/^klaud(?=_|$)/, 'beluga');
-        const own = belugaTool(mcp[2]!, input);
+        const own = belugaTool(mcp[2]!, input, w);
         if (own && (server === 'beluga' || server === 'beluga_task')) return own;
-        return both(`Used ${spaced(mcp[2]!)} from ${spaced(server)}`, `Using ${spaced(mcp[2]!)} from ${spaced(server)}`);
+        return pair(w, 'mcp', { tool: spaced(mcp[2]!), server: spaced(server) });
       }
-      return belugaTool(tool, input) ?? both(`Used ${spaced(tool)}`, `Using ${spaced(tool)}`);
+      return belugaTool(tool, input, w) ?? pair(w, 'used', { tool: spaced(tool) });
     }
   }
 }
@@ -225,7 +230,7 @@ const KNOWN = new Set([
   'who_can', 'answer_question', 'list_peers', 'list_peer_files', 'send_chat', 'continue_in_worktree', 'screenshot', 'device_info',
 ]);
 
-/** A one-line step ("Bash npm test", "ask_person bob", "wait_for t_123") in words. */
+/** A one-line step ("Bash npm test", "ask_person bob", "wait_for t_123") in words, in the app's language (the screens read it). */
 export function humanizeLine(line: string): HumanStep {
   const m = /^((?:mcp__)?[A-Za-z][\w-]*)(?:\s+([\s\S]*))?$/.exec(line.trim());
   const name = m?.[1] ?? '';
@@ -234,5 +239,5 @@ export function humanizeLine(line: string): HumanStep {
   const key = LINE_ARG[name];
   // Grep's line is the pattern (quoted) and then where.
   const value = name === 'Grep' ? (/^"([^"]*)"/.exec(m[2] ?? '')?.[1] ?? rest.split(' ')[0] ?? '') : rest;
-  return humanizeTool(name, key && value ? { [key]: value } : {});
+  return toolWords(name, key && value ? { [key]: value } : {}, undefined, t);
 }

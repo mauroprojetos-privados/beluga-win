@@ -6,6 +6,7 @@ import { activityOf } from '../../../../../src/ui/workspace-models.js';
 import { worktreeOrigin } from '../../../../../src/workspaces/origin.js';
 import type { Project, Workspace } from '../../../../../src/workspaces/types.js';
 import { isReady } from '../project/home-model.js';
+import { t } from '../../../../../src/shared/i18n/index.js';
 
 /**
  * What the Overview shows and how it's narrowed: every worktree and chat, archived ones too,
@@ -18,8 +19,12 @@ export type OverviewFilter = (typeof FILTERS)[number];
 export const SORTS = ['recent', 'name', 'size'] as const;
 export type OverviewSort = (typeof SORTS)[number];
 
-export const FILTER_LABELS: Record<OverviewFilter, string> = { all: 'All', active: 'Active', needs: 'Needs You', ready: 'Ready to Merge', archived: 'Archived' };
-export const SORT_LABELS: Record<OverviewSort, string> = { recent: 'Recent', name: 'Name', size: 'Size' };
+const FILTER_KEYS = { all: 'views.overview.filterAll', active: 'views.overview.filterActive', needs: 'views.overview.filterNeeds', ready: 'views.overview.filterReady', archived: 'views.overview.filterArchived' } as const satisfies Record<OverviewFilter, string>;
+const SORT_KEYS = { recent: 'views.overview.sortRecent', name: 'views.overview.sortName', size: 'views.overview.sortSize' } as const satisfies Record<OverviewSort, string>;
+/** A segment's name, in the app's language. */
+export const filterLabel = (f: OverviewFilter): string => t(FILTER_KEYS[f]);
+/** A sort's name, in the app's language. */
+export const sortLabel = (x: OverviewSort): string => t(SORT_KEYS[x]);
 
 export interface OverviewItem {
   readonly ws: Workspace;
@@ -201,18 +206,18 @@ export function readOverviewPrefs(raw: string | null): OverviewPrefs {
 
 /** What an empty list says, per segment (and with a project picked). */
 export function emptyText(filter: OverviewFilter, projectName?: string): { title: string; detail: string } {
-  const where = projectName ? ` in ${projectName}` : '';
+  const p = { project: projectName ?? '' };
   switch (filter) {
     case 'all':
-      return { title: `No workspaces${where}`, detail: 'Start a worktree for a task, or a chat to ask anything.' };
+      return { title: projectName ? t('views.overview.emptyAllIn', p) : t('views.overview.emptyAll'), detail: t('views.overview.emptyAllDetail') };
     case 'active':
-      return { title: `Nothing active${where}`, detail: 'Everything here is archived. Start a worktree, or restore one from Archived.' };
+      return { title: projectName ? t('views.overview.emptyActiveIn', p) : t('views.overview.emptyActive'), detail: t('views.overview.emptyActiveDetail') };
     case 'needs':
-      return { title: `Nothing needs you${where}`, detail: 'Approvals, merge conflicts and failing checks show up here.' };
+      return { title: projectName ? t('views.overview.emptyNeedsIn', p) : t('views.overview.emptyNeeds'), detail: t('views.overview.emptyNeedsDetail') };
     case 'ready':
-      return { title: `Nothing ready to merge${where}`, detail: 'Worktrees with committed work that isn’t in main yet show up here.' };
+      return { title: projectName ? t('views.overview.emptyReadyIn', p) : t('views.overview.emptyReady'), detail: t('views.overview.emptyReadyDetail') };
     case 'archived':
-      return { title: `Nothing archived yet${where}`, detail: 'Archiving a worktree frees its folder. Its branch and conversation stay here, ready to restore.' };
+      return { title: projectName ? t('views.overview.emptyArchivedIn', p) : t('views.overview.emptyArchived'), detail: t('views.overview.emptyArchivedDetail') };
   }
 }
 
@@ -236,7 +241,7 @@ export function needsThere(items: readonly OverviewItem[]): NeedsThere[] {
       id: i.ws.id,
       title: i.plan?.title ?? i.ws.name,
       project: i.project.root ? i.project.name : 'Chats',
-      why: i.plan?.tip || (i.rank === 1 ? 'Checks failing' : 'Waiting for you'),
+      why: i.plan?.tip || (i.rank === 1 ? t('views.overview.checksFailing') : t('views.overview.waitingForYou')),
       page: i.plan ? { kind: 'plan' as const, id: i.plan.plan.id } : { kind: 'workspace' as const, id: i.ws.id, tab: 'chat' as const },
     }));
 }

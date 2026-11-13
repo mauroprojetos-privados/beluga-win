@@ -1,0 +1,295 @@
+/* Bots (docs/bots.md): the sidebar's rows, the plan beside a bot's chat, and Bot Studio. Soft, solid, no glows. */
+
+.navLabel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+.navName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.navLine {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.navWarn {
+  color: var(--warn);
+}
+
+/* A bot's chat with its plan beside it. */
+.withPlan {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 44%);
+}
+.withPlan > :first-child {
+  min-width: 0;
+}
+.planPane {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 0.5px solid var(--hairline-strong);
+  background: var(--bg);
+}
+.planHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 0.5px solid var(--hairline);
+}
+.planTitle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.planTitle strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.planTitle span {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.planBody {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.planNote {
+  padding: 16px;
+  color: var(--text-3);
+}
+.showPlan {
+  position: absolute;
+  right: 10px;
+  top: 8px;
+  z-index: 2;
+}
+
+/* Bot Studio */
+.studio {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.botList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.botRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: var(--text);
+  width: 100%;
+}
+.botRow:hover {
+  background: var(--bg-hover);
+}
+.botRowOn {
+  background: var(--bg-selected);
+}
+.botMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--bg-sunken);
+  color: var(--text-2);
+  flex: none;
+}
+.botMeta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.botMeta span {
+  font-size: 11px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.head h3 {
+  flex: 1;
+  margin: 0;
+  font-size: 15px;
+}
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  border-bottom: 0.5px solid var(--hairline);
+  padding-bottom: 6px;
+}
+.tab {
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  padding: 4px 10px;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+}
+.tab:hover {
+  background: var(--bg-hover);
+}
+.tabOn {
+  background: var(--bg-selected);
+  color: var(--text);
+}
+.saved {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.area {
+  width: 100%;
+  min-height: 160px;
+  padding: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--bg-raised);
+  box-shadow: 0 0 0 0.5px var(--hairline-strong);
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 12px;
+  line-height: 1.45;
+  resize: vertical;
+  user-select: text;
+  color: var(--text);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.field > span {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.bar {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.grow {
+  flex: 1;
+}
+.problems {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: var(--radius-s);
+  background: var(--bg-sunken);
+  color: var(--warn);
+  font-size: 12px;
+}
+.error {
+  color: var(--error);
+  font-size: 12px;
+}
+.conflict {
+  padding: 8px 10px;
+  border-radius: var(--radius-s);
+  background: var(--bg-sunken);
+  color: var(--text);
+  font-size: 12px;
+  border: 0.5px solid var(--warn);
+}
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-s);
+  background: var(--bg-raised);
+  box-shadow: 0 0 0 0.5px var(--hairline);
+}
+.item .grow span {
+  display: block;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.used {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 11px;
+}
+.chip {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--bg-sunken);
+  color: var(--text-2);
+}
+.test {
+  display: flex;
+  flex-direction: column;
+  min-height: 360px;
+  height: 420px;
+  border-radius: var(--radius-s);
+  box-shadow: 0 0 0 0.5px var(--hairline-strong);
+  overflow: hidden;
+}
+.diff {
+  margin: 0;
+  max-height: 260px;
+  overflow: auto;
+  padding: 8px;
+  border-radius: 6px;
+  background: var(--bg-sunken);
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+.add {
+  color: var(--ok);
+}
+.del {
+  color: var(--error);
+}
+.drop {
+  padding: 14px;
+  border-radius: var(--radius-s);
+  border: 1px dashed var(--hairline-strong);
+  color: var(--text-3);
+  text-align: center;
+}
+.dropOver {
+  border-color: var(--accent);
+  color: var(--text);
+}

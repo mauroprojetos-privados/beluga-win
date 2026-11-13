@@ -2,6 +2,7 @@ import type { PreviewProblem } from '@beluga/shared/preview/opened.js';
 import { openExternal } from '../../lib/system.js';
 import { Icon } from '../Icon.js';
 import { Button, IconButton, cx } from '../ui.js';
+import { useT } from '../../lib/i18n.js';
 import { type FiredEvent, floatsOverFrame } from './preview-model.js';
 import type { AuditIssue } from './use-preview.js';
 import s from './preview.module.css';
@@ -10,18 +11,19 @@ import s from './preview.module.css';
 
 /** Why it isn't drawing, in plain words, with the one thing to do about it. */
 export function ProblemCard({ problem, touched, onReset, onAsk, onRetry, onTurnOn, url }: { problem: PreviewProblem; touched: boolean; onReset: () => void; onAsk: () => void; onRetry: () => void; onTurnOn: () => void; url: string | undefined }) {
+  const t = useT();
   const action =
     problem.kind === 'off'
-      ? { label: 'Turn On…', run: onTurnOn }
+      ? { label: t('components.preview.turnOn'), run: onTurnOn }
       : problem.kind === 'not-running'
-        ? { label: 'Try Again', run: onRetry }
+        ? { label: t('common.retry'), run: onRetry }
         : (problem.kind === 'no-frames' || problem.kind === 'elsewhere') && url
-          ? { label: 'Open in Browser', run: () => void openExternal(url) }
+          ? { label: t('components.preview.openInBrowser'), run: () => void openExternal(url) }
           : problem.kind === 'render' && touched
-            ? { label: 'Reset Props', run: onReset }
+            ? { label: t('components.preview.resetProps'), run: onReset }
             : problem.kind === 'provider'
-              ? { label: 'Ask Agent to Set Up', run: onAsk }
-              : { label: 'Ask Agent to Fix', run: onAsk };
+              ? { label: t('components.preview.askSetUp'), run: onAsk }
+              : { label: t('components.preview.askFix'), run: onAsk };
   return (
     <div className={cx(s.problem, floatsOverFrame(problem) && s.problemOver)} role="status">
       <Icon name="info" size={14} className={s.problemIcon} />
@@ -54,16 +56,17 @@ export function EventsStrip({ events }: { events: readonly FiredEvent[] }) {
 
 /** What the accessibility check found, in plain words; each shows its element in the drawing. */
 export function AuditPanel({ issues, onShow, onAgain, onClose }: { issues: readonly AuditIssue[]; onShow: (id: string) => void; onAgain: () => void; onClose: () => void }) {
+  const t = useT();
   return (
     <div className={s.audit}>
       <div className={s.panelHead}>
-        <span className={s.panelTitle}>Accessibility</span>
-        <span className={s.panelHint}>{issues.length ? `${issues.length === 1 ? 'One thing' : `${issues.length} things`} to look at. Click one to see it.` : 'Nothing to fix found: names, labels, contrast and headings look right.'}</span>
+        <span className={s.panelTitle}>{t('components.preview.accessibility')}</span>
+        <span className={s.panelHint}>{issues.length ? t('components.preview.auditFound', { count: issues.length }) : t('components.preview.auditClean')}</span>
         <span className={s.grow} />
         <Button size="small" variant="quiet" onClick={onAgain}>
-          Check Again
+          {t('components.preview.checkAgain')}
         </Button>
-        <IconButton icon="x" label="Close" onClick={onClose} />
+        <IconButton icon="x" label={t('common.close')} onClick={onClose} />
       </div>
       {issues.length ? (
         <ul className={s.issues}>

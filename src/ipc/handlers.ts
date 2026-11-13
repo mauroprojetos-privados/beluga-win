@@ -10,7 +10,6 @@ import { ATTACHMENT_SHARE, type FetchShared, attachmentOnDisk, chipText, expandC
 import { fetchBytes } from '../core/downloads.js';
 import { testDatabase } from '../core/views/sources.js';
 import { existsSync, statSync } from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { findProjects, isMainCheckout } from '../workspaces/discovery.js';
 import { cloneProject, createProject, defaultProjectsHome, initProject } from '../workspaces/new-project.js';
@@ -22,9 +21,13 @@ import { NETWORK_HANDLERS } from './network-handlers.js';
 import { STRIPE_HANDLERS } from './stripe-handlers.js';
 import { REVENUECAT_HANDLERS } from './revenuecat-handlers.js';
 import { SUPPORT_HANDLERS } from './support-handlers.js';
+import { I18N_HANDLERS } from './i18n-handlers.js';
+import { STACK_HANDLERS } from './stack-handlers.js';
 import { STATS_HANDLERS } from './stats-handlers.js';
 import { maybeStatsOf } from '../core/stats/counter.js';
 import { WEB_HANDLERS } from './web-handlers.js';
+import { ROUTING_HANDLERS } from './routing-handlers.js';
+import { BOTS_HANDLERS } from './bots-handlers.js';
 import { DIAGNOSTICS_HANDLERS } from './diagnostics-handlers.js';
 import { CLAUDE_CODE_HANDLERS } from './claude-code-handlers.js';
 import { STEPS_HANDLERS } from './steps-handlers.js';
@@ -55,6 +58,8 @@ import { AGENT_TERM_HANDLERS } from './agent-term-handlers.js';
 import { worktreePorts } from '../workspaces/ports.js';
 import { waitingNeeds } from '../companion/needs-you.js';
 import { saveDismissedNeeds, withDismissed } from '../core/dismissed-needs.js';
+import { t } from '../shared/i18n/index.js';
+import { localPath } from '../core/home-path.js';
 
 /**
  * What each API method does (see api.ts for the list and its arguments). Runs in the core:
@@ -73,7 +78,8 @@ const moverIn = (s: Session): WorktreeMover => {
   return worktreeMover(s.store, c);
 };
 const rootOf = (s: Session, projectId: string): string | undefined => s.store.getState().projects.find((p) => p.id === projectId)?.root || undefined;
-const expandHome = (p: string): string => p.replace(/^~(?=$|\/)/, os.homedir());
+// A folder a screen sent: "~" expanded, and in WSL a path the Windows app wrote ("\\wsl.localhost\…", "D:\…") made Linux's.
+const expandHome = (p: string): string => localPath(p);
 const bench = (s: Session): Workbench | undefined => s.workbench;
 
 /** Pull a file from a friend's share through this session's connection. */
@@ -117,7 +123,7 @@ export const HANDLERS = {
   'session.localLocation': (s, abs, dir) => s.localLocation(abs, dir),
   'session.testNotification': (s) => {
     s.notifier.test();
-    s.toast('Sent a test notification', 'success');
+    s.toast(t('toasts.ipc.testNotification'), 'success');
   },
 
   'host.answerApproval': (s, answer, id) => s.answerApproval(answer, id),
@@ -272,8 +278,8 @@ export const HANDLERS = {
   'workspaces.removeOther': (s, id, force) => ctl(s)?.removeOther(id, force ?? false) ?? false,
   'workspaces.staleOthers': (s, projectId, source) => ctl(s)?.others.stale(projectId, source) ?? [],
   'workspaces.cleanUpOthers': (s, projectId, ids) => ctl(s)?.others.cleanUp(projectId, ids),
-  'workspaces.addProject': (s, dir) => ctl(s)?.addProject(dir),
-  'workspaces.addFolder': (s, dir) => ctl(s)?.addFolder(dir),
+  'workspaces.addProject': (s, dir) => ctl(s)?.addProject(expandHome(dir)),
+  'workspaces.addFolder': (s, dir) => ctl(s)?.addFolder(expandHome(dir)),
   'workspaces.selectFile': (s, index) => ctl(s)?.selectFile(index),
   'workspaces.diffAhead': (s, index) => ctl(s)?.diffAhead(index),
   'workspaces.review': (s, id) => ctl(s)?.loadReview(id),
@@ -401,7 +407,7 @@ export const HANDLERS = {
     if (isMainCheckout(abs)) return (await ctl(s)?.addProject(abs)) ?? {};
     if (findProjects([abs]).length) return (await ctl(s)?.addFolder(abs)) ?? {};
     const plain = existsSync(abs);
-    const error = plain ? `${path.basename(abs)} isn't a git project yet` : `${abs} isn't there`;
+    const error = plain ? t('toasts.ipc.notGitYet', { name: path.basename(abs) }) : t('toasts.ipc.notThere', { path: abs });
     s.toast(error, 'warn');
     // A plain folder: the Add projects sheet offers to set up git there (projects.initGit).
     return plain ? { error, canInit: true } : { error };
@@ -446,8 +452,12 @@ export const HANDLERS = {
   ...STRIPE_HANDLERS,
   ...REVENUECAT_HANDLERS,
   ...SUPPORT_HANDLERS,
+  ...I18N_HANDLERS,
+  ...STACK_HANDLERS,
   ...STATS_HANDLERS,
   ...WEB_HANDLERS,
+  ...ROUTING_HANDLERS,
+  ...BOTS_HANDLERS,
   ...DIAGNOSTICS_HANDLERS,
   ...CLAUDE_CODE_HANDLERS,
   ...STEPS_HANDLERS,

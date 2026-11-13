@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { query, type Options } from '@anthropic-ai/claude-agent-sdk';
+import { query, type McpServerConfig, type Options } from '@anthropic-ai/claude-agent-sdk';
 import { MAX_ATTACHMENT_BYTES, linkedImages, mediaTypeOf } from '../../../core/attachments.js';
 import { buildPrompt, summarizeTool } from '../../prompt.js';
 import { runInstructions } from '../../run-instructions.js';
@@ -223,7 +223,9 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
         ...(launch.allowDangerouslySkipPermissions ? { allowDangerouslySkipPermissions: true } : {}),
         ...(Object.keys(launch.extraArgs).length ? { extraArgs: launch.extraArgs } : {}),
         // Your own MCP servers first, so a name of Beluga's always means Beluga's.
-        mcpServers: { ...(input.ownerMcp && !input.guest ? ownerMcpServers(cwd, { ...process.env, ...input.env }) : {}), ...sdkServers(runToolSuites(input, bridge, shelf, cwd)) },
+        // A bot's run (docs/bots.md): only its own servers, strictly (--strict-mcp-config), so yours and other bots' never reach it.
+        mcpServers: { ...(place?.mcp ? (place.mcp.servers as Record<string, McpServerConfig>) : input.ownerMcp && !input.guest ? ownerMcpServers(cwd, { ...process.env, ...input.env }) : {}), ...sdkServers(runToolSuites(input, bridge, shelf, cwd)) },
+        ...(place?.mcp ? { strictMcpConfig: true } : {}),
         // The hook runs before Claude Code's own permission logic, even for commands it would
         // auto-approve, so the machine owner stays in control of every risky action.
         hooks: {

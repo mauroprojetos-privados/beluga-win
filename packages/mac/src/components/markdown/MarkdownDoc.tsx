@@ -26,7 +26,9 @@ import { TASKS_FENCE } from '@beluga/shared/task-refs.js';
 import { TaskCards } from '../../tasks/TaskRef.js';
 import { prepareMath } from '@beluga/shared/render/math.js';
 import { RichBlock, useRichFence } from '../blocks/RichBlock.js';
+import { t as tNow } from '@beluga/shared/i18n/index.js';
 import m from './markdown.module.css';
+import { useT } from '../../lib/i18n.js';
 
 /**
  * The Markdown reader: GitHub-flavored Markdown (tables, task lists, footnotes, alerts, autolinks),
@@ -66,6 +68,7 @@ const classesOf = (el: Element | undefined): string[] => {
 };
 
 function FrontMatter({ yaml }: { yaml: string }) {
+  const t = useT();
   const [rows, setRows] = useState<readonly MetaRow[]>();
   useEffect(() => {
     let alive = true;
@@ -79,7 +82,7 @@ function FrontMatter({ yaml }: { yaml: string }) {
   }, [yaml]);
   if (!rows?.length) return null;
   return (
-    <dl className={m.meta} aria-label="Front matter">
+    <dl className={m.meta} aria-label={t('components.markdown.frontMatter')}>
       {rows.map((r, i) => (
         <div key={`${r.key}:${i}`} className={m.metaRow}>
           <dt>{r.key}</dt>
@@ -99,6 +102,7 @@ interface Ctx {
 
 function heading(Tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6', ctx: { current: Ctx }) {
   return function Heading({ id, className, children }: { id?: string; className?: string; children?: ReactNode }) {
+    const t = useT();
     // The footnotes' heading is for screen readers only (as on GitHub): no link to it.
     if (className === 'sr-only') return <Tag id={id} className={className}>{children}</Tag>;
     return (
@@ -107,8 +111,8 @@ function heading(Tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6', ctx: { current: C
           <a
             className={m.anchor}
             href={`#${id}`}
-            aria-label="Copy a link to this section"
-            title="Copy a link to this section"
+            aria-label={t('components.markdown.copySectionLink')}
+            title={t('components.markdown.copySectionLink')}
             onClick={(e) => {
               e.preventDefault();
               ctx.current.anchor(id);
@@ -184,7 +188,7 @@ function makeComponents(ctx: { current: Ctx }): Components {
         }
       />
     ),
-    input: ({ type, checked }) => (type === 'checkbox' ? <input type="checkbox" className={m.check} checked={!!checked} readOnly disabled aria-label={checked ? 'Done' : 'Not done'} /> : null),
+    input: ({ type, checked }) => (type === 'checkbox' ? <input type="checkbox" className={m.check} checked={!!checked} readOnly disabled aria-label={checked ? tNow('common.done') : tNow('components.markdown.notDone')} /> : null),
     p: ({ className, children }) => {
       if (className !== 'markdown-alert-title') return <p>{children}</p>;
       const kind = KIND_BY_TITLE.get(String(children)) ?? 'note';

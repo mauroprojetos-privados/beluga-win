@@ -34,6 +34,13 @@ export const SYNCED_SETTINGS = [
   'effort',
   'defaultAgent',
   'projectAgents',
+  'language',
+  'commitLanguages',
+  'combos',
+  'difficultyCombos',
+  'roleCombos',
+  'categoryCombos',
+  'savingsBaseline',
   'autoSetup',
   'branchPrefix',
   'contextMeter',
@@ -88,6 +95,9 @@ export const LOCAL_SETTINGS = [
   'askMeFor',
   'askFreely',
   'capabilities',
+  // Your stack runs on this computer (docs/stack.md): what it starts and sets up is its own.
+  'stackRepair',
+  'stackBootstrap',
 ] as const satisfies ReadonlyArray<keyof Settings>;
 
 /** What Settings calls each synced setting, for a conflict said in words. */
@@ -103,6 +113,13 @@ export const SETTING_LABELS: Readonly<Record<SyncedSetting, string>> = {
   effort: 'Effort',
   defaultAgent: 'Default agent',
   projectAgents: 'Project agents',
+  language: 'Language',
+  commitLanguages: 'Language for commits and PRs',
+  combos: 'Combos',
+  difficultyCombos: 'Combos by how hard a task is',
+  roleCombos: 'Combos by role',
+  categoryCombos: 'Combos by kind of work',
+  savingsBaseline: 'What savings are measured against',
   autoSetup: 'Run setup in new worktrees',
   branchPrefix: 'Branch prefix',
   contextMeter: 'Context meter',

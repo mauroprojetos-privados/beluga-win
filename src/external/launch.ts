@@ -20,11 +20,12 @@ import { workspaceTools } from './adapters/tools/workspace.js';
 import { sessionState } from './adapters/session-state.js';
 import { sessionPeers } from './adapters/session-peers.js';
 import { sessionWorkspace } from './adapters/session-workspace.js';
-import { REMOTE_FULL_WARNING } from '../shared/remote-full.js';
+import { remoteFullWarning } from '../shared/remote-full.js';
 import { LIMITS } from './domain/limits.js';
 import { DISCOVERY_TOOLS } from './domain/tools.js';
 import { attachExternal, detachExternal } from './registry.js';
 import { ExternalService } from './service.js';
+import { t } from '../shared/i18n/index.js';
 
 /** The external agents' server, in the daemon only. Listens only if you left it on. Returns its stop. */
 export function launchExternal(deps: { readonly session: Session; readonly log?: (line: string) => void }): () => Promise<void> {
@@ -45,19 +46,19 @@ export function launchExternal(deps: { readonly session: Session; readonly log?:
     // The agent is the card's peer: its cap on waiting cards applies and a stop finds them. The answer is only for this call, and writes no trust.
     ask: (title, detail, once, card, signal) => deps.session.host.ask('tool', title, detail, card ? externalRequester(card.agentId) : undefined, card?.chatId ? `ws:${card.chatId}` : card ? externalRequester(card.agentId) : 'room', { once, call: true, ...(card ? { asker: card.agent } : {}), ...(signal ? { signal } : {}) }),
     stopWork: (grantId) => stopAgentWork(deps.session, grantId),
-    notify: (grant) => deps.session.toast(`${grant.name} connected to Beluga as an external agent (${grant.level})`, 'info'),
+    notify: (grant) => deps.session.toast(t('toasts.external.connected', { name: grant.name, level: grant.level }), 'info'),
     notifyRemoteFull: (grant) => {
-      const body = `${grant.name} at ${grant.redirectHost} has Full trust from outside this computer. ${REMOTE_FULL_WARNING} Revoke it in Settings › External agents if you didn't mean this.`;
+      const body = t('toasts.external.remoteFull', { name: grant.name, host: grant.redirectHost, warning: remoteFullWarning() });
       deps.session.toast(body, 'error');
       deps.session.notifier.notify({ kind: 'problems', title: `${grant.name} has Full trust from outside this computer`, body });
     },
     notifyLockout: () => {
-      const body = 'Too many wrong pairing codes came through a remote address, so new remote sign-ins stop for up to 10 minutes. Connected agents keep working. Wait, or close the route in Settings › External agents.';
+      const body = t('toasts.external.lockout');
       deps.session.toast(body, 'error');
       deps.session.notifier.notify({ kind: 'problems', title: 'Remote sign-ins are stopped', body });
     },
     notifySuspended: (grant) => {
-      deps.session.toast(`${grant.name} was suspended after repeated refusals. Resume or revoke it in Settings › External agents.`, 'error');
+      deps.session.toast(t('toasts.external.suspended', { name: grant.name }), 'error');
       deps.session.notifier.notify({ kind: 'problems', title: `${grant.name} was suspended`, body: 'It was refused again and again, so Beluga stopped it. Resume or revoke it in Settings › External agents.' });
     },
   });

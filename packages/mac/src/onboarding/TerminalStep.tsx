@@ -4,6 +4,7 @@ import type { TerminalFound } from '@beluga/terminal/import/look.js';
 import { cx } from '../components/ui.js';
 import { type Before, Swatches, TermPreview, before, importable, useTerminals, withImport } from '../dialogs/TerminalImport.js';
 import { getPrefs, setPrefs, usePrefs } from '../lib/prefs.js';
+import { useT } from '../lib/i18n.js';
 import { colorsFor, importSummary } from '../lib/terminal-import-model.js';
 import { hasFont } from '../lib/terminal-look.js';
 import { Rise, SPRING, Words } from './fx.js';
@@ -19,6 +20,7 @@ const KEEP = 'beluga';
  * changes nothing; Settings › Terminal › Import from… has it later.
  */
 export function TerminalStep() {
+  const t = useT();
   const prefs = usePrefs();
   const { found } = useTerminals();
   const choices = importable(found);
@@ -33,22 +35,22 @@ export function TerminalStep() {
     setPrefs(f ? withImport({ ...getPrefs(), ...orig.current }, f) : { ...orig.current, termTheme: null });
   };
   const chosen = choices.find((f) => f.app === picked);
-  const options: Array<{ key: string; label: string; found?: TerminalFound }> = [...choices.map((f) => ({ key: f.app, label: f.name, found: f })), { key: KEEP, label: 'Beluga’s Own' }];
+  const options: Array<{ key: string; label: string; found?: TerminalFound }> = [...choices.map((f) => ({ key: f.app, label: f.name, found: f })), { key: KEEP, label: t('components.onboarding.terminal.belugasOwn') }];
   return (
     <div className={s.setup}>
       <h2 className={s.title}>
-        <Words text="Coming from another terminal?" />
+        <Words text={t('components.onboarding.terminal.title')} />
       </h2>
       <Rise delay={0.2} className={s.body}>
         {found === undefined
-          ? `Looking for the terminals on ${thisComputer()}…`
+          ? t('components.onboarding.terminal.looking', { computer: thisComputer() })
           : choices.length
-            ? 'Bring its colours, font and cursor into Beluga’s terminal. It changes as you pick, and Settings › Terminal has it later.'
-            : 'No other terminal here has settings to bring, so Beluga’s terminal keeps its own look. Settings › Terminal › Import from… can bring one in later.'}
+            ? t('components.onboarding.terminal.bring')
+            : t('components.onboarding.terminal.none')}
       </Rise>
       {choices.length ? (
         <>
-          <div className={cx(s.looks, s.terms)} role="radiogroup" aria-label="Terminal look">
+          <div className={cx(s.looks, s.terms)} role="radiogroup" aria-label={t('components.onboarding.terminal.look')}>
             {options.map((o, i) => {
               const on = picked === o.key;
               return (
@@ -81,7 +83,7 @@ export function TerminalStep() {
             })}
           </div>
           <Rise delay={0.5} className={s.termBrings}>
-            {chosen?.look ? importSummary(chosen.look, hasFont).join(' · ') : 'Beluga’s colours, following light and dark.'}
+            {chosen?.look ? importSummary(chosen.look, hasFont).join(' · ') : t('components.onboarding.terminal.belugaColours')}
           </Rise>
         </>
       ) : null}

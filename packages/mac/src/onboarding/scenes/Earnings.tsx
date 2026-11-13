@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react';
 import { Icon } from '../../components/Icon.js';
+import { useT } from '../../lib/i18n.js';
 import { EASE_OUT, SPRING, Ticker } from '../fx.js';
 import { useBeats } from './use-beats.js';
 import s from './scenes.module.css';
@@ -29,6 +30,7 @@ function Spark({ points }: { readonly points: readonly number[] }) {
 }
 
 export function Earnings() {
+  const t = useT();
   // Beats: the month so far, then a new sale for web.
   const beat = useBeats([2600, 2800], 1);
   const sold = beat === 1;
@@ -38,14 +40,14 @@ export function Earnings() {
       <motion.div className={s.earnings} initial={{ rotateX: 10, rotateY: -14 }} animate={{ rotateX: 10, rotateY: -14 }}>
         <div className={s.earnHead}>
           <div>
-            <span className={s.dim}>This month</span>
+            <span className={s.dim}>{t('components.onboarding.scene.earnings.thisMonth')}</span>
             <strong className={s.total}>
               {/* When the sale lands it counts on from the month so far, not from zero. */}
               <Ticker key={sold ? 'after' : 'before'} value={total} from={sold ? total - SALE : 0} format={money} duration={sold ? 0.6 : 1.6} />
             </strong>
           </div>
           <span className={s.stripe}>
-            <span className={s.stripeDot} /> Stripe connected
+            <span className={s.stripeDot} /> {t('components.onboarding.scene.earnings.stripe')}
           </span>
         </div>
         {PROJECTS.map((p, i) => {
@@ -67,9 +69,9 @@ export function Earnings() {
             <motion.div key="sale" className={s.sale} initial={{ opacity: 0, y: 16, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8 }} transition={SPRING}>
               <span className={s.saleIcon}>+</span>
               <span>
-                <strong>{money(SALE)}</strong> new subscription · web
+                <strong>{money(SALE)}</strong> {t('components.onboarding.scene.earnings.newSub')}
               </span>
-              <span className={s.dim}>just now</span>
+              <span className={s.dim}>{t('components.onboarding.scene.earnings.justNow')}</span>
             </motion.div>
           ) : null}
         </AnimatePresence>

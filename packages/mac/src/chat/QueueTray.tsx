@@ -12,6 +12,7 @@ import { shortcutKeys } from '../lib/shortcuts.js';
 import { usePrefs } from '../lib/prefs.js';
 import { otherKeySteers } from './send-action.js';
 import { useSteerBlock } from './use-steer.js';
+import { useT } from '../lib/i18n.js';
 
 const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
@@ -35,15 +36,16 @@ const STEERING_MS = 8_000;
  */
 function SteerButton({ steering, blocked, steerKey, onSteer }: { steering: boolean; blocked?: string; steerKey?: string; onSteer: () => void }) {
   const { client } = useBeluga();
+  const t = useT();
   return (
-    <Tip label={blocked ?? (steering ? 'Steering: sending it to your agent now' : 'Steer: your agent reads this after its current step, without stopping it')} keys={blocked ? undefined : steerKey}>
+    <Tip label={blocked ?? (steering ? t('chat.queue.steeringTip') : t('chat.queue.steerTip'))} keys={blocked ? undefined : steerKey}>
       <button
         type="button"
         className={cx(s.now, (blocked || steering) && s.nowOff, steering && s.steering)}
         aria-disabled={Boolean(blocked || steering)}
         onClick={() => (blocked ? toast(client, blocked, 'warn') : steering ? undefined : onSteer())}
       >
-        {steering ? 'Steering…' : 'Steer'}
+        {steering ? t('chat.queue.steering') : t('chat.queue.steer')}
       </button>
     </Tip>
   );
@@ -68,6 +70,7 @@ function Row({ channel, prompt, mine, className, children }: { channel: string; 
 export function QueueTray({ queue, selfName, onEdit, channel: given }: { queue: readonly QueuedMessage[]; selfName: string; onEdit: (text: string) => void; channel?: string }) {
   const { client } = useBeluga();
   const api = useApi();
+  const t = useT();
   const onScreen = useApp((st) => channelOf(st.view));
   const channel = given ?? onScreen;
   const [steering, setSteering] = useState<ReadonlySet<string>>(new Set());
@@ -92,45 +95,45 @@ export function QueueTray({ queue, selfName, onEdit, channel: given }: { queue: 
     api.host.promote(id).then(
       (ok) => {
         if (!ok) return settle(id);
-        const t = setTimeout(() => (timers.current.delete(t), settle(id)), STEERING_MS);
-        timers.current.add(t);
+        const timer = setTimeout(() => (timers.current.delete(timer), settle(id)), STEERING_MS);
+        timers.current.add(timer);
       },
       (err: unknown) => {
         settle(id);
-        toast(client, `Couldn’t steer: ${errorText(err)}`, 'error');
+        toast(client, t('chat.queue.couldntSteer', { error: errorText(err) }), 'error');
       },
     );
   };
   return (
-    <section className={s.tray} aria-label="Queued messages">
+    <section className={s.tray} aria-label={t('chat.queue.aria')}>
       <header className={s.head}>
         <Icon name="clock" size={12} />
-        <span className={s.title}>Queued</span>
+        <span className={s.title}>{t('chat.status.queued')}</span>
         <span className={s.count}>{queue.length}</span>
-        <span className={s.note}>{queue[0]?.slotWait ? slotWaitNote(queue[0].slotWait) : 'runs after the current task, in this order'}</span>
+        <span className={s.note}>{queue[0]?.slotWait ? slotWaitNote(queue[0].slotWait) : t('chat.queue.note')}</span>
       </header>
       <ol className={s.list}>
         {queue.map((q, i) => {
           const at = yours.indexOf(q);
-          const who = q.by === selfName ? (q.claude === selfName ? '' : `for ${q.claude}'s agent`) : `${q.by}`;
+          const who = q.by === selfName ? (q.claude === selfName ? '' : t('chat.queue.forAgent', { name: q.claude })) : `${q.by}`;
           return (
             <Row key={q.requestId} channel={channel} prompt={q.prompt} mine={q.yours} className={cx(s.row, !q.yours && s.theirs)}>
               <span className={s.n}>{i + 1}</span>
               <span className={s.text} title={imageLinksAsWords(q.prompt)}>
-                {imageLinksAsWords(q.prompt) || 'A message'}
+                {imageLinksAsWords(q.prompt) || t('chat.queue.aMessage')}
               </span>
               {who ? <span className={s.who}>{who}</span> : null}
               {q.yours ? (
                 <span className={s.acts}>
                   {yours.length > 1 ? (
                     <>
-                      <Act icon="chevronUp" label="Move up" disabled={at === 0} onClick={() => call(api.host.reorderQueued(q.requestId, at - 1))} />
-                      <Act icon="chevronDown" label="Move down" disabled={at === yours.length - 1} onClick={() => call(api.host.reorderQueued(q.requestId, at + 1))} />
+                      <Act icon="chevronUp" label={t('chat.queue.moveUp')} disabled={at === 0} onClick={() => call(api.host.reorderQueued(q.requestId, at - 1))} />
+                      <Act icon="chevronDown" label={t('chat.queue.moveDown')} disabled={at === yours.length - 1} onClick={() => call(api.host.reorderQueued(q.requestId, at + 1))} />
                     </>
                   ) : null}
                   <Act
                     icon="pencil"
-                    label="Edit: take it out of the queue and back into the box"
+                    label={t('chat.queue.edit')}
                     onClick={() =>
                       call(
                         api.host.cancelQueued(q.requestId).then((ok) => {
@@ -139,12 +142,12 @@ export function QueueTray({ queue, selfName, onEdit, channel: given }: { queue: 
                       )
                     }
                   />
-                  <Act icon="x" label="Remove from the queue" onClick={() => call(api.host.cancelQueued(q.requestId))} />
+                  <Act icon="x" label={t('chat.queue.remove')} onClick={() => call(api.host.cancelQueued(q.requestId))} />
                   <SteerButton steering={steering.has(q.requestId)} steerKey={steerKey} onSteer={() => steer(q.requestId)} />
                 </span>
               ) : (
                 <span className={s.acts}>
-                  <SteerButton steering={false} blocked={q.by === selfName ? `It waits for ${q.claude}'s agent: only ${q.claude} can steer it` : `${q.by}'s message: only ${q.by} can steer it`} onSteer={() => undefined} />
+                  <SteerButton steering={false} blocked={q.by === selfName ? t('chat.queue.blockedAgent', { name: q.claude }) : t('chat.queue.blockedMessage', { name: q.by })} onSteer={() => undefined} />
                 </span>
               )}
             </Row>

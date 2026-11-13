@@ -1,4 +1,5 @@
 import type { DiffLine } from '../../../../src/shared/diff-lines.js';
+import { t } from '../../../../src/shared/i18n/index.js';
 
 /**
  * Comments on a diff's lines, for the chat. Each waits above its conversation's message box as a
@@ -60,7 +61,7 @@ const span = (from: number, to: number): string => (to !== from ? `${from}-${to}
 /** "README.md:2-4", or "README.md, removed line 7": where a comment is, in words. */
 export function commentWhere(c: Pick<DiffComment, 'path' | 'side' | 'from' | 'to'>): string {
   if (c.side === 'new') return `${c.path}:${span(c.from, c.to)}`;
-  return `${c.path}, removed line${c.to !== c.from ? 's' : ''} ${span(c.from, c.to)}`;
+  return t('views.comment.whereRemoved', { count: c.to !== c.from ? 2 : 1, path: c.path, span: span(c.from, c.to) });
 }
 
 /** A fence longer than any run of backticks in the code, so the code can't close it. */
@@ -71,8 +72,8 @@ function fenceFor(body: string): string {
 
 /** A comment as it goes to the agent. */
 export function commentText(c: DiffComment): string {
-  const head = c.side === 'new' ? `On \`${commentWhere(c)}\`:` : `On \`${c.path}\`, removed line${c.to !== c.from ? 's' : ''} ${span(c.from, c.to)}:`;
-  const body = [...c.code, ...(c.more > 0 ? [`… ${c.more} more lines`] : [])].join('\n');
+  const head = c.side === 'new' ? t('views.comment.headNew', { where: commentWhere(c) }) : t('views.comment.headRemoved', { count: c.to !== c.from ? 2 : 1, path: c.path, span: span(c.from, c.to) });
+  const body = [...c.code, ...(c.more > 0 ? [t('views.comment.more', { count: c.more })] : [])].join('\n');
   const fence = fenceFor(body);
   return [head, `${fence}diff`, body, fence, c.text].join('\n');
 }

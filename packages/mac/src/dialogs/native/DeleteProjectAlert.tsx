@@ -1,7 +1,8 @@
 import { Alert } from '../../components/Alert.js';
 import { worktreeOrigin } from '@beluga/workspaces/origin.js';
 import { useApi, useApp } from '../../lib/beluga.js';
-import { count } from './pick.js';
+import { useT } from '../../lib/i18n.js';
+import { rich } from './parts.js';
 
 /**
  * Delete Project…: it leaves Beluga, and so do the worktrees Beluga made for it (archived first,
@@ -10,6 +11,7 @@ import { count } from './pick.js';
  */
 export function DeleteProjectAlert({ projectId, close }: { projectId: string; close: () => void }) {
   const api = useApi();
+  const t = useT();
   const project = useApp((st) => st.projects.find((p) => p.id === projectId && p.root));
   if (!project) return null;
   const worktrees = project.workspaces.filter((w) => w.kind === 'worktree' && !w.archived && worktreeOrigin(w) === 'beluga').length;
@@ -21,24 +23,22 @@ export function DeleteProjectAlert({ projectId, close }: { projectId: string; cl
     <Alert
       icon="alert"
       tone="danger"
-      title={`Delete “${project.name}” from Beluga?`}
+      title={t('native.deleteProject.title', { name: project.name })}
       message={
         <>
           <p>
-            It leaves Beluga: the sidebar, its group and Hidden Projects.
+            {t('native.deleteProject.leaves')}
             {worktrees ? (
               <>
                 {' '}
-                The {count(worktrees, 'worktree')} Beluga made for it {worktrees === 1 ? 'goes' : 'go'} too: archived first, so everything of yours in {worktrees === 1 ? 'it' : 'them'} is kept (uncommitted work included), then {worktrees === 1 ? 'its folder is' : 'their folders are'} removed. Add the project again to restore {worktrees === 1 ? 'it' : 'them'}.
+                {t('native.deleteProject.worktrees', { count: worktrees })}
               </>
             ) : null}
           </p>
-          <p>
-            Your project folder <code>{project.root}</code> isn’t touched: nothing in it is deleted or moved to the Trash.
-          </p>
+          <p>{rich(t('native.deleteProject.folder'), { folder: <code>{project.root}</code> })}</p>
         </>
       }
-      confirm={{ label: 'Delete from Beluga', destructive: true, onClick: remove }}
+      confirm={{ label: t('native.deleteProject.confirm'), destructive: true, onClick: remove }}
       onCancel={close}
     />
   );

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Icon } from '../components/Icon.js';
 import { Avatar, cx, personColor } from '../components/ui.js';
 import { type ChatPop, popMs } from './chat-pops.js';
+import { useT } from '../lib/i18n.js';
 import s from './chatpops.module.css';
 
 /** One message, rising in and dissolving once there was time to read it (`age`: how far along it already is). */
@@ -24,9 +25,10 @@ function Pop({ pop, age }: { pop: ChatPop; age: number }) {
 
 /** The messages that pop up, newest at the bottom (also the sharer's overlay, calloverlay/). */
 export function PopList({ pops, now, dark, className }: { pops: readonly ChatPop[]; now: number; dark?: boolean; className?: string }) {
+  const t = useT();
   if (!pops.length) return null;
   return (
-    <ol className={cx(s.pops, dark && s.dark, className)} aria-live="polite" aria-label="Messages in the chat">
+    <ol className={cx(s.pops, dark && s.dark, className)} aria-live="polite" aria-label={t('network.pops.messages')}>
       {pops.map((p) => (
         <Pop key={p.id} pop={p} age={Math.max(0, now - p.at)} />
       ))}

@@ -3,6 +3,7 @@ import type { Actor } from '../../../../src/core/board/model.js';
 import { AUTONOMY_INFO, type Autonomy, type Plan, type PlanBody, type PlanEvent, type PlanPr, type PlansState, diffBodies, milestoneDeps, planTitle, reviewState, shownBody } from '../../../../src/core/plans/model.js';
 import { type MilestoneState, type MilestoneView, type NextStep, type PlanView, type TaskState, type TaskView, agentNowWords } from '../../../../src/core/plans/progress.js';
 import { pulseWords } from '../../../../src/core/plans/watchdog.js';
+import { type Key, t } from '../../../../src/shared/i18n/index.js';
 
 /**
  * The Plans screens' pure parts (no DOM): words and tones for states, what a plan waits for as a
@@ -12,32 +13,38 @@ import { pulseWords } from '../../../../src/core/plans/watchdog.js';
 
 export type Tone = 'muted' | 'neutral' | 'claude' | 'info' | 'ok' | 'warn' | 'error' | 'accent';
 
-export const TASK_STATE: Readonly<Record<TaskState, { readonly label: string; readonly tone: Tone }>> = {
-  draft: { label: 'Draft', tone: 'muted' },
-  later: { label: 'Later', tone: 'muted' },
-  blocked: { label: 'Waiting', tone: 'muted' },
-  ready: { label: 'Ready', tone: 'accent' },
-  running: { label: 'Working', tone: 'claude' },
-  asking: { label: 'Waiting for you', tone: 'warn' },
-  idle: { label: 'Stopped without finishing', tone: 'warn' },
-  stalled: { label: 'Needs you', tone: 'warn' },
-  review: { label: 'In review', tone: 'info' },
-  planned: { label: 'Merged into plan', tone: 'info' },
-  done: { label: 'Done', tone: 'ok' },
-  canceled: { label: 'Canceled', tone: 'muted' },
-  missing: { label: 'Deleted', tone: 'muted' },
-};
+const and = (xs: readonly string[]): string => xs.join(` ${t('common.and')} `);
 
-export const MILESTONE_STATE: Readonly<Record<MilestoneState, { readonly label: string; readonly tone: Tone }>> = {
-  draft: { label: 'Draft', tone: 'muted' },
-  later: { label: 'Up next', tone: 'muted' },
-  running: { label: 'In progress', tone: 'claude' },
-  checking: { label: 'Agent is checking', tone: 'claude' },
-  gate: { label: 'Ready to pass', tone: 'accent' },
-  failed: { label: 'Check failed', tone: 'error' },
-  merging: { label: 'Merging into the plan', tone: 'claude' },
-  passed: { label: 'Passed', tone: 'ok' },
-};
+/** Its words are said at render (getters), so a language change shows at once. */
+const stateWords = <S extends string>(words: Record<S, readonly [Key, Tone]>): Readonly<Record<S, { readonly label: string; readonly tone: Tone }>> =>
+  Object.fromEntries(Object.entries<readonly [Key, Tone]>(words).map(([s, [key, tone]]) => [s, { get label() { return t(key); }, tone }])) as Record<S, { readonly label: string; readonly tone: Tone }>;
+
+export const TASK_STATE: Readonly<Record<TaskState, { readonly label: string; readonly tone: Tone }>> = stateWords<TaskState>({
+  draft: ['plans.m.draft', 'muted'],
+  later: ['plans.m.later', 'muted'],
+  blocked: ['plans.m.waiting', 'muted'],
+  ready: ['plans.m.ready', 'accent'],
+  running: ['plans.m.working', 'claude'],
+  asking: ['plans.m.waitingForYou', 'warn'],
+  idle: ['plans.m.stoppedUnfinished', 'warn'],
+  stalled: ['plans.m.needsYou', 'warn'],
+  review: ['plans.m.inReview', 'info'],
+  planned: ['plans.m.mergedIntoPlan', 'info'],
+  done: ['plans.m.taskDone', 'ok'],
+  canceled: ['plans.m.canceled', 'muted'],
+  missing: ['plans.m.deleted', 'muted'],
+});
+
+export const MILESTONE_STATE: Readonly<Record<MilestoneState, { readonly label: string; readonly tone: Tone }>> = stateWords<MilestoneState>({
+  draft: ['plans.m.draft', 'muted'],
+  later: ['plans.m.upNext', 'muted'],
+  running: ['plans.m.inProgress', 'claude'],
+  checking: ['plans.m.agentChecking', 'claude'],
+  gate: ['plans.m.readyToPass', 'accent'],
+  failed: ['plans.m.checkFailed', 'error'],
+  merging: ['plans.m.mergingIntoPlan', 'claude'],
+  passed: ['plans.m.passed', 'ok'],
+});
 
 /**
  * A milestone's status text in the plan's list: its state, plus when it runs. Open milestones say
@@ -48,36 +55,36 @@ export function milestoneLabel(view: Pick<PlanView, 'milestones' | 'open'>, m: M
   const title = (id: string): string => `“${view.milestones.find((x) => x.milestone.id === id)?.milestone.title ?? id}”`;
   if (m.state === 'later') {
     const waits = m.dependsOn.filter((d) => view.milestones.find((x) => x.milestone.id === d)?.state !== 'passed');
-    return waits.length ? `After ${waits.map(title).join(' and ')}` : base;
+    return waits.length ? t('plans.m.after', { list: and(waits.map(title)) }) : base;
   }
   const beside = view.open.filter((x) => x.milestone.id !== m.milestone.id);
   if (!view.open.some((x) => x.milestone.id === m.milestone.id) || !beside.length) return base;
-  return `${base} · alongside ${beside.length > 2 ? `${beside.length} others` : beside.map((x) => title(x.milestone.id)).join(' and ')}`;
+  return t('plans.m.alongside', { base, who: beside.length > 2 ? t('plans.m.others', { count: beside.length }) : and(beside.map((x) => title(x.milestone.id))) });
 }
 
 /** How a plan is, in one word, for lists and the page's header. */
 export function planStatus(view: Pick<PlanView, 'plan' | 'next'>): { readonly label: string; readonly tone: Tone } {
   const { plan, next } = view;
-  if (!plan.body) return { label: 'Draft', tone: 'muted' };
-  if (plan.status === 'done' && !plan.draft) return next.kind === 'ship' ? { label: plan.pr?.state === 'CLOSED' ? 'PR closed' : plan.pr ? 'PR open' : 'Ready to ship', tone: plan.pr?.state === 'CLOSED' ? 'warn' : 'accent' } : { label: 'Done', tone: 'ok' };
-  if (plan.draft) return { label: 'Changes proposed', tone: 'accent' };
-  if (plan.paused) return { label: 'Paused', tone: 'muted' };
+  if (!plan.body) return { label: t('plans.m.draft'), tone: 'muted' };
+  if (plan.status === 'done' && !plan.draft) return next.kind === 'ship' ? { label: plan.pr?.state === 'CLOSED' ? t('plans.m.prClosed') : plan.pr ? t('plans.m.prOpen') : t('plans.m.readyToShip'), tone: plan.pr?.state === 'CLOSED' ? 'warn' : 'accent' } : { label: t('plans.m.done'), tone: 'ok' };
+  if (plan.draft) return { label: t('plans.m.changesProposed'), tone: 'accent' };
+  if (plan.paused) return { label: t('plans.m.paused'), tone: 'muted' };
   switch (next.kind) {
     case 'pass':
     case 'start':
     case 'answer':
     case 'stalled':
-      return { label: 'Waiting for you', tone: 'accent' };
+      return { label: t('plans.m.waitingForYou'), tone: 'accent' };
     case 'failed':
-      return { label: 'Needs a fix', tone: 'error' };
+      return { label: t('plans.m.needsFix'), tone: 'error' };
     case 'checking':
-      return { label: 'Checking', tone: 'claude' };
+      return { label: t('plans.m.checking'), tone: 'claude' };
     case 'merging':
-      return next.milestone.merging?.conflict?.stuck ? { label: 'Waiting for you', tone: 'accent' } : { label: 'Merging', tone: 'claude' };
+      return next.milestone.merging?.conflict?.stuck ? { label: t('plans.m.waitingForYou'), tone: 'accent' } : { label: t('plans.m.merging'), tone: 'claude' };
     case 'working':
-      return { label: 'Running', tone: 'claude' };
+      return { label: t('plans.m.running'), tone: 'claude' };
     default:
-      return { label: 'Waiting', tone: 'muted' };
+      return { label: t('plans.m.waiting'), tone: 'muted' };
   }
 }
 
@@ -105,40 +112,40 @@ export function milestoneNowWords(m: Pick<MilestoneView, 'agentNow' | 'agent' | 
 export function nextWords(next: NextStep): { readonly title: string; readonly detail?: string } {
   switch (next.kind) {
     case 'approve':
-      return { title: 'Approve Plan', detail: 'Its tasks go on the board and the plan starts' };
+      return { title: t('plans.approvePlan'), detail: t('plans.m.approveDetail') };
     case 'review_changes':
-      return { title: 'Apply Changes', detail: 'Your agent proposed changes to the plan' };
+      return { title: t('plans.applyChanges'), detail: t('plans.m.reviewChangesDetail') };
     case 'resume':
-      return { title: 'Resume', detail: 'Paused: nothing starts until you resume it' };
+      return { title: t('plans.resume'), detail: t('plans.m.resumeDetail') };
     case 'start': {
       // Yours: no worktree, you answer it in the plan's conversation (see core/plans/decisions.ts).
-      const yours = next.tasks.filter((t) => t.forYou);
-      if (yours.length === next.tasks.length) return { title: yours.length === 1 ? `Answer “${yours[0]!.task.title}”` : `Answer ${yours.length} Decisions`, detail: 'Yours: answer in the plan’s conversation, and it carries on' };
+      const yours = next.tasks.filter((x) => x.forYou);
+      if (yours.length === next.tasks.length) return { title: yours.length === 1 ? t('plans.m.answerOne', { title: yours[0]!.task.title }) : t('plans.m.answerMany', { count: yours.length }), detail: t('plans.m.answerDetail') };
       const claude = next.tasks.length - yours.length;
-      return { title: claude === 1 ? `Start “${next.tasks.find((t) => !t.forYou)!.task.title}”` : `Start ${claude} Tasks`, detail: claude === 1 ? 'Ready to go' : 'Ready to go, side by side' };
+      return { title: claude === 1 ? t('plans.m.startOne', { title: next.tasks.find((x) => !x.forYou)!.task.title }) : t('plans.m.startMany', { count: claude }), detail: claude === 1 ? t('plans.m.readyToGo') : t('plans.m.readyToGoSide') };
     }
     case 'pass':
-      return { title: `Pass “${next.milestone.milestone.title}”`, detail: next.milestone.run.check ? (next.milestone.run.check.verdict === 'pass' ? 'The agent checked it: every criterion holds' : 'The agent’s check found problems') : 'Every task is finished' };
+      return { title: t('plans.m.passTitle', { title: next.milestone.milestone.title }), detail: next.milestone.run.check ? (next.milestone.run.check.verdict === 'pass' ? t('plans.m.checkedHolds') : t('plans.m.checkFoundProblems')) : t('plans.m.everyTaskFinished') };
     case 'checking':
-      return { title: 'Agent is checking', detail: `The pass criteria of “${next.milestone.milestone.title}”` };
+      return { title: t('plans.m.agentChecking'), detail: t('plans.m.passCriteriaOf', { title: next.milestone.milestone.title }) };
     case 'failed':
-      return { title: 'Needs a fix', detail: `“${next.milestone.milestone.title}” didn’t pass the agent’s check` };
+      return { title: t('plans.m.needsFix'), detail: t('plans.m.didntPass', { title: next.milestone.milestone.title }) };
     case 'answer':
-      return { title: 'Your agent asked something', detail: next.tasks.map((t) => t.issue?.key ?? t.task.title).join(', ') };
+      return { title: t('plans.m.agentAsked'), detail: next.tasks.map((x) => x.issue?.key ?? x.task.title).join(', ') };
     case 'stalled':
-      return { title: next.tasks.length === 1 ? `Resume ${next.tasks[0]!.issue?.key ?? `“${next.tasks[0]!.task.title}”`}` : `Resume ${next.tasks.length} Tasks`, detail: next.tasks.map((t) => t.watch?.line ?? `${t.issue?.key ?? t.task.title} stopped again`).join(' · ') };
+      return { title: next.tasks.length === 1 ? t('plans.m.resumeOne', { what: next.tasks[0]!.issue?.key ?? `“${next.tasks[0]!.task.title}”` }) : t('plans.m.resumeMany', { count: next.tasks.length }), detail: next.tasks.map((x) => x.watch?.line ?? t('plans.m.stoppedAgain', { what: x.issue?.key ?? x.task.title })).join(' · ') };
     case 'working':
-      return { title: next.tasks.length ? `${next.tasks.length} ${next.tasks.length === 1 ? 'task' : 'tasks'} in progress` : 'Starting…', ...(next.note ? { detail: next.note } : {}) };
+      return { title: next.tasks.length ? t('plans.m.inProgressCount', { count: next.tasks.length }) : t('tasks.starting'), ...(next.note ? { detail: next.note } : {}) };
     case 'waiting':
-      return { title: 'Waiting', detail: next.why };
+      return { title: t('plans.m.waiting'), detail: next.why };
     case 'merging':
-      return { title: next.text, detail: `“${next.milestone.milestone.title}” passes once its work is merged into the plan’s branch` };
+      return { title: next.text, detail: t('plans.m.passesOnceMerged', { title: next.milestone.milestone.title }) };
     case 'ship':
-      if (next.pr?.state === 'OPEN') return { title: `Pull request #${next.pr.number} is open`, detail: `${next.branch} → main: ${prWords(next.pr)}` };
-      if (next.pr?.state === 'CLOSED') return { title: `Pull request #${next.pr.number} was closed`, detail: 'Closed without merging: the plan’s tasks stay merged into the plan' };
-      return { title: 'Open PR', detail: `Every milestone passed: ${next.branch} has all the plan’s work` };
+      if (next.pr?.state === 'OPEN') return { title: t('plans.m.prIsOpen', { number: next.pr.number }), detail: `${next.branch} → main: ${prWords(next.pr)}` };
+      if (next.pr?.state === 'CLOSED') return { title: t('plans.m.prWasClosed', { number: next.pr.number }), detail: t('plans.m.closedDetail') };
+      return { title: t('plans.openPr'), detail: t('plans.m.everyPassedBranch', { branch: next.branch }) };
     case 'done':
-      return { title: 'Done', detail: 'Every milestone passed' };
+      return { title: t('plans.m.done'), detail: t('plans.m.everyPassed') };
   }
 }
 
@@ -201,7 +208,8 @@ interface BranchBits {
 const branchBits = (plan: Plan): BranchBits => plan as Plan & BranchBits;
 
 const quoted = (m: MilestoneView): string => `“${m.milestone.title}”`;
-const count = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
+/** “3 tasks”, said (`plans.m.n.<what>` is a plural entry). */
+const count = (n: number, what: 'task' | 'thing' | 'milestone' | 'otherTask' | 'readyTask'): string => t(`plans.m.n.${what}`, { count: n });
 
 /** What's merging into the plan's branch now, when the plan carries that (a conflict first). */
 function mergingLine(view: PlanView): Headline | undefined {
@@ -210,13 +218,13 @@ function mergingLine(view: PlanView): Headline | undefined {
   const conflict = entries.find(([, m]) => m.conflict);
   if (conflict) {
     const c = conflict[1].conflict!;
-    const what = c.key ?? c.merging ?? 'the plan’s branch';
-    return c.stuck ? { who: 'you', text: `Fix the merge conflict in ${what}${c.files?.length ? ` (${c.files.slice(0, 2).join(', ')})` : ''}` } : { who: 'claude', text: `Fixing a merge conflict in ${what}` };
+    const what = c.key ?? c.merging ?? t('plans.thePlansBranch');
+    return c.stuck ? { who: 'you', text: c.files?.length ? t('plans.m.fixConflictFiles', { what, files: c.files.slice(0, 2).join(', ') }) : t('plans.m.fixConflict', { what }) } : { who: 'claude', text: t('plans.m.fixingConflictIn', { what }) };
   }
   const first = entries[0];
   if (!first) return undefined;
   const m = view.milestones.find((x) => x.milestone.id === first[0]);
-  return { who: 'beluga', text: `Merging ${m ? quoted(m) : 'a milestone'} into ${branchBits(view.plan).branch ?? 'the plan’s branch'}` };
+  return { who: 'beluga', text: t('plans.m.mergingInto', { what: m ? quoted(m) : t('plans.aMilestone'), branch: branchBits(view.plan).branch ?? t('plans.thePlansBranch') }) };
 }
 
 /**
@@ -226,17 +234,17 @@ function mergingLine(view: PlanView): Headline | undefined {
  */
 export function headline(view: PlanView): Headline {
   const { plan, next } = view;
-  const running = view.active.filter((t) => t.state === 'running' || t.state === 'idle');
-  const inMilestones = new Set(running.map((t) => t.milestoneId)).size;
-  const alsoRunning = running.length ? ` · ${count(running.length, 'task')} running` : '';
+  const running = view.active.filter((x) => x.state === 'running' || x.state === 'idle');
+  const inMilestones = new Set(running.map((x) => x.milestoneId)).size;
+  const alsoRunning = running.length ? t('plans.m.alsoRunning', { tasks: count(running.length, 'task') }) : '';
   if (!plan.body && view.milestones.length) {
     // The draft's review before approval (BLG-772).
     const review = reviewState(plan);
-    if (review === 'reviewing') return { who: 'claude', text: plan.review?.thenApprove ? 'A fresh agent is verifying the plan; it’s approved once nothing needs fixing' : 'A fresh agent is verifying the plan' };
-    if (review === 'findings' && !plan.review?.fixAsked) return { who: 'you', text: `Verifying found ${count(plan.review!.findings.length, 'thing')} to fix in the plan: Fix, or approve anyway` };
+    if (review === 'reviewing') return { who: 'claude', text: plan.review?.thenApprove ? t('plans.m.verifyingThenApprove') : t('plans.verifyingToast') };
+    if (review === 'findings' && !plan.review?.fixAsked) return { who: 'you', text: t('plans.m.verifyFound', { things: count(plan.review!.findings.length, 'thing') }) };
   }
-  if (!plan.body) return view.milestones.length ? { who: 'you', text: `Approve the plan: ${count(view.milestones.length, 'milestone')} · ${count(view.total, 'task')} · a draft, not on the board yet` } : { who: 'claude', text: 'Your agent is writing the plan' };
-  if (plan.draft) return { who: 'you', text: `Review your agent’s changes: ${changeWords(plan)}` };
+  if (!plan.body) return view.milestones.length ? { who: 'you', text: t('plans.m.approveDraft', { milestones: count(view.milestones.length, 'milestone'), tasks: count(view.total, 'task') }) } : { who: 'claude', text: t('plans.m.writingPlan') };
+  if (plan.draft) return { who: 'you', text: t('plans.m.reviewChanges', { changes: changeWords(plan) }) };
   if (next.kind !== 'done' && next.kind !== 'answer' && next.kind !== 'failed') {
     const merging = mergingLine(view);
     if (merging) return merging;
@@ -244,82 +252,82 @@ export function headline(view: PlanView): Headline {
   switch (next.kind) {
     case 'approve':
     case 'review_changes':
-      return { who: 'you', text: `Review your agent’s changes: ${changeWords(plan)}` };
+      return { who: 'you', text: t('plans.m.reviewChanges', { changes: changeWords(plan) }) };
     case 'resume':
-      return { who: 'you', text: 'Resume the plan: it’s paused, nothing starts' };
+      return { who: 'you', text: t('plans.m.resumePlan') };
     case 'answer':
-      return { who: 'you', text: `Answer your agent in ${next.tasks.map((t) => t.issue?.key ?? `“${t.task.title}”`).join(', ')}` };
+      return { who: 'you', text: t('plans.m.answerAgentIn', { list: next.tasks.map((x) => x.issue?.key ?? `“${x.task.title}”`).join(', ') }) };
     case 'failed':
-      return { who: 'you', text: `${quoted(next.milestone)} didn’t pass the agent’s check: send it back or pass it anyway` };
+      return { who: 'you', text: t('plans.m.failedLine', { title: quoted(next.milestone) }) };
     case 'pass': {
       const m = next.milestone;
       const failed = m.run.mergeFailed;
-      if (failed) return { who: 'you', text: `${quoted(m)} couldn’t merge into ${plan.branch ?? 'the plan’s branch'}: ${failed.reason} — fix that, then pass it again` };
+      if (failed) return { who: 'you', text: t('plans.m.couldntMergeLine', { title: quoted(m), branch: plan.branch ?? t('plans.thePlansBranch'), reason: failed.reason }) };
       const n = m.milestone.criteria.length;
-      const why = m.run.check?.verdict === 'pass' ? `The agent checked ${n === 1 ? 'its criterion' : n === 2 ? 'both criteria' : `all ${n} criteria`}` : 'every task is finished';
-      return { who: 'you', text: `Pass ${quoted(m)} — ${why}` };
+      const why = m.run.check?.verdict === 'pass' ? (n === 1 ? t('plans.m.checkedIts') : n === 2 ? t('plans.m.checkedBoth') : t('plans.m.checkedAll', { n })) : t('plans.m.everyTaskFinishedLower');
+      return { who: 'you', text: t('plans.m.passLine', { title: quoted(m), why }) };
     }
     case 'start':
-      return { who: 'you', text: next.tasks.length === 1 ? `Start “${next.tasks[0]!.task.title}”` : `Start ${count(next.tasks.length, 'task')}` };
+      return { who: 'you', text: next.tasks.length === 1 ? t('plans.m.startOne', { title: next.tasks[0]!.task.title }) : t('plans.m.startLine', { tasks: count(next.tasks.length, 'task') }) };
     case 'checking':
-      return { who: 'claude', text: `The agent is checking ${quoted(next.milestone)}${alsoRunning}` };
+      return { who: 'claude', text: t('plans.m.agentCheckingLine', { title: quoted(next.milestone), also: alsoRunning }) };
     case 'working': {
-      if (running.length) return { who: 'claude', text: `${count(running.length, 'task')} running${inMilestones > 1 ? ` in ${inMilestones} milestones` : ''}` };
+      if (running.length) return { who: 'claude', text: inMilestones > 1 ? t('plans.m.runningIn', { tasks: count(running.length, 'task'), n: inMilestones }) : t('plans.m.runningTasks', { tasks: count(running.length, 'task') }) };
       const starting = startingMilestones(view);
-      return { who: 'beluga', text: starting.length ? settingUp(view, starting) : 'Starting the next tasks' };
+      return { who: 'beluga', text: starting.length ? settingUp(view, starting) : t('plans.m.startingNext') };
     }
     case 'waiting':
       return { who: 'beluga', text: next.why };
     case 'merging':
       return { who: next.milestone.merging?.conflict?.stuck ? 'you' : 'beluga', text: next.text };
     case 'stalled':
-      return { who: 'you', text: `Resume ${next.tasks.map((t) => t.issue?.key ?? `“${t.task.title}”`).join(', ')}: its agent stopped again without finishing` };
+      return { who: 'you', text: t('plans.m.resumeStalled', { list: next.tasks.map((x) => x.issue?.key ?? `“${x.task.title}”`).join(', ') }) };
     case 'ship':
       return shipHeadline(plan, next.branch, next.pr);
     case 'done':
-      return { who: 'beluga', text: 'Done: every milestone passed' };
+      return { who: 'beluga', text: t('plans.m.doneLine') };
   }
 }
 
 /** From a task's worktree: where it stands in its plan, in the same voice as the plan's sentence. */
 export function taskHeadline(view: PlanView, taskId: string): Headline | undefined {
-  const t = view.milestones.flatMap((m) => m.tasks).find((x) => x.task.id === taskId);
-  const m = t && view.milestones.find((x) => x.milestone.id === t.milestoneId);
-  if (!t || !m) return undefined;
-  const into = 'Beluga merges this into the plan';
-  const state = t.state as string;
-  if (state === 'planned') return { who: 'beluga', text: 'Merged into the plan; done when the plan’s pull request merges' };
-  switch (t.state) {
+  const task = view.milestones.flatMap((m) => m.tasks).find((x) => x.task.id === taskId);
+  const m = task && view.milestones.find((x) => x.milestone.id === task.milestoneId);
+  if (!task || !m) return undefined;
+  const into = t('plans.m.into');
+  const state = task.state as string;
+  if (state === 'planned') return { who: 'beluga', text: t('plans.m.tMerged') };
+  switch (task.state) {
     case 'running':
-      return { who: 'claude', text: t.step ? `The agent is working on this: ${t.step}` : 'The agent is working on this' };
+      return { who: 'claude', text: task.step ? t('plans.m.tWorkingStep', { step: task.step }) : t('plans.m.tWorking') };
     case 'asking':
-      return { who: 'you', text: 'The agent asked you something here' };
+      return { who: 'you', text: t('plans.m.tAsked') };
     case 'idle':
-      return { who: 'beluga', text: 'In progress; nobody is working on it right now' };
+      return { who: 'beluga', text: t('plans.m.tIdle') };
     case 'ready':
-      if (t.forYou) return { who: 'you', text: 'Yours: answer it in the plan’s conversation (no worktree)' };
-      if (t.queued) return { who: 'claude', text: 'Next for this milestone’s agent, in its worktree' };
-      return m.autonomy === 'step' ? { who: 'you', text: 'Ready: start it from the plan' } : { who: 'beluga', text: 'Ready: it starts by itself' };
+      if (task.forYou) return { who: 'you', text: t('plans.m.tYours') };
+      if (task.queued) return { who: 'claude', text: t('plans.m.tQueued') };
+      return m.autonomy === 'step' ? { who: 'you', text: t('plans.m.tReadyStep') } : { who: 'beluga', text: t('plans.m.tReadyAuto') };
     case 'blocked':
     case 'later':
-      return { who: 'beluga', text: t.why ?? 'Waiting' };
+      return { who: 'beluga', text: task.why ?? t('plans.m.waiting') };
     case 'done':
-      return { who: 'beluga', text: m.state === 'passed' ? 'Done and in the plan' : `Done. Waiting for ${quoted(m)} to pass` };
+      return { who: 'beluga', text: m.state === 'passed' ? t('plans.m.tDoneIn') : t('plans.m.tDoneWaiting', { title: quoted(m) }) };
     case 'canceled':
     case 'missing':
-      return { who: 'beluga', text: 'Taken out of the plan' };
+      return { who: 'beluga', text: t('plans.m.tTakenOut') };
     case 'draft':
-      return { who: 'you', text: 'A draft: approve the plan first' };
+      return { who: 'you', text: t('plans.m.tDraft') };
     case 'review':
       break;
   }
   // Done here: what's left is the milestone's.
-  const others = m.tasks.filter((x) => x !== t && !['review', 'done', 'canceled', 'missing', 'planned'].includes(x.state)).length;
-  if (m.state === 'running') return { who: 'beluga', text: `Done. Waiting for ${count(others, 'other task')} of ${quoted(m)}, then the milestone check; ${into}` };
-  if (m.state === 'checking' || (m.state === 'gate' && m.milestone.criteria.length && !m.run.check)) return { who: 'claude', text: `Done. The agent is checking ${quoted(m)}; ${into}` };
-  if (m.state === 'gate') return m.autonomy === 'autopilot' ? { who: 'beluga', text: `Done. ${quoted(m)} passes by itself; ${into}` } : { who: 'you', text: `Done. Pass ${quoted(m)} in the plan; ${into}` };
-  if (m.state === 'failed') return { who: 'you', text: `Done, but ${quoted(m)} didn’t pass the agent’s check` };
-  return { who: 'beluga', text: `Done. Waiting for the milestone check; ${into}` };
+  const others = m.tasks.filter((x) => x !== task && !['review', 'done', 'canceled', 'missing', 'planned'].includes(x.state)).length;
+  if (m.state === 'running') return { who: 'beluga', text: t('plans.m.tWaitOthers', { others: count(others, 'otherTask'), title: quoted(m), into }) };
+  if (m.state === 'checking' || (m.state === 'gate' && m.milestone.criteria.length && !m.run.check)) return { who: 'claude', text: t('plans.m.tChecking', { title: quoted(m), into }) };
+  if (m.state === 'gate') return m.autonomy === 'autopilot' ? { who: 'beluga', text: t('plans.m.tPassesItself', { title: quoted(m), into }) } : { who: 'you', text: t('plans.m.tPassIt', { title: quoted(m), into }) };
+  if (m.state === 'failed') return { who: 'you', text: t('plans.m.tFailed', { title: quoted(m) }) };
+  return { who: 'beluga', text: t('plans.m.tWaitCheck', { into }) };
 }
 
 // ---- changing how a plan runs
@@ -329,25 +337,25 @@ export function modeChange(view: PlanView, to: Autonomy): { readonly title: stri
   const branch = branchBits(view.plan).branch;
   const label = AUTONOMY_INFO[to].label;
   const from = {
-    step: 'From now on nothing starts by itself: you start each task. Tasks already running go on.',
-    gated: 'From now on tasks start by themselves, and each milestone waits for you to pass it once the agent has checked it.',
-    autopilot: `From now on the agent passes milestones itself${branch ? ` and merges them into ${branch}` : ''}. It stops only if a check fails.`,
+    step: t('plans.m.fromStep'),
+    gated: t('plans.m.fromGated'),
+    autopilot: branch ? t('plans.m.fromAutopilotBranch', { branch }) : t('plans.m.fromAutopilot'),
   }[to];
   const open = view.open;
   const nowBits: string[] = [];
   if (to === 'autopilot') {
     const passing = open.filter((m) => m.state === 'gate' && (m.run.check?.verdict === 'pass' || !m.milestone.criteria.length));
-    if (passing.length) nowBits.push(`${passing.map(quoted).join(' and ')} ${passing.length === 1 ? 'passes' : 'pass'} now`);
+    if (passing.length) nowBits.push(t('plans.m.passNow', { count: passing.length, list: and(passing.map(quoted)) }));
   }
   if (to !== 'step') {
-    const ready = view.ready.filter((t) => !t.forYou).length;
+    const ready = view.ready.filter((x) => !x.forYou).length;
     const room = Math.max(0, view.plan.maxParallel - view.active.length);
     const starts = Math.min(ready, room);
-    if (starts) nowBits.push(`${count(starts, 'ready task')} ${starts === 1 ? 'starts' : 'start'} now`);
+    if (starts) nowBits.push(t('plans.m.startNow', { count: starts }));
   }
-  if (view.plan.body?.milestones.some((m) => m.autonomy && m.autonomy !== to)) nowBits.push('milestones you set their own way follow this too');
+  if (view.plan.body?.milestones.some((m) => m.autonomy && m.autonomy !== to)) nowBits.push(t('plans.m.ownWayToo'));
   const now = nowBits.length ? `${nowBits.join('; ')}.` : undefined;
-  return { title: `Switch to ${label}`, from, ...(now ? { now: now[0]!.toUpperCase() + now.slice(1) } : {}) };
+  return { title: t('plans.m.switchTo', { label }), from, ...(now ? { now: now[0]!.toUpperCase() + now.slice(1) } : {}) };
 }
 
 // ---- what happened
@@ -432,8 +440,8 @@ export function changeMarks(plan: Plan): ReadonlyMap<string, 'added' | 'changed'
 
 export function changeWords(plan: Plan): string {
   const d = diffBodies(plan.body, plan.draft);
-  const parts = [d.added.length ? `${d.added.length} new` : '', d.changed.length ? `${d.changed.length} changed` : '', d.removed.length ? `${d.removed.length} taken out` : ''].filter(Boolean);
-  return parts.length ? parts.join(' · ') : 'Milestones changed';
+  const parts = [d.added.length ? t('plans.m.nNew', { n: d.added.length }) : '', d.changed.length ? t('plans.m.nChanged', { n: d.changed.length }) : '', d.removed.length ? t('plans.m.nTakenOut', { n: d.removed.length }) : ''].filter(Boolean);
+  return parts.length ? parts.join(' · ') : t('plans.m.milestonesChanged');
 }
 
 // ---- the graph's structure
@@ -502,13 +510,13 @@ export interface MilestoneLink {
  * says Merging, Fixing a conflict or Conflict while that runs, never a silent "Passed".
  */
 export function milestoneLink(m: MilestoneView | undefined): MilestoneLink {
-  if (!m) return { state: 'waiting', label: 'Unlocks' };
+  if (!m) return { state: 'waiting', label: t('plans.m.unlocks') };
   if (m.state === 'merging') {
     const c = m.merging?.conflict;
-    return { state: 'ready', label: c ? (c.stuck ? 'Conflict: needs you' : 'Fixing a conflict') : 'Merging' };
+    return { state: 'ready', label: c ? (c.stuck ? t('plans.conflictNeedsYou') : t('plans.m.fixingAConflict')) : t('plans.m.merging') };
   }
-  if (m.state === 'passed' || m.run.passedAt) return { state: 'done', label: 'Unlocked' };
-  return { state: m.state === 'gate' || m.state === 'checking' ? 'ready' : 'waiting', label: 'Unlocks' };
+  if (m.state === 'passed' || m.run.passedAt) return { state: 'done', label: t('plans.m.unlocked') };
+  return { state: m.state === 'gate' || m.state === 'checking' ? 'ready' : 'waiting', label: t('plans.m.unlocks') };
 }
 
 /**
@@ -530,17 +538,17 @@ export function milestoneJoin(parents: readonly (MilestoneView | undefined)[], b
   const total = parents.length;
   const state: MilestoneLink['state'] = passed === total ? 'done' : links.some((l) => l.state === 'ready') ? 'ready' : 'waiting';
   const left = parents.filter((m, i) => m && links[i]!.state !== 'done').map((m) => `“${m!.milestone.title}”`);
-  const into = branch ? ` and merged into ${branch}` : '';
-  const tip = passed === total ? `All ${total} passed${into}: it starts from ${branch ?? 'their work'}` : `Unlocks when all ${total} have passed${into} · waiting on ${left.join(', ')}`;
+  const into = branch ? t('plans.m.andMergedInto', { branch }) : '';
+  const tip = passed === total ? t('plans.m.joinAllPassed', { total, into, from: branch ?? t('plans.m.theirWork') }) : t('plans.m.joinWaiting', { total, into, list: left.join(', ') });
   return { passed, total, state, tip };
 }
 
 /** What a gated milestone's lock says: what it waits on, or the branch it starts from once they're in. */
 export function lockWords(waitsOn: readonly string[], dependsOn: number, branch: string | undefined): string {
-  const names = waitsOn.map((t) => `“${t}”`).join(' and ');
-  if (waitsOn.length) return `Unlocks when ${names} ${waitsOn.length === 1 ? 'passes' : 'pass'}${branch ? ` and ${waitsOn.length === 1 ? 'is' : 'are'} merged into ${branch}` : ''}`;
-  if (!branch) return 'Unlocked';
-  return `Unlocked: starts from ${branch}, with ${dependsOn === 1 ? 'the milestone before it' : `all ${dependsOn} before it`} merged in`;
+  const names = and(waitsOn.map((x) => `“${x}”`));
+  if (waitsOn.length) return branch ? t('plans.m.lockWaitsBranch', { count: waitsOn.length, names, branch }) : t('plans.m.lockWaits', { count: waitsOn.length, names });
+  if (!branch) return t('plans.m.unlocked');
+  return dependsOn === 1 ? t('plans.m.unlockedFromOne', { branch }) : t('plans.m.unlockedFromAll', { branch, n: dependsOn });
 }
 
 // ---------------------------------------------------------------- setting up
@@ -566,28 +574,28 @@ export function startingMilestones(view: Pick<PlanView, 'plan' | 'open'>): reado
 /** “Setting up: making the plan's branch, then starting an agent for “API” and “UI”” */
 export function settingUp(view: Pick<PlanView, 'plan'>, starting: readonly MilestoneView[]): string {
   const names = starting.map((m) => `“${m.milestone.title}”`);
-  const list = names.length > 2 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names.join(' and ');
-  return `Setting up: ${view.plan.branch ? '' : 'making the plan’s branch, then '}starting an agent for ${list}`;
+  const list = names.length > 2 ? `${names.slice(0, -1).join(', ')} ${t('common.and')} ${names.at(-1)}` : and(names);
+  return view.plan.branch ? t('plans.m.settingUp', { list }) : t('plans.m.settingUpBranch', { list });
 }
 
 // ---- the plan's branch and pull request
 
 /** What stands in the way of the plan's pull request, in a few words (“checks pending · needs a review”). */
 export function prWords(pr: PlanPr): string {
-  if (pr.state === 'MERGED') return 'merged into main';
-  if (pr.state === 'CLOSED') return 'closed without merging';
+  if (pr.state === 'MERGED') return t('plans.m.pr.merged');
+  if (pr.state === 'CLOSED') return t('plans.m.pr.closed');
   const bits: string[] = [];
-  if (pr.draft) bits.push('a draft');
-  if (pr.conflicts) bits.push('conflicts with main');
-  else if (pr.mergeState === 'behind') bits.push('behind main');
-  if (pr.checks === 'failing') bits.push('checks failing');
-  else if (pr.checks === 'pending') bits.push('checks running');
-  else if (pr.checks === 'passing') bits.push('checks pass');
-  if (pr.review === 'CHANGES_REQUESTED') bits.push('changes requested');
-  else if (pr.review === 'REVIEW_REQUIRED') bits.push('needs a review');
-  else if (pr.review === 'APPROVED') bits.push('approved');
-  if (pr.autoMerge) bits.push('merges when checks pass');
-  return bits.length ? bits.join(' · ') : 'ready to merge';
+  if (pr.draft) bits.push(t('plans.m.pr.draft'));
+  if (pr.conflicts) bits.push(t('plans.m.pr.conflicts'));
+  else if (pr.mergeState === 'behind') bits.push(t('plans.m.pr.behind'));
+  if (pr.checks === 'failing') bits.push(t('plans.m.pr.failing'));
+  else if (pr.checks === 'pending') bits.push(t('plans.m.pr.pending'));
+  else if (pr.checks === 'passing') bits.push(t('plans.m.pr.passing'));
+  if (pr.review === 'CHANGES_REQUESTED') bits.push(t('plans.m.pr.changesRequested'));
+  else if (pr.review === 'REVIEW_REQUIRED') bits.push(t('plans.m.pr.needsReview'));
+  else if (pr.review === 'APPROVED') bits.push(t('plans.m.pr.approved'));
+  if (pr.autoMerge) bits.push(t('plans.m.pr.autoMerge'));
+  return bits.length ? bits.join(' · ') : t('plans.m.pr.ready');
 }
 
 /**
@@ -619,32 +627,32 @@ export function shipAction(plan: Plan, pr: PlanPr | undefined): ShipAction {
   return { kind: 'merge' };
 }
 
-const fileList = (files: readonly string[]): string => files.slice(0, 2).join(', ') + (files.length > 2 ? ` and ${files.length - 2} more` : '');
+const fileList = (files: readonly string[]): string => files.slice(0, 2).join(', ') + (files.length > 2 ? ` ${t('plans.andMore', { count: files.length - 2 })}` : '');
 
 function shipHeadline(plan: Plan, branch: string, pr: PlanPr | undefined): Headline {
   const a = shipAction(plan, pr);
-  const n = pr ? `#${pr.number}` : 'the pull request';
+  const n = pr ? `#${pr.number}` : t('plans.m.thePr');
   switch (a.kind) {
     case 'open':
-      return a.again ? { who: 'you', text: `${n} was closed without merging: open it again, or merge locally` } : { who: 'you', text: `Open the plan’s pull request: ${branch} → main` };
+      return a.again ? { who: 'you', text: t('plans.m.ship.closed', { n }) } : { who: 'you', text: t('plans.m.ship.open', { branch }) };
     case 'catching_up':
-      return { who: 'beluga', text: `Merging ${a.main} into ${branch}, so ${n} merges cleanly` };
+      return { who: 'beluga', text: t('plans.m.ship.catchingUp', { main: a.main, branch, n }) };
     case 'fixing':
-      return { who: 'claude', text: `Your agent is fixing the conflict with main in ${fileList(a.files)}` };
+      return { who: 'claude', text: t('plans.m.ship.fixing', { files: fileList(a.files) }) };
     case 'stuck':
-      return { who: 'you', text: `The conflict with main in ${fileList(a.files)} is still there: ask your agent again, or fix it in its folder` };
+      return { who: 'you', text: t('plans.m.ship.stuck', { files: fileList(a.files) }) };
     case 'resolve':
-      return { who: 'you', text: `${n} conflicts with main: Resolve Conflicts brings main into ${branch}` };
+      return { who: 'you', text: t('plans.m.ship.resolve', { n, branch }) };
     case 'draft':
-      return { who: 'you', text: `${n} is a draft: mark it ready on GitHub` };
+      return { who: 'you', text: t('plans.m.ship.draft', { n }) };
     case 'queued':
-      return { who: 'beluga', text: `${n} merges by itself once its checks pass` };
+      return { who: 'beluga', text: t('plans.m.ship.queued', { n }) };
     case 'wait':
-      return { who: 'you', text: `${n}: ${prWords(pr!)} — merge it once they pass` };
+      return { who: 'you', text: t('plans.m.ship.wait', { n, why: prWords(pr!) }) };
     case 'merge':
-      return { who: 'you', text: `Merge ${n} on GitHub: every milestone passed, ${prWords(pr!)}` };
+      return { who: 'you', text: t('plans.m.ship.merge', { n, why: prWords(pr!) }) };
     case 'merged':
-      return { who: 'beluga', text: `${n} merged into main` };
+      return { who: 'beluga', text: t('plans.m.ship.merged', { n }) };
   }
 }
 
@@ -667,33 +675,34 @@ export function branchFlow(view: PlanView): readonly FlowStep[] {
   const pr = plan.pr;
   const steps: FlowStep[] = [];
   const shipped = plan.shipped;
-  steps.push({ id: 'main', kind: 'main', label: 'main', detail: shipped ? (shipped.how === 'pr' ? `the plan’s work is in, via #${shipped.number}` : 'the plan’s work is in, merged here') : 'the plan’s work goes here at the end', state: shipped ? 'done' : 'waiting' });
+  steps.push({ id: 'main', kind: 'main', label: 'main', detail: shipped ? (shipped.how === 'pr' ? t('plans.m.flow.inVia', { number: shipped.number ?? '' }) : t('plans.m.flow.inHere')) : t('plans.m.flow.goesHere'), state: shipped ? 'done' : 'waiting' });
   if (branch) {
     const ship = shipAction(plan, pr);
     const prState: FlowStep['state'] = shipped || pr?.state === 'MERGED' ? 'done' : ship.kind === 'stuck' || ship.kind === 'resolve' || pr?.state === 'CLOSED' || pr?.checks === 'failing' ? 'problem' : pr ? 'active' : 'waiting';
-    const prDetail = plan.mainMerge?.conflict ? `conflicts with main in ${fileList(plan.mainMerge.conflict.files)}${plan.mainMerge.conflict.stuck ? ': needs you' : ': your agent is fixing it'}` : pr ? prWords(pr) : shipped?.how === 'local' ? 'merged here instead' : 'opened once every milestone passed';
-    steps.push({ id: 'pr', kind: 'pr', label: pr ? `Pull request #${pr.number}` : 'Pull request', detail: `${branch} → main · ${prDetail}`, state: shipped?.how === 'local' ? 'done' : prState });
-    steps.push({ id: 'branch', kind: 'branch', label: branch, detail: 'made from main: every task starts from it, each milestone merges into it', state: shipped ? 'done' : 'active' });
+    const prDetail = plan.mainMerge?.conflict ? (plan.mainMerge.conflict.stuck ? t('plans.m.flow.conflictsStuck', { files: fileList(plan.mainMerge.conflict.files) }) : t('plans.m.flow.conflictsFixing', { files: fileList(plan.mainMerge.conflict.files) })) : pr ? prWords(pr) : shipped?.how === 'local' ? t('plans.m.flow.mergedHereInstead') : t('plans.m.flow.openedOnce');
+    steps.push({ id: 'pr', kind: 'pr', label: pr ? t('plans.m.prIs', { number: pr.number }) : t('plans.m.pullRequest'), detail: `${branch} → main · ${prDetail}`, state: shipped?.how === 'local' ? 'done' : prState });
+    steps.push({ id: 'branch', kind: 'branch', label: branch, detail: t('plans.m.flow.madeFromMain'), state: shipped ? 'done' : 'active' });
   } else if (plan.body && plan.status !== 'done') {
     const failed = [...plan.activity].reverse().find((e) => e.kind === 'problem' && /^couldn’t make the plan’s branch/.test(e.text));
-    steps.push({ id: 'branch', kind: 'branch', label: 'No plan branch', detail: failed ? `${failed.text.replace(/^couldn’t make the plan’s branch /, 'couldn’t make ')}` : 'not made yet: tasks start from main', state: failed ? 'problem' : 'waiting' });
+    steps.push({ id: 'branch', kind: 'branch', label: t('plans.m.flow.noBranch'), detail: failed ? `${failed.text.replace(/^couldn’t make the plan’s branch /, 'couldn’t make ')}` : t('plans.m.flow.notMadeYet'), state: failed ? 'problem' : 'waiting' });
   }
   for (const m of view.milestones) {
     const c = m.merging?.conflict;
     const failed = m.run.mergeFailed;
     const state: FlowStep['state'] = m.state === 'merging' ? (c?.stuck ? 'problem' : 'active') : failed ? 'problem' : m.state === 'passed' ? 'done' : m.state === 'later' || m.state === 'draft' ? 'later' : 'waiting';
+    const into = branch ?? t('plans.m.theBranch');
     const detail =
       m.state === 'merging'
         ? c
-          ? `merging into ${branch ?? 'the branch'}: ${c.key ?? c.merging} conflicts in ${fileList(c.files)}${c.stuck ? ' — needs you' : ' — your agent is fixing it'}`
-          : `merging into ${branch ?? 'the branch'} now`
+          ? t(c.stuck ? 'plans.m.flow.msConflictStuck' : 'plans.m.flow.msConflictFixing', { branch: into, what: c.key ?? c.merging, files: fileList(c.files) })
+          : t('plans.m.flow.msMergingNow', { branch: into })
         : failed
-          ? `couldn’t merge: ${failed.reason}`
+          ? t('plans.m.flow.msCouldnt', { reason: failed.reason })
           : m.state === 'passed'
             ? branch
-              ? `merged into ${branch}`
-              : 'passed'
-            : `merges into ${branch ?? 'the plan’s branch'} when it passes · ${m.finished}/${m.total} tasks finished`;
+              ? t('plans.m.flow.msMergedInto', { branch })
+              : t('plans.m.flow.msPassed')
+            : t('plans.m.flow.msMergesWhen', { branch: branch ?? t('plans.thePlansBranch'), finished: m.finished, total: m.total });
     steps.push({ id: m.milestone.id, kind: 'milestone', label: m.milestone.title, detail, state });
   }
   return steps;

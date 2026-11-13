@@ -6,7 +6,7 @@ import type { Complete, RuntimeId } from './types.js';
 const RUNTIME_LABELS: Readonly<Record<string, string>> = { codex: 'Codex', opencode: 'OpenCode', copilot: 'Copilot' };
 
 /** The side calls a backend may offer (agent/side-calls.ts). */
-export type SideCallBackend = Pick<AgentBackend, 'nameTask' | 'titlePlan' | 'titleChat' | 'answerChat' | 'fixSetup' | 'fixRun' | 'workOutScripts' | 'draftTask' | 'describeProject' | 'reviewPr'>;
+export type SideCallBackend = Pick<AgentBackend, 'nameTask' | 'titlePlan' | 'titleChat' | 'answerChat' | 'fixSetup' | 'fixRun' | 'workOutScripts' | 'draftTask' | 'classifyTask' | 'describeProject' | 'reviewPr'>;
 
 /**
  * Where a side call goes (BLG-503): `own`, your default agent's runtime's one-shot call (Codex's),

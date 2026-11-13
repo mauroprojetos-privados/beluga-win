@@ -9,6 +9,7 @@ import { Section, Sheet, Tag } from './parts.js';
 import { ACCESS, type Access, SharePicker } from './SharePicker.js';
 import s from './sharing.module.css';
 import { thisComputer } from '../../lib/os-words.js';
+import { useT } from '../../lib/i18n.js';
 
 /**
  * Share with…: a project with friends over the network. Nobody hosts: it shows in each friend's
@@ -18,6 +19,7 @@ import { thisComputer } from '../../lib/os-words.js';
  */
 export function ShareProjectSheet({ projectId, close }: { readonly projectId: string; readonly close: () => void }) {
   const api = useApi();
+  const t = useT();
   const { client } = useBeluga();
   const project = useApp((st) => st.projects.find((p) => p.id === projectId));
   const grants = useApp((st) => st.projectShares[projectId]);
@@ -31,7 +33,7 @@ export function ShareProjectSheet({ projectId, close }: { readonly projectId: st
       const why = cannotTake(f.name, f.beluga, 'share.project', f.online);
       return { peerId: f.peerId, name: f.name, ...(why ? { why } : {}) };
     });
-  const none = !network.enabled ? 'Turn on the Beluga network in Settings to share with your friends.' : network.friends.length ? 'All your friends have it.' : 'No friends yet. Add a friend first, then share with them here.';
+  const none = !network.enabled ? t('native.wsShare.networkOff') : network.friends.length ? t('native.wsShare.allHaveIt') : t('native.shareProject.noFriends');
   const set = (peerId: string, access: Access): void => {
     const done = access === 'none' ? api.sharing.unshareFriend({ peerId, projectId }) : api.sharing.shareWithFriend({ peerId, projectId, role: access });
     void done.catch((err: unknown) => toast(client, err instanceof Error ? err.message : String(err), 'warn'));
@@ -39,46 +41,46 @@ export function ShareProjectSheet({ projectId, close }: { readonly projectId: st
   const worktrees = project.workspaces.filter((w) => !w.archived && !w.external && w.kind !== 'main').length;
   return (
     <Sheet
-      title={`Share “${project.name}”`}
-      subtitle={`Friends you add see it in their Projects with your avatar, with its ${worktrees === 1 ? 'worktree' : `${worktrees} worktrees`} (and new ones). Nobody needs to host, and it stays while either of you is offline.`}
+      title={t('native.wsShare.title', { name: project.name })}
+      subtitle={t('native.shareProject.subtitle', { count: worktrees })}
       badge={<ProjectIcon id={project.id} name={project.name} size={36} />}
       close={close}
       footer={
         <>
           <span />
           <Button variant="primary" onClick={close}>
-            Done
+            {t('common.done')}
           </Button>
         </>
       }
     >
-      <Section title="Share with">
+      <Section title={t('native.wsShare.shareWith')}>
         <SharePicker candidates={candidates} onShare={set} none={none} />
       </Section>
-      <Section title="Friends with access">
-        <div className={s.list} role="list" aria-label="Friends with access">
+      <Section title={t('native.shareProject.friendsWithAccess')}>
+        <div className={s.list} role="list" aria-label={t('native.shareProject.friendsWithAccess')}>
           {friends.map((f) => {
             const access: Access = grants?.[f.peerId]?.role ?? 'none';
             const only = grants?.[f.peerId]?.only;
             const presence = presenceOf({ network, peers }, f.peerId);
-            const detail = access === 'contribute' ? 'Talks to your agent in its worktrees' : 'Follows along, read-only';
+            const detail = access === 'contribute' ? t('native.shareProject.talks') : t('native.shareProject.follows');
             return (
               <div key={f.peerId} role="listitem" className={s.item}>
                 <Avatar name={f.name} id={f.peerId} size={24} />
                 <div className={s.itemText}>
                   <span className={s.itemTitle}>
-                    {f.name} {presence.state === 'online' ? null : <Tag tone="muted">{presence.label}</Tag>} {only ? <Tag>{only.length === 1 ? 'one worktree' : `${only.length} worktrees`}</Tag> : null}
+                    {f.name} {presence.state === 'online' ? null : <Tag tone="muted">{presence.label}</Tag>} {only ? <Tag>{t('native.shareProject.only', { count: only.length })}</Tag> : null}
                   </span>
                   <span className={s.itemDetail}>{detail}</span>
                 </div>
-                <Select<Access> label={`Access for ${f.name}`} value={access} options={ACCESS} onChange={(a) => set(f.peerId, a)} />
+                <Select<Access> label={t('native.wsShare.accessFor', { name: f.name })} value={access} options={ACCESS()} onChange={(a) => set(f.peerId, a)} />
               </div>
             );
           })}
-          {friends.length ? null : <div className={s.empty}>Not shared with anyone yet.</div>}
+          {friends.length ? null : <div className={s.empty}>{t('native.shareProject.nobody')}</div>}
         </div>
       </Section>
-      <p className={s.hint}>Your agent does the work, on {thisComputer()}. Risky steps still ask you, unless you fully trust the person asking.</p>
+      <p className={s.hint}>{t('native.shareProject.hint', { computer: thisComputer() })}</p>
     </Sheet>
   );
 }

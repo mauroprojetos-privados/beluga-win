@@ -142,6 +142,22 @@ function sharedTouches(body: PlanBody): string[] {
   return out;
 }
 
+/** Tasks a smaller model can't check by itself (no verify), and a task told to touch what another says not to, in the same milestone. */
+function weakTasks(body: PlanBody): string[] {
+  const out: string[] = [];
+  const all = allTasks(body);
+  for (const { task: t } of all) {
+    if ((t.estimate ?? 0) >= 2 && t.assignee !== 'me' && !t.verify?.length) out.push(`${name(t)} has no verify: give a command for each acceptance criterion and what it prints when it works.`);
+  }
+  for (const a of all) {
+    for (const b of all) {
+      if (a.task.id === b.task.id || a.milestone.id !== b.milestone.id) continue;
+      for (const path of sharedPaths(a.task.touches, b.task.outOfScope)) out.push(`${name(a.task)} touches ${path}, which ${name(b.task)} says not to touch: fix one of them.`);
+    }
+  }
+  return out;
+}
+
 /** Milestones with no tasks. */
 const emptyMilestones = (body: PlanBody): string[] => body.milestones.filter((m) => !m.tasks.length).map((m) => `Milestone ${mName(m)} has no tasks: add its tasks, or remove it.`);
 
@@ -215,7 +231,7 @@ const clip = (text: string, n = 90): string => {
 
 /** Every warning for a plan as it is now (`previous`: as it was before this change). */
 export function coherenceWarnings(body: PlanBody, previous?: PlanBody): string[] {
-  return [...staleDecisions(body, previous), ...danglingRefs(body, previous), ...duplicates(body), ...sharedTouches(body), ...emptyMilestones(body)];
+  return [...staleDecisions(body, previous), ...danglingRefs(body, previous), ...duplicates(body), ...sharedTouches(body), ...weakTasks(body), ...emptyMilestones(body)];
 }
 
 /** Tasks whose text still uses a superseded decision's terms (ids): for screens and tests. */

@@ -1,15 +1,18 @@
 import path from 'node:path';
+import { appLocale } from '../core/language.js';
 import { STILLS_DIR, STILL_SCHEME } from '../shared/preview/ref.js';
 import { SCRATCH_DIR } from '../shared/scratch-dir.js';
 import { dialogueHeader } from '../core/dialogues/view.js';
 import { agentPicker, pickedAgent } from '../shared/agent-picker.js';
+import { runRouteOf } from '../core/routing/model.js';
+import { taskKindLine } from '../core/routing/outcomes.js';
 import { roomAgentTags } from '../shared/agent-tags.js';
 import { type Approval, type DomainState, type LogItem, type SubAgent, isRunning } from '../core/store.js';
 import { agentLabel, agentName } from '../shared/agent-label.js';
 import { waitingNote } from '../core/friend-share-people.js';
 import { criteria, tally } from '../core/board/criteria.js';
 import { OFFER_DETAIL, offerWords, waitingOn, waitingWords, workingOn, workingWords } from '../core/team/model.js';
-import { type Issue, STATUS_INFO, actorName, activityText, assigneeName, boardName, boardOf, byStatus, isArchived, isEpic, isOwnBoard, isStartable, isVisiting, issueById, progressOf as boardProgress, reposOf, showsOn } from '../core/board/model.js';
+import { type Issue, actorName, activityText, assigneeName, boardName, boardOf, byStatus, isArchived, isEpic, isOwnBoard, isStartable, isVisiting, issueById, progressOf as boardProgress, reposOf, showsOn } from '../core/board/model.js';
 import type { CcAgent } from '../core/claude-code/model.js';
 import type { PendingQuestion } from '../core/collab-store.js';
 import { type TaskView as GwTask, isFinal, requestGist, stateLabel, stateTone, targetLabel } from '../core/gateway/model.js';
@@ -25,6 +28,7 @@ import { sentinelGraph } from '../core/sentinel/workflow.js';
 import { widgetSnapshot } from '../core/sentinel/widgets.js';
 import { COMPARE, changeText, deltaOf, formatMetric } from '../core/sentinel/metrics.js';
 import type { Workspace } from '../workspaces/types.js';
+import { statusLabel } from '../shared/i18n/words.js';
 import { type MilestoneView, type PlanView as PlanProgress, agentNowWords, liveFrom, planView } from '../core/plans/progress.js';
 import { triageFacts } from '../core/triage/facts.js';
 import { categoryOf, triageKey } from '../core/triage/model.js';
@@ -38,6 +42,7 @@ import { type AgentRef, CLAUDE_AGENT, type Profile, defaultAgentOf } from '../pr
 import { threadNesting } from '../ui/thread-tree.js';
 import { providerCards } from '../ui/usage-cards.js';
 import {
+  type BotSummary,
   type BranchView,
   type ChatMessageView,
   type ChatsView,
@@ -73,6 +78,7 @@ import {
   VIEW_TURNS,
   type WorkView,
 } from './protocol.js';
+import { botStatusLine } from '../core/bots/schema.js';
 import { HIDDEN_STEP, humanizeDoing, humanizeStep, plainLine, stepWords, stripCode } from './strip.js';
 import { withMath } from './math-svg.js';
 import { agentRefView, chatTopic, clip, convTopic, dashboardTopic, myId, nameOf, needsYou, planTopic, progressOf, sentinelTopic, taskTopic } from './needs-you.js';
@@ -82,7 +88,7 @@ export { chatTopic, convTopic, dashboardTopic, planTopic, sentinelTopic, taskTop
 export { needsYou };
 import { ASSISTANT_CHANNEL, ASSISTANT_TITLE, activeAssistantChannel, assistantChatTitle, isAssistant } from '../shared/assistant.js';
 import { STEERED_IN, TAKEN_BACK, type SteeredMessage, asSent, steeredMessages, steerWaiting } from '../shared/claude-notices.js';
-import { slotWaitDetail } from '../shared/run-slots.js';
+import { slotWaitLine } from '../shared/run-slots.js';
 import type { DocKey } from './files.js';
 
 /** Words for a turn: code taken out (strip.ts), math typeset (math-svg.ts). */
@@ -222,6 +228,37 @@ function macChatSummaries(state: DomainState, waiting: ReadonlySet<string>, ctx?
 }
 
 /**
+ * Your bots for the phone (1.53, docs/bots.md): Your Mac first (its open chat), then yours, each with
+ * what it's doing and its conversation's state. Only when there's something to show: another bot, or
+ * Your Mac at work on a plan it dispatched.
+ */
+function botSummaries(state: DomainState, waiting: ReadonlySet<string>, ctx?: ViewContext): BotSummary[] {
+  return state.bots.bots.slice(0, 40).map((b): BotSummary => {
+    const channel = b.mac ? activeAssistantChannel(state.assistant) : b.channel;
+    const conv = summaryOf(state, { channel, title: b.name, mine: true }, waiting, ctx);
+    const line = botStatusLine(b.status);
+    const nextName = b.nextRun !== undefined ? b.triggers?.find((t) => t.next === b.nextRun)?.name : undefined;
+    return {
+      id: clip(b.id, 40),
+      name: clip(b.name, 100),
+      icon: clip(b.icon, 40),
+      ...(b.color ? { color: b.color } : {}),
+      ...(b.description ? { description: clip(plainLine(b.description, 300), 300) } : {}),
+      topic: `conv:${channel}`,
+      mac: b.mac,
+      ...(line ? { line: clip(line, 200) } : {}),
+      ...(b.status ? { plan: `plan:${b.status.planId}` } : {}),
+      ...(conv ? { status: conv.status } : {}),
+      ...(b.problems.length ? { problems: b.problems.length } : {}),
+      // 1.55: its own chats (Your Mac's are macChats), and when it next acts on its own.
+      ...(b.chats && b.chats.length > 1 ? { chats: b.chats.slice(0, 40).flatMap((c) => summaryOf(state, { channel: c.channel, title: assistantChatTitle(c.channel, state.log, 60), mine: true }, waiting, ctx) ?? []) } : {}),
+      ...(b.nextRun !== undefined ? { nextRun: Math.max(0, Math.round(b.nextRun)) } : {}),
+      ...(nextName ? { nextRunName: clip(nextName, 80) } : {}),
+    };
+  });
+}
+
+/**
  * The conversation a channel the phone names is: an older phone knows only `mac:assistant`, so
  * once that first chat is deleted it means the chat open on the Mac. Anything else as it is.
  */
@@ -247,7 +284,12 @@ export function conversations(state: DomainState): Conversation[] {
     .slice(-TASKS_SHOWN)
     .map((t) => ({ channel: `task:${t.id}`, title: plainLine(t.summary ?? t.ask, 300) || 'A question', project: 'Asked of friends', projectId: 'asked', mine: false }));
   const seen = new Set<string>();
-  return [...assistantConversations(state), ...own, ...shared, ...room, ...asked].filter((c) => !seen.has(c.channel) && Boolean(seen.add(c.channel)));
+  // Your bots besides Your Mac (docs/bots.md, 1.53): each its own conversation, opened and written in like Your Mac's.
+  // 1.55: each of a bot's chats (its tabs on the Mac), the one open first.
+  const bots = state.bots.bots
+    .filter((b) => !b.mac)
+    .flatMap((b) => [{ channel: b.channel, title: b.name, mine: true }, ...(b.chats ?? []).filter((c) => c.channel !== b.channel).map((c) => ({ channel: c.channel, title: `${b.name} · ${assistantChatTitle(c.channel, state.log)}`, mine: true }))]);
+  return [...assistantConversations(state), ...bots, ...own, ...shared, ...room, ...asked].filter((c) => !seen.has(c.channel) && Boolean(seen.add(c.channel)));
 }
 
 const itemsOf = (state: DomainState, channel: string): LogItem[] => state.log.filter((l) => l.channel === channel);
@@ -636,12 +678,16 @@ export function homeView(state: DomainState, ctx: ViewContext): HomeView {
   const first = review[0] ? taskTopic(review[0].id) : undefined;
   const assistant = summaryOf(state, openAssistant(state), waiting, ctx);
   const macChats = macChatSummaries(state, waiting, ctx);
+  const bots = botSummaries(state, waiting, ctx);
   return {
-    mac: { name: clip(ctx.mac.name, 100), version: clip(ctx.mac.version, 40), keepAwake: state.prefs.keepAwake ?? 'off' },
+    mac: { name: clip(ctx.mac.name, 100), version: clip(ctx.mac.version, 40), keepAwake: state.prefs.keepAwake ?? 'off', language: appLocale(state.prefs) },
     // 1.5: Your Mac, for Home's "Ask your Mac" (its last line, whether it works).
     ...(assistant ? { assistant } : {}),
     // 1.14: all of Your Mac's chats, for the phone's chat list.
     ...(macChats.length ? { macChats } : {}),
+    // 1.53: your bots, Your Mac first (docs/bots.md).
+    // 1.55: Your Mac alone shows too once it acts on its own (its next run).
+    ...(bots.length > 1 || bots[0]?.line || bots[0]?.nextRun !== undefined ? { bots } : {}),
     me: { name: clip(myName(state), 64), peerId: myId(state) },
     usage: usageViews(state.peers.find((p) => p.peerId === state.self?.peerId) ?? state.self, state.prefs.defaultAgent),
     needsYou: items,
@@ -871,7 +917,7 @@ function queueOf(state: DomainState, channel: string): NonNullable<ConvView['que
   return state.log
     .filter((l): l is AgentItem => l.type === 'agent' && l.channel === channel && l.status === 'queued' && l.owner === me && (l.requester !== undefined ? l.requester === me : l.requesterName === l.ownerName))
     .slice(0, 20)
-    .map((l) => ({ id: clip(l.requestId, 200), text: plainLine(l.prompt ?? '', 300) || 'A message', ...(l.slotWait ? { waiting: clip(slotWaitDetail(l.slotWait), 300) } : {}) }));
+    .map((l) => ({ id: clip(l.requestId, 200), text: plainLine(l.prompt ?? '', 300) || 'A message', ...(l.slotWait ? { waiting: clip(slotWaitLine(l.slotWait), 300) } : {}) }));
 }
 
 const planState = (plan: Plan, progress: PlanProgress): string => (plan.status === 'active' && plan.paused ? 'paused' : plan.status === 'active' && progress.next.kind === 'done' ? 'done' : plan.status);
@@ -936,6 +982,8 @@ export function planPageView(state: DomainState, id: string): PlanView | undefin
           ...(t.task.acceptance.length ? { acceptance: t.task.acceptance.slice(0, 20).map((a) => clip(plainLine(a, 400), 400)) } : {}),
           ...(waits.length ? { blockedBy: waits.slice(0, 20).map((b) => clip(b, 200)) } : {}),
           ...(t.why ? { why: clip(plainLine(t.why, 300), 300) } : {}),
+          ...(t.task.stopIf?.length ? { stopIf: t.task.stopIf.slice(0, 6).map((s) => clip(plainLine(s, 300), 300)) } : {}),
+          ...(t.task.verify?.length ? { checks: t.task.verify.length } : {}),
         };
       }),
       ...(m.dependsOn.length ? { dependsOn: m.dependsOn.slice(0, 20).map((d) => clip(d, 200)) } : {}),
@@ -1054,7 +1102,7 @@ export function tasksView(state: DomainState, ctx?: ViewContext): TasksView {
         const list = g.status === 'done' ? [...g.issues].sort((a, b) => (b.closedAt ?? b.updatedAt) - (a.closedAt ?? a.updatedAt)) : g.issues;
         const max = g.status === 'done' ? DONE_SHOWN : PER_GROUP;
         const tasks = list.slice(0, max).flatMap((i) => taskSummary(state, i, id) ?? []);
-        return { status: g.status, label: STATUS_INFO[g.status].label, tasks, ...(list.length > max ? { more: list.length - max } : {}) };
+        return { status: g.status, label: statusLabel(g.status), tasks, ...(list.length > max ? { more: list.length - max } : {}) };
       });
     const icon = reposOf(state.board, id)[0] ?? id;
     return [{ id: clip(id, 200), name: clip(boardName(state.board, id, repoName), 200), ...iconOf(ctx, icon), groups }];
@@ -1086,7 +1134,9 @@ export function taskPageView(state: DomainState, id: string, ctx?: ViewContext):
   const ws = i.worktrees.at(-1);
   const worktree = ws ? state.projects.flatMap((p) => p.workspaces).find((w) => w.id === ws)?.name : undefined;
   const { pr: _pr, ...rest } = summary;
-  const live = summary.conv ? pickedAgent(agentPicker(state, summary.conv.slice('conv:'.length), defaultAgentOf(state.self).runtime)) : undefined;
+  const picked = summary.conv ? pickedAgent(agentPicker(state, summary.conv.slice('conv:'.length), defaultAgentOf(state.self).runtime)) : undefined;
+  // On a combo (docs/routing.md): the target its newest run went to ("Economy · Codex"), once one has run.
+  const live = picked?.combo && summary.conv ? (routedAgent(state.log, summary.conv.slice('conv:'.length)) ?? picked) : picked;
   return {
     ...rest,
     project: clip(project?.name ?? '', 200),
@@ -1108,11 +1158,31 @@ export function taskPageView(state: DomainState, id: string, ctx?: ViewContext):
     })),
     ...(worktree ? { worktree: clip(worktree, 200) } : {}),
     ...(i.pr ? { pr: { number: i.pr.number, state: i.pr.state, title: clip(plainLine(i.pr.title, 300), 300), checks: i.pr.checks } } : {}),
-    moves: MOVES.filter((s) => s !== i.status).map((s) => ({ status: s, label: STATUS_INFO[s].label })),
+    moves: MOVES.filter((s) => s !== i.status).map((s) => ({ status: s, label: statusLabel(s) })),
     // Who works it (BLG-498), shown only (BLG-569): with a worktree on it, the agent and model running
     // there (changed in its conversation); else its own (none: your default). The list is for Start with….
     ...(live ? { agent: agentRefView(live) } : i.agent ? { agent: agentRefView(i.agent) } : {}),
     ...(isStartable(i) ? { agents: workPicker(state, i.agent) } : {}),
+    ...(i.difficulty ? { difficulty: i.difficulty } : {}),
+    // 1.52 (docs/routing.md): its kind of work, what it starts on, and how it went.
+    ...kindView(state, i),
+  };
+}
+
+/** A task's kind line for the phone (1.52), clipped to the view's limits. */
+function kindView(state: DomainState, i: Issue): { kind?: NonNullable<TaskPageView['kind']> } {
+  const line = taskKindLine(state, i);
+  if (!line) return {};
+  return {
+    kind: {
+      ...(line.category ? { category: line.category } : {}),
+      ...(line.label ? { label: clip(line.label, 40) } : {}),
+      ...(line.why ? { why: clip(plainLine(line.why, 200), 200) } : {}),
+      words: clip(line.words, 140),
+      ...(line.corrected ? { corrected: true } : {}),
+      ...(line.ok !== undefined ? { ok: line.ok } : {}),
+      ...(line.outcome ? { outcome: clip(line.outcome, 200) } : {}),
+    },
   };
 }
 
@@ -1609,4 +1679,10 @@ export function viewOf(state: DomainState, ctx: ViewContext, topic: Topic): unkn
   if (topic.startsWith('dashboard:')) return dashboardView(state, topic.slice('dashboard:'.length), ctx);
   if (topic === 'widgets') return widgetsView(state, ctx);
   return undefined;
+}
+
+/** The agent a conversation's newest run on a combo ran on, with the combo's name (docs/routing.md). */
+function routedAgent(log: DomainState['log'], channel: string): AgentRef | undefined {
+  const r = runRouteOf(log, channel);
+  return r ? { runtime: r.runtime, label: clip(r.target, 64), ...(r.model ? { model: clip(r.model, 64) } : {}), combo: r.combo, comboName: clip(r.name, 64) } : undefined;
 }

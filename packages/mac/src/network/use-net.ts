@@ -4,6 +4,7 @@ import { useApp, useBeluga } from '../lib/beluga.js';
 import { dmId, groupId } from './net-model.js';
 import { getPrefs, setPrefs } from '../lib/prefs.js';
 import { showPanelTab } from '../lib/panel.js';
+import { t } from '@beluga/shared/i18n/index.js';
 
 /** The Beluga network as the shared state has it. */
 export const useNetwork = (): NetworkState => useApp((st) => st.network);
@@ -53,7 +54,7 @@ export async function befriend(client: SocketClient, peerId: string, name: strin
   try {
     if (!client.store.getState().network.enabled) await quietly(client, client.api.network.setEnabled(true));
     await quietly(client, client.api.network['friends.addFromRoom'](peerId));
-    say(`Sent ${name} a friend request. You’re friends once they accept`, 'success');
+    say(t('network.net.requestSent', { name }), 'success');
   } catch (err) {
     say(message(err), 'error');
   }
@@ -63,7 +64,7 @@ export async function befriend(client: SocketClient, peerId: string, name: strin
 export async function answerOffer(client: SocketClient, peerId: string, name: string, accept: boolean): Promise<void> {
   try {
     await quietly(client, client.api.network['friends.answerOffer'](peerId, accept));
-    if (accept) client.store.dispatch({ type: 'toast', text: `You and ${name} are friends now`, level: 'success' });
+    if (accept) client.store.dispatch({ type: 'toast', text: t('network.add.friendsNow', { name }), level: 'success' });
   } catch (err) {
     client.store.dispatch({ type: 'toast', text: message(err).replace(/^Something went wrong: /, ''), level: 'error' });
   }

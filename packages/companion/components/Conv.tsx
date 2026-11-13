@@ -15,6 +15,7 @@ import { InlineMath, type MathMap } from './render/MathBlock';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { ago, useFile } from '../lib/hooks';
 import type { ConvSummary, ProseView, SubAgentView, Topic } from '../lib/link/protocol';
+import { t as tx } from '../lib/language';
 import { color, tint, type } from '../lib/theme';
 import { Card, IconBadge, Press, T, type Tone, toneInk } from './ui';
 
@@ -169,7 +170,7 @@ export function Prose({ prose, color: tone = color.text, size = 15.5, at, tasks:
             </Text>
           );
         }
-        if (b.kind === 'img') return /^https?:\/\//.test(b.src) ? <WebImage key={bi} src={b.src} alt={b.alt} /> : b.src.startsWith('out:') ? <MacImage key={bi} refId={b.src} alt={b.alt} /> : <MacImage key={bi} alt={b.alt || b.src.split('/').pop() || 'Picture'} />;
+        if (b.kind === 'img') return /^https?:\/\//.test(b.src) ? <WebImage key={bi} src={b.src} alt={b.alt} /> : b.src.startsWith('out:') ? <MacImage key={bi} refId={b.src} alt={b.alt} /> : <MacImage key={bi} alt={b.alt || b.src.split('/').pop() || tx('phoneParts.conv.picture')} />;
         if (b.kind === 'h') {
           return (
             <Text key={bi} style={[base, { fontWeight: '700', marginTop: bi ? 4 : 0, marginBottom: -3 }]}>
@@ -223,7 +224,7 @@ function WebImage({ src, alt }: { readonly src: string; readonly alt: string }) 
 function MacImage({ refId, alt }: { readonly refId?: string; readonly alt: string }) {
   const file = useFile(refId, 'thumb');
   const [aspect, setAspect] = useState(16 / 10);
-  const open = () => refId && openOutput({ ref: refId, name: alt || 'Picture', kind: 'image' }, []);
+  const open = () => refId && openOutput({ ref: refId, name: alt || tx('phoneParts.conv.picture'), kind: 'image' }, []);
   return (
     <Press haptics={false} disabled={!refId || !file?.uri} onPress={open} accessibilityLabel={alt} style={{ borderRadius: 14, overflow: 'hidden', backgroundColor: color.sunken }}>
       {file?.uri ? (
@@ -235,7 +236,7 @@ function MacImage({ refId, alt }: { readonly refId?: string; readonly alt: strin
       )}
       {alt || !refId ? (
         <T v="caption" style={{ padding: 8 }}>
-          {refId ? alt : `${alt} · on the Mac`}
+          {refId ? alt : tx('phoneParts.conv.onMac', { name: alt ?? '' })}
         </T>
       ) : null}
     </Press>
@@ -339,7 +340,7 @@ export function NotOnPrChip({ gap }: { readonly gap: NonNullable<ConvSummary['no
 }
 
 /** "3 commits not on PR #398". */
-export const notOnPrWords = (gap: NonNullable<ConvSummary['notOnPr']>): string => `${gap.count} commit${gap.count === 1 ? '' : 's'} not on PR #${gap.pr}`;
+export const notOnPrWords = (gap: NonNullable<ConvSummary['notOnPr']>): string => tx('phoneParts.conv.notOnPr', { count: gap.count, pr: gap.pr });
 
 /** A row of sub-agent chips under a turn. */
 export function AgentChips({ agents, onOpen }: { readonly agents: readonly SubAgentView[]; readonly onOpen: (a: SubAgentView) => void }) {

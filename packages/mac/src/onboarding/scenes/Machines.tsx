@@ -3,6 +3,8 @@ import { Icon, type IconName } from '../../components/Icon.js';
 import { MachineMark } from '../../machines/MachineMark.js';
 import { usePrefs } from '../../lib/prefs.js';
 import { thisComputer, upFirst } from '../../lib/os-words.js';
+import { t } from '@beluga/shared/i18n/index.js';
+import { useT } from '../../lib/i18n.js';
 import { SPRING } from '../fx.js';
 import { useBeats } from './use-beats.js';
 import s from './scenes.module.css';
@@ -25,19 +27,19 @@ interface Machine {
   readonly hue: number;
 }
 
-const MACHINES: readonly Machine[] = [
-  { id: 'mini', icon: 'macMini', name: 'Mac mini', where: 'At home', hue: 160 },
+const MACHINES = (): readonly Machine[] => [
+  { id: 'mini', icon: 'macMini', name: 'Mac mini', where: t('components.onboarding.scene.machines.atHome'), hue: 160 },
   { id: 'aws', icon: 'cloud', mark: { kind: 'aws', platform: 'linux' }, name: 'build-box', where: 'AWS · us-east-1', hue: 250 },
-  { id: 'linux', icon: 'server', mark: { kind: 'linux', platform: 'linux', distro: 'ubuntu' }, name: 'Linux box', where: 'Ubuntu · office', hue: 60 },
+  { id: 'linux', icon: 'server', mark: { kind: 'linux', platform: 'linux', distro: 'ubuntu' }, name: t('components.onboarding.scene.machines.linuxBox'), where: t('components.onboarding.scene.machines.office'), hue: 60 },
 ];
 
 /** What the AWS mark is drawn from: an AWS computer's kind. */
 const AWS_MARK = { kind: 'aws', platform: 'linux' } as const;
 
-const STEPS: ReadonlyArray<{ icon: IconName; text: string; code?: string; short: string }> = [
-  { icon: 'terminal', text: 'Ran', code: 'npm ci', short: 'npm ci' },
-  { icon: 'terminal', text: 'Ran', code: 'npm run test:e2e', short: 'test:e2e' },
-  { icon: 'check', text: '214 tests passed', short: '214 passed' },
+const STEPS = (): ReadonlyArray<{ id: string; icon: IconName; text: string; code?: string; short: string }> => [
+  { id: 'ci', icon: 'terminal', text: t('components.onboarding.scene.machines.ran'), code: 'npm ci', short: 'npm ci' },
+  { id: 'e2e', icon: 'terminal', text: t('components.onboarding.scene.machines.ran'), code: 'npm run test:e2e', short: 'test:e2e' },
+  { id: 'passed', icon: 'check', text: t('components.onboarding.scene.machines.passed'), short: t('components.onboarding.scene.machines.passedShort') },
 ];
 
 // Beats: the task on this Mac · Runs on flips to AWS · it hops there · two steps stream back ·
@@ -79,29 +81,32 @@ function Packet({ d, icon, tone }: { readonly d: string; readonly icon: IconName
 }
 
 function Status({ machine, beat, still }: { readonly machine: Machine; readonly beat: number; readonly still: boolean }) {
+  const t = useT();
   if (machine.id === 'mini') {
     return (
       <span className={m.always}>
-        <Icon name="power" size={10} /> Always On
+        <Icon name="power" size={10} /> Always On{/* i18n-ignore */}
       </span>
     );
   }
-  if (machine.id === 'linux' || beat < HOP) return <span className={s.dim}>Ready</span>;
+  if (machine.id === 'linux' || beat < HOP) return <span className={s.dim}>{t('components.onboarding.scene.machines.ready')}</span>;
   if (beat >= DONE) {
     return (
       <span className={m.state}>
-        <Icon name="check" size={11} className={s.done} /> Done
+        <Icon name="check" size={11} className={s.done} /> {t('common.done')}
       </span>
     );
   }
   return (
     <span className={m.state}>
-      <Icon name="refresh" size={11} className={still ? m.live : s.spin} /> {beat === HOP ? 'Starting the task' : 'Running the e2e suite'}
+      <Icon name="refresh" size={11} className={still ? m.live : s.spin} /> {beat === HOP ? t('components.onboarding.scene.machines.starting') : t('components.onboarding.scene.machines.running')}
     </span>
   );
 }
 
 export function Machines() {
+  const t = useT();
+  const steps = STEPS();
   const beat = useBeats(BEATS, REST);
   const still = (useReducedMotion() ?? false) || usePrefs().reduceMotion;
   const onAws = beat >= PICKED;
@@ -122,22 +127,22 @@ export function Machines() {
               </span>
               <div>
                 <strong>{upFirst(thisComputer())}</strong>
-                <span className={m.sub}>Your Beluga app</span>
+                <span className={m.sub}>{t('components.onboarding.scene.machines.yourApp')}</span>
               </div>
             </div>
             <AnimatePresence mode="popLayout" initial={false}>
               {closed ? (
                 <motion.div key="lid" className={m.lid} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={SPRING}>
                   <Icon name="laptop" size={20} />
-                  <strong>Lid closed</strong>
-                  <span className={m.sub}>The task carries on</span>
+                  <strong>{t('components.onboarding.scene.machines.lidClosed')}</strong>
+                  <span className={m.sub}>{t('components.onboarding.scene.machines.carriesOn')}</span>
                 </motion.div>
               ) : (
                 <motion.div key="chat" className={m.body} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={SPRING}>
-                  <span className={m.ask}>Run the e2e suite</span>
+                  <span className={m.ask}>{t('components.onboarding.scene.machines.ask')}</span>
                   <div className={s.steps}>
-                    {STEPS.slice(0, shown).map((st, i) => (
-                      <motion.div key={st.short} className={`${s.step} ${m.line}`} initial={still ? false : { opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={SPRING}>
+                    {steps.slice(0, shown).map((st, i) => (
+                      <motion.div key={st.id} className={`${s.step} ${m.line}`} initial={still ? false : { opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={SPRING}>
                         <Icon name={live(i) ? 'refresh' : st.icon} size={12} className={live(i) ? (still ? m.live : s.spin) : s.done} />
                         <span>{st.text}</span>
                         {st.code ? <code>{st.code}</code> : null}
@@ -146,10 +151,10 @@ export function Machines() {
                   </div>
                   <div className={m.composer}>
                     <span className={m.chip}>
-                      <Icon name="claude" size={10} /> Opus
+                      <Icon name="claude" size={10} /> Opus{/* i18n-ignore */}
                     </span>
                     <motion.span key={String(onAws)} className={m.chip} data-on={onAws || undefined} initial={still || !onAws ? false : { scale: 0.86 }} animate={{ scale: 1 }} transition={SPRING}>
-                      {onAws ? <MachineMark machine={AWS_MARK} size={10} /> : <Icon name="laptop" size={10} />} Runs on {onAws ? 'build-box' : thisComputer()}
+                      {onAws ? <MachineMark machine={AWS_MARK} size={10} /> : <Icon name="laptop" size={10} />} {t('components.onboarding.scene.machines.runsOn', { where: onAws ? 'build-box' : thisComputer() })}
                     </motion.span>
                   </div>
                 </motion.div>
@@ -158,21 +163,21 @@ export function Machines() {
           </motion.div>
 
           <span className={m.note}>
-            <Icon name="lock" size={10} /> Paired to you, end-to-end encrypted
+            <Icon name="lock" size={10} /> {t('components.onboarding.scene.machines.paired')}
           </span>
 
           <div className={m.phone} data-keeps-up={closed || undefined}>
             <span className={m.notch} />
             <span className={m.phoneHead}>
-              <Icon name="cloud" size={9} /> e2e suite
+              <Icon name="cloud" size={9} /> {t('components.onboarding.scene.machines.suite')}
             </span>
-            {STEPS.slice(0, shown).map((st, i) => (
-              <span key={st.short} className={m.phoneLine}>
+            {steps.slice(0, shown).map((st, i) => (
+              <span key={st.id} className={m.phoneLine}>
                 <Icon name={live(i) ? 'refresh' : st.icon} size={9} className={live(i) ? (still ? m.live : s.spin) : s.done} />
                 {st.short}
               </span>
             ))}
-            {shown === 0 ? <span className={`${m.phoneLine} ${s.dim}`}>Following</span> : null}
+            {shown === 0 ? <span className={`${m.phoneLine} ${s.dim}`}>{t('components.onboarding.scene.machines.following')}</span> : null}
           </div>
         </div>
 
@@ -203,7 +208,7 @@ export function Machines() {
         </div>
 
         <div className={m.list}>
-          {MACHINES.map((mc) => (
+          {MACHINES().map((mc) => (
             <div key={mc.id} className={m.machine} data-busy={(mc.id === 'aws' && working && beat < DONE) || undefined}>
               <div className={m.head}>
                 <span className={m.tile} style={{ ['--hue' as string]: mc.hue }}>

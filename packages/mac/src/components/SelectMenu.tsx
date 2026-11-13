@@ -5,6 +5,7 @@ import { OptionIcon, type SelectEntry, type SelectOption, useTypeahead } from '.
 import { type MoveKey, type Placement, filterEntries, firstEnabled, flatOptions, menuRows, moveActive, placeMenu, typeahead } from './select-model.js';
 import { cx } from './ui.js';
 import s from './select.module.css';
+import { useT } from '../lib/i18n.js';
 
 interface MenuProps<T extends string> {
   readonly listId: string;
@@ -43,6 +44,7 @@ function reveal(list: HTMLElement | null, row: HTMLElement | null | undefined, c
 
 /** The open menu of a Select (mounted while open, so each opening starts fresh). */
 export function SelectMenu<T extends string>(p: MenuProps<T>) {
+  const t = useT();
   const [query, setQuery] = useState('');
   const shown = useMemo(() => filterEntries(p.options, query), [p.options, query]);
   const rows = useMemo(() => menuRows(shown), [shown]);
@@ -190,11 +192,11 @@ export function SelectMenu<T extends string>(p: MenuProps<T>) {
             ref={field}
             className={s.search}
             type="text"
-            aria-label="Filter the list"
+            aria-label={t('components.select.filter')}
             aria-controls={p.listId}
             aria-autocomplete="list"
             aria-activedescendant={active >= 0 ? optionId(active) : undefined}
-            placeholder={p.searchPlaceholder ?? 'Search'}
+            placeholder={p.searchPlaceholder ?? t('common.search')}
             value={query}
             spellCheck={false}
             autoComplete="off"
@@ -264,7 +266,7 @@ export function SelectMenu<T extends string>(p: MenuProps<T>) {
             </div>
           );
         })}
-        {opts.length ? null : <div className={s.empty}>{query ? 'No matches' : 'Nothing to choose'}</div>}
+        {opts.length ? null : <div className={s.empty}>{query ? t('components.noMatches') : t('components.select.nothing')}</div>}
       </div>
     </Popover.Content>
   );

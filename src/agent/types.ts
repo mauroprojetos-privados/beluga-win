@@ -1,4 +1,5 @@
 import type { ChatAnswerRequest } from '../core/chat/claude-prompt.js';
+import type { Locale } from '../shared/i18n/locales.js';
 import type { ScriptFix, SetupFix, WorkedOutScripts } from './setup-fixer.js';
 import type { DraftContext, TaskDraft } from './task-drafter.js';
 import type { AgentRef, ClaudeAnswer, ClaudeQuestion, FsEntry, PeerInfo, Usage } from '../protocol.js';
@@ -117,6 +118,11 @@ export interface AgentRunInput {
   readonly board?: BoardTools;
   /** The task this run's worktree is doing (its brief), or a note that the board is there: added to the instructions. */
   readonly taskBrief?: string;
+  /**
+   * What the agent answers in (Settings › General › Language), and what it writes commit messages and
+   * pull requests in (the project's own choice, English by default; docs/i18n.md). Unset: English.
+   */
+  readonly language?: { readonly answerIn: Locale; readonly commitIn: Locale };
   /**
    * Plan mode with the board: whether the plan's task still has to be defined (task_define) before
    * the plan goes to you, and what to do when you approve it (its task goes on the board).
@@ -317,6 +323,8 @@ export interface BoardTools {
   ): string;
   editBrief(key: string | undefined, section: 'goal' | 'context' | 'acceptance' | 'decisions' | 'questions' | 'handoff', content: string, reason?: string, mode?: 'replace' | 'append'): string;
   note(key: string | undefined, text: string): string;
+  /** Stop a task the run can't do as written, with why: it leaves the run's queue and the plan's agent rewrites it. */
+  stop(key: string | undefined, reason: string): string;
   relate(key: string | undefined, relation: 'blocked_by' | 'blocks' | 'related', other: string, remove?: boolean): string;
   attachProof(key: string | undefined, proof: { readonly kind: 'image' | 'url' | 'file' | 'graph' | 'text'; readonly title: string; readonly path?: string; readonly url?: string; readonly body?: string }): string;
 }
@@ -390,6 +398,36 @@ export interface MacTools {
   startPlan(input: { readonly project: string; readonly goal: string }): Promise<string>;
   /** Archive a worktree (by id or name), losslessly as the Archive button does; `confirmed` once the owner said yes to stopping its Claude. */
   archiveWorktree(input: { readonly worktree: string; readonly confirmed?: boolean }): Promise<string>;
+  /**
+   * A bot's (docs/bots.md): a plan written whole, each task with its category or difficulty, which
+   * route it to a combo or another bot. Only a bot that plans and dispatches has it.
+   */
+  dispatchPlan?(input: DispatchInput): Promise<string>;
+  /** A bot's: search its own knowledge (knowledge.json's sources), never another bot's. Only a bot with knowledge has it. */
+  knowledgeSearch?(query: string, limit?: number): Promise<string>;
+}
+
+/** A plan a bot writes for plan_dispatch (core/bots). */
+export interface DispatchInput {
+  readonly project: string;
+  readonly title: string;
+  readonly goal: string;
+  readonly milestones: ReadonlyArray<{
+    readonly id?: string;
+    readonly title: string;
+    readonly criteria?: readonly string[];
+    readonly dependsOn?: readonly string[];
+    readonly tasks: ReadonlyArray<{
+      readonly id: string;
+      readonly title: string;
+      readonly goal?: string;
+      readonly acceptance?: readonly string[];
+      readonly blockedBy?: readonly string[];
+      readonly touches?: readonly string[];
+      readonly category?: string;
+      readonly difficulty?: 'simple' | 'normal' | 'hard';
+    }>;
+  }>;
 }
 
 /** A message sent into a live run: while it waits on its background agents, or steering it. */
@@ -489,6 +527,17 @@ export interface AgentPlace {
   readonly shipped?: { readonly number: number; readonly url?: string; readonly into: string };
   /** Its pull request is open (BLG-840): the run pushes its commits there (see prompt.ts buildCommitAppend). */
   readonly openPr?: OpenPr;
+  /**
+   * The conversation picked a combo (core/routing): `agent`, `model` and `effort` are already its
+   * target that can run now (`index`). None can: `problem` says why, and the run doesn't start.
+   */
+  readonly route?: { readonly combo: string; readonly index: number; readonly problem?: string };
+  /**
+   * A bot's run (docs/bots.md): only its own MCP servers (its folder's .mcp.json, secrets filled
+   * in), with `--strict-mcp-config` so neither yours nor another bot's reach it. Beluga's own tools
+   * still come. A runtime other than Claude Code doesn't load them (Bot Studio says so).
+   */
+  readonly mcp?: { readonly servers: Readonly<Record<string, Readonly<Record<string, unknown>>>>; readonly strict: true };
 }
 
 /** A worktree's open pull request, for its run's commit rules (BLG-840). */
@@ -563,6 +612,8 @@ export interface AgentBackend {
   workOutScripts?(dir: string, want: { setup: boolean; run: boolean; system?: string }): Promise<WorkedOutScripts | undefined>;
   /** A task written from a description: title, goal, criteria, labels from the board's own (Sonnet). */
   draftTask?(text: string, ctx: DraftContext): Promise<TaskDraft | undefined>;
+  /** What kind of work a task made by hand is (Phase 3, docs/routing.md): a quick Haiku look, no tools. */
+  classifyTask?(task: { readonly title: string; readonly goal?: string }): Promise<import('./task-drafter.js').TaskKind | undefined>;
   /** What a project is about, from a quick read-only look at its folder (About This Project, BLG-298). */
   describeProject?(dir: string, project: string): Promise<string | undefined>;
   /** A pull request reviewed before a sentinel merges it: ship or hold, in one sentence (a small model, read-only). */

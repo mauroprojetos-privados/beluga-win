@@ -14,6 +14,7 @@ import { belugaLine, conversationOf, presenceLine, shownState, sortMembers } fro
 import { openNet } from './net-sheets.js';
 import s from '../layout/Inspector.module.css';
 import n from './network.module.css';
+import { useT } from '../lib/i18n.js';
 
 function Panel({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
   return (
@@ -41,16 +42,17 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
  * menus, Settings and requests only say it and link here), and your rules for their requests.
  */
 function FriendAccess({ peerId, name }: { peerId: string; name: string }) {
+  const t = useT();
   const api = useApi();
   const { client } = useBeluga();
   const gateway = useApp((st) => st.gateway.enabled);
   const level = useApp((st): TrustLevel => st.levels[peerId] ?? st.remembered[peerId]?.trust ?? (st.policy === 'deny' ? 'blocked' : st.policy === 'auto' ? 'trusted' : 'ask'));
   const set = (v: TrustLevel): void =>
-    void api.people.setTrust(peerId, v).catch((err: unknown) => client.store.dispatch({ type: 'toast', text: `Couldn't change it: ${err instanceof Error ? err.message : String(err)}`, level: 'error' }));
+    void api.people.setTrust(peerId, v).catch((err: unknown) => client.store.dispatch({ type: 'toast', text: t('network.insp.couldntChange', { error: err instanceof Error ? err.message : String(err) }), level: 'error' }));
   return (
-    <Panel title="Trust">
+    <Panel title={t('network.insp.trust')}>
       <div className={s.wide}>
-        <Select<TrustLevel> label={`Trust ${name}`} value={level} onChange={set} options={TRUST_LEVELS.map((l) => ({ value: l, label: TRUST_INFO[l].label, description: TRUST_INFO[l].detail }))} />
+        <Select<TrustLevel> label={t('network.insp.trustName', { name })} value={level} onChange={set} options={TRUST_LEVELS.map((l) => ({ value: l, label: TRUST_INFO[l].label, description: TRUST_INFO[l].detail }))} />
       </div>
       <p className={s.note}>{TRUST_INFO[level].detail}</p>
       {gateway ? <PersonRules peerId={peerId} compact /> : null}
@@ -67,6 +69,7 @@ function useTrustLabel(): (peerId: string) => string {
 }
 
 function PersonRow({ p, trust }: { p: ChatPerson; trust?: string }) {
+  const t = useT();
   const chip = versionChip(p, APP_VERSION);
   const line = p.me || p.claude === 'offline' || p.claude === 'update' || !trust ? claudeLine(p) : `${trust} · ${claudeLine(p)}`;
   return (
@@ -79,7 +82,7 @@ function PersonRow({ p, trust }: { p: ChatPerson; trust?: string }) {
         </PersonButton>
       )}
       <span className={n.hereText}>
-        <span className={n.hereName}>{p.me ? 'You' : p.name}</span>
+        <span className={n.hereName}>{p.me ? t('network.conv.you') : p.name}</span>
         <span className={n.hereLine}>{line}</span>
       </span>
       {chip ? <span className={chip.behind ? n.hereBehind : n.hereVersion}>{chip.text}</span> : null}
@@ -92,6 +95,7 @@ function PersonRow({ p, trust }: { p: ChatPerson; trust?: string }) {
  * their Beluga's version (or what it needs), then what waits on whom.
  */
 function PeopleHere({ id, title }: { id: string; title: string }) {
+  const t = useT();
   const { people, waiting } = useChatPeople(id);
   const trust = useTrustLabel();
   return (
@@ -104,12 +108,12 @@ function PeopleHere({ id, title }: { id: string; title: string }) {
         </ul>
       </Panel>
       {waiting.length ? (
-        <Panel title="Waiting">
+        <Panel title={t('network.conv.waiting')}>
           <ul className={n.hereList}>
             {waiting.map((w) => (
               <li key={`${w.target.kind}:${w.target.id}`}>
                 <button type="button" className={n.waitRow} title={waitingLabel(w)} onClick={() => showWaiting(w)}>
-                  <span className={n.hereName}>{w.on === 'you' ? 'On you' : `On ${w.onName}`}</span>
+                  <span className={n.hereName}>{w.on === 'you' ? t('network.insp.onYou') : t('network.insp.onName', { name: w.onName })}</span>
                   <span className={n.hereLine}>{w.text}</span>
                 </button>
               </li>
@@ -125,6 +129,7 @@ const since = (ts: number): string => new Date(ts).toLocaleDateString([], { mont
 
 /** The inspector beside a conversation with friends: who it's with (a friend, or a group's members). */
 export function ConversationDetails({ id }: { id: string }) {
+  const t = useT();
   const net = useApp((st) => st.network);
   const target = conversationOf(id);
   if (target?.kind === 'dm') {
@@ -132,13 +137,14 @@ export function ConversationDetails({ id }: { id: string }) {
     if (!f) return null;
     return (
       <>
-        <PeopleHere id={id} title="In this conversation" />
-        <Panel title="Friend">
-          <Field label="Name">{f.name}</Field>
-          <Field label="Status">{presenceLine(f)}</Field>
-          <Field label="Connection">{!f.online ? 'Not connected' : f.via === 'relay' ? 'Through another member’s computer' : 'Direct'}</Field>
+        <PeopleHere id={id} title={t('network.insp.inConversation')} />
+        <Panel title={t('network.team.friend')}>
+          <Field label={t('network.sheets.name')}>{f.name}</Field>
+          <Field label={t('network.insp.status')}>{presenceLine(f)}</Field>
+          <Field label={t('network.insp.connection')}>{!f.online ? t('network.insp.notConnected') : f.via === 'relay' ? t('network.insp.throughOther') : t('network.insp.direct')}</Field>
+          {/* i18n-ignore */}
           <Field label="Beluga">{belugaLine(f)}</Field>
-          <Field label="Added">{since(f.addedAt)}</Field>
+          <Field label={t('network.insp.added')}>{since(f.addedAt)}</Field>
         </Panel>
         <FriendAccess peerId={f.peerId} name={f.name} />
       </>
@@ -149,20 +155,20 @@ export function ConversationDetails({ id }: { id: string }) {
     if (!g) return null;
     return (
       <>
-        {g.active ? <PeopleHere id={id} title="In this channel" /> : null}
+        {g.active ? <PeopleHere id={id} title={t('network.insp.inChannel')} /> : null}
         <Panel
-        title="Channel"
+        title={t('network.insp.channel')}
         action={
           <Button size="small" variant="quiet" icon="people" onClick={() => openNet({ kind: 'group_info', groupId: g.id })}>
-            Info
+            {t('network.insp.info')}
           </Button>
         }
       >
-        <Field label="Name">{g.name}</Field>
-        <Field label="Members">
+        <Field label={t('network.sheets.name')}>{g.name}</Field>
+        <Field label={t('network.insp.members')}>
           <span className={n.stack} style={{ ['--ring' as string]: 'var(--bg-sunken)', flexWrap: 'wrap', rowGap: 4 }}>
             {sortMembers(g.members).map((m) => (
-              <Tip key={m.peerId} label={m.self ? `${m.name} (you)` : `${m.name} · ${presenceLine(m)}${m.admin ? ' · admin' : ''}`}>
+              <Tip key={m.peerId} label={m.self ? t('network.group.selfName', { name: m.name }) : `${m.name} · ${presenceLine(m)}${m.admin ? t('network.insp.adminSuffix') : ''}`}>
                 <span style={{ marginRight: 4 }}>
                   {m.self ? (
                     <PersonAvatar name={m.name} id={m.peerId} size={20} />
@@ -176,8 +182,8 @@ export function ConversationDetails({ id }: { id: string }) {
             ))}
           </span>
         </Field>
-        <Field label="You">{g.active ? (g.admin ? 'Admin' : 'Member') : 'Left'}</Field>
-        <Field label="Created">{since(g.createdAt)}</Field>
+        <Field label={t('network.conv.you')}>{g.active ? (g.admin ? t('network.group.admin') : t('network.insp.member')) : t('network.insp.left')}</Field>
+        <Field label={t('network.insp.created')}>{since(g.createdAt)}</Field>
         </Panel>
       </>
     );

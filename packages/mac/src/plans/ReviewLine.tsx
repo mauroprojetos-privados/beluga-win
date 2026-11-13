@@ -9,6 +9,8 @@ import { Button, cx } from '../components/ui.js';
 import { TonePill } from './marks.js';
 import type { Tone } from './plans-model.js';
 import { usePlanActions } from './use-plans.js';
+import { useT } from '../lib/i18n.js';
+import { type Key, t as tx } from '@beluga/shared/i18n/index.js';
 
 /**
  * While a fresh agent verifies the plan: never a still line that could be taken for stuck (BLG-772).
@@ -24,22 +26,23 @@ function Verifying({ plan }: { plan: Plan }) {
   const progress = verifyProgress(run?.type === 'agent' ? run : undefined);
   const now = useClock(true);
   const { openWorktree } = usePlanActions();
+  const t = useT();
   const took = Math.max(0, (now || Date.now()) - (progress.startedAt ?? review.at));
   return (
-    <div className={cx(p.changes, p.review, p.verifying)} role="status" aria-label="Verifying the plan">
+    <div className={cx(p.changes, p.review, p.verifying)} role="status" aria-label={t('plans.r.verifying')}>
       <div className={p.reviewHead}>
         <LiveDot />
-        <strong>Verifying the plan</strong>
+        <strong>{t('plans.r.verifying')}</strong>
         <span className={p.verifyTime}>{formatDuration(took)}</span>
-        <span className={p.verifyWhy}>A fresh agent checks it for contradictions, duplicates and stale decisions{review.thenApprove ? ', then approves it if nothing needs fixing' : ''}.</span>
+        <span className={p.verifyWhy}>{review.thenApprove ? t('plans.r.whyThenApprove') : t('plans.r.why')}</span>
         <span className={p.grow} />
         {review.chat ? (
           <Button size="small" variant="quiet" icon="eye" onClick={() => openWorktree(review.chat!)}>
-            Watch It Work
+            {t('plans.r.watch')}
           </Button>
         ) : null}
       </div>
-      <ol className={p.verifyChecks} aria-label="Checks">
+      <ol className={p.verifyChecks} aria-label={t('plans.r.checks')}>
         {progress.checks.map((c) => (
           <li key={c.key} className={p.verifyCheck} data-state={c.state}>
             {c.state === 'done' ? <Icon name="check" size={11} /> : c.state === 'now' ? <LiveDot /> : <span className={p.verifyTodo} aria-hidden="true" />}
@@ -57,12 +60,18 @@ function Verifying({ plan }: { plan: Plan }) {
 import p from './plans.module.css';
 
 /** What each kind of finding is called, and its tone. */
+const finding = (key: Key, tone: Tone): { readonly label: string; readonly tone: Tone } => ({
+  get label() {
+    return tx(key);
+  },
+  tone,
+});
 export const FINDING_WORDS: Readonly<Record<ReviewFinding['kind'], { readonly label: string; readonly tone: Tone }>> = {
-  contradiction: { label: 'Contradiction', tone: 'warn' },
-  duplicate: { label: 'Duplicate', tone: 'info' },
-  stale: { label: 'Stale', tone: 'accent' },
-  order: { label: 'Order', tone: 'claude' },
-  other: { label: 'Other', tone: 'neutral' },
+  contradiction: finding('plans.r.contradiction', 'warn'),
+  duplicate: finding('plans.r.duplicate', 'info'),
+  stale: finding('plans.r.stale', 'accent'),
+  order: finding('plans.r.order', 'claude'),
+  other: finding('plans.r.other', 'neutral'),
 };
 
 /**
@@ -72,6 +81,7 @@ export const FINDING_WORDS: Readonly<Record<ReviewFinding['kind'], { readonly la
  */
 export function ReviewLine({ plan, onApprove }: { plan: Plan; onApprove: () => void }) {
   const { api, act } = usePlanActions();
+  const t = useT();
   const state = reviewState(plan);
   const review = plan.review;
   if (state === 'reviewing' && review) return <Verifying plan={plan} />;
@@ -81,19 +91,19 @@ export function ReviewLine({ plan, onApprove }: { plan: Plan; onApprove: () => v
     <div className={cx(p.changes, p.review)} role="status">
       <div className={p.reviewHead}>
         <Icon name="eye" size={13} />
-        <strong>{review.fixAsked ? 'Your agent is fixing what verifying found' : `Verifying found ${n === 1 ? 'one thing' : `${n} things`} to fix`}</strong>
+        <strong>{review.fixAsked ? t('plans.r.fixing') : t('plans.r.found', { count: n })}</strong>
         <span className={p.grow} />
         {review.fixAsked ? (
           <Button size="small" variant="quiet" onClick={() => void act(() => api.verify(plan.id, { thenApprove: true }))}>
-            Verify, Then Approve
+            {t('plans.verifyThenApprove')}
           </Button>
         ) : (
           <>
             <Button size="small" variant="quiet" onClick={onApprove}>
-              Approve Anyway
+              {t('plans.approveAnyway')}
             </Button>
-            <Button size="small" variant="primary" icon="wand" onClick={() => void act(() => api.fixReview(plan.id), 'Sent to your agent')}>
-              Fix
+            <Button size="small" variant="primary" icon="wand" onClick={() => void act(() => api.fixReview(plan.id), t('plans.sentToAgent'))}>
+              {t('plans.fix')}
             </Button>
           </>
         )}

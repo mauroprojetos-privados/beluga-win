@@ -26,6 +26,8 @@ import { useMyAgent } from '../lib/agent-words.js';
 import { agentName } from '@beluga/shared/agent-label.js';
 import type { AgentRef } from '@beluga/protocol.js';
 import t from './tasks.module.css';
+import { useT } from '../lib/i18n.js';
+import { t as tx } from '@beluga/shared/i18n/index.js';
 
 const NONE: readonly never[] = [];
 
@@ -73,21 +75,22 @@ export function IssueMeta({ issue, compact, labels = true, progress: ring = true
   const epicPlan = useApp((s) => planEpic(s)?.plan);
   const epicMilestone = useApp((s) => planEpic(s)?.milestone);
   const epic = epicPlan ? { plan: epicPlan, milestone: epicMilestone } : undefined;
+  const tr = useT();
   return (
     <span className={cx(t.meta, compact && t.metaCompact)}>
       {issue.drafting ? (
         <span className={t.writing} aria-live="polite">
           <Dot tone="claude" live />
-          The agent is writing…
+          {tr('tasks.p.agentWriting')}
         </span>
       ) : null}
       {issue.needsChecks && STATUS_INFO[issue.status].open ? (
-        <Tip label="Kept out of review: an acceptance criterion is neither ticked nor explained">
-          <span className={t.needsChecks}>Needs its checks</span>
+        <Tip label={tr('tasks.p.keptOut')}>
+          <span className={t.needsChecks}>{tr('tasks.p.needsChecks')}</span>
         </Tip>
       ) : null}
       {plan && milestone ? (
-        <Tip label={`Part of the plan “${(plan.body ?? plan.draft)?.title ?? ''}”, milestone “${milestone}”`}>
+        <Tip label={tr('tasks.p.partOfPlan', { plan: (plan.body ?? plan.draft)?.title ?? '', milestone })}>
           <span className={t.planMark}>
             <Icon name="flag" size={11} />
             {compact ? null : milestone}
@@ -95,23 +98,23 @@ export function IssueMeta({ issue, compact, labels = true, progress: ring = true
         </Tip>
       ) : null}
       {epic ? (
-        <Tip label={epic.milestone ? `A milestone of the plan “${planTitle(epic.plan)}”: its tasks are under it` : 'A plan: its milestones are under it, and their tasks under them'}>
+        <Tip label={epic.milestone ? tr('tasks.p.milestoneOf', { plan: planTitle(epic.plan) }) : tr('tasks.p.aPlan')}>
           <span className={t.planMark}>
             <Icon name="flag" size={11} />
-            {compact ? null : epic.milestone ? 'Milestone' : 'Plan'}
+            {compact ? null : epic.milestone ? tr('tasks.p.milestone') : tr('plans.d.plan')}
           </span>
         </Tip>
       ) : null}
       {blocked && STATUS_INFO[issue.status].open ? (
-        <Tip label={`Waits on ${waitsOn}`}>
+        <Tip label={tr('tasks.p.waitsOn', { what: waitsOn })}>
           <span className={t.blocked}>
             <Icon name="stopSign" size={11} />
-            {compact ? blocked : `Blocked by ${blockedBy}`}
+            {compact ? blocked : tr('tasks.p.blockedBy', { what: blockedBy })}
           </span>
         </Tip>
       ) : null}
       {epicKey ? (
-        <Tip label={`Part of the epic ${epicKey} ${epicTitle ?? ''}`}>
+        <Tip label={tr('tasks.p.partOfEpic', { key: epicKey, title: epicTitle ?? '' })}>
           <span className={t.epicOf}>
             <Icon name="epic" size={11} />
             {epicKey}
@@ -119,7 +122,7 @@ export function IssueMeta({ issue, compact, labels = true, progress: ring = true
         </Tip>
       ) : null}
       {ring && progress.total ? (
-        <Tip label={`${progress.done} of ${progress.total} sub-tasks done`}>
+        <Tip label={tr('tasks.p.subTasksDone', { done: progress.done, total: progress.total })}>
           <span className={t.progress}>
             <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
               <circle cx="6" cy="6" r="4.6" className={t.progressTrack} />
@@ -140,14 +143,14 @@ export function IssueMeta({ issue, compact, labels = true, progress: ring = true
         </span>
       ) : null}
       {!presence ? null : running ? (
-        <Tip label={doing ? `Agent: ${doing}` : 'The agent is working on it'}>
+        <Tip label={doing ? tr('tasks.p.agentDoing', { doing }) : tr('tasks.p.agentWorkingOnIt')}>
           <span className={t.working}>
             <Dot tone="claude" live />
             {doing ? <span className={t.nowStep}>{doing}</span> : null}
           </span>
         </Tip>
       ) : worktree && !issue.pr ? (
-        <Tip label={issue.branch ? `In worktree on ${issue.branch}` : 'Has a worktree'}>
+        <Tip label={issue.branch ? tr('tasks.p.inWorktreeOn', { branch: issue.branch }) : tr('tasks.p.hasWorktree')}>
           <span className={t.worktreeMark}>
             <Icon name="branch" size={11} />
           </span>
@@ -198,9 +201,10 @@ export function EpicBar({ issue }: { issue: Issue }) {
   const done = useApp((s) => progressOf(s.board, issue).done);
   const total = useApp((s) => progressOf(s.board, issue).total);
   const all = useApp((s) => childrenOf(s.board, issue).length);
-  const words = total ? `${done} of ${total} done` : `${all} sub-task${all === 1 ? '' : 's'}, all canceled`;
+  const tr = useT();
+  const words = total ? tr('tasks.p.nOfDone', { done, total }) : tr('tasks.p.allCanceled', { count: all });
   return (
-    <span className={t.epicBar} role="img" aria-label={`Sub-tasks: ${words}`}>
+    <span className={t.epicBar} role="img" aria-label={tr('tasks.p.subTasksAria', { words })}>
       <span className={t.epicTrack}>
         <span className={t.epicFill} style={{ width: `${total ? (done / total) * 100 : 0}%` }} />
       </span>
@@ -219,7 +223,8 @@ export function TuckButton({ issue }: { issue: Issue }) {
   const opened = useTasksPrefs().opened;
   const away = !opened.includes(issue.id);
   const n = useApp((s) => childrenOf(s.board, issue).length);
-  const label = away ? `Show its ${n} sub-task${n === 1 ? '' : 's'}` : 'Tuck its sub-tasks under it';
+  const tr = useT();
+  const label = away ? tr('tasks.p.showSubTasks', { count: n }) : tr('tasks.p.tuckSubTasks');
   // A press here isn't the card's: no drag, no opening the task.
   const stop = (e: { stopPropagation: () => void }): void => e.stopPropagation();
   return (
@@ -258,18 +263,19 @@ export function useSharedWith(): (projectId: string) => string | undefined {
     const mates = teammatesOf(team, projectId).map((m) => m.name);
     const tracker = sync?.[projectId] ? 'Linear' : undefined;
     const all = [...mates, ...(tracker ? [tracker] : [])];
-    return all.length ? (all.length === 1 ? all[0] : `${all.slice(0, -1).join(', ')} and ${all.at(-1)}`) : undefined;
+    return all.length ? (all.length === 1 ? all[0] : `${all.slice(0, -1).join(', ')} ${tx('common.and')} ${all.at(-1)}`) : undefined;
   };
 }
 
 /** A private task's lock (BLG-501): beside its key, or with the word on a task's page. */
 export function PrivateMark({ issue, labelled }: { readonly issue: Pick<Issue, 'private'>; readonly labelled?: boolean }) {
+  const tr = useT();
   if (!issue.private) return null;
   return (
-    <Tip label="Private: only you see it. Share with Team from its ⋯ when it’s ready">
-      <span className={cx(t.privateTag, labelled && t.labelled)} aria-label="Private">
+    <Tip label={tr('tasks.p.privateTip')}>
+      <span className={cx(t.privateTag, labelled && t.labelled)} aria-label={tr('tasks.p.private')}>
         <Icon name="lock" size={11} />
-        {labelled ? 'Private' : null}
+        {labelled ? tr('tasks.p.private') : null}
       </span>
     </Tip>
   );
@@ -277,9 +283,9 @@ export function PrivateMark({ issue, labelled }: { readonly issue: Pick<Issue, '
 
 /** Make Private or Share with Team, as the one item a task's menu has for it (BLG-501). */
 export function privacyItem(issue: Issue, sharedWith: string | undefined, setPrivate: (on: boolean) => void): ActionItem[] {
-  if (issue.private) return [{ label: 'Share with Team', icon: 'people', hint: sharedWith ? 'Everyone on the team will see it' : 'Teammates will see it once you team up', onSelect: () => setPrivate(false) }];
+  if (issue.private) return [{ label: tx('tasks.shareWithTeam'), icon: 'people', hint: sharedWith ? tx('tasks.p.teamWillSee') : tx('tasks.p.matesWillSee'), onSelect: () => setPrivate(false) }];
   if (!sharedWith) return [];
-  return [{ label: 'Make Private', icon: 'lock', hint: 'Only you; the team won’t see it', onSelect: () => setPrivate(true) }];
+  return [{ label: tx('tasks.p.makePrivate'), icon: 'lock', hint: tx('tasks.p.onlyYou'), onSelect: () => setPrivate(true) }];
 }
 
 export function useIssueMenu(): (issue: Issue) => ActionItem[] {
@@ -290,6 +296,7 @@ export function useIssueMenu(): (issue: Issue) => ActionItem[] {
   const friends = useApp((s) => s.network.friends);
   const startWith = useStartWith();
   const mine = useMyAgent();
+  const tr = useT();
   const plans = useApp((s) => s.plans.plans);
   /** Its own agent, else its plan's (BLG-497); none: yours. */
   const ownAgent = (issue: Issue): AgentRef | undefined => issue.agent ?? (issue.plan ? plans.find((p) => p.id === issue.plan!.id)?.agent : undefined);
@@ -297,7 +304,7 @@ export function useIssueMenu(): (issue: Issue) => ActionItem[] {
   /** Start with ▸ (BLG-506): every agent and model, this start only; "your agent" over its own is yours by name. */
   const startWithMenu = (issue: Issue): ActionItem => {
     const own = ownAgent(issue);
-    return { label: 'Start with', icon: 'play', submenu: startWith(own, (a) => startIt(issue, a ?? (own ? mine : undefined)), ''), onSelect: () => undefined };
+    return { label: tr('tasks.p.startWith'), icon: 'play', submenu: startWith(own, (a) => startIt(issue, a ?? (own ? mine : undefined)), ''), onSelect: () => undefined };
   };
   const sharedWith = useSharedWith();
   /** Your chat with a teammate, the task in the box (BLG-263: you ask, nothing is given to their Claude). */
@@ -311,11 +318,12 @@ export function useIssueMenu(): (issue: Issue) => ActionItem[] {
     };
     return [
       {
-        label: 'Ask in a Chat',
+        label: tr('tasks.p.askInChat'),
         icon: 'chat',
         separate: true,
         submenu: mates.flatMap((m) => [
-          { label: `${m.name}’s agent`, hint: `@claude:… @${issue.key}`, onSelect: () => go(m.peerId, askAboutTask(issue.key, m.name, true)) },
+          // i18n-ignore
+          { label: tr('tasks.p.theirAgent', { name: m.name }), hint: `@claude:… @${issue.key}`, onSelect: () => go(m.peerId, askAboutTask(issue.key, m.name, true)) },
           { label: m.name, hint: `@${issue.key}`, onSelect: () => go(m.peerId, askAboutTask(issue.key, m.name, false)) },
         ]),
         onSelect: () => undefined,
@@ -329,44 +337,44 @@ export function useIssueMenu(): (issue: Issue) => ActionItem[] {
     // Archived: its words to read, back out of the Archive, or gone for good.
     if (isArchived(issue)) {
       return [
-        { label: 'Open', icon: 'task', onSelect: () => open(issue) },
-        { label: 'Restore from Archive', icon: 'refresh', separate: true, onSelect: () => void act(() => api.unarchive(issue.id), `${issue.key} is back on the board`) },
-        { label: 'Copy Key', icon: 'copy', separate: true, hint: issue.key, onSelect: () => void copyText(issue.key).then(() => toast(client, `Copied ${issue.key}`, 'success')) },
-        { label: 'Delete for Good…', danger: true, separate: true, onSelect: () => confirmDelete(issue, () => void act(() => api.remove(issue.id), `Deleted ${issue.key}`)) },
+        { label: tr('common.open'), icon: 'task', onSelect: () => open(issue) },
+        { label: tr('tasks.p.restoreFromArchive'), icon: 'refresh', separate: true, onSelect: () => void act(() => api.unarchive(issue.id), tr('tasks.backOnBoard', { key: issue.key })) },
+        { label: tr('tasks.p.copyKey'), icon: 'copy', separate: true, hint: issue.key, onSelect: () => void copyText(issue.key).then(() => toast(client, tr('tasks.p.copiedKey', { key: issue.key }), 'success')) },
+        { label: tr('tasks.p.deleteForGood'), danger: true, separate: true, onSelect: () => confirmDelete(issue, () => void act(() => api.remove(issue.id), tr('tasks.deleted', { key: issue.key }))) },
       ];
     }
     return [
-      { label: 'Open', icon: 'task', onSelect: () => open(issue) },
+      { label: tr('common.open'), icon: 'task', onSelect: () => open(issue) },
       ...(worktree
-        ? [{ label: 'Open Worktree', icon: 'branch' as const, onSelect: () => openWorktree(worktree) }]
+        ? [{ label: tr('tasks.openWorktree'), icon: 'branch' as const, onSelect: () => openWorktree(worktree) }]
         : startable
           ? [
               // Its agent is still writing it: starting waits for the brief (BLG-598).
-              { label: 'Start', icon: 'play' as const, hint: issue.drafting ? 'Once its brief is written' : `A new worktree, ${ownAgent(issue) ? agentName(ownAgent(issue)) : 'your agent'} working on it`, disabled: Boolean(issue.drafting), onSelect: () => startIt(issue, ownAgent(issue)) },
+              { label: tr('tasks.start'), icon: 'play' as const, hint: issue.drafting ? tr('tasks.p.onceBrief') : tr('tasks.p.newWorktreeWho', { who: ownAgent(issue) ? agentName(ownAgent(issue)) : tr('tasks.p.yourAgent') }), disabled: Boolean(issue.drafting), onSelect: () => startIt(issue, ownAgent(issue)) },
               { ...startWithMenu(issue), disabled: Boolean(issue.drafting) },
-              { label: 'Start Worktree Only', icon: 'branch' as const, hint: 'Without the agent', disabled: Boolean(issue.drafting), onSelect: () => void act(() => api.start(issue.id, {})) },
+              { label: tr('tasks.p.worktreeOnly'), icon: 'branch' as const, hint: tr('tasks.p.withoutAgent'), disabled: Boolean(issue.drafting), onSelect: () => void act(() => api.start(issue.id, {})) },
             ]
           : []),
       // Finished (or canceled) work starts again only deliberately: back to Ready, then Start.
-      ...(startable ? [] : [{ label: 'Reopen the Task', icon: 'refresh' as const, onSelect: () => void act(() => api.update(issue.id, { status: 'todo' }), `Reopened ${issue.key}`) }]),
+      ...(startable ? [] : [{ label: tr('tasks.p.reopen'), icon: 'refresh' as const, onSelect: () => void act(() => api.update(issue.id, { status: 'todo' }), tr('tasks.p.reopened', { key: issue.key })) }]),
       ...askIn(issue),
       {
-        label: 'Status',
+        label: tr('tasks.status'),
         separate: true,
         submenu: ISSUE_STATUSES.map((s) => ({ label: STATUS_INFO[s].label, checked: issue.status === s, onSelect: () => void act(() => api.update(issue.id, { status: s })) })),
         onSelect: () => undefined,
       },
       {
-        label: 'Priority',
+        label: tr('tasks.priority'),
         submenu: PRIORITIES.map((p) => ({ label: PRIORITY_INFO[p].label, checked: issue.priority === p, onSelect: () => void act(() => api.update(issue.id, { priority: p })) })),
         onSelect: () => undefined,
       },
-      { label: 'Add Sub-task…', icon: 'plus', onSelect: () => openSheet({ kind: 'new_task', projectId: issue.projectId, parent: issue.id }) },
-      ...privacyItem(issue, sharedWith(issue.projectId), (on) => void act(() => api.setPrivate(issue.id, on), on ? `${issue.key} is private: only you see it` : `Shared ${issue.key} with the team`)),
-      ...(isOpen(issue.status) ? [] : [{ label: 'Archive', icon: 'archive' as const, hint: 'Off the board; its proof files let go', onSelect: () => void act(() => api.archive(issue.id), `Archived ${issue.key}`) }]),
-      { label: 'Copy Key', icon: 'copy', separate: true, hint: issue.key, onSelect: () => void copyText(issue.key).then(() => toast(client, `Copied ${issue.key}`, 'success')) },
-      { label: 'Copy Title and Key', onSelect: () => void copyText(`${issue.key} ${issue.title}`).then(() => toast(client, 'Copied', 'success')) },
-      { label: 'Delete Task…', danger: true, onSelect: () => confirmDelete(issue, () => void act(() => api.remove(issue.id), `Deleted ${issue.key}`)) },
+      { label: tr('tasks.p.addSubTask'), icon: 'plus', onSelect: () => openSheet({ kind: 'new_task', projectId: issue.projectId, parent: issue.id }) },
+      ...privacyItem(issue, sharedWith(issue.projectId), (on) => void act(() => api.setPrivate(issue.id, on), on ? tr('tasks.p.isPrivate', { key: issue.key }) : tr('tasks.shared', { key: issue.key }))),
+      ...(isOpen(issue.status) ? [] : [{ label: tr('tasks.p.archive'), icon: 'archive' as const, hint: tr('tasks.p.archiveHint'), onSelect: () => void act(() => api.archive(issue.id), tr('tasks.p.archived', { key: issue.key })) }]),
+      { label: tr('tasks.p.copyKey'), icon: 'copy', separate: true, hint: issue.key, onSelect: () => void copyText(issue.key).then(() => toast(client, tr('tasks.p.copiedKey', { key: issue.key }), 'success')) },
+      { label: tr('tasks.p.copyTitleKey'), onSelect: () => void copyText(`${issue.key} ${issue.title}`).then(() => toast(client, tr('tasks.p.copied'), 'success')) },
+      { label: tr('tasks.p.deleteTask'), danger: true, onSelect: () => confirmDelete(issue, () => void act(() => api.remove(issue.id), tr('tasks.deleted', { key: issue.key }))) },
     ];
   };
 }
@@ -374,9 +382,9 @@ export function useIssueMenu(): (issue: Issue) => ActionItem[] {
 function confirmDelete(issue: Issue, run: () => void): void {
   openSheet({
     kind: 'confirm',
-    title: `Delete ${issue.key}?`,
-    message: `“${issue.title}”, its brief and its history go away. Its sub-tasks stay, as tasks of their own. Its worktree isn't touched.`,
-    confirm: 'Delete Task',
+    title: tx('tasks.p.deleteTitle', { key: issue.key }),
+    message: tx('tasks.p.deleteMessage', { title: issue.title }),
+    confirm: tx('tasks.p.deleteTaskButton'),
     destructive: true,
     run,
   });
@@ -386,6 +394,7 @@ function confirmDelete(issue: Issue, run: () => void): void {
 export function ArchiveDoneButton({ projectId }: { projectId?: string }) {
   const { api, act } = useTaskActions();
   const n = useApp((s) => doneCount(s.board, projectId));
+  const tr = useT();
   if (!n || !projectId) return null;
-  return <IconButton icon="archive" label={`Archive ${n} Done ${n === 1 ? 'Task' : 'Tasks'}`} onClick={() => void act(() => api.archiveDone(projectId), `Archived ${n} done ${n === 1 ? 'task' : 'tasks'}: they’re in the Archive`)} />;
+  return <IconButton icon="archive" label={tr('tasks.p.archiveNDone', { count: n })} onClick={() => void act(() => api.archiveDone(projectId), tr('tasks.p.archivedNDone', { count: n }))} />;
 }

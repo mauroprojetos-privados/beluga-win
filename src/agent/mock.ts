@@ -831,6 +831,13 @@ export function createMockBackend(bridge: RoomBridge, pace = 1): AgentBackend {
       await new Promise((r) => setTimeout(r, Math.max(watch, (ctx.look ? 6000 : 1500) * pace)));
       return mockDraft(text, ctx);
     },
+    // A task made by hand: its kind, by its words, a beat later as Haiku would say it.
+    classifyTask: async (task) => {
+      await new Promise((r) => setTimeout(r, 300 * pace));
+      const t = `${task.title} ${task.goal ?? ''}`.toLowerCase();
+      const category: import('../core/routing/model.js').WorkCategory = /\b(docs?|readme|write-?up|changelog)\b/.test(t) ? 'docs' : /\b(ui|css|style|layout|design|icon|colou?r)\b/.test(t) ? 'visual' : /\b(review|audit)\b/.test(t) ? 'review' : /\b(find out|investigate|explore|research|why)\b/.test(t) ? 'explore' : /\b(typo|rename|bump)\b/.test(t) ? 'quick' : 'deep';
+      return { category, why: 'From the words of its title' };
+    },
     describeProject: async (_dir, project) => {
       await new Promise((r) => setTimeout(r, 4000 * pace));
       return mockAbout(project);

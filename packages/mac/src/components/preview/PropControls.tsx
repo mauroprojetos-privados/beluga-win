@@ -4,6 +4,7 @@ import { pictureOf } from '@beluga/shared/preview/samples.js';
 import { Icon } from '../Icon.js';
 import { Select } from '../Select.js';
 import { Tip, cx } from '../ui.js';
+import { useT } from '../../lib/i18n.js';
 import { GridEditor, JsonEditor, RowsEditor } from './PropEditors.js';
 import { choiceLabels, controlOf, dateAt, dayOf, startValue } from './preview-model.js';
 import s from './preview.module.css';
@@ -26,7 +27,8 @@ export interface PropControlsProps {
 }
 
 export function PropControls({ fields, values, onChange, onClear, fired }: PropControlsProps) {
-  if (!fields.length) return <div className={s.propsEmpty}>It takes no props.</div>;
+  const t = useT();
+  if (!fields.length) return <div className={s.propsEmpty}>{t('components.preview.noProps')}</div>;
   return (
     <div className={s.props}>
       {fields.map((f) => (
@@ -37,6 +39,7 @@ export function PropControls({ fields, values, onChange, onClear, fired }: PropC
 }
 
 function PropRow({ field, value, set, onChange, onClear, fired }: { field: Field; value: unknown; set: boolean; onChange: (v: unknown) => void; onClear: () => void; fired: number }) {
+  const t = useT();
   const kind = controlOf(field, value);
   const name = (
     <span className={cx(s.propName, field.doc && s.propDoc)}>
@@ -52,7 +55,7 @@ function PropRow({ field, value, set, onChange, onClear, fired }: { field: Field
         {field.doc ? <Tip label={field.doc}>{name}</Tip> : name}
         <span className={s.grow} />
         {set && field.optional && kind !== 'event' ? (
-          <button type="button" className={s.iconMini} aria-label={`Use ${field.name}’s default`} title="Use its default" onClick={onClear}>
+          <button type="button" className={s.iconMini} aria-label={t('components.preview.useNamedDefault', { name: field.name })} title={t('components.preview.useDefault')} onClick={onClear}>
             <Icon name="x" size={9} />
           </button>
         ) : null}
@@ -64,16 +67,18 @@ function PropRow({ field, value, set, onChange, onClear, fired }: { field: Field
 
 /** A prop left to the component: its default, and a way to set it. */
 function Unset({ field, onSet }: { field: Field; onSet: () => void }) {
+  const t = useT();
   const fallback = field.fallback !== undefined ? (typeof field.fallback === 'string' ? `“${field.fallback}”` : JSON.stringify(field.fallback)) : undefined;
   return (
     <button type="button" className={s.unset} onClick={onSet}>
-      {fallback ? `Default ${fallback}` : 'Not set'}
-      <span className={s.setIt}>Set</span>
+      {fallback ? t('components.preview.defaultValue', { value: fallback }) : t('components.preview.notSet')}
+      <span className={s.setIt}>{t('components.preview.set')}</span>
     </button>
   );
 }
 
 function Control({ field, kind, value, onChange, fired }: { field: Field; kind: ReturnType<typeof controlOf>; value: unknown; onChange: (v: unknown) => void; fired: number }): ReactNode {
+  const t = useT();
   const label = field.name;
   switch (kind) {
     case 'choice': {
@@ -100,7 +105,7 @@ function Control({ field, kind, value, onChange, fired }: { field: Field; kind: 
     case 'color':
       return (
         <span className={s.colorField}>
-          <input type="color" value={String(value)} aria-label={`${label} colour`} onChange={(e) => onChange(e.target.value)} />
+          <input type="color" value={String(value)} aria-label={t('components.preview.colourOf', { name: label })} onChange={(e) => onChange(e.target.value)} />
           <input className={s.field} value={String(value ?? '')} aria-label={label} onChange={(e) => onChange(e.target.value)} />
         </span>
       );
@@ -108,7 +113,7 @@ function Control({ field, kind, value, onChange, fired }: { field: Field; kind: 
       return (
         <span className={s.pictureField}>
           <img src={pictureOf(value)} alt="" />
-          <input className={s.field} placeholder="A sample picture · paste a link" aria-label={label} onChange={(e) => e.target.value && onChange(e.target.value)} />
+          <input className={s.field} placeholder={t('components.preview.samplePicture')} aria-label={label} onChange={(e) => e.target.value && onChange(e.target.value)} />
         </span>
       );
     case 'longText':
@@ -116,7 +121,7 @@ function Control({ field, kind, value, onChange, fired }: { field: Field; kind: 
     case 'text':
       return <input className={s.field} value={typeof value === 'string' || typeof value === 'number' ? String(value) : ''} aria-label={label} onChange={(e) => onChange(e.target.value)} />;
     case 'event':
-      return <span className={cx(s.fired, fired > 0 && s.firedOn)}>{fired ? `Fired ${fired === 1 ? 'once' : `${fired} times`}` : 'Fires when used'}</span>;
+      return <span className={cx(s.fired, fired > 0 && s.firedOn)}>{fired ? t('components.preview.fired', { count: fired }) : t('components.preview.firesWhenUsed')}</span>;
     case 'grid':
       return <GridEditor value={value} label={label} onChange={onChange} />;
     case 'rows':

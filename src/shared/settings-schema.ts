@@ -1,11 +1,14 @@
 import { z } from 'zod';
 import { AgentRef } from '../protocol.js';
+import { CategoryCombos, DifficultyCombos, RoleCombos, SavedCombos } from '../core/routing/model.js';
+import { SAVINGS_BASELINES } from '../core/routing/outcomes.js';
 import { AUTO_COMPACT_DEFAULT, AUTO_COMPACT_MAX, AUTO_COMPACT_MIN } from './context-usage.js';
 import { PARALLEL_RUNS_DEFAULT, PARALLEL_RUNS_MAX, PARALLEL_RUNS_MIN } from './run-slots.js';
 import { CHAT_LIMIT_DEFAULT, CHAT_LIMIT_MAX } from './chat-limit.js';
 import { AUTO_CONTINUE_OFF_MAX } from './auto-continue.js';
 import { MAX_AGENT_ARGS, MAX_AGENT_ARG_LENGTH } from './agent-args.js';
 import { THREAD_LIMITS_DEFAULT, THREAD_LIMITS_MAX } from './threads.js';
+import { LANGUAGE_CHOICES, LOCALES } from './i18n/locales.js';
 import { coercePerKind, coerceSound, DEFAULT_SOUND, DEFAULT_VOLUME, PerKindSounds, SoundChoice } from './notify-sound.js';
 
 // Settings as data (no file access), so the reducer and the clients can use them anywhere.
@@ -111,6 +114,10 @@ export const Settings = z.object({
   /** Run New Work On (BLG-780): `here`, `best`, or a computer's id. */
   runOn: z.string().regex(RUN_ON).default('here'),
   theme: z.enum(THEMES).default('calm'),
+  /** Settings › General › Language (docs/i18n.md): the system's (`auto`), or one of ours. Your agents answer in it too. */
+  language: z.enum(LANGUAGE_CHOICES).catch('auto').default('auto'),
+  /** A project's language for commit messages and pull requests (by project name); unset: English. It never follows `language`. */
+  commitLanguages: z.record(z.string().min(1).max(80), z.enum(LOCALES)).optional().catch(undefined),
   /** Default trust for people you haven't chosen a level for. Unset until you answer the welcome screen once. */
   policy: z.enum(['ask', 'auto', 'deny']).optional(),
   mouse: z.boolean().default(true),
@@ -129,6 +136,16 @@ export const Settings = z.object({
   defaultAgent: AgentRef.optional(),
   /** A project's own default agent (by project name), over `defaultAgent` for work in that project. */
   projectAgents: z.record(z.string().min(1).max(80), AgentRef).optional(),
+  /** Your combos (core/routing, docs/routing.md): unset, the defaults as this computer has them. A malformed one is dropped alone. */
+  combos: SavedCombos,
+  /** Which combo a task of each difficulty starts on when it names no agent (docs/routing.md). */
+  difficultyCombos: DifficultyCombos.optional().catch(undefined),
+  /** Which combo each role runs on: a plan's head, its milestones, the checker, the PR reviewer (docs/routing.md). */
+  roleCombos: RoleCombos.optional().catch(undefined),
+  /** Which combo (and effort) a task of each kind of work starts on when it names no agent (docs/routing.md). */
+  categoryCombos: CategoryCombos.optional().catch(undefined),
+  /** What routing's savings are measured against (docs/routing.md); unset: everything on Opus. */
+  savingsBaseline: z.enum(SAVINGS_BASELINES).optional().catch(undefined),
   /** What new worktrees' branches start with (`beluga/<name>`); empty: no prefix. */
   branchPrefix: z.string().regex(BRANCH_PREFIX_RE).catch(BRANCH_PREFIX_DEFAULT),
   /** Run the project's setup script (e.g. npm install) in every new worktree. */
@@ -165,6 +182,10 @@ export const Settings = z.object({
   pushToPr: z.boolean().catch(true),
   /** Claude keeps screenshots and scratch output in the workspace's git-ignored `.beluga/scratch/` folder. */
   scratchFolder: z.boolean().default(true),
+  /** Your stack (docs/stack.md): start a service that's down by itself. */
+  stackRepair: z.boolean().catch(true),
+  /** Your stack: set a project up for it as it's added or made. */
+  stackBootstrap: z.boolean().catch(true),
   /** How much of Claude's sub-agent work the chat shows. */
   subagents: z.enum(['full', 'compact', 'hidden']).default('full'),
   /** Workspace buttons you chose to hide from the top bar. */

@@ -4,6 +4,9 @@ import { cx } from '../components/ui.js';
 import { type SettingsPane, useApp } from '../lib/beluga.js';
 import { type PaneResults, SETTINGS_FIND_EVENT, type SettingHit, flatHits, hitAnchors, searchSettings } from '../lib/settings-search.js';
 import { PANES, SETTINGS, THREAD_LIMITS_GROUP } from './settings-index.js';
+import { useLocale, useT } from '../lib/i18n.js';
+import { saidPanes, saidSettings } from './settings-said.js';
+import { t as say } from '@beluga/shared/i18n/index.js';
 import s from './settings.module.css';
 
 type Pane = (typeof PANES)[number];
@@ -45,7 +48,11 @@ export function useSettingsSearch(panes: readonly Pane[], pane: SettingsPane, op
   const [jump, setJump] = useState<{ hit: Hit; at: number }>();
   // Thread limits show with agent threads on, in the pane and here.
   const threadsOn = useApp((st) => st.prefs.agentThreads ?? false);
-  const results = useMemo(() => searchSettings(query, threadsOn ? SETTINGS : SETTINGS.filter((e) => e.group !== THREAD_LIMITS_GROUP), panes), [query, panes, threadsOn]);
+  // Matched in English and in the app's language (settings-said.ts); the said words show.
+  const locale = useLocale();
+  const entries = useMemo(() => saidSettings(threadsOn ? SETTINGS : SETTINGS.filter((e) => e.group !== THREAD_LIMITS_GROUP)), [threadsOn, locale]);
+  const said = useMemo(() => saidPanes(panes), [panes, locale]);
+  const results = useMemo(() => searchSettings(query, entries, said, say('settings.search.openPane')), [query, entries, said]);
   const hits = useMemo(() => flatHits(results), [results]);
   const matched = useMemo(() => new Set(results.map((r) => r.pane.id)), [results]);
 
@@ -153,6 +160,7 @@ export function revealSetting(container: HTMLElement, hit: Hit): () => void {
 
 /** The field at the top of Settings' sidebar: ↑/↓ move through the results, Return opens one. */
 export function SettingsSearchField({ search }: { search: SettingsSearch }) {
+  const t = useT();
   const { field, query, showing, hits, active } = search;
   return (
     <label className={s.search}>
@@ -161,12 +169,12 @@ export function SettingsSearchField({ search }: { search: SettingsSearch }) {
         ref={field}
         type="text"
         role="combobox"
-        aria-label="Search settings"
+        aria-label={t('sheets.settingsSearch.label')}
         aria-autocomplete="list"
         aria-expanded={showing}
         aria-controls={LIST_ID}
         {...(showing && hits[active] ? { 'aria-activedescendant': optionId(active) } : {})}
-        placeholder="Search"
+        placeholder={t('common.search')}
         spellCheck={false}
         autoComplete="off"
         value={query}
@@ -184,7 +192,7 @@ export function SettingsSearchField({ search }: { search: SettingsSearch }) {
         }}
       />
       {query ? (
-        <button type="button" className={s.searchClear} aria-label="Clear the search" onClick={search.clear}>
+        <button type="button" className={s.searchClear} aria-label={t('sheets.settingsSearch.clear')} onClick={search.clear}>
           <Icon name="x" size={10} />
         </button>
       ) : null}
@@ -194,6 +202,7 @@ export function SettingsSearchField({ search }: { search: SettingsSearch }) {
 
 /** The results, grouped by pane, where the pane shows while words are typed; or that nothing matches. */
 export function SettingsSearchResults({ search, panes }: { search: SettingsSearch; panes: readonly Pane[] }) {
+  const t = useT();
   const { results, hits, active, query } = search;
   const list = useRef<HTMLDivElement>(null);
   // Keep the one ↑/↓ is on in view.
@@ -206,15 +215,15 @@ export function SettingsSearchResults({ search, panes }: { search: SettingsSearc
       {/* Read out as it changes: how many were found, or (shown too) that nothing matches. */}
       <div className={count ? s.srOnly : s.searchEmpty} role="status">
         {count ? (
-          `${count} ${count === 1 ? 'setting' : 'settings'} found`
+          t('sheets.settingsSearch.found', { count })
         ) : (
           <>
             <Icon name="search" size={18} />
-            No settings match “{query.trim()}”
+            {t('sheets.settingsSearch.none', { query: query.trim() })}
           </>
         )}
       </div>
-      <div ref={list} id={LIST_ID} role="listbox" aria-label="Settings found" className={s.results} hidden={!count}>
+      <div ref={list} id={LIST_ID} role="listbox" aria-label={t('sheets.settingsSearch.results')} className={s.results} hidden={!count}>
         {results.map((r) => {
           const icon = panes.find((p) => p.id === r.pane.id)?.icon ?? 'gear';
           const headId = `${LIST_ID}-${r.pane.id}`;
@@ -222,18 +231,19 @@ export function SettingsSearchResults({ search, panes }: { search: SettingsSearc
             <div key={r.pane.id} role="group" aria-labelledby={headId} className={s.resultGroup}>
               <div id={headId} className={s.resultPane}>
                 <Icon name={icon} size={12} />
-                {r.pane.label}
+                {r.pane.said?.label ?? r.pane.label}
               </div>
               {r.hits.map((hit) => {
                 const i = hits.indexOf(hit);
-                const where = hit.entry?.group && hit.entry.group !== hit.label ? hit.entry.group : undefined;
+                const group = hit.entry?.said?.group ?? hit.entry?.group;
+                const where = group && group !== hit.label ? group : undefined;
                 return (
                   <div
                     key={hit.key}
                     id={optionId(i)}
                     role="option"
                     aria-selected={i === active}
-                    aria-label={`${r.pane.label} › ${hit.label}`}
+                    aria-label={`${r.pane.said?.label ?? r.pane.label} › ${hit.label}`}
                     {...(hit.detail ? { 'aria-description': hit.detail } : {})}
                     className={cx(s.result, i === active && s.resultOn)}
                     // The field keeps focus: ↑/↓ and Return still work after a hover.

@@ -6,6 +6,7 @@ import { imageSource, localImage } from '../../chat/md-images.js';
 import { openLightbox, useImage } from '../../chat/images.js';
 import type { Side } from './graph-model.js';
 import { KindIcon, StatusMark, StatusPill } from './marks.js';
+import { useT } from '../../lib/i18n.js';
 import g from './graph.module.css';
 
 /**
@@ -116,6 +117,7 @@ export const TableNode = memo(function TableNode({ data }: NodeProps<FlowNode>) 
           {fields.map((f, i) => (
             <li key={`${i}:${f.name}`} className={g.fieldRow} title={f.note}>
               <span className={g.fieldKey} data-key={f.key}>
+                {/* i18n-ignore: database key marks */}
                 {f.key === 'pk' ? 'PK' : f.key === 'fk' ? 'FK' : null}
               </span>
               <span className={g.fieldName}>{f.name}</span>
@@ -135,6 +137,7 @@ export const TableNode = memo(function TableNode({ data }: NodeProps<FlowNode>) 
 
 /** A picture as proof (a screenshot of the page that changed): click for full size. */
 export const ImageNode = memo(function ImageNode({ data }: NodeProps<FlowNode>) {
+  const t = useT();
   const { node } = data;
   const path = node.image ?? '';
   // The same rule as a picture in a message: an absolute path to an image file on this Mac.
@@ -143,7 +146,7 @@ export const ImageNode = memo(function ImageNode({ data }: NodeProps<FlowNode>) 
   return (
     <div className={cx(g.card, g.imageCard, node.emphasis && g.emphasis)} data-kind="image">
       <Ends sides={data.sides} />
-      {local ? <Picture path={source.path} label={node.label} /> : <div className={g.noPicture}>{path ? 'Pictures from other computers show as a name' : 'No picture'}</div>}
+      {local ? <Picture path={source.path} label={node.label} /> : <div className={g.noPicture}>{path ? t('components.graph.otherComputers') : t('components.graph.noPicture')}</div>}
       <div className={g.imageCaption}>
         <span className={g.label}>{node.label}</span>
         {node.sublabel ? <span className={g.sublabel}>{node.sublabel}</span> : null}
@@ -153,12 +156,13 @@ export const ImageNode = memo(function ImageNode({ data }: NodeProps<FlowNode>) 
 });
 
 function Picture({ path, label }: { path: string; label: string }) {
+  const t = useT();
   const { client } = useBeluga();
   const image = localImage(path, label);
   const state = useImage(client.api, image);
-  if (state.status !== 'ready') return <div className={g.noPicture}>{state.status === 'loading' ? 'Loading…' : 'Can’t open this picture'}</div>;
+  if (state.status !== 'ready') return <div className={g.noPicture}>{state.status === 'loading' ? t('common.loading') : t('components.graph.cantOpenPicture')}</div>;
   return (
-    <button type="button" className={cx(g.picture, 'nodrag')} onClick={() => openLightbox([image])} aria-label={`Open ${label}`}>
+    <button type="button" className={cx(g.picture, 'nodrag')} onClick={() => openLightbox([image])} aria-label={t('components.graph.openNamed', { name: label })}>
       <img src={state.url} alt={label} draggable={false} />
     </button>
   );

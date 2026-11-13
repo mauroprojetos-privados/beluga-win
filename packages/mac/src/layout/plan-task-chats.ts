@@ -1,5 +1,6 @@
 import type { ActionItem } from '../components/SpecMenu.js';
 import { type UiPrefs, getPrefs, setPrefs } from '../lib/prefs.js';
+import { t } from '@beluga/shared/i18n/index.js';
 
 /**
  * A plan is one row in the sidebar; for those who want the detail, its tasks' chats can show
@@ -16,5 +17,5 @@ function setShowsTaskChats(planId: string, on: boolean): void {
 /** The ⋯ item (the plan's row and its page; they pass usePrefs() so its check stays true). */
 export const taskChatsItem = (planId: string, prefs: UiPrefs): ActionItem => {
   const on = showsTaskChats(planId, prefs);
-  return { label: 'Show Task Chats in the Sidebar', checked: on, onSelect: () => setShowsTaskChats(planId, !on) };
+  return { label: t('layout.plan.taskChats'), checked: on, onSelect: () => setShowsTaskChats(planId, !on) };
 };

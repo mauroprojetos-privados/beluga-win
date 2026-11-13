@@ -7,20 +7,23 @@ import { useActions } from '../lib/actions.js';
 import { useApp } from '../lib/beluga.js';
 import { checksSummary } from '../lib/pr-checks.js';
 import { conversationCounts, openPrPage, usePrConversation } from '../pr/use-pr-conversation.js';
+import { type Key } from '@beluga/shared/i18n/index.js';
+import { useT } from '../lib/i18n.js';
 import s from './pr-strip.module.css';
 
-const CHECKS: Record<PullRequest['checks'], string> = { passing: 'Checks passed', failing: 'Checks failed', pending: 'Checks running', none: 'No checks' };
+const CHECKS: Record<PullRequest['checks'], Key> = { passing: 'chat.pr.checksPassed', failing: 'chat.pr.checksFailed', pending: 'chat.pr.checksRunning', none: 'chat.pr.noChecks' };
 
 /** How many comments, and how many threads still open: opens the PR's page. */
 function CommentsButton({ workspaceId }: { workspaceId: string }) {
   const { data } = usePrConversation(workspaceId);
   const counts = conversationCounts(data);
+  const t = useT();
   if (!data || !counts.said) return null;
   return (
-    <Tip label="The PR’s page: what reviewers said, with the code they mean; reply, resolve, or ask your agent">
+    <Tip label={t('chat.pr.commentsTip')}>
       <button type="button" className={cx(s.status, s.toggle, counts.open ? s.wait : undefined)} data-pr-comments={counts.said} onClick={() => openPrPage(workspaceId)}>
         <Icon name="chat" size={11} />
-        {counts.open ? `${counts.open} open` : `${counts.said} ${counts.said === 1 ? 'comment' : 'comments'}`}
+        {counts.open ? t('chat.pr.open', { count: counts.open }) : t('chat.pr.comments', { count: counts.said })}
         <Icon name="chevronRight" size={10} />
       </button>
     </Tip>
@@ -37,6 +40,7 @@ function CommentsButton({ workspaceId }: { workspaceId: string }) {
 export function PrStrip({ workspaceId }: { workspaceId: string }) {
   const actions = useActions();
   const pr = useApp((st) => st.prs[workspaceId]);
+  const t = useT();
   const [open, setOpen] = useState<boolean>();
   if (!pr || pr.state !== 'OPEN') return null;
   const runs = pr.checkRuns ?? [];
@@ -45,7 +49,7 @@ export function PrStrip({ workspaceId }: { workspaceId: string }) {
   return (
     <div className={s.strip} data-pr-strip={pr.state}>
         <div className={s.row}>
-          <Tip label="Open the pull request: its checks, review and every way to merge">
+          <Tip label={t('chat.pr.openTip')}>
             <button type="button" className={s.main} onClick={() => actions.run({ type: 'ws', id: workspaceId, action: 'pr' })}>
               <Icon name="pr" size={13} />
               <span className={s.number}>#{pr.number}</span>
@@ -55,7 +59,7 @@ export function PrStrip({ workspaceId }: { workspaceId: string }) {
           <CommentsButton workspaceId={workspaceId} />
           <button type="button" className={cx(s.status, s.toggle, tone)} disabled={!runs.length} aria-expanded={shown} onClick={() => setOpen(!shown)}>
             {pr.checks === 'pending' ? <span className={s.spinner} /> : pr.checks === 'passing' ? <Icon name="check" size={11} /> : pr.checks === 'failing' ? <Icon name="x" size={11} /> : null}
-            {runs.length ? checksSummary(runs) : CHECKS[pr.checks]}
+            {runs.length ? checksSummary(runs) : t(CHECKS[pr.checks])}
             {runs.length ? <Icon name={shown ? 'chevronUp' : 'chevronDown'} size={10} /> : null}
           </button>
         </div>

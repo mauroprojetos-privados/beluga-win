@@ -9,14 +9,17 @@ import { Group, Row } from '../settings-controls.js';
 import st from '../settings.module.css';
 import { PlayButton, SoundPicker } from './SoundPicker.js';
 import s from './sound.module.css';
+import { say, useT } from '../../lib/i18n.js';
+import { t as tt } from '@beluga/shared/i18n/index.js';
 
-const GROUP_LABELS: Readonly<Record<SoundGroup, string>> = {
-  needsYou: 'Your agent needs you',
-  done: 'Your agent finished',
-  mentions: 'Messages and mentions',
-  people: 'People come and go',
-  background: 'Background tasks',
-};
+/** Each kind of notification, in the app's language. */
+const GROUP_LABELS = (): Readonly<Record<SoundGroup, string>> => ({
+  needsYou: tt('sheets.sound.needsYou'),
+  done: tt('sheets.sound.done'),
+  mentions: tt('sheets.sound.mentions'),
+  people: tt('sheets.sound.people'),
+  background: tt('sheets.sound.background'),
+});
 
 /** Whose sound the picker is choosing: everything's, or one kind's. */
 type Target = 'all' | SoundGroup;
@@ -32,6 +35,8 @@ export interface SoundSettingsProps {
 
 /** Settings › Notifications › Sound: which sound, per kind if you like, and how loud. */
 export function SoundSettings({ n, save, test }: SoundSettingsProps) {
+  const t = useT();
+  const labels = GROUP_LABELS();
   const perKind = n.perKind !== null && n.perKind !== undefined;
   const [target, setTarget] = useState<Target>(perKind ? 'needsYou' : 'all');
   const [volume, setVolume] = useState(volumeOf(n));
@@ -42,15 +47,15 @@ export function SoundSettings({ n, save, test }: SoundSettingsProps) {
   useEffect(() => setVolume(volumeOf(n)), [n.soundVolume]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (Math.abs(volume - volumeOf(n)) < 0.005) return;
-    const t = setTimeout(() => save({ soundVolume: volume }), 350);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => save({ soundVolume: volume }), 350);
+    return () => clearTimeout(timer);
   }, [volume]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Beluga's sounds go to ~/Library/Sounds ahead of the next notification (old ones are removed).
   const inUse = JSON.stringify([n.sound, n.perKind, n.soundVolume]);
   useEffect(() => {
-    const t = setTimeout(() => void syncSounds(n).catch(() => undefined), 800);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => void syncSounds(n).catch(() => undefined), 800);
+    return () => clearTimeout(timer);
   }, [inUse]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pick = (choice: SoundChoice): void => {
@@ -74,46 +79,46 @@ export function SoundSettings({ n, save, test }: SoundSettingsProps) {
   };
 
   return (
-    <Group title="Sound">
-      <Row label="Sounds" detail={perKind ? 'Pick a kind below, then its sound.' : 'One sound for every notification.'}>
+    <Group title={say('Sound')}>
+      <Row label={say('Sounds')} detail={perKind ? t('sheets.sound.pickKind') : t('sheets.sound.oneSound')}>
         <Segmented<'same' | 'kind'>
-          label="Sounds"
+          label={say('Sounds')}
           value={perKind ? 'kind' : 'same'}
           onChange={setMode}
           options={[
-            { value: 'same', label: 'Same for all' },
-            { value: 'kind', label: 'Per kind' },
+            { value: 'same', label: t('sheets.sound.sameForAll') },
+            { value: 'kind', label: t('sheets.sound.perKind') },
           ]}
         />
       </Row>
       {perKind ? (
-        <div className={s.kinds} role="radiogroup" aria-label="Kind of notification">
+        <div className={s.kinds} role="radiogroup" aria-label={t('sheets.sound.kindOfNotification')}>
           {SOUND_GROUPS.map((g) => {
             const choice = soundFor(n, g);
             const on = editing === g;
             return (
               <div key={g} className={cx(st.row, s.kind, on && s.kindOn)}>
                 <button type="button" role="radio" aria-checked={on} className={s.kindPick} onClick={() => setTarget(g)}>
-                  <span className={st.rowLabel}>{GROUP_LABELS[g]}</span>
+                  <span className={st.rowLabel}>{labels[g]}</span>
                   <span className={s.kindSound}>{soundTitle(choice)}</span>
                 </button>
-                <PlayButton choice={choice} volume={volume} label={`${GROUP_LABELS[g]}: ${soundTitle(choice)}`} />
+                <PlayButton choice={choice} volume={volume} label={`${labels[g]}: ${soundTitle(choice)}`} />
               </div>
             );
           })}
         </div>
       ) : (
-        <Row label="Notification sound" detail="Plays with each banner. Focus and System Settings can still silence it.">
+        <Row label={say('Notification sound')} detail={say('Plays with each banner. Focus and System Settings can still silence it.')}>
           <span className={s.current}>{soundTitle(value)}</span>
           <PlayButton choice={value} volume={volume} label={soundTitle(value)} />
         </Row>
       )}
       {test}
-      <SoundPicker key={editing} value={value} volume={volume} made={n.madeSounds} onPick={pick} onKeep={keep} {...(editing === 'all' ? {} : { kindLabel: GROUP_LABELS[editing] })} />
-      <Row label="Volume" detail="For Beluga’s own sounds (8-bit and generated). Mac sounds play at your alert volume.">
+      <SoundPicker key={editing} value={value} volume={volume} made={n.madeSounds} onPick={pick} onKeep={keep} {...(editing === 'all' ? {} : { kindLabel: labels[editing] })} />
+      <Row label={say('Volume')} detail={say('For Beluga’s own sounds (8-bit and generated). Mac sounds play at your alert volume.')}>
         <input
           className={st.slider}
-          aria-label="Volume of Beluga’s sounds"
+          aria-label={t('sheets.sound.volumeLabel')}
           type="range"
           min={0}
           max={1}

@@ -1,4 +1,5 @@
 import type { CommitRef } from '../../../../../src/workspaces/history.js';
+import { t } from '../../../../../src/shared/i18n/index.js';
 
 /**
  * History's words and pieces, without React: avatars (initials and a color per person; no
@@ -35,12 +36,12 @@ const DAY = 24 * HOUR;
 /** "just now", "5 min ago", "3 h ago", "yesterday", "4 d ago", "3 wk ago", then the date. */
 export function timeAgo(ts: number, now = Date.now()): string {
   const d = Math.max(0, now - ts);
-  if (d < MIN) return 'just now';
-  if (d < HOUR) return `${Math.floor(d / MIN)} min ago`;
-  if (d < DAY) return `${Math.floor(d / HOUR)} h ago`;
-  if (d < 2 * DAY) return 'yesterday';
-  if (d < 7 * DAY) return `${Math.floor(d / DAY)} d ago`;
-  if (d < 35 * DAY) return `${Math.floor(d / (7 * DAY))} wk ago`;
+  if (d < MIN) return t('views.history.justNow');
+  if (d < HOUR) return t('views.history.minAgo', { n: Math.floor(d / MIN) });
+  if (d < DAY) return t('views.history.hAgo', { n: Math.floor(d / HOUR) });
+  if (d < 2 * DAY) return t('views.history.yesterday');
+  if (d < 7 * DAY) return t('views.history.dAgo', { n: Math.floor(d / DAY) });
+  if (d < 35 * DAY) return t('views.history.wkAgo', { n: Math.floor(d / (7 * DAY)) });
   const date = new Date(ts);
   const sameYear = date.getFullYear() === new Date(now).getFullYear();
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) });
@@ -68,12 +69,12 @@ const ORDER: Record<PillTone, number> = { head: 0, worktree: 1, branch: 2, upstr
  */
 export function pillsOf(refs: readonly CommitRef[], ctx: { worktrees?: ReadonlyMap<string, { id: string; name: string }>; upstream?: string; current?: string } = {}): Pill[] {
   const out: Pill[] = refs.map((r): Pill => {
-    if (r.kind === 'head') return { label: ctx.current ? `HEAD → ${ctx.current}` : 'HEAD', tone: 'head', title: ctx.current ? `Checked out: ${ctx.current}` : 'Checked out here (detached)' };
-    if (r.kind === 'tag') return { label: r.name, tone: 'tag', title: `Tag ${r.name}` };
-    if (r.kind === 'remote') return r.name === ctx.upstream ? { label: r.name, tone: 'upstream', title: `${r.name}: as of the last fetch` } : { label: r.name, tone: 'remote', title: `Remote branch ${r.name}` };
+    if (r.kind === 'head') return { label: ctx.current ? `HEAD → ${ctx.current}` : 'HEAD', tone: 'head', title: ctx.current ? t('views.history.checkedOut', { branch: ctx.current }) : t('views.history.checkedOutDetached') };
+    if (r.kind === 'tag') return { label: r.name, tone: 'tag', title: t('views.history.tagTitle', { name: r.name }) };
+    if (r.kind === 'remote') return r.name === ctx.upstream ? { label: r.name, tone: 'upstream', title: t('views.history.upstreamTitle', { name: r.name }) } : { label: r.name, tone: 'remote', title: t('views.history.remoteTitle', { name: r.name }) };
     const wt = ctx.worktrees?.get(r.name);
-    if (wt) return { label: r.name, tone: 'worktree', worktree: wt, title: `Worktree ${wt.name} (click to open)` };
-    return { label: r.name, tone: 'branch', title: `Branch ${r.name}` };
+    if (wt) return { label: r.name, tone: 'worktree', worktree: wt, title: t('views.history.worktreeTitle', { name: wt.name }) };
+    return { label: r.name, tone: 'branch', title: t('views.history.branchTitle', { name: r.name }) };
   });
   // HEAD → main says it already: drop the separate "main" pill.
   const shown = ctx.current && out.some((p) => p.tone === 'head') ? out.filter((p) => !(p.tone === 'branch' && p.label === ctx.current)) : out;
@@ -90,8 +91,8 @@ export function branchChoices(filters: { current?: string; branches: readonly st
   const as = (names: readonly string[] = []): BranchChoice[] => names.map((b) => ({ value: b, label: b }));
   return {
     all: [
-      { value: 'all', label: 'All Branches' },
-      { value: 'current', label: filters?.current ? `Current (${filters.current})` : 'Current (HEAD)' },
+      { value: 'all', label: t('views.history.allBranches') },
+      { value: 'current', label: filters?.current ? t('views.history.current', { branch: filters.current }) : t('views.history.currentHead') },
     ],
     local: as(filters?.branches),
     remote: as(filters?.remotes),

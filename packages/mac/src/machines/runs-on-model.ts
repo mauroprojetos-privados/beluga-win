@@ -2,6 +2,7 @@
 import type { MachineView } from '../../../../src/machines/machines.js';
 import { placeNewWork } from '../../../../src/machines/placement.js';
 import { statusLine, whyNot } from '../../../../src/machines/words.js';
+import { t } from '../../../../src/shared/i18n/index.js';
 
 // The words themselves are the engine's (the phone's Runs on sheet says the same, BLG-810).
 export { runtimeWords, statusLine, whyNot } from '../../../../src/machines/words.js';
@@ -33,24 +34,24 @@ export interface RunsOnRow {
 /** Best Available's line: what it does, and which computer it would pick now and why. */
 export function bestLine(machines: readonly MachineView[], hereName: string, runtime = 'claude'): string {
   const p = placeNewWork(BEST, machines, { name: hereName }, { runtime });
-  return `Picks the computer with the most room. ${p.why}`;
+  return t('project.machines.bestLine', { why: p.why });
 }
 
 /** The menu's rows: This Mac, each computer, Best Available. */
 export function runsOnRows(machines: readonly MachineView[], runtime: string, hereName: string, now = Date.now()): RunsOnRow[] {
   return [
-    { value: HERE, label: hereName, line: 'The computer in front of you', disabled: false },
+    { value: HERE, label: hereName, line: t('project.machines.inFront'), disabled: false },
     ...machines.map((m) => {
       const why = whyNot(m, runtime, now);
       return { value: m.id, label: m.name, line: why ?? statusLine(m), disabled: Boolean(why), machine: m };
     }),
-    { value: BEST, label: 'Best Available', line: bestLine(machines, hereName, runtime), disabled: false },
+    { value: BEST, label: t('project.machines.bestAvailable'), line: bestLine(machines, hereName, runtime), disabled: false },
   ];
 }
 
 /** What the chip says after "Runs on": This Mac, the computer's name, or Best Available. */
 export function runsOnName(value: RunsOn, machines: readonly MachineView[], hereName: string): string {
-  if (value === BEST) return 'Best Available';
+  if (value === BEST) return t('project.machines.bestAvailable');
   if (value === HERE) return hereName;
   return machines.find((m) => m.id === value)?.name ?? hereName;
 }
@@ -81,7 +82,7 @@ export function rememberPick(picks: Readonly<Record<string, RunsOn>>, project: s
  */
 export function holdReason(route: { readonly where: 'here' } | { readonly where: 'computer'; readonly machine: Pick<MachineView, 'name'> }, picked: RunsOn, machines: readonly MachineView[], runtime: string, hereName: string, folder?: string, now = Date.now()): string | undefined {
   const named = machines.find((m) => m.id === picked);
-  if (route.where === 'here' && named) return `${named.name} can’t take it now (${whyNot(named, runtime, now) ?? 'not ready'}). Nothing was started: pick another computer in Runs on, or wait for it.`;
-  if (route.where === 'computer' && folder) return `That folder is on ${hereName}, so ${route.machine.name} can’t use it. Open ${route.machine.name}’s page to start a chat in one of its folders, or pick ${hereName} in Runs on.`;
+  if (route.where === 'here' && named) return t('project.machines.cantTake', { name: named.name, why: whyNot(named, runtime, now) ?? t('project.machines.notReady') });
+  if (route.where === 'computer' && folder) return t('project.machines.folderHere', { here: hereName, name: route.machine.name });
   return undefined;
 }

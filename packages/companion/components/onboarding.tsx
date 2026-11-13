@@ -3,6 +3,7 @@ import { Check, Hourglass, Smartphone, SquareTerminal, X } from 'lucide-react-na
 import { useEffect } from 'react';
 import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import Animated, { Easing, FadeInDown, interpolate, type SharedValue, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withSpring, withTiming } from 'react-native-reanimated';
+import { t } from '../lib/language';
 import { alpha, brand, color, ink, scheme, tint, type } from '../lib/theme';
 import { Mark } from './Mark';
 import { Card, IconBadge, T, toneBg, toneInk } from './ui';
@@ -66,17 +67,17 @@ export function Illustration({ page }: { readonly page: 0 | 1 | 2 }) {
             <IconBadge Icon={SquareTerminal} tone="peach" size={30} />
             <View style={{ flex: 1 }}>
               <T v="callout" c={color.text} style={{ fontWeight: '600' }}>
-                Approval
+                {t('phone.needs.kindApproval')}
               </T>
-              <T v="caption">Your agent · now</T>
+              <T v="caption">{t('phoneParts.onboarding.agentNow')}</T>
             </View>
           </View>
           <T v="callout" c={color.text} style={{ fontWeight: '600' }}>
-            Deploy to staging?
+            {t('phoneParts.onboarding.deploy')}
           </T>
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Chip label="Decline" Icon={X} tone="plain" />
-            <Chip label="Approve" Icon={Check} tone="mint" flex />
+            <Chip label={t('needs.decline')} Icon={X} tone="plain" />
+            <Chip label={t('needs.approve')} Icon={Check} tone="mint" flex />
           </View>
         </Card>
         <SwipeHint />
@@ -85,19 +86,19 @@ export function Illustration({ page }: { readonly page: 0 | 1 | 2 }) {
   }
   return (
     <View style={{ width: 290, gap: 10 }}>
-      <Bubble mine text="Run the tests and send me a screenshot" />
+      <Bubble mine text={t('phoneParts.onboarding.runTests')} />
       <Card style={{ padding: 12, gap: 8 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <View style={{ width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: tint.peach }}>
             <Text style={{ color: ink.peach, fontSize: 12, fontWeight: '800' }}>✳</Text>
           </View>
           <T v="callout" c={color.text} style={{ fontWeight: '600' }}>
-            Your agent
+            {t('phoneParts.onboarding.yourAgent')}
           </T>
           <View style={{ flex: 1 }} />
           <Hourglass color={ink.peach} size={14} />
         </View>
-        <T v="callout">All 40 tests pass. Here it is:</T>
+        <T v="callout">{t('phoneParts.onboarding.testsPass')}</T>
         <View style={{ height: 70, borderRadius: 12, backgroundColor: tint.sky, padding: 10, gap: 6 }}>
           <View style={{ width: '60%', height: 8, borderRadius: 4, backgroundColor: ink.sky, opacity: 0.35 }} />
           <View style={{ width: '85%', height: 8, borderRadius: 4, backgroundColor: ink.sky, opacity: 0.25 }} />
@@ -129,7 +130,7 @@ function SwipeHint() {
   return (
     <Animated.View style={[{ alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6 }, s]}>
       <T v="caption" c={ink.mint} style={{ fontWeight: '700' }}>
-        swipe to approve
+        {t('phoneParts.onboarding.swipe')}
       </T>
       <Text style={{ color: ink.mint, fontSize: 16 }}>→</Text>
     </Animated.View>
@@ -192,7 +193,7 @@ export function MacPairing({ style }: { readonly style?: ViewStyle }) {
           <View key={i} style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: c }} />
         ))}
         <T v="caption" style={{ marginLeft: 8, fontSize: 11 }}>
-          Settings › Phone
+          {t('phoneParts.onboarding.settingsPhone')}
         </T>
       </View>
       <View style={{ flexDirection: 'row', padding: 12, gap: 12 }}>
@@ -209,11 +210,11 @@ export function MacPairing({ style }: { readonly style?: ViewStyle }) {
               ))}
             </View>
           </View>
-          <Text style={{ ...type.mono, fontSize: 11, letterSpacing: 1, color: color.text2 }}>K7QM-4XPA-R2TD</Text>
+          <Text style={{ ...type.mono, fontSize: 11, letterSpacing: 1, color: color.text2 }}>{/* i18n-ignore */}K7QM-4XPA-R2TD</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 24, borderRadius: 12, backgroundColor: tint.sky }}>
             <Smartphone color={ink.sky} size={12} />
             <T v="caption" c={ink.sky} style={{ fontSize: 11, fontWeight: '700' }}>
-              Pair a Phone
+              {t('phoneParts.onboarding.pairPhone')}
             </T>
           </View>
         </View>

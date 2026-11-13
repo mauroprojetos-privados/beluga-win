@@ -10,6 +10,7 @@ import { useApi } from '../lib/beluga.js';
 import { useClock } from '../lib/window-active.js';
 import { useSteps } from './use-steps.js';
 import s from './claude-code.module.css';
+import { useT } from '../lib/i18n.js';
 
 /**
  * A Claude Code transcript, live and read-only: messages, Claude's words (Markdown) and its tool
@@ -86,6 +87,7 @@ const MessageStep = memo(function MessageStep({ step, open }: { step: CcStep; op
 });
 
 const StepView = memo(function StepView({ step, who }: { step: CcStep; who: 'session' | 'agent' }) {
+  const t = useT();
   if (step.kind === 'note') {
     return (
       <div className={s.note}>
@@ -98,8 +100,8 @@ const StepView = memo(function StepView({ step, who }: { step: CcStep; who: 'ses
   return (
     <div className={cx(s.turn, user && s.turnUser)}>
       <div className={s.turnHead}>
-        {/* agent-wording: claude */}
-        {user ? <span className={s.who}>{who === 'agent' ? 'Task' : 'You'}</span> : <span className={cx(s.who, s.whoClaude)}>Claude</span>}
+        {/* agent-wording: claude · i18n-ignore: the runtime's name */}
+        {user ? <span className={s.who}>{who === 'agent' ? t('github.tx.task') : t('github.tx.you')}</span> : <span className={cx(s.who, s.whoClaude)}>Claude</span>}
         <span className={s.when}>{time(step.ts)}</span>
       </div>
       <div className={s.turnBody}>
@@ -113,6 +115,7 @@ export function LiveTranscript({ sessionId, agentId, version, live, label }: { s
   const { steps, more, missing, loading, error, loadEarlier } = useSteps(sessionId, agentId, version);
   const open = useDisclosure(`cc:${sessionId}/${agentId ?? ''}`);
   const now = useClock(live);
+  const t = useT();
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const [away, setAway] = useState(false);
@@ -180,10 +183,10 @@ export function LiveTranscript({ sessionId, agentId, version, live, label }: { s
                 loadEarlier();
               }}
             >
-              Show earlier steps
+              {t('github.tx.earlier')}
             </button>
           ) : steps.length ? (
-            <div className={s.earliest}>Beluga shows the newest part of this transcript</div>
+            <div className={s.earliest}>{t('github.tx.newest')}</div>
           ) : null}
           {blocks(steps).map((b) =>
             b.kind === 'tools' ? (
@@ -205,13 +208,14 @@ export function LiveTranscript({ sessionId, agentId, version, live, label }: { s
               <Working />
             </div>
           ) : null}
-          {!steps.length && !loading ? <div className={s.quiet}>{missing ? 'Beluga isn’t watching this one any more (it went quiet).' : error ? `Couldn’t read it: ${error}` : 'Nothing written yet.'}</div> : null}
+          {!steps.length && !loading ? <div className={s.quiet}>{missing ? t('github.tx.notWatching') : error ? t('github.tx.cantRead', { error }) : t('github.tx.nothingYet')}</div> : null}
         </div>
       </div>
       {away ? (
         <div className={s.jump}>
           <Button size="small" icon="chevronDown" onClick={toBottom}>
-            {unseen ? `${unseen} new step${unseen === 1 ? '' : 's'}` : 'Latest'}
+            {unseen ? t('github.tx.newSteps', { count: unseen }) : t('github.tx.latest')}
+
           </Button>
         </div>
       ) : null}

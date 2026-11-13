@@ -5,6 +5,7 @@ import { cx } from '../ui.js';
 import type { ViewData } from './use-view-data.js';
 import { formatNumber } from './format.js';
 import { useHoverTip } from './HoverTip.js';
+import { useT } from '../../lib/i18n.js';
 import v from './views.module.css';
 
 /**
@@ -25,29 +26,30 @@ function when(bar: GanttBar, hours: boolean): string {
 }
 
 export function GanttView({ view, data, full }: { view: View; data: ViewData; full: boolean }) {
+  const t = useT();
   const plan = useMemo(() => planGantt(view, data.rows, data.columns), [view, data.rows, data.columns]);
   const { show, hide, tip } = useHoverTip();
-  if (!plan) return <div className={v.empty}>{data.loading ? 'Loading…' : 'Nothing to put on a timeline (it needs a start date)'}</div>;
-  const pct = (t: number): string => `${(along(plan, t) * 100).toFixed(3)}%`;
+  if (!plan) return <div className={v.empty}>{data.loading ? t('common.loading') : t('components.views.gantt.empty')}</div>;
+  const pct = (at: number): string => `${(along(plan, at) * 100).toFixed(3)}%`;
   const bars = plan.lanes.reduce((n, l) => n + l.bars.length, 0);
   return (
     <div className={cx(v.gantt, !full && bars > 25 && v.ganttScroll)} onMouseLeave={hide}>
       <div className={v.ganttAxis}>
         <span className={v.ganttCorner} />
         <span className={v.ganttTrack}>
-          {plan.ticks.map((t) => (
-            <span key={t.t} className={v.ganttTick} style={{ left: pct(t.t) }}>
-              {t.label}
+          {plan.ticks.map((tick) => (
+            <span key={tick.t} className={v.ganttTick} style={{ left: pct(tick.t) }}>
+              {tick.label}
             </span>
           ))}
         </span>
       </div>
       <div className={v.ganttRows}>
         <div className={v.ganttGrid} aria-hidden="true">
-          {plan.ticks.map((t) => (
-            <span key={t.t} className={v.ganttLine} style={{ left: pct(t.t) }} />
+          {plan.ticks.map((tick) => (
+            <span key={tick.t} className={v.ganttLine} style={{ left: pct(tick.t) }} />
           ))}
-          {plan.today !== undefined ? <span className={v.ganttToday} style={{ left: pct(plan.today) }} title="Today" /> : null}
+          {plan.today !== undefined ? <span className={v.ganttToday} style={{ left: pct(plan.today) }} title={t('components.views.gantt.today')} /> : null}
         </div>
         {plan.lanes.map((lane, li) => (
           <div key={`${lane.name}-${li}`} className={v.ganttLane} role="group" aria-label={lane.name || undefined}>
@@ -56,19 +58,19 @@ export function GanttView({ view, data, full }: { view: View; data: ViewData; fu
               const tone = barTone(bar.status);
               const body = (
                 <>
-                  <div className={v.tipHead}>{bar.label || 'Untitled'}</div>
+                  <div className={v.tipHead}>{bar.label || t('components.views.gantt.untitled')}</div>
                   <div className={v.tipRow}>
                     <span className={v.tipName}>{when(bar, plan.hours)}</span>
                   </div>
                   {bar.progress !== undefined ? (
                     <div className={v.tipRow}>
-                      <span className={v.tipName}>Progress</span>
+                      <span className={v.tipName}>{t('components.views.gantt.progress')}</span>
                       <span className={v.tipValue}>{formatNumber(bar.progress * 100, { decimals: 0 })}%</span>
                     </div>
                   ) : null}
                   {bar.status ? (
                     <div className={v.tipRow}>
-                      <span className={v.tipName}>Status</span>
+                      <span className={v.tipName}>{t('components.views.gantt.status')}</span>
                       <span className={v.tipValue}>{bar.status}</span>
                     </div>
                   ) : null}

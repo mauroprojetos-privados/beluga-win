@@ -8,6 +8,8 @@ import { useApp, useBeluga } from '../lib/beluga.js';
 import { EmojiPicker } from './EmojiPicker.js';
 import { errorText, quietly } from './use-net.js';
 import r from './reactions.module.css';
+import { t } from '@beluga/shared/i18n/index.js';
+import { useT } from '../lib/i18n.js';
 
 /**
  * Emoji reactions on a chat message (BLG-702), as Slack has them: the chips under it (emoji and
@@ -22,7 +24,7 @@ export type OnReact = (emoji: string, on?: boolean) => void;
 /** A failure is said in a toast. */
 function useCall(): (call: Promise<unknown>) => void {
   const { client } = useBeluga();
-  return (call) => void quietly(client, call).catch((err: unknown) => client.store.dispatch({ type: 'toast', text: `Couldn’t react: ${errorText(err)}`, level: 'error' }));
+  return (call) => void quietly(client, call).catch((err: unknown) => client.store.dispatch({ type: 'toast', text: t('network.react.couldnt', { error: errorText(err) }), level: 'error' }));
 }
 
 /** Reacting to a message in a friends' chat (a DM or a channel). */
@@ -41,16 +43,17 @@ export function useChatReact(channel: string, id: string): OnReact {
 
 /** The chips under a message; nothing when it has none. `nameOf` says "you" for you. */
 export function ReactionChips({ reactions, me, nameOf, mine, onReact }: { reactions: readonly Reaction[] | undefined; me?: string | undefined; nameOf: (peerId: string) => string; mine?: boolean; onReact: OnReact }) {
+  const t = useT();
   if (!reactions?.length) return null;
-  const who = (peerId: string): string => (peerId === me ? 'you' : nameOf(peerId));
+  const who = (peerId: string): string => (peerId === me ? t('network.notes.you') : nameOf(peerId));
   return (
-    <div className={cx(r.chips, mine && r.chipsMine)} role="group" aria-label="Reactions">
+    <div className={cx(r.chips, mine && r.chipsMine)} role="group" aria-label={t('network.react.reactions')}>
       {reactions.map((x) => {
         const yours = Boolean(me && hasReacted(reactions, x.emoji, me));
-        const line = `${reactorsLine(x.by, who, 8)} reacted with ${x.emoji}`;
+        const line = t('network.react.line', { who: reactorsLine(x.by, who, 8), emoji: x.emoji });
         return (
           <Tip key={x.emoji} label={line} side="top">
-            <button type="button" className={cx(r.chip, yours && r.chipMine)} aria-pressed={yours} aria-label={`${x.emoji} ${x.by.length}: ${line}${yours ? '. Click to take yours back' : '. Click to add yours'}`} onClick={() => onReact(x.emoji, !yours)} data-reaction={x.emoji}>
+            <button type="button" className={cx(r.chip, yours && r.chipMine)} aria-pressed={yours} aria-label={`${x.emoji} ${x.by.length}: ${line}${yours ? t('network.react.takeBack') : t('network.react.addYours')}`} onClick={() => onReact(x.emoji, !yours)} data-reaction={x.emoji}>
               <span className={r.chipEmoji}>{x.emoji}</span>
               <span className={r.chipCount}>{x.by.length}</span>
             </button>
@@ -73,6 +76,7 @@ function useQuickRow(): string[] {
 }
 
 function ReactCard({ reactions, me, onReact, close }: { reactions: readonly Reaction[] | undefined; me: string | undefined; onReact: OnReact; close: () => void }) {
+  const t = useT();
   const quick = useQuickRow();
   const [more, setMore] = useState(false);
   // As its chip does: one you already put there is taken back (it's tinted in the row).
@@ -82,13 +86,13 @@ function ReactCard({ reactions, me, onReact, close }: { reactions: readonly Reac
   };
   if (more) return <EmojiPicker recent={quick} onPick={pick} />;
   return (
-    <div className={r.quick} role="group" aria-label="React">
+    <div className={r.quick} role="group" aria-label={t('network.react.react')}>
       {quick.map((e) => (
-        <button key={e} type="button" className={cx(r.quickPick, me && hasReacted(reactions, e, me) && r.quickPicked)} aria-label={`React with ${e}`} onClick={() => pick(e)}>
+        <button key={e} type="button" className={cx(r.quickPick, me && hasReacted(reactions, e, me) && r.quickPicked)} aria-label={t('network.react.with', { emoji: e })} onClick={() => pick(e)}>
           {e}
         </button>
       ))}
-      <button type="button" className={r.quickMore} aria-label="More emoji" title="More emoji" onClick={() => setMore(true)}>
+      <button type="button" className={r.quickMore} aria-label={t('network.react.more')} title={t('network.react.more')} onClick={() => setMore(true)}>
         <Icon name="plus" size={14} />
       </button>
     </div>
@@ -100,19 +104,20 @@ function ReactCard({ reactions, me, onReact, close }: { reactions: readonly Reac
  * `on`: sit on the top corner of the message itself instead (its parent a `r.onMessage`): `end` for one on the left, `start` for yours on the right.
  */
 export function ReactButton({ reactions, me, onReact, on }: { reactions: readonly Reaction[] | undefined; me: string | undefined; onReact: OnReact; on?: 'start' | 'end' }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   return (
     <div className={cx(r.react, on === 'end' && r.reactEnd, on === 'start' && r.reactStart, open && r.reactOpen)}>
       <Popover.Root open={open} onOpenChange={setOpen}>
-        <Tip label="Add Reaction" side="top">
+        <Tip label={t('network.react.add')} side="top">
           <Popover.Trigger asChild>
-            <button type="button" className={r.reactButton} aria-label="Add Reaction">
+            <button type="button" className={r.reactButton} aria-label={t('network.react.add')}>
               <Icon name="smilePlus" size={15} />
             </button>
           </Popover.Trigger>
         </Tip>
         <Popover.Portal>
-          <Popover.Content className={r.card} side="top" align="end" sideOffset={6} collisionPadding={10} aria-label="React to this message">
+          <Popover.Content className={r.card} side="top" align="end" sideOffset={6} collisionPadding={10} aria-label={t('network.react.toMessage')}>
             <ReactCard reactions={reactions} me={me} onReact={onReact} close={() => setOpen(false)} />
           </Popover.Content>
         </Popover.Portal>

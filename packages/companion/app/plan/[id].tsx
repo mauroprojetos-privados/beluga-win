@@ -19,14 +19,16 @@ import type { ConvView, PlanView, Topic } from '../../lib/link/protocol';
 import { color } from '../../lib/theme';
 import { calls } from '../../lib/link/calls';
 import { store } from '../../lib/store';
+import { t, useT } from '../../lib/language';
 
 /** How a plan runs (src/core/plans/model.ts AUTONOMY_INFO), as the Mac says it. */
-const AUTONOMY = {
-  step: { label: 'Step by Step', sub: 'You start each task', Icon: Hand },
-  gated: { label: 'Check-ins', sub: 'Runs, then waits for you at each milestone', Icon: Gauge },
-  autopilot: { label: 'Autopilot', sub: 'Runs to the end, stops only if something fails', Icon: Rocket },
-} as const;
-type Autonomy = keyof typeof AUTONOMY;
+const autonomy = () =>
+  ({
+    step: { label: t('phoneApp.plan.step'), sub: t('phoneApp.plan.stepSub'), Icon: Hand },
+    gated: { label: t('phoneApp.plan.gated'), sub: t('phoneApp.plan.gatedSub'), Icon: Gauge },
+    autopilot: { label: t('phoneApp.plan.autopilot'), sub: t('phoneApp.plan.autopilotSub'), Icon: Rocket },
+  }) as const;
+type Autonomy = keyof ReturnType<typeof autonomy>;
 
 /**
  * A plan (Advanced Planning) as it's designed and run: its goal, decisions waiting on you (Approve
@@ -43,6 +45,8 @@ export default function Plan() {
   const p = view?.data;
   const needs = useVisibleNeeds(p?.needsYou);
   const insets = useSafeAreaInsets();
+  const say = useT();
+  const AUTONOMY = autonomy();
   const tasks = p?.milestones.flatMap((m) => m.tasks) ?? [];
   const done = tasks.filter((t) => t.state === 'done').length;
   const [menu, setMenu] = useState(false);
@@ -50,11 +54,11 @@ export default function Plan() {
   const [picking, setPicking] = useState(false);
   // Who works its milestones and tasks (1.35, BLG-498): its own pick, else your default; changed from ⋯.
   const defaultGroup = p?.agents?.groups.find((g) => g.isDefault);
-  const agentWords = p?.agent ? agentName(p.agent, { model: true }) : defaultGroup ? `Your agent (${defaultGroup.label})` : 'Your agent';
+  const agentWords = p?.agent ? agentName(p.agent, { model: true }) : defaultGroup ? say('phoneApp.plan.yourAgentIs', { label: defaultGroup.label }) : say('phoneApp.plan.yourAgent');
   const agentRuntime = p?.agent?.runtime ?? defaultGroup?.runtime;
   const setAgent = (agent: { runtime: string; label: string; model?: string } | null, label: string): void => {
     void store.call<string>(calls.setPlanAgent(id ?? '', agent, label)).then(
-      (said) => store.toast({ text: typeof said === 'string' ? said : `${label} works this plan`, tone: 'ok' }),
+      (said) => store.toast({ text: typeof said === 'string' ? said : say('phoneApp.plan.works', { label }), tone: 'ok' }),
       (e: Error) => store.toast({ text: e.message, tone: 'error' }),
     );
   };
@@ -78,10 +82,10 @@ export default function Plan() {
 
   return (
     <Screen>
-      <Header scrolled={scrolled} back eyebrow="Plan" title={p?.title ?? 'Plan'} at={view?.at} right={
+      <Header scrolled={scrolled} back eyebrow={say('phoneApp.plan.plan')} title={p?.title ?? say('phoneApp.plan.plan')} at={view?.at} right={
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            {p ? <Pill label={p.state === 'running' ? 'Running' : p.state} tone={toneOf(p.state)} /> : null}
-            <More onPress={() => setMenu(true)} label="Plan options" />
+            {p ? <Pill label={p.state === 'running' ? say('phone.home.running') : p.state} tone={toneOf(p.state)} /> : null}
+            <More onPress={() => setMenu(true)} label={say('phoneApp.plan.options')} />
           </View>
         } />
       <Options
@@ -89,23 +93,23 @@ export default function Plan() {
         onClose={() => setMenu(false)}
         title={p?.title}
         options={[
-          { Icon: markIcon(runtimeMark(agentRuntime)), label: 'Agent for its work', sub: agentWords, tone: 'lavender', hidden: !p?.agents, onPress: () => setPicking(true) },
-          { Icon: Monitor, label: 'Open on your Mac', sub: 'Its graph, outline and conversation', tone: 'plain', onPress: () => void openOnMac({ topic }) },
+          { Icon: markIcon(runtimeMark(agentRuntime)), label: say('phoneApp.plan.agentFor'), sub: agentWords, tone: 'lavender', hidden: !p?.agents, onPress: () => setPicking(true) },
+          { Icon: Monitor, label: say('phone.needs.openOnMac'), sub: say('phoneApp.plan.openOnMacSub'), tone: 'plain', onPress: () => void openOnMac({ topic }) },
         ]}
       />
       <AgentChoiceSheet
-        title="Agent for its work"
-        caption={p?.running ? 'For what starts next: milestones at work keep their agent' : 'Works its milestones and tasks'}
+        title={say('phoneApp.plan.agentFor')}
+        caption={p?.running ? say('phoneApp.plan.agentRunningSub') : say('phoneApp.plan.agentSub')}
         picker={p?.agents}
         visible={picking}
         onClose={() => setPicking(false)}
-        yours={{ on: !p?.agent, onPick: () => setAgent(null, 'Your agent') }}
+        yours={{ on: !p?.agent, onPick: () => setAgent(null, say('phoneApp.plan.yourAgent')) }}
         onPick={(g, value, label) => setAgent(agentOfRow(g, value), value ? `${g.label} · ${label}` : g.label)}
       />
       <Options
         visible={howOpen}
         onClose={() => setHowOpen(false)}
-        title="How it runs"
+        title={say('phoneApp.plan.how')}
         options={(Object.keys(AUTONOMY) as Autonomy[]).map((a) => ({
           Icon: AUTONOMY[a].Icon,
           label: AUTONOMY[a].label,
@@ -124,20 +128,19 @@ export default function Plan() {
                   <View style={{ width: `${tasks.length ? (done / tasks.length) * 100 : 0}%`, height: 6, borderRadius: 3, backgroundColor: color.ok, opacity: 0.5 }} />
                 </View>
                 <T v="caption" c={color.text2}>
-                  {done} of {tasks.length} tasks
+                  {say('phoneApp.plan.tasksDone', { done, total: tasks.length })}
                 </T>
               </View>}
               {p.running || blocked ? (
                 <T v="caption" c={color.text2}>
-                  {[p.running ? `${p.running} running side by side${p.parallel ? ` (up to ${p.parallel})` : ''}` : '', blocked ? `${blocked} waiting on others` : ''].filter(Boolean).join(' · ')}
+                  {[p.running ? (p.parallel ? say('phoneApp.plan.sideBySideUpTo', { count: p.running, max: p.parallel }) : say('phoneApp.plan.sideBySide', { count: p.running })) : '', blocked ? say('phoneApp.plan.waitingOthers', { count: blocked }) : ''].filter(Boolean).join(' · ')}
                 </T>
               ) : null}
               {how && !drafting ? (
-                <Press onPress={() => setHowOpen(true)} accessibilityLabel={`How it runs: ${how.label}`} style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 7, height: 34, paddingHorizontal: 12, borderRadius: 17, backgroundColor: toneBg('lavender') }}>
+                <Press onPress={() => setHowOpen(true)} accessibilityLabel={say('phoneApp.plan.howA11y', { label: how.label })} style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 7, height: 34, paddingHorizontal: 12, borderRadius: 17, backgroundColor: toneBg('lavender') }}>
                   <how.Icon color={toneInk('lavender')} size={15} strokeWidth={1.9} />
                   <T v="caption" c={toneInk('lavender')} style={{ fontWeight: '700' }}>
-                    {how.label}
-                    {p.paused ? ' · paused' : ''}
+                    {p.paused ? say('phoneApp.plan.paused', { label: how.label }) : how.label}
                   </T>
                   <ChevronDown color={toneInk('lavender')} size={14} />
                 </Press>
@@ -146,7 +149,7 @@ export default function Plan() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <AgentMarkIcon mark={runtimeMark(agentRuntime)} size={14} color={color.text2} />
                   <T v="caption" c={color.text2}>
-                    Worked by {agentWords}
+                    {say('phoneApp.plan.workedBy', { who: agentWords })}
                   </T>
                 </View>
               ) : null}
@@ -159,7 +162,7 @@ export default function Plan() {
             {!drafting && p.milestones.length > 1 ? (
               <View style={{ marginTop: 24, gap: 12 }}>
                 <T v="eyebrow" style={{ paddingHorizontal: 20 }}>
-                  Map
+                  {say('phoneApp.plan.map')}
                 </T>
                 <MilestoneMap milestones={p.milestones} onPick={pick} />
               </View>
@@ -167,7 +170,7 @@ export default function Plan() {
             {needs.length ? (
               <View style={{ marginTop: 20, gap: 10 }}>
                 <T v="eyebrow" style={{ paddingHorizontal: 20 }}>
-                  Waiting on you
+                  {say('phoneApp.plan.waitingYou')}
                 </T>
                 {needs.map((n) => (
                   <Animated.View key={n.id} entering={FadeIn.duration(180)} layout={LinearTransition.duration(180)}>
@@ -183,7 +186,7 @@ export default function Plan() {
             {/* What the plan has decided (1.47): a replaced decision stays, crossed out. */}
             {p.decisions?.length ? (
               <View style={{ marginTop: 22, paddingHorizontal: 20, gap: 8 }}>
-                <T v="eyebrow">Decisions</T>
+                <T v="eyebrow">{say('phoneApp.plan.decisions')}</T>
                 {p.decisions.map((d, i) => (
                   <View key={i} style={{ flexDirection: 'row', gap: 8 }}>
                     <Check color={d.replaced ? color.text3 : color.ok} size={14} strokeWidth={2} style={{ marginTop: 3 }} />
@@ -203,7 +206,7 @@ export default function Plan() {
               <>
                 <View style={{ marginTop: 26, paddingHorizontal: 16 }} onLayout={(e) => (listTop.current = e.nativeEvent.layout.y)}>
                   <T v="eyebrow" style={{ paddingHorizontal: 4, marginBottom: 14 }}>
-                    Milestones
+                    {say('phoneApp.plan.milestones')}
                   </T>
                   {p.milestones.map((m, i) => (
                     <View key={m.id} onLayout={(e) => tops.current.set(m.id, e.nativeEvent.layout.y)}>
@@ -216,7 +219,7 @@ export default function Plan() {
           </>
         ) : (
           <T v="callout" style={{ padding: 20 }}>
-            Opening the plan…
+            {say('phoneApp.plan.opening')}
           </T>
         )}
       </ScrollView>
@@ -236,15 +239,16 @@ function Verifying({ review }: { review: NonNullable<PlanView['review']> }) {
   }, [breath, reduced]);
   const dot = useAnimatedStyle(() => ({ opacity: breath.value }));
   const done = review.checksDone ?? 0;
+  const say = useT();
   return (
-    <View style={{ gap: 6, padding: 12, borderRadius: 14, backgroundColor: toneBg('lavender') }} accessibilityRole="summary" accessibilityLabel={`Verifying the plan: ${done} of 4 checks done`}>
+    <View style={{ gap: 6, padding: 12, borderRadius: 14, backgroundColor: toneBg('lavender') }} accessibilityRole="summary" accessibilityLabel={say('phoneApp.plan.verifyingA11y', { done, total: 4 })}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Animated.View style={[{ width: 8, height: 8, borderRadius: 4, backgroundColor: toneInk('lavender') }, dot]} />
         <T v="caption" c={toneInk('lavender')} style={{ fontWeight: '700', flex: 1 }}>
-          Verifying the plan
+          {say('phoneApp.plan.verifying')}
         </T>
         <T v="caption" c={toneInk('lavender')}>
-          {done} of 4 checks
+          {say('phoneApp.plan.checks', { done, total: 4 })}
         </T>
       </View>
       <View style={{ flexDirection: 'row', gap: 4 }}>
@@ -275,6 +279,7 @@ function Milestone({ m, last, i, draft, titles, after, picked }: { m: PlanView['
   const running = m.state === 'running';
   const done = m.state === 'done';
   const n = m.tasks.filter((t) => t.state === 'done').length;
+  const say = useT();
   return (
     <Animated.View entering={FadeIn.duration(180)} style={{ flexDirection: 'row', gap: 14 }}>
       <View style={{ width: 26, alignItems: 'center' }}>
@@ -294,7 +299,7 @@ function Milestone({ m, last, i, draft, titles, after, picked }: { m: PlanView['
             </T>
           </View>
           <T v="caption" c={toneInk(tone)} style={{ fontWeight: "600", marginTop: 2, textTransform: "capitalize" }}>
-            {m.state === 'gate' ? 'Waiting for you to pass it' : m.state}
+            {m.state === 'gate' ? say('phoneApp.plan.gate') : m.state}
           </T>
           {m.agentNow ? (
             // Its agent at work right now, even between tasks (1.40): a tap opens its conversation.
@@ -310,11 +315,11 @@ function Milestone({ m, last, i, draft, titles, after, picked }: { m: PlanView['
           ) : null}
           {after.length ? (
             <T v="caption" c={color.text3} numberOfLines={2} style={{ marginTop: 2 }}>
-              After {after.join(', ')}
+              {say('phoneApp.plan.after', { list: after.join(', ') })}
             </T>
           ) : m.dependsOn && i > 0 ? (
             <T v="caption" c={color.text3} style={{ marginTop: 2 }}>
-              Runs alongside the others
+              {say('phoneApp.plan.alongside')}
             </T>
           ) : null}
         </Press>
@@ -343,7 +348,7 @@ function Milestone({ m, last, i, draft, titles, after, picked }: { m: PlanView['
                       </T>
                       {waits.length ? (
                         <T v="caption" c={color.text3} numberOfLines={shown ? undefined : 1}>
-                          Waits on {waits.join(', ')}
+                          {say('phoneApp.plan.waitsOn', { list: waits.join(', ') })}
                         </T>
                       ) : null}
                       {shown && t.goal ? (
@@ -356,6 +361,23 @@ function Milestone({ m, last, i, draft, titles, after, picked }: { m: PlanView['
                           {t.acceptance.map((a) => (
                             <T key={a} v="caption" c={color.text2}>
                               ◦ {a}
+                            </T>
+                          ))}
+                        </View>
+                      ) : null}
+                      {shown && t.checks ? (
+                        <T v="caption" c={color.text3} style={{ marginTop: 4 }}>
+                          {say('phoneApp.plan.provedBy', { count: t.checks })}
+                        </T>
+                      ) : null}
+                      {shown && t.stopIf?.length ? (
+                        <View style={{ marginTop: 4, gap: 2 }}>
+                          <T v="caption" c={color.text3}>
+                            {say('phoneApp.plan.stopsIf')}
+                          </T>
+                          {t.stopIf.map((s) => (
+                            <T key={s} v="caption" c={color.text2}>
+                              ◦ {s}
                             </T>
                           ))}
                         </View>
@@ -388,7 +410,7 @@ function Milestone({ m, last, i, draft, titles, after, picked }: { m: PlanView['
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, paddingHorizontal: 12 }}>
                     <Eye color={toneInk('lavender')} size={15} />
                     <T v="callout" style={{ flex: 1 }}>
-                      {m.state === 'checking' ? 'Watch the check' : 'Open the check'}
+                      {m.state === 'checking' ? say('phoneApp.plan.watchCheck') : say('phoneApp.plan.openCheck')}
                     </T>
                     <ChevronRight color={color.text3} size={15} />
                   </View>

@@ -10,6 +10,7 @@ export const PANES: ReadonlyArray<PaneInfo<SettingsPane> & { icon: IconName; key
   { id: 'general', label: 'General', icon: 'gear', keywords: 'profile account' },
   { id: 'appearance', label: 'Appearance', icon: 'eye', keywords: 'look themes colors colours display' },
   { id: 'claude', label: 'Agent', icon: 'spark', keywords: 'claude codex model ai' },
+  { id: 'bots', label: 'Bots', icon: 'bot', keywords: 'your mac bot studio persona orchestrator dispatch categories autonomy skills knowledge memory mcp' },
   { id: 'notifications', label: 'Notifications', icon: 'bell', keywords: 'alerts sounds' },
   { id: 'workspaces', label: 'Workspaces', icon: 'branch', keywords: 'worktrees projects git' },
   { id: 'terminal', label: 'Terminal', icon: 'terminal', keywords: 'shell console xterm' },
@@ -22,7 +23,8 @@ export const PANES: ReadonlyArray<PaneInfo<SettingsPane> & { icon: IconName; key
   { id: 'computers', label: 'Your Computers', icon: 'server', keywords: 'machines servers mac mini aws cloud ssh remote linux pair' },
   { id: 'voice', label: 'Voice', icon: 'mic', keywords: 'dictation speech microphone talk transcribe' },
   { id: 'keyboard', label: 'Keyboard', icon: 'command', keywords: 'shortcuts keys hotkeys bindings' },
-  { id: 'advanced', label: 'Advanced', icon: 'wrench', keywords: 'web access browser agent threads' },
+  { id: 'stack', label: 'Stack', icon: 'plug', keywords: 'ollama openviking hooktop rtk token-goat gitnexus graphify gls graph-loop-solo services tools index setup' },
+  { id: 'advanced', label: 'Advanced', icon: 'wrench', keywords: 'engine wsl linux web access browser agent threads' },
   { id: 'experimental', label: 'Experimental', icon: 'flask', keywords: 'labs beta early preview features try' },
   { id: 'about', label: 'About', icon: 'globe', keywords: 'version logs support' },
 ];
@@ -94,6 +96,14 @@ export const SETTINGS: readonly Entry[] = [
   ]),
   group('claude', 'Your agents', 'Each agent Beluga can run, and how to set it up.', 'sign in install login claude code codex'),
   ...rows('claude', 'Your agents', [['Signed in or installed one just now?', 'Check Again looks for your agents now.', 'check again refresh']]),
+  group('claude', 'Combos', 'Agents and models in order: each run goes to the first that can run.', 'combo routing fallback chain economy strong local first cheap tokens failover'),
+  ...rows('claude', 'Combos', [
+    ['Agents in order', 'Each run goes to the first that can run then.', 'combo routing fallback order'],
+    ['By how hard a task is', 'A task that names no agent starts on the combo for its difficulty.', 'difficulty simple normal hard classify task combo'],
+    ['By kind of work', 'A task of each kind (quick, deep, ultrabrain, visual, review, docs, explore) starts on this combo and effort.', 'category kind quick deep ultrabrain visual review docs explore classify task combo effort'],
+    ['Savings against', 'What Usage › Combos prices your runs against: everything on Opus, Sonnet or Codex.', 'savings baseline opus cost price saved'],
+    ['By role', 'The combo a plan head, milestones, the checker and the PR reviewer run on.', 'role plan head milestone checker cross vendor reviewer pull request combo'],
+  ]),
   group('claude', 'Launch flags', 'Your own flags for claude and codex.', 'args arguments cli flags dangerously skip permissions'),
   ...rows('claude', 'Launch flags', [
     ['Claude Code', 'Your own flags for claude.', 'flags arguments cli'],
@@ -129,6 +139,33 @@ export const SETTINGS: readonly Entry[] = [
     ['Templates', 'Ways to start a task.', 'task templates start'],
   ]),
 
+  // Bots (docs/bots.md): Your Mac first, then yours; Bot Studio for the one picked
+  group('bots', 'Your bots', 'Your Mac and the bots you made: each a folder of files.', 'your mac bot list orchestrator'),
+  group('bots', 'New Bot', 'From scratch, a template, or a .zip.', 'new bot create add'),
+  ...rows('bots', 'New Bot', [
+    ['From scratch', 'A name now; the rest in its tabs.', 'new bot name'],
+    ['From a template', 'Supabase, Expo, Deploy or a PR reviewer.', 'template gallery supabase expo deploy reviewer'],
+    ['Import a .zip', 'A bot exported from Beluga, without its secrets.', 'import zip'],
+  ]),
+  group('bots', 'Create with Claude Code', 'Claude Code drafts a bot’s files from a description; you see the diff first.', 'create with claude draft describe ai'),
+  group('bots', 'Improve with Claude Code', 'Claude Code drafts changes to a bot; you see the diff first.', 'improve claude draft diff'),
+  ...rows('bots', undefined, [
+    ['Name', 'Its name in the sidebar and on your phone.', 'bot name identity'],
+    ['What it’s for', 'The sidebar’s hint, and how other bots know what to hand it.', 'description purpose identity'],
+    ['Icon and colour', undefined, 'icon color colour identity'],
+    ['Projects it acts in', 'Their folders are added to its runs for reading.', 'projects add-dir'],
+    ['Its own combo', 'What it thinks and talks with.', 'combo model bot'],
+    ['Categories', 'Each task it dispatches has a category, which picks the combo or bot.', 'categories quick deep visual review dispatch route'],
+    ['By how hard', 'For a task with no category.', 'difficulty simple normal hard'],
+    ['Autonomy', 'Ask first, run and stop on failure, or autopilot.', 'autonomy ask autopilot approve'],
+    ['Its MCP servers', 'Only these reach its runs.', 'mcp tools servers strict check connect'],
+    ['Add one of yours', 'Its settings copied, its tokens into secrets.', 'add mcp server secret'],
+    ['Show', 'Skills or sub-agents.', 'skills sub-agents agents'],
+    ['Copy a skill', 'One of yours, or another bot’s.', 'copy import skill'],
+    ['Searched with', 'OpenViking, or a local full-text index.', 'knowledge openviking index rag search'],
+    ['A web page', 'Fetched now and kept as text.', 'knowledge url docs page'],
+    ['Try a search', 'What its knowledge_search tool would find.', 'knowledge search test'],
+  ]),
   // Notifications
   ...rows('notifications', undefined, [
     ['Desktop notifications', 'The bell in the toolbar lists everything either way.', 'alerts banners notify'],
@@ -311,6 +348,14 @@ export const SETTINGS: readonly Entry[] = [
   ]),
 
   // Advanced
+  group('stack', 'Your stack', 'What your agents lean on, looked at every few minutes.', 'check now status running installed'),
+  group('stack', 'Services', 'Ollama, OpenViking, hooktop.', 'ollama openviking hooktop running down start'),
+  group('stack', 'Tools', 'RTK, token-goat, GitNexus, graphify, gls.', 'rtk token-goat gitnexus graphify gls installed missing'),
+  ...rows('stack', 'Automatically', [
+    ['Start services that are down', 'Ollama, OpenViking and hooktop, once per outage.', 'repair restart start ollama openviking hooktop'],
+    ['Set up new projects', 'Git, GitNexus, graphify, OpenViking, beluga.json and CLAUDE.md.', 'bootstrap setup git index beluga.json claude.md new project'],
+  ]),
+  ...rows('advanced', 'Engine', [['Where Beluga runs', 'On Windows, or in a WSL distro.', 'engine wsl linux ubuntu distro windows subsystem remote daemon']]),
   ...rows('advanced', 'Web access', [
     ['Open Beluga in a browser', 'Use Beluga from a browser.', 'web browser remote access'],
     ['Reached from', 'This computer, your network, or anywhere.', 'local network tunnel internet'],

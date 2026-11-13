@@ -4,6 +4,8 @@
  * object and array with how much it holds. Text that doesn't read as JSON stays code. Pure.
  */
 
+import { t } from '../i18n/index.js';
+
 export type Json = null | boolean | number | string | readonly Json[] | { readonly [k: string]: Json };
 
 export interface JsonDoc {
@@ -69,11 +71,8 @@ export function readJson(text: string): JsonDoc | undefined {
 
 /** What a folded object or array holds, in words ("3 keys", "12 items"). */
 export function jsonSize(v: Json): string {
-  if (Array.isArray(v)) return `${v.length} ${v.length === 1 ? 'item' : 'items'}`;
-  if (v && typeof v === 'object') {
-    const n = Object.keys(v).length;
-    return `${n} ${n === 1 ? 'key' : 'keys'}`;
-  }
+  if (Array.isArray(v)) return t('shared.json.items', { count: v.length });
+  if (v && typeof v === 'object') return t('shared.json.keys', { count: Object.keys(v).length });
   return '';
 }
 

@@ -7,6 +7,8 @@ import { type Signal, signalOf } from './attention-model.js';
 import { SignalMark } from './signal-marks.js';
 import { Row } from './sidebar-parts.js';
 import { yourComputer } from '../lib/os-words.js';
+import { BotLabel } from '../bots/BotsNav.js';
+import { useT } from '../lib/i18n.js';
 
 const RANK: Record<Signal['level'], number> = { needs: 3, unread: 2, working: 1, idle: 0 };
 
@@ -16,6 +18,7 @@ const RANK: Record<Signal['level'], number> = { needs: 3, unread: 2, working: 1,
  * (one waiting for you, then news, then working). The open one is the phone's Ask your Mac.
  */
 export function AssistantNav() {
+  const t = useT();
   const actions = useActions();
   // The phone is the Phone tab in this page's panel, not a row of its own (BLG-292); its full-size mirror is still yours.
   const selected = useApp((s) => s.view.kind === 'assistant' || s.view.kind === 'phone');
@@ -25,11 +28,13 @@ export function AssistantNav() {
     const channels = own.length ? own.map((c) => c.channel) : [ASSISTANT_CHANNEL];
     return channels.map((c) => signalOf(s, c)).reduce((a, b) => (RANK[b.level] > RANK[a.level] ? b : a));
   }, sameDeep);
+  const bot = useApp((s) => s.bots.bots.find((x) => x.mac), sameDeep);
   return (
     <Row
       icon={<Icon name="laptop" size={14} />}
-      label={ASSISTANT_TITLE}
-      detail={signal.tip || `Ask ${yourComputer()} anything: screenshots, what’s running, start a worktree or a task. Several chats as tabs; the open one is on your phone too`}
+      // Set up as a bot (docs/bots.md): what it's doing under its name ("2 of 6 done · waiting on …").
+      label={bot?.status || bot?.problems.length ? <BotLabel name={bot.name} bot={bot} /> : (bot?.name ?? ASSISTANT_TITLE)}
+      detail={signal.tip || t('layout.assistant.detail', { computer: yourComputer() })}
       selected={selected}
       onClick={() => actions.run({ type: 'view', view: { kind: 'assistant' } })}
       trailing={<SignalMark signal={signal} />}

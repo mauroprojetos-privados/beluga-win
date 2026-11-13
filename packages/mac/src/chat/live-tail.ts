@@ -3,6 +3,7 @@ import type { LogItem } from '../../../../src/core/store.js';
 import type { StepSummary } from '../../../../src/shared/steps.js';
 import { READS_AFTER_STEP, STEERED_IN, STOPPING_FOR, TAKEN_BACK, backgroundWait } from '../../../../src/shared/claude-notices.js';
 import { HIDDEN_STEPS, isRunning } from '../../../../src/ui/format.js';
+import { t } from '../../../../src/shared/i18n/index.js';
 
 /**
  * Where a Claude turn is drawn when you said something while it worked (BLG-22). Messages sent
@@ -179,10 +180,10 @@ export function workingPhase(card: AgentItem): string | undefined {
   // Answered, but its run waits on work it left going in the background.
   const waiting = backgroundWait([card]);
   if (waiting) return waiting;
-  if (card.between === 'writing' || (card.text && !card.between)) return 'Writing';
-  if (card.between === 'thinking') return 'Thinking';
+  if (card.between === 'writing' || (card.text && !card.between)) return t('chat.working.writing');
+  if (card.between === 'thinking') return t('chat.working.thinking');
   if (card.steps.some((x) => !HIDDEN_STEPS.test(x))) return '';
   const subs = card.subagents.filter((x) => x.status === 'running').length;
   // Before its first step: what it waits on, when it says (Claude Code downloading, an API retry; BLG-403).
-  return subs ? `${subs} sub-agent${subs === 1 ? '' : 's'} at work` : (card.progress ?? 'Starting');
+  return subs ? t('chat.working.subs', { count: subs }) : (card.progress ?? t('chat.working.starting'));
 }

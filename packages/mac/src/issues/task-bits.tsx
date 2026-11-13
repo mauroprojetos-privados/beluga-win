@@ -6,6 +6,7 @@ import { Icon } from '../components/Icon.js';
 import { Button, Tip, cx } from '../components/ui.js';
 import { useApp } from '../lib/beluga.js';
 import { useIssueActions } from './use-issues.js';
+import { useT } from '../lib/i18n.js';
 import s from './issues.module.css';
 
 /**
@@ -16,10 +17,11 @@ import s from './issues.module.css';
 /** "◉ #48": the issue a task is for; it opens the issue's page. */
 export function IssueMark({ issue, compact }: { issue: Issue; compact?: boolean }) {
   const { openIssue } = useIssueActions();
+  const t = useT();
   if (!issue.github) return null;
   const gh = issue.github;
   return (
-    <Tip label={`For GitHub issue ${gh.repo}#${gh.number}: open it`}>
+    <Tip label={t('github.bits.forIssue', { repo: gh.repo, number: gh.number })}>
       <button
         type="button"
         className={cx(s.ghMark, compact && s.ghMarkCompact)}
@@ -47,11 +49,12 @@ export function useInvestigated(issue: Issue): boolean {
 export function FixItButton({ issue, size = 'small' }: { issue: Issue; size?: 'small' | 'regular' }) {
   const investigated = useInvestigated(issue);
   const { fix } = useIssueActions();
+  const t = useT();
   const [busy, setBusy] = useState(false);
   if (!investigated || !issue.github) return null;
   const n = issue.github.number;
   return (
-    <Tip label={`The agent fixes #${n} here and opens a pull request that closes it`}>
+    <Tip label={t('github.bits.fixHere', { number: n })}>
       <Button
         variant="primary"
         size={size}
@@ -64,7 +67,7 @@ export function FixItButton({ issue, size = 'small' }: { issue: Issue; size?: 's
           setBusy(false);
         }}
       >
-        {busy ? 'Asking the agent…' : 'Fix It'}
+        {busy ? t('github.askingTheAgent') : t('github.fixIt')}
       </Button>
     </Tip>
   );
@@ -73,12 +76,14 @@ export function FixItButton({ issue, size = 'small' }: { issue: Issue; size?: 's
 /** The task page's GitHub row: the issue in Beluga, and on GitHub. */
 export function GitHubIssueProp({ issue, Prop }: { issue: Issue; Prop: (p: { label: string; quiet?: boolean; children: React.ReactNode }) => React.ReactNode }) {
   const { openIssue, openOnGitHub } = useIssueActions();
+  const t = useT();
   if (!issue.github) return null;
   const gh = issue.github;
   return (
+    // i18n-ignore
     <Prop label="GitHub" quiet>
       <span className={s.propIssue}>
-        <Tip label={`Open #${gh.number} in Beluga`}>
+        <Tip label={t('github.bits.openInBeluga', { number: gh.number })}>
           <button type="button" className={s.propIssueOpen} onClick={() => openIssue(issue.projectId, gh.number)}>
             <Icon name="issue" size={12} />
             <span>
@@ -86,8 +91,9 @@ export function GitHubIssueProp({ issue, Prop }: { issue: Issue; Prop: (p: { lab
             </span>
           </button>
         </Tip>
-        <Tip label="Open on GitHub">
-          <button type="button" className={s.propIssueOut} aria-label={`Open #${gh.number} on GitHub`} onClick={() => openOnGitHub(gh.url)}>
+        <Tip label={t('github.openOnGitHub')}>
+          <button type="button" className={s.propIssueOut} aria-label={t('github.openNumberOnGitHub', { number: gh.number })}
+ onClick={() => openOnGitHub(gh.url)}>
             <Icon name="external" size={11} />
           </button>
         </Tip>

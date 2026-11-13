@@ -1,7 +1,7 @@
 import type { PeerInfo } from '../protocol.js';
 import type { Settings, TrustLevel } from './settings.js';
 import { type Store, peerName } from './store.js';
-import { TRUST_INFO } from './trust.js';
+import { trustWords } from '../shared/i18n/words.js';
 
 export interface PeopleDeps {
   readonly store: Store;
@@ -75,7 +75,7 @@ export class People {
     this.deps.store.dispatch({ type: 'trust_prompt', peerId, show: false });
     const name = peerName(state, peerId);
     this.persist((people) => ({ ...people, [peerId]: { name: name.slice(0, 32), trust: level } }));
-    if (!quiet) this.deps.toast(`${name}: ${TRUST_INFO[level].label}. ${TRUST_INFO[level].detail}`, 'success');
+    if (!quiet) this.deps.toast(`${name}: ${trustWords(level).label}. ${trustWords(level).detail}`, 'success');
   }
 
   /** Forget a saved choice (they fall back to your default). */

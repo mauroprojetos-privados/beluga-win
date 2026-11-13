@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon.js';
 import { Tip, cx } from '../components/ui.js';
 import { ResizeHandle } from '../layout/panel/ResizeHandle.js';
 import { toast, useApi, useApp, useBeluga } from '../lib/beluga.js';
+import { useT } from '../lib/i18n.js';
 import { clampVisuals } from '../lib/convo-mode.js';
 import { DEFAULT_PREFS, getPrefs, setPrefs, usePrefs } from '../lib/prefs.js';
 import { chordLabel } from '../lib/shortcuts-model.js';
@@ -44,6 +45,7 @@ interface SplitsProps {
 /** The panes as their splits lay them out, each divider draggable. */
 function Splits({ tree, path, render, onResize }: SplitsProps) {
   const box = useRef<HTMLDivElement>(null);
+  const tr = useT();
   if (tree.kind === 'pane') return render(tree.key);
   const right = tree.dir === 'right';
   return (
@@ -53,7 +55,7 @@ function Splits({ tree, path, render, onResize }: SplitsProps) {
       </div>
       <ResizeHandle
         axis={right ? 'x' : 'y'}
-        label={right ? 'Resize the panes side by side' : 'Resize the panes one above the other'}
+        label={right ? tr('chat.termView.resizeRow') : tr('chat.termView.resizeCol')}
         className={s.splitHandle}
         onMove={(pos) => {
           const r = box.current?.getBoundingClientRect();
@@ -103,9 +105,10 @@ const focusPane = (root: HTMLElement | null, key: string): void => {
 export function AgentTermView({ wsId }: { readonly wsId: string }) {
   const api = useApi();
   const { client } = useBeluga();
+  const tr = useT();
   const prefs = usePrefs();
   const cwd = useApp((st) => st.projects.flatMap((p) => p.workspaces).find((w) => w.id === wsId)?.path ?? '');
-  const agentLabel = useApp((st) => st.agentTerms[wsId]?.label ?? st.projects.flatMap((p) => p.workspaces).find((w) => w.id === wsId)?.agent?.label ?? 'Your agent');
+  const agentLabel = useApp((st) => st.agentTerms[wsId]?.label ?? st.projects.flatMap((p) => p.workspaces).find((w) => w.id === wsId)?.agent?.label ?? tr('chat.term.yourAgent'));
   const visuals = useApp((st) => st.termVisuals[wsId]);
   const agentKey = agentTermId(wsId);
   const [tabs, setTabsState] = useState<TermTabs>(() => loadTabs(wsId));
@@ -156,13 +159,13 @@ export function AgentTermView({ wsId }: { readonly wsId: string }) {
   const openNewest = (): void => {
     const newest = visuals?.[visuals.length - 1];
     if (newest) open({ kind: 'visual', n: newest.n });
-    else toast(client, `No visuals yet: when ${agentLabel} shows a graph or a table here, ${keyOf('newest_visual') ?? chordLabel('Cmd+Enter')} opens it`, 'info');
+    else toast(client, tr('chat.termView.noVisuals', { agent: agentLabel, keys: keyOf('newest_visual') ?? chordLabel('Cmd+Enter') }), 'info');
   };
 
   const newKey = (t: TermTabs): string => paneTermId(wsId, nextPaneNumber(allPaneKeys(t)));
   const newTab = (): void => {
     const t = tabsNow.current;
-    if (t.tabs.length >= MAX_TABS) return toast(client, `Up to ${MAX_TABS} tabs here`, 'info');
+    if (t.tabs.length >= MAX_TABS) return toast(client, tr('chat.termView.maxTabs', { count: MAX_TABS }), 'info');
     const key = newKey(t);
     show(addTab(t, key), key);
   };
@@ -170,7 +173,7 @@ export function AgentTermView({ wsId }: { readonly wsId: string }) {
     const t = tabsNow.current;
     const tab = tabOf(t, target);
     if (!tab) return;
-    if (paneKeys(tab.tree).length >= MAX_PANES) return toast(client, `Up to ${MAX_PANES} panes in one tab`, 'info');
+    if (paneKeys(tab.tree).length >= MAX_PANES) return toast(client, tr('chat.termView.maxPanes', { count: MAX_PANES }), 'info');
     const key = newKey(t);
     show(withTree({ ...t, tabs: t.tabs.map((x) => (x.id === tab.id ? { id: x.id, tree: x.tree } : x)) }, tab.id, splitPane(tab.tree, target, dir, key)), key);
   };
@@ -179,7 +182,7 @@ export function AgentTermView({ wsId }: { readonly wsId: string }) {
     const t = tabsNow.current;
     const tab = tabOf(t, key);
     if (!tab) return;
-    if (key === agentKey) return toast(client, `${agentLabel}’s terminal stays here: Take Over in the chat gives the conversation back to it`, 'info');
+    if (key === agentKey) return toast(client, tr('chat.termView.agentStays', { agent: agentLabel }), 'info');
     void api.terminals.close(key).catch(() => undefined);
     const keysLeft = paneKeys(tab.tree).filter((k) => k !== key);
     if (!keysLeft.length) return show(closeTab(t, tab.id));
@@ -228,12 +231,12 @@ export function AgentTermView({ wsId }: { readonly wsId: string }) {
   const tabTitle = (id: string, tree: PaneTree, zoom?: string): string => {
     if (id === AGENT_TAB) return agentLabel;
     const key = zoom ?? paneKeys(tree).find((k) => k === focusKey) ?? paneKeys(tree)[0]!;
-    return titles[key] || 'Shell';
+    return titles[key] || tr('chat.termView.shell');
   };
   return (
     <div ref={view} className={s.view}>
       <div className={s.main}>
-        <div className={s.tabs} role="tablist" aria-label="Terminal tabs">
+        <div className={s.tabs} role="tablist" aria-label={tr('chat.termView.tabs')}>
           {tabs.tabs.map((tab, i) => {
             const on = tab.id === tabs.active;
             const title = tabTitle(tab.id, tab.tree, tab.zoom);
@@ -247,15 +250,15 @@ export function AgentTermView({ wsId }: { readonly wsId: string }) {
                   </button>
                 </Tip>
                 {tab.id === AGENT_TAB ? null : (
-                  <button type="button" className={s.tabClose} aria-label={`Close ${title}`} onClick={() => closeWholeTab(tab.id)}>
+                  <button type="button" className={s.tabClose} aria-label={tr('chat.visuals.close', { title })} onClick={() => closeWholeTab(tab.id)}>
                     <Icon name="x" size={10} />
                   </button>
                 )}
               </div>
             );
           })}
-          <Tip label="New Tab: a shell in this worktree" keys={keyOf('new_tab')}>
-            <button type="button" className={s.tabAdd} aria-label="New Tab" onClick={newTab}>
+          <Tip label={tr('chat.termView.newTabTip')} keys={keyOf('new_tab')}>
+            <button type="button" className={s.tabAdd} aria-label={tr('chat.termView.newTab')} onClick={newTab}>
               <Icon name="plus" size={13} />
             </button>
           </Tip>
@@ -302,7 +305,7 @@ export function AgentTermView({ wsId }: { readonly wsId: string }) {
         <>
           <ResizeHandle
             axis="x"
-            label="Resize the visuals"
+            label={tr('chat.termView.resizeVisuals')}
             className={s.visualsEdge}
             onMove={(x) => {
               const r = view.current?.getBoundingClientRect();

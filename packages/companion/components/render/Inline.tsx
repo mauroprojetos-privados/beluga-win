@@ -8,6 +8,7 @@ import { useSupports, useView } from '../../lib/hooks';
 import type { PlansView, SentinelsView, WorkView } from '../../lib/link/protocol';
 import { type InlineElement, parseColor, readInline, relative, toneOf } from '../../lib/render';
 import { store } from '../../lib/store';
+import { t as tx } from '../../lib/language';
 import { color, ink, tint, type } from '../../lib/theme';
 import { haptic, Press, type Tone, toneBg, toneInk } from '../ui';
 import { TaskChip } from './TaskChip';
@@ -46,7 +47,7 @@ export function InlineThing({ el }: { readonly el: InlineElement }) {
   switch (el.kind) {
     case 'color':
       return (
-        <Press haptics={false} onPress={() => (haptic.tap(), void Clipboard.setStringAsync(el.value), store.toast({ text: `Copied ${el.value}`, tone: 'ok' }))} style={[pill, { backgroundColor: color.code }]}>
+        <Press haptics={false} onPress={() => (haptic.tap(), void Clipboard.setStringAsync(el.value), store.toast({ text: tx('phoneParts.copiedWhat', { what: el.value }), tone: 'ok' }))} style={[pill, { backgroundColor: color.code }]}>
           <Swatch value={parseColor(el.value) ? el.value : '#000'} />
           <Text style={[type.mono, { color: color.text, fontSize: 12.5 }]}>{el.value}</Text>
         </Press>
@@ -138,7 +139,7 @@ function WorktreeChip({ id }: { readonly id: string }) {
     <Press haptics={false} onPress={() => router.push(`/conv/${encodeURIComponent(`ws:${id}`)}`)} style={[pill, { backgroundColor: tint.mint }]}>
       <GitBranch color={ink.mint} size={12} strokeWidth={1.9} />
       <Text numberOfLines={1} style={{ ...type.caption, color: ink.mint, fontWeight: '700', maxWidth: 180 }}>
-        {found ? `${found.project} · ${found.c.title}` : 'New worktree'}
+        {found ? `${found.project} · ${found.c.title}` : tx('phoneParts.inline.newWorktree')}
       </Text>
     </Press>
   );
@@ -152,7 +153,7 @@ function PlanChip({ id }: { readonly id: string }) {
     <Press haptics={false} onPress={() => router.push(`/plan/${encodeURIComponent(id)}`)} style={[pill, { backgroundColor: tint.butter }]}>
       <Workflow color={ink.butter} size={12} strokeWidth={1.9} />
       <Text numberOfLines={1} style={{ ...type.caption, color: ink.butter, fontWeight: '700', maxWidth: 180 }}>
-        {plan?.title ?? 'Plan'}
+        {plan?.title ?? tx('phoneParts.inline.plan')}
       </Text>
     </Press>
   );
@@ -167,6 +168,7 @@ function SentinelChip({ id }: { readonly id: string }) {
     <Press haptics={false} disabled={!on} onPress={() => router.push(`/sentinel/${encodeURIComponent(id)}`)} style={[pill, { backgroundColor: tint.sky }]}>
       <Shield color={ink.sky} size={12} strokeWidth={1.9} />
       <Text numberOfLines={1} style={{ ...type.caption, color: ink.sky, fontWeight: '700', maxWidth: 180 }}>
+        {/* i18n-ignore */}
         {s?.name ?? 'Sentinel'}
       </Text>
     </Press>

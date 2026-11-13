@@ -2,6 +2,7 @@ import { Check } from 'lucide-react-native';
 import { ScrollView, View } from 'react-native';
 import { calls } from '../lib/link/calls';
 import type { AgentPickerView, Topic } from '../lib/link/protocol';
+import { t } from '../lib/language';
 import { store } from '../lib/store';
 import { useOn } from '../lib/scope';
 import { color } from '../lib/theme';
@@ -28,7 +29,7 @@ export function AgentPickerSheet({ topic, picker, visible, onClose }: { readonly
         : calls.setAgent(topic, g.isDefault && !value ? null : { runtime: g.runtime, label: g.label, ...(value ? { model: value } : {}) }, `${g.label} ${label}`);
     void store.call(call, on ? { on } : {}).catch((e: Error) => store.toast({ text: e.message, tone: 'error' }));
   };
-  return <AgentChoiceSheet title="Agent" caption="For this conversation, from your next message" picker={picker} visible={visible} onClose={onClose} onPick={pick} />;
+  return <AgentChoiceSheet title={t('phoneParts.agent.title')} caption={t('phoneParts.agent.caption')} picker={picker} visible={visible} onClose={onClose} onPick={pick} />;
 }
 
 /** The agent a picked row stands for (BLG-498): its runtime, and its model unless it's the runtime's own default. */
@@ -75,8 +76,8 @@ export function AgentChoiceSheet({ title, caption, picker, visible, onClose, onP
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14, backgroundColor: yours.on ? color.card : 'transparent' }}>
               <AgentMarkIcon mark={runtimeMark(def?.runtime)} size={18} color={color.text2} />
               <View style={{ flex: 1 }}>
-                <T v="body">{def ? `Your agent (${def.label})` : 'Your agent'}</T>
-                <T v="caption">Whatever your default agent is when the work starts</T>
+                <T v="body">{def ? t('phoneParts.agent.yoursNamed', { name: def.label }) : t('phoneParts.onboarding.yourAgent')}</T>
+                <T v="caption">{t('phoneParts.agent.yoursSub')}</T>
               </View>
               {yours.on ? <Check size={18} color={color.text} /> : null}
             </View>
@@ -87,7 +88,7 @@ export function AgentChoiceSheet({ title, caption, picker, visible, onClose, onP
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <AgentMarkIcon mark={runtimeMark(g.runtime)} size={18} color={color.text2} />
               <T v="heading" style={{ flexShrink: 1 }}>
-                {g.isDefault ? `${g.label} · your default` : g.label}
+                {g.isDefault ? t('phoneParts.agent.yourDefault', { name: g.label }) : g.label}
               </T>
             </View>
             {g.available ? (

@@ -5,6 +5,8 @@ import { Alert, Checkbox } from '../../components/Alert.js';
 import { tildePath } from '../../layout/outside-model.js';
 import { useApi, useApp } from '../../lib/beluga.js';
 import s from './clean-up.module.css';
+import { useT } from '../../lib/i18n.js';
+import { rich } from './parts.js';
 
 /**
  * Clean Up Worktrees…: a project's worktrees made outside Beluga that can go without losing
@@ -13,6 +15,7 @@ import s from './clean-up.module.css';
  */
 export function CleanUpWorktreesAlert({ projectId, close }: { projectId: string; close: () => void }) {
   const api = useApi();
+  const t = useT();
   const project = useApp((st) => st.projects.find((p) => p.id === projectId));
   const disk = useApp((st) => st.disk);
   const home = useApp((st) => st.home);
@@ -36,15 +39,15 @@ export function CleanUpWorktreesAlert({ projectId, close }: { projectId: string;
     };
   }, [api, projectId]);
   if (!project) return null;
-  if (!list) return <Alert icon="refresh" tone="info" title={`Looking at the worktrees in ${project.name}…`} confirm={{ label: 'Remove', disabled: true, onClick: () => undefined }} onCancel={close} />;
+  if (!list) return <Alert icon="refresh" tone="info" title={t('native.cleanUp.looking', { name: project.name })} confirm={{ label: t('native.person.remove'), disabled: true, onClick: () => undefined }} onCancel={close} />;
   if (!list.length) {
     return (
       <Alert
         icon="check"
         tone="info"
-        title="Nothing to clean up"
-        message={<p>Every worktree made outside Beluga in {project.name} still has work of its own, or is still in use: uncommitted changes, or commits that aren’t in its base branch yet. Remove one from its page if you’re sure.</p>}
-        confirm={{ label: 'OK', onClick: close }}
+        title={t('native.cleanUp.nothing')}
+        message={<p>{t('native.cleanUp.nothingMessage', { name: project.name })}</p>}
+        confirm={{ label: t('common.ok'), onClick: close }}
         cancel={false}
         onCancel={close}
       />
@@ -52,25 +55,25 @@ export function CleanUpWorktreesAlert({ projectId, close }: { projectId: string;
   }
   const chosen = list.filter((w) => ticked.has(w.id));
   const frees = chosen.reduce((n, w) => n + (disk[w.id] ?? 0), 0);
-  const toggle = (id: string, on: boolean): void => setTicked((t) => (on ? new Set([...t, id]) : new Set([...t].filter((x) => x !== id))));
+  const toggle = (id: string, on: boolean): void => setTicked((was) => (on ? new Set([...was, id]) : new Set([...was].filter((x) => x !== id))));
   return (
     <Alert
       icon="archive"
       tone="caution"
-      title={`Clean up worktrees in ${project.name}?`}
+      title={t('native.cleanUp.title', { name: project.name })}
       message={
         <p>
-          These have nothing of their own: no uncommitted changes, and their work is merged or their folder is gone. Beluga removes the ones you tick; branches stay, so nothing committed is lost.
+          {t('native.cleanUp.message')}
           {frees ? (
             <>
               {' '}
-              This frees about <strong>{formatBytes(frees)}</strong>.
+              {rich(t('native.cleanUp.frees'), { size: <strong>{formatBytes(frees)}</strong> })}
             </>
           ) : null}
         </p>
       }
       confirm={{
-        label: chosen.length ? `Remove ${chosen.length}` : 'Remove',
+        label: chosen.length ? t('native.cleanUp.removeN', { n: chosen.length }) : t('native.person.remove'),
         destructive: true,
         disabled: busy || !chosen.length,
         onClick: () => {
@@ -83,7 +86,7 @@ export function CleanUpWorktreesAlert({ projectId, close }: { projectId: string;
       }}
       onCancel={close}
     >
-      <div className={s.list} role="group" aria-label="Worktrees to remove">
+      <div className={s.list} role="group" aria-label={t('native.cleanUp.listLabel')}>
         {list.map((w) => (
           <Checkbox
             key={w.id}

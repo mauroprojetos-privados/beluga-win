@@ -1,6 +1,7 @@
 import { CircleHelp, RefreshCw } from 'lucide-react-native';
 import { ScrollView, View } from 'react-native';
 import type { Diagnosis } from '../lib/link/diagnose';
+import { t } from '../lib/language';
 import { color } from '../lib/theme';
 import { Sheet } from './Sheet';
 import { Button, Card, IconBadge, T } from './ui';
@@ -32,7 +33,7 @@ export function WhySheet({ diagnosis, visible, onDismiss, onRetry, window = fals
         ) : null}
         {diagnosis.detail.length ? (
           <View style={{ gap: 6 }}>
-            <T v="eyebrow">What was tried</T>
+            <T v="eyebrow">{t('phoneParts.why.tried')}</T>
             {diagnosis.detail.map((line, i) => (
               <T key={i} v="caption" c={color.text3}>
                 {line}
@@ -42,7 +43,7 @@ export function WhySheet({ diagnosis, visible, onDismiss, onRetry, window = fals
         ) : null}
         {diagnosis.retry && onRetry ? (
           <Button
-            label="Try again"
+            label={t('phoneParts.screen.tryAgain')}
             Icon={RefreshCw}
             onPress={() => {
               onDismiss();

@@ -1,4 +1,5 @@
 import type { PlanTools } from '../../agent/types.js';
+import { comboForRole } from '../routing/model.js';
 import type { AgentRef } from '../../protocol.js';
 import { agentName } from '../../shared/agent-label.js';
 import type { Actor, ExternalActor, Issue } from '../board/model.js';
@@ -12,7 +13,7 @@ import { coherenceWarnings, warningsText } from './coherence.js';
 import { DraftReviewer } from './draft-review.js';
 import { dropEpics, syncEpics } from './epics.js';
 import type { BodyInput, PlanOp, TaskInput } from './edit.js';
-import { type Autonomy, type Plan, type TestsAt, activeDecisions, allTasks, checkerOf, planForHome, planTaskOfIssue, planTitle, reviewerOf } from './model.js';
+import { type Autonomy, FAILS_TO_PAUSE, type Plan, type TestsAt, activeDecisions, allTasks, checkerOf, planForHome, planTaskOfIssue, planTitle, reviewerOf } from './model.js';
 import { PlanMover } from './move-work.js';
 import { issueForWorkspace } from '../board/model.js';
 import { type PilotDeps, PlanPilot } from './pilot.js';
@@ -67,8 +68,13 @@ export class PlansWork {
   readonly pilot: PlanPilot;
   /** Moving a plan to another computer of yours (BLG-806): this daemon's part. */
   readonly mover: PlanMover;
+  /** How a bot's plan routes its tasks (core/bots sets it once it starts): see PilotDeps.route. */
+  router?: PilotDeps['route'];
   /** A fresh agent's read of each first draft, before Approve Plan (see draft-review.ts). */
   readonly reviewer: DraftReviewer;
+
+  /** What the plans do in git (the one given, or the controller's). */
+  private readonly git: PlanGit | undefined;
 
   constructor(private readonly deps: PlansWorkDeps) {
     this.plans = deps.plans;
@@ -81,11 +87,14 @@ export class PlansWork {
         ? {
             reviewChat: async (plan: Plan) => {
               const ws = await deps.controller!.newChat(plan.projectId, `Review: ${planTitle(plan)}`.slice(0, 40), undefined, { quiet: true });
-              if (ws && plan.agent) deps.controller!.manager.setAgent(ws.id, plan.agent);
+              // Settings' checker combo (docs/routing.md: a cross-vendor check) over the plan's agent.
+              const agent = comboForRole(deps.store.getState(), 'checker') ?? plan.agent;
+              if (ws && agent) deps.controller!.manager.setAgent(ws.id, agent);
               return ws?.id;
             },
             chatAgent: (chat: string, plan: Plan) => {
-              if (plan.agent) deps.controller!.manager.setAgent(chat, plan.agent);
+              const agent = comboForRole(deps.store.getState(), 'checker') ?? plan.agent;
+              if (agent) deps.controller!.manager.setAgent(chat, agent);
             },
           }
         : {}),
@@ -97,6 +106,7 @@ export class PlansWork {
       ...(deps.delayMs !== undefined ? { delayMs: deps.delayMs } : {}),
     });
     const git = deps.git === null ? undefined : (deps.git ?? (deps.controller?.manager ? planGitOf(deps.controller) : undefined));
+    this.git = git;
     this.pilot = new PlanPilot({
       store: deps.store,
       plans: deps.plans,
@@ -112,7 +122,8 @@ export class PlansWork {
             // On the plan's agent (BLG-503), like its workers; none picked: the project's.
             checkerChat: async (plan, milestone) => {
               const ws = await deps.controller!.newChat(plan.projectId, `Check: ${milestone.title}`.slice(0, 40), undefined, { quiet: true });
-              if (ws && plan.agent) deps.controller!.manager.setAgent(ws.id, plan.agent);
+              const agent = comboForRole(deps.store.getState(), 'checker') ?? plan.agent;
+              if (ws && agent) deps.controller!.manager.setAgent(ws.id, agent);
               return ws?.id;
             },
             retireChat: (id) => void deps.controller!.archive(id, false, { quiet: true }).catch(() => undefined),
@@ -128,6 +139,7 @@ export class PlansWork {
       ...(deps.forYou ? { forYou: deps.forYou } : {}),
       ...(deps.rescueMs !== undefined ? { rescueMs: deps.rescueMs } : {}),
       structure: (plan) => this.structure(plan.id),
+      route: (planId) => this.router?.(planId),
     });
     this.mover = new PlanMover({
       store: deps.store,
@@ -147,6 +159,19 @@ export class PlansWork {
     deps.board.setBriefExtra((issue) => this.workerBrief(issue));
     // A milestone's worktree: its one Claude gets the milestone (its tasks in order, where each stands).
     deps.board.setRunBrief((channel) => this.milestoneBrief(channel));
+    // A milestone's agent stopping a task with why (task_stop): its plan's agent rewrites it.
+    deps.board.setOnTaskStopped((issueId, reason) => this.taskStopped(issueId, reason));
+  }
+
+  /** A run stopped a task (task_stop): nothing happens unless it's a task of a plan (see PlanPilot.taskStopped). */
+  taskStopped(issueId: string, reason: string): void {
+    this.pilot.taskStopped(issueId, reason);
+  }
+
+  /** A task started again goes back to its agent's queue (it was stopped by it). */
+  private startedAgain(planId: string, task: string): void {
+    const hit = allTasks(this.plans.need(planId).body).find((t) => t.task.id === task || (t.task.issueId && this.deps.board.board.get(t.task.issueId)?.key === task.toUpperCase()));
+    if (hit) this.plans.clearStopped(planId, hit.task.id);
   }
 
   stop(): void {
@@ -172,6 +197,9 @@ export class PlansWork {
     if (!goal) throw new Error('Say what the plan is for');
     const chat = await controller.newChat(input.projectId, UNTITLED, undefined, { quiet: true });
     if (!chat) throw new Error('Couldn’t start the plan’s conversation');
+    // Its head runs on Settings' combo for plan heads (docs/routing.md), when there is one.
+    const head = comboForRole(this.deps.store.getState(), 'planHead');
+    if (head) controller.manager.setAgent(chat.id, head);
     const home = `${WS}${chat.id}`;
     const plan = this.plans.create({ projectId: input.projectId, home, goal, ...(input.autonomy ? { autonomy: input.autonomy } : {}), ...(input.testsAt ? { testsAt: input.testsAt } : {}), ...(input.agent ? { agent: input.agent } : {}) }, this.me());
     if (!opts.quiet) this.deps.intend({ type: 'navigate', view: { kind: 'plan', id: plan.id } });
@@ -185,6 +213,25 @@ export class PlansWork {
       })
       .catch(() => undefined);
     return plan;
+  }
+
+  /**
+   * A plan a bot wrote whole (core/bots, plan_dispatch): its own conversation in the project (the
+   * head Claude that checks its milestones), the draft written as the bot's, and approved at once
+   * when `approve` (the bot's autonomy runs it). Nothing asks a head Claude to plan: the bot did.
+   */
+  async createWritten(input: { readonly projectId: string; readonly body: BodyInput; readonly autonomy: Autonomy; readonly approve: boolean; readonly by: string }): Promise<Plan> {
+    const controller = this.deps.controller;
+    if (!controller) throw new Error('Plans need a project folder');
+    const chat = await controller.newChat(input.projectId, input.body.title.slice(0, 40) || UNTITLED, undefined, { quiet: true });
+    if (!chat) throw new Error('Couldn’t start the plan’s conversation');
+    const head = comboForRole(this.deps.store.getState(), 'planHead');
+    if (head) controller.manager.setAgent(chat.id, head);
+    const home = `${WS}${chat.id}`;
+    const made = this.plans.create({ projectId: input.projectId, home, title: input.body.title, goal: input.body.goal, autonomy: input.autonomy }, this.me());
+    const plan = this.plans.writeDraft(made.id, { ...input.body, milestones: input.body.milestones.map((m) => ({ ...m, tasks: (m.tasks ?? []).map((t) => this.adopt(t, made.id)) })) }, this.claude());
+    this.deps.store.dispatch({ type: 'system', channel: home, text: `${input.by} planned this and dispatches its tasks${input.approve ? '' : ': it waits for your Approve'}.`, level: 'info' });
+    return input.approve ? this.approve(plan.id, this.claude()) : plan;
   }
 
   /**
@@ -408,7 +455,7 @@ export class PlansWork {
 
   /** `agent` (Start with…, BLG-506): who works it this once; none: the task's own, the plan's, or your default. */
   startTask(id: string, task: string, agent?: AgentRef): Promise<string> {
-    return this.pilot.startNow(id, task, this.me(), agent);
+    return this.pilot.startNow(id, task, this.me(), agent).then((said) => (this.startedAgain(id, task), said));
   }
 
   /** Wake a task whose Claude stopped without finishing (Resume on its card). */
@@ -534,7 +581,12 @@ export class PlansWork {
           return `${said} Your check is done: end your turn.`;
         }
         this.deps.store.dispatch({ type: 'system', channel: plan.home, text: `“${m.title}” didn’t pass its check: ${first}`, level: 'info' });
-        this.deps.askClaude(checkFailedPrompt(m.title, notes, auto), plan.home, false);
+        const fails = this.plans.need(planId).runs[m.id]?.fails ?? 1;
+        if (fails >= FAILS_TO_PAUSE) {
+          this.plans.setPaused(planId, true, { kind: 'beluga' }, `“${m.title}” failed its check ${fails} times`);
+          return 'Recorded as failed. The plan is paused for the user: this milestone failed too many times. End your turn.';
+        }
+        this.deps.askClaude(checkFailedPrompt(m.title, notes, auto, fails), plan.home, false);
         return 'Recorded as failed. The plan’s Claude adds the fix tasks from your notes. Your check is done: end your turn.';
       },
     };
@@ -580,6 +632,8 @@ export class PlansWork {
       const before = plans.need(planId);
       const was = planTitle(before);
       const plan = change();
+      const git = this.git;
+      if (git?.head && !plan.plannedAt) void git.head(plan.projectId, 'HEAD').then((sha) => sha && this.plans.setPlannedAt(plan.id, sha)).catch(() => undefined);
       this.nameHome(plan, was);
       this.syncHomeTask(plan);
       if (!plan.draft) return 'The plan is unchanged.';
@@ -615,7 +669,7 @@ export class PlansWork {
         const auto = (m.autonomy ?? plan.autonomy) === 'autopilot';
         return verdict === 'pass' ? (auto ? 'Recorded: the milestone passes and the plan moves on.' : 'Recorded: the user passes the milestone.') : 'Recorded as failed. Add the fix tasks with plan_update.';
       },
-      start: (task) => this.pilot.startNow(planId, task, by()),
+      start: (task) => this.pilot.startNow(planId, task, by()).then((said) => (this.startedAgain(planId, task), said)),
       message: (task, text, mode = 'queue') => {
         const plan = plans.need(planId);
         const hit = allTasks(plan.body).find((t) => t.task.id === task || (t.task.issueId && this.deps.board.board.get(t.task.issueId)?.key === task.toUpperCase()));

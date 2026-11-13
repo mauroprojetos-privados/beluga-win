@@ -6,6 +6,7 @@ import { brandText } from '../lib/brand.js';
 import { MESSAGE_BANNER, type MessageBannerDetail, NOTIFICATION_TAP } from '../lib/notices.js';
 import { GroupAvatar } from './Avatars.js';
 import s from './network.module.css';
+import { useT } from '../lib/i18n.js';
 
 /** How long a banner stays (hovering keeps it). */
 const BANNER_MS = 6000;
@@ -16,6 +17,7 @@ const BANNER_MS = 6000;
  * Clicking it opens the conversation.
  */
 export function MessageBanner() {
+  const t = useT();
   const [banner, setBanner] = useState<(MessageBannerDetail & { id: number }) | undefined>();
   const [hover, setHover] = useState(false);
   const network = useApp((st) => st.network);
@@ -48,7 +50,7 @@ export function MessageBanner() {
             {banner.body ? <span className={s.bannerBody}>{brandText(banner.body)}</span> : null}
           </span>
         </button>
-        <button type="button" className={s.bannerClose} aria-label="Dismiss" onClick={() => setBanner(undefined)}>
+        <button type="button" className={s.bannerClose} aria-label={t('network.banner.dismiss')} onClick={() => setBanner(undefined)}>
           <Icon name="x" size={11} />
         </button>
       </div>

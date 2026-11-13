@@ -12,6 +12,7 @@ import { Board, type IssuePatch, type NewIssue } from './board.js';
 import type { IssuePr } from './model.js';
 import { agentLabel, agentName } from '../../shared/agent-label.js';
 import { type AgentRef, defaultAgentOf } from '../../protocol.js';
+import { taskRoute } from '../routing/model.js';
 import { chosenAgent } from '../settings.js';
 import { needsChecksText, unexplained } from './criteria.js';
 import { inSet, labelsFor } from './labels.js';
@@ -37,6 +38,8 @@ export interface BoardWorkDeps {
   readonly askClaude: (prompt: string, channel: string, shown?: string) => void;
   /** Your Claude writes a task from a description (none: the first line is the title). */
   readonly draftTask?: (text: string, ctx: DraftContext) => Promise<TaskDraft | undefined>;
+  /** A quick look says what kind of work a task made by hand is (docs/routing.md; none: it keeps no kind). */
+  readonly classifyTask?: (task: { readonly title: string; readonly goal?: string }) => Promise<{ readonly category: import('../routing/model.js').WorkCategory; readonly why?: string } | undefined>;
   /** Your Claude writes what a project is about from a quick look at its folder (none: people write it). */
   readonly describeProject?: (dir: string, project: string) => Promise<string | undefined>;
   /** A quiet word on screen (what Claude wrote in the background). */
@@ -45,6 +48,8 @@ export interface BoardWorkDeps {
   readonly findPr?: (dir: string, branch: string) => Promise<IssuePr | undefined>;
   /** How often to look for merged pull requests of tasks nobody watches any more (0: only when asked). */
   readonly sweepMs?: number;
+  /** A run stopped a task it can't do as written (task_stop), with why: a plan's agent takes it from there (see PlansWork.taskStopped). */
+  readonly onTaskStopped?: (issueId: string, reason: string) => void;
 }
 
 /** Looking for shipped work: soon after start, then every ten minutes. */
@@ -72,8 +77,16 @@ export class BoardWork {
   /** Tasks Claude is writing from a description (by id): starting one waits for its words. */
   private readonly drafts = new Map<string, Promise<void>>();
 
+  /** Told when a run stops a task (see BoardWorkDeps.onTaskStopped); the plans' work sets it when there is no dependency to pass. */
+  private onTaskStopped: ((issueId: string, reason: string) => void) | undefined;
+
+  setOnTaskStopped(fn: (issueId: string, reason: string) => void): void {
+    this.onTaskStopped = fn;
+  }
+
   constructor(private readonly deps: BoardWorkDeps) {
     this.board = deps.board;
+    this.onTaskStopped = deps.onTaskStopped;
     if (deps.controller) this.offs.push(deps.controller.onWorktree((e) => this.onWorktree(e)));
     // An epic's worktree works in its sub-tasks' worktrees in other repos too (BLG-561).
     if (deps.controller?.setAlsoIn) this.offs.push(deps.controller.setAlsoIn((id) => this.alsoIn(id).map((w) => w.path)));
@@ -269,7 +282,7 @@ export class BoardWork {
   addDraft(place: string, d: TaskDraft, agent?: AgentRef): Issue[] {
     const { projectId, board } = this.placeOf(place);
     const who = d.epic ? undefined : this.whom(projectId, d.for);
-    const first = this.board.create({ projectId, board, title: d.title, labels: d.labels, ...(d.priority ? { priority: d.priority } : {}), ...(who ? { assignee: who } : {}), ...(agent ? { agent } : {}), brief: draftBrief(d) }, this.me());
+    const first = this.board.create({ projectId, board, title: d.title, labels: d.labels, ...(d.priority ? { priority: d.priority } : {}), ...(d.difficulty ? { difficulty: d.difficulty } : {}), ...draftKind(d), ...(who ? { assignee: who } : {}), ...(agent ? { agent } : {}), brief: draftBrief(d) }, this.me());
     return [first, ...this.addMore(first, agent ? { agent } : {}, d)];
   }
 
@@ -297,7 +310,9 @@ export class BoardWork {
       .catch(() => undefined)
       .then((d) => {
         try {
-          this.board.finishDraft(issue.id, d, this.myClaude(), text);
+          const done = this.board.finishDraft(issue.id, d, this.myClaude(), text);
+          // A drafter that named no kind (an older model, no draft at all): a quick look gives it one.
+          if (!done.category) this.classifyLater(done.id);
           if (d && opts.several) this.addTheRest(issue, input, d);
         } catch {
           // Deleted meanwhile.
@@ -306,6 +321,25 @@ export class BoardWork {
       .finally(() => this.drafts.delete(issue.id));
     this.drafts.set(issue.id, done);
     return issue;
+  }
+
+  /**
+   * A task made by hand (no drafter wrote it) gets its kind from a quick look, in the background
+   * (docs/routing.md). Nothing to look with, or it says nothing: it keeps none.
+   */
+  classifyLater(ref: string): void {
+    const look = this.deps.classifyTask;
+    const issue = this.board.get(ref);
+    if (!look || !issue || issue.category) return;
+    void look({ title: issue.title, ...(issue.brief.goal ? { goal: issue.brief.goal } : {}) })
+      .catch(() => undefined)
+      .then((kind) => {
+        try {
+          if (kind) this.board.setClassified(issue.id, kind.category, kind.why);
+        } catch {
+          // Deleted meanwhile.
+        }
+      });
   }
 
   /** The tasks after the first that one New Task message asked for, and who each is for (BLG-319). */
@@ -332,6 +366,8 @@ export class BoardWork {
           status: first.status,
           labels: [...new Set([...(input.labels ?? []), ...m.labels])],
           ...(m.priority ? { priority: m.priority } : input.priority ? { priority: input.priority } : {}),
+          ...(m.difficulty ? { difficulty: m.difficulty } : {}),
+          ...draftKind(m),
           ...(who ? { assignee: who } : {}),
           ...(d.epic ? { parent: first.id } : input.parent ? { parent: input.parent } : {}),
           // One New Task message, one agent for all it made.
@@ -368,8 +404,12 @@ export class BoardWork {
     this.expecting.push(ticket);
     let ws: Workspace | undefined;
     try {
-      const agent = opts.agent ?? issue.agent;
+      // None named (docs/routing.md): its own agent › its kind's combo › its difficulty's › your agent.
+      const route = opts.agent ? { agent: opts.agent, from: 'agent' as const } : taskRoute(this.deps.store.getState(), issue);
+      const agent = route.agent;
       ws = await controller.newWorktree(issue.projectId, name, { ...(opts.base ? { base: opts.base } : {}), ...(opts.quiet ? { quiet: true } : {}), ...(agent ? { agent } : {}) });
+      // Its kind's effort, when Settings gives one (the combo's targets' own still win).
+      if (ws && 'effort' in route && route.effort) controller.manager.setEffort(ws.id, route.effort);
     } finally {
       const at = this.expecting.indexOf(ticket);
       if (at >= 0) this.expecting.splice(at, 1);
@@ -918,6 +958,14 @@ export class BoardWork {
         return `Updated the ${section} of ${next.key}`;
       },
       note: (key, text) => `Noted on ${board.comment(pick(key).id, text, by()).key}`,
+      stop: (key, reason) => {
+        const issue = pick(key);
+        board.comment(issue.id, `Stopped: ${reason}`, by());
+        // Not under way any more: back in To Do (queued in its worktree), so the watchdog doesn't wake it and Start can take it again.
+        if (issue.status === 'in_progress') board.update(issue.id, { status: 'todo' }, by());
+        this.onTaskStopped?.(issue.id, reason);
+        return 'Stopped. The plan’s agent rewrites it; go on with your other tasks.';
+      },
       relate: (key, relation, other, remove) => {
         if (home) pick(other);
         const next = board.relate(pick(key).id, relation, other, !remove, by());
@@ -1001,4 +1049,9 @@ export const andList = (items: readonly string[]): string => (items.length < 2 ?
 function draftBrief(d: TaskDraft): Partial<Record<BriefSection, string>> {
   const acceptance = d.acceptance.map((a) => `- [ ] ${a.replace(/\s+/g, ' ').trim()}`).join('\n');
   return { ...(d.goal.trim() ? { goal: d.goal.trim() } : {}), ...(d.context?.trim() ? { context: d.context.trim() } : {}), ...(acceptance ? { acceptance } : {}) };
+}
+
+/** A draft's kind of work and its why, as a new task takes them (docs/routing.md). */
+function draftKind(d: Pick<TaskDraft, 'category' | 'categoryWhy'>): { category?: TaskDraft['category']; categoryWhy?: string } {
+  return d.category ? { category: d.category, ...(d.categoryWhy ? { categoryWhy: d.categoryWhy } : {}) } : {};
 }

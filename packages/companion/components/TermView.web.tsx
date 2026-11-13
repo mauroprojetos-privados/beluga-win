@@ -1,5 +1,6 @@
 import { type Ref, createElement, useEffect, useImperativeHandle, useRef } from 'react';
 import { type StyleProp, View, type ViewStyle } from 'react-native';
+import { t } from '../lib/language';
 import type { TermHandle, TermPageMsg } from './TermView';
 
 export type { TermHandle, TermPageMsg } from './TermView';
@@ -28,7 +29,7 @@ export function TermView({ html, onMessage, style, ref }: { readonly html: strin
   }, []);
   return (
     <View style={[{ flex: 1 }, style]}>
-      {createElement('iframe', { ref: frame, srcDoc: html, title: 'Terminal', sandbox: 'allow-scripts', style: { border: 0, width: '100%', height: '100%', display: 'block', background: 'transparent' } })}
+      {createElement('iframe', { ref: frame, srcDoc: html, title: t('phoneParts.terminal'), sandbox: 'allow-scripts', style: { border: 0, width: '100%', height: '100%', display: 'block', background: 'transparent' } })}
     </View>
   );
 }

@@ -2,6 +2,8 @@
 import type { PathInfo } from '../../../../src/core/attachments.js';
 import type { DropVerdict, SentPiece } from '../../../../src/machines/uploads.js';
 
+import { t } from '../../../../src/shared/i18n/index.js';
+
 export type { DropVerdict } from '../../../../src/machines/uploads.js';
 
 /**
@@ -74,7 +76,7 @@ export function planDrop(files: readonly PathInfo[], checks: readonly DropVerdic
   for (const f of files) {
     const c = by.get(f.path);
     // Not checked: not sent.
-    if (!c) refused.push({ name: f.name, reason: 'it couldn’t be checked' });
+    if (!c) refused.push({ name: f.name, reason: t('chat.attach.notChecked') });
     else if (c.verdict === 'refuse') refused.push({ name: f.name, reason: c.reason });
     else (c.verdict === 'ask' ? ask : send).push(f);
   }
@@ -86,10 +88,10 @@ export function envAsk(files: readonly PathInfo[], machineName: string, run: () 
   const names = files.map((f) => f.name).join(', ');
   return {
     kind: 'confirm',
-    title: `Send ${names} to ${machineName}?`,
-    message: `${files.length === 1 ? 'It holds' : 'They hold'} secrets. ${files.length === 1 ? 'It goes' : 'They go'} over your encrypted link, for this message only.`,
-    confirm: 'Send Once',
-    cancel: 'Don’t Send',
+    title: t('chat.attach.envTitle', { names, machine: machineName }),
+    message: t('chat.attach.envMessage', { count: files.length }),
+    confirm: t('chat.attach.sendOnce'),
+    cancel: t('chat.limit.dontSend'),
     run,
   };
 }

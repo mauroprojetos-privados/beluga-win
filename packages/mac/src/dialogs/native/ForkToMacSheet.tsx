@@ -12,6 +12,9 @@ import { openSheet } from '../../lib/sheets.js';
 import s from './fork-to-mac.module.css';
 import m from './menus.module.css';
 import { computerTitle, thisComputer } from '../../lib/os-words.js';
+import { t } from '@beluga/shared/i18n/index.js';
+import { useT } from '../../lib/i18n.js';
+import { rich } from './parts.js';
 
 /** The folder and branch name Beluga makes from a name (as the core's `slug` does). */
 const slug = (name: string): string =>
@@ -41,17 +44,18 @@ function Row({ icon, title, detail }: { icon: IconName; title: string; detail: s
  */
 export function ForkToMacSheet({ owner, wsId, close }: { owner: string; wsId: string; close: () => void }) {
   const api = useApi();
+  const t = useT();
   const ws = useApp((st) => st.shared.find((w) => w.id === wsId && w.owner === owner));
-  const ownerName = useApp((st) => st.sharedProjects.find((p) => p.owner === owner)?.ownerName ?? st.network.friends.find((f) => f.peerId === owner)?.name ?? 'Your friend');
+  const ownerName = useApp((st) => st.sharedProjects.find((p) => p.owner === owner)?.ownerName ?? st.network.friends.find((f) => f.peerId === owner)?.name) ?? t('native.fork.yourFriend');
   const full = useApp((st) => trustOf(st, owner) === 'full');
   const [name, setName] = useState(ws?.name ?? '');
   if (!ws) return null;
   return (
     <FormSheet
-      title={`Fork “${ws.name}” to This ${computerTitle()}`}
+      title={t('native.fork.title', { name: ws.name, computer: computerTitle() })}
       icon="laptop"
-      intro={`A worktree of your own that starts where ${ownerName}’s is now, with your agent. ${ownerName}’s goes on as it is.`}
-      submitLabel="Fork"
+      intro={t('native.fork.intro', { owner: ownerName })}
+      submitLabel={t('native.fork.fork')}
       canSubmit={Boolean(slug(name))}
       onSubmit={async () => {
         await api.sharing.fork(owner, wsId, name.trim());
@@ -60,26 +64,26 @@ export function ForkToMacSheet({ owner, wsId, close }: { owner: string; wsId: st
       onCancel={close}
       width={540}
     >
-      <Field label="Comes with it">
+      <Field label={t('native.fork.comesWithIt')}>
         <ul className={s.list}>
-          <Row icon="branch" title="Its commits and uncommitted changes" detail="Uncommitted work stays uncommitted, as it was" />
-          <Row icon="folder" title="Its Scratch" detail="Screenshots, notes and logs the agent saved" />
-          <Row icon="chat" title="The conversation" detail="Your agent remembers it and carries on" />
+          <Row icon="branch" title={t('native.fork.commits')} detail={t('native.fork.commitsDetail')} />
+          <Row icon="folder" title={t('native.fork.scratch')} detail={t('native.fork.scratchDetail')} />
+          <Row icon="chat" title={t('native.fork.conversation')} detail={t('native.fork.conversationDetail')} />
         </ul>
       </Field>
-      <Field label="Stays behind">
+      <Field label={t('native.fork.staysBehind')}>
         <div className={m.note}>
           <Icon name="eyeOff" size={14} />
-          <span>node_modules, build output and anything else git ignores, made again by the setup here. Never a .env file or a key.</span>
+          <span>{t('native.fork.staysBehindDetail')}</span>
         </div>
       </Field>
       {full ? null : (
         <div className={m.note}>
           <Icon name="lock" size={14} />
-          <span>{`It’s ${ownerName}’s code: the setup waits until you’ve looked it over, and your .env files aren’t copied in.`}</span>
+          <span>{t('native.fork.notTrusted', { owner: ownerName })}</span>
         </div>
       )}
-      <Field label="Name" htmlFor="fork-mac-name" hint={slug(name) ? <>Your branch <code>beluga/{slug(name)}</code></> : undefined}>
+      <Field label={t('native.fork.name')} htmlFor="fork-mac-name" hint={slug(name) ? rich(t('native.fork.yourBranch'), { branch: <code>beluga/{slug(name)}</code> }) : undefined}>
         <TextInput id="fork-mac-name" value={name} onChange={setName} maxLength={120} spellCheck={false} />
       </Field>
     </FormSheet>
@@ -92,13 +96,14 @@ export function ForkToMacSheet({ owner, wsId, close }: { owner: string; wsId: st
  */
 function ForkProgress({ fork }: { fork: SharedFork }) {
   const { total } = fork;
+  const t = useT();
   if (total === undefined) {
     // A Mac on an older Beluga doesn't say how big it is.
     return (
-      <Tip label="Its changes, Scratch and conversation are coming over">
+      <Tip label={t('native.fork.comingOver')}>
         <span className={s.progress} role="status">
           <Icon name="laptop" size={14} />
-          Copying…
+          {t('native.fork.copying')}
         </span>
       </Tip>
     );
@@ -106,13 +111,13 @@ function ForkProgress({ fork }: { fork: SharedFork }) {
   const received = Math.min(fork.received ?? 0, total);
   const here = received >= total;
   const pct = total ? Math.floor((received / total) * 100) : 100;
-  const files = fork.files ? `, ${fork.files} ${fork.files === 1 ? 'file' : 'files'}` : '';
-  const tip = here ? 'All here: making it a worktree of yours' : `${formatBytes(received)} of ${formatBytes(total)}: its commits${files} and the conversation`;
+  const files = fork.files ? t('native.fork.files', { count: fork.files }) : '';
+  const tip = here ? t('native.fork.allHere') : t('native.fork.progressTip', { received: formatBytes(received), total: formatBytes(total), files });
   return (
     <Tip label={tip}>
-      <span className={s.progress} role="progressbar" aria-label={here ? 'Setting up your fork' : 'Copying your fork'} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+      <span className={s.progress} role="progressbar" aria-label={here ? t('native.fork.settingUpFork') : t('native.fork.copyingFork')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
         <Icon name="laptop" size={14} />
-        {here ? 'Setting up…' : `Copying ${pct}%`}
+        {here ? t('native.fork.settingUp') : t('native.fork.copyingPct', { pct })}
         <span className={s.bar} aria-hidden="true">
           <span style={{ width: `${pct}%` }} />
         </span>
@@ -127,45 +132,46 @@ function ForkProgress({ fork }: { fork: SharedFork }) {
  */
 export function ForkToMacButton({ owner, wsId }: { owner: string; wsId: string }) {
   const actions = useActions();
+  const t = useT();
   const ws = useApp((st) => st.shared.find((w) => w.id === wsId && w.owner === owner));
   const fork = useApp((st) => st.forks[wsId]);
   const mine = useApp((st) => (fork?.wsId ? findWorkspace(st.projects, fork.wsId) : undefined));
-  const ownerName = useApp((st) => st.network.friends.find((f) => f.peerId === owner)?.name ?? 'their');
+  const ownerName = useApp((st) => st.network.friends.find((f) => f.peerId === owner)?.name);
   const online = useApp((st) => Boolean(st.network.friends.find((f) => f.peerId === owner)?.online));
   if (!ws || ws.via !== 'mesh' || ws.role !== 'contribute') return null;
   if (fork?.state === 'ready' && mine && !mine.archived) {
     return (
-      <Tip label={`Your fork, on ${mine.branch ?? 'its own branch'}`}>
+      <Tip label={t('native.fork.yourForkOn', { branch: mine.branch ?? t('native.fork.ownBranch') })}>
         <Button variant="quiet" icon="laptop" onClick={() => actions.run({ type: 'view', view: { kind: 'workspace', id: mine.id, tab: 'chat' } })}>
-          Open My Fork
+          {t('native.fork.openMyFork')}
         </Button>
       </Tip>
     );
   }
   if (fork?.state === 'copying') return <ForkProgress fork={fork} />;
   if (fork?.state === 'preparing') {
-    const project = ws.project ?? 'the project';
+    const project = ws.project ?? t('native.fork.theProject');
     return (
-      <Tip label={`${project} isn’t on ${thisComputer()} yet: it’s copied here first, then forked`}>
+      <Tip label={t('native.fork.notHereYet', { project, computer: thisComputer() })}>
         <Button variant="quiet" icon="download" disabled aria-busy="true">
-          {`Getting ${project}…`}
+          {t('native.fork.getting', { project })}
         </Button>
       </Tip>
     );
   }
   if (fork?.state === 'asking') {
     return (
-      <Tip label={online ? `${ownerName}’s computer is packing it` : 'It goes as soon as their computer is back'}>
+      <Tip label={online ? (ownerName ? t('native.fork.packingTip', { owner: ownerName }) : t('native.fork.packingTipTheir')) : t('native.fork.whenBack')}>
         <Button variant="quiet" icon="laptop" disabled aria-busy="true">
-          {online ? 'Packing…' : `Waiting for ${ownerName}’s computer…`}
+          {online ? t('native.fork.packing') : ownerName ? t('native.fork.waitingFor', { owner: ownerName }) : t('native.fork.waitingForTheir')}
         </Button>
       </Tip>
     );
   }
   return (
-    <Tip label={fork?.state === 'failed' ? `Last time: ${fork.error ?? 'it didn’t work'}. Try again` : `Your own copy of this worktree on ${thisComputer()}: its changes, Scratch and conversation`}>
+    <Tip label={fork?.state === 'failed' ? t('native.fork.lastTime', { error: fork.error ?? t('native.fork.didntWork') }) : t('native.fork.ownCopy', { computer: thisComputer() })}>
       <Button variant="quiet" icon="laptop" onClick={() => openSheet({ kind: 'fork_to_mac', owner, wsId })}>
-        Fork to My {computerTitle()}
+        {t('native.fork.forkToMy', { computer: computerTitle() })}
       </Button>
     </Tip>
   );

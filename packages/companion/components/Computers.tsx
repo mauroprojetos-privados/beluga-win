@@ -7,6 +7,7 @@ import { ago, useComputers, useFolded, useView } from '../lib/hooks';
 import type { ComputerLinkState } from '../lib/link/computers';
 import type { PhoneComputer, WorkView } from '../lib/link/protocol';
 import { OnComputer } from '../lib/scope';
+import { t } from '../lib/language';
 import { store } from '../lib/store';
 import { color } from '../lib/theme';
 import type { IconLike } from './AgentMark';
@@ -32,10 +33,10 @@ export const takesWork = (s: ComputerLinkState): boolean => s.phase === 'open' &
 
 /** One line: what it has free (or why it can't take work), or offline since when the phone last reached it. */
 export function computerLine(s: ComputerLinkState, now = Date.now()): string {
-  if (s.phase === 'open') return s.computer.why ?? s.computer.line ?? 'Connected';
-  if (s.phase === 'dialing') return 'Connecting…';
-  if (s.phase === 'refused') return s.detail ?? 'It turned this phone away';
-  return s.lastSeen ? `Offline since ${when(s.lastSeen, now)}` : 'Offline';
+  if (s.phase === 'open') return s.computer.why ?? s.computer.line ?? t('phoneParts.computers.connected');
+  if (s.phase === 'dialing') return t('phoneParts.screen.connecting');
+  if (s.phase === 'refused') return s.detail ?? t('phoneParts.computers.refused');
+  return s.lastSeen ? t('phoneParts.computers.offlineSince', { when: when(s.lastSeen, now) }) : t('phoneParts.computers.offline');
 }
 
 export function ComputerMark({ s, size = 22 }: { readonly s: ComputerLinkState; readonly size?: number }) {
@@ -49,7 +50,7 @@ export function ComputersWork() {
   return (
     <View style={{ gap: 12 }}>
       <T v="eyebrow" style={{ paddingHorizontal: 20, marginTop: 8 }}>
-        Your computers
+        {t('phoneParts.computers.title')}
       </T>
       {computers.map((s) => (
         <OnComputer.Provider key={s.computer.id} value={s.computer.id}>
@@ -78,10 +79,10 @@ function ComputerSection({ s }: { readonly s: ComputerLinkState }) {
           {convs.length ? (
             convs.map(({ c, project }, i) => {
               const st = statusIcon(c.needsYou ? 'waiting' : c.status);
-              return <Row key={c.topic} first={i === 0} Icon={st.Icon} tone={live ? st.tone : 'plain'} label={c.title} sub={[project, c.needsYou ? 'Needs you' : c.status === 'working' ? c.last : undefined, ago(c.lastAt)].filter(Boolean).join(' · ') || c.last} onPress={() => router.push(convHref(c.topic, id) as never)} />;
+              return <Row key={c.topic} first={i === 0} Icon={st.Icon} tone={live ? st.tone : 'plain'} label={c.title} sub={[project, c.needsYou ? t('phoneParts.sentinels.needsYou') : c.status === 'working' ? c.last : undefined, ago(c.lastAt)].filter(Boolean).join(' · ') || c.last} onPress={() => router.push(convHref(c.topic, id) as never)} />;
             })
           ) : (
-            <Row first Icon={Plus} label={work ? 'Nothing here yet' : live ? 'Loading its work…' : 'Not reached yet'} sub={`Start work on ${s.computer.name} from New Task`} onPress={() => router.push('/ask' as never)} />
+            <Row first Icon={Plus} label={work ? t('phoneParts.computers.nothing') : live ? t('phoneParts.computers.loading') : t('phoneParts.computers.notReached')} sub={t('phoneParts.computers.startOn', { name: s.computer.name })} onPress={() => router.push('/ask' as never)} />
           )}
         </Card>
       )}
@@ -92,13 +93,13 @@ function ComputerSection({ s }: { readonly s: ComputerLinkState }) {
 /** Runs on's rows (New Task): This Mac, then each computer with its line; one that can't take work says why instead of being picked. */
 export function runsOnOptions(computers: readonly ComputerLinkState[], pick: (on: string | undefined) => void): Option[] {
   return [
-    { Icon: Laptop, label: 'This Mac', sub: store.getState().phase === 'open' ? 'Your Mac, where you paired this phone' : 'Your Mac is away: it starts when it wakes', onPress: () => pick(undefined) },
+    { Icon: Laptop, label: t('phoneParts.computers.thisMac'), sub: store.getState().phase === 'open' ? t('phoneParts.computers.thisMacSub') : t('phoneParts.computers.thisMacAway'), onPress: () => pick(undefined) },
     ...computers.map((s) => ({
       Icon: computerIcon(s.computer),
       label: s.computer.name,
       sub: computerLine(s),
       tone: (takesWork(s) ? 'sky' : 'plain') as Option['tone'],
-      onPress: () => (takesWork(s) ? pick(s.computer.id) : store.toast({ text: `${s.computer.name} can’t take work now: ${computerLine(s)}`, tone: 'info' })),
+      onPress: () => (takesWork(s) ? pick(s.computer.id) : store.toast({ text: t('phoneParts.computers.cantTake', { name: s.computer.name, why: computerLine(s) }), tone: 'info' })),
     })),
   ];
 }
@@ -107,13 +108,13 @@ export function runsOnOptions(computers: readonly ComputerLinkState[], pick: (on
 export function RunsOnRow({ on, onPress }: { readonly on: ComputerLinkState | undefined; readonly onPress: () => void }) {
   const Icon = on ? computerIcon(on.computer) : Laptop;
   return (
-    <Press onPress={onPress} accessibilityRole="button" accessibilityLabel={`Runs on ${on?.computer.name ?? 'This Mac'}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 10, height: 40, paddingHorizontal: 12, borderRadius: 20, backgroundColor: color.sunken }}>
+    <Press onPress={onPress} accessibilityRole="button" accessibilityLabel={t('phoneParts.computers.runsOnLabel', { name: on?.computer.name ?? t('phoneParts.computers.thisMac') })} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 10, height: 40, paddingHorizontal: 12, borderRadius: 20, backgroundColor: color.sunken }}>
       <T v="caption" c={color.text2} style={{ fontWeight: '600' }}>
-        Runs on
+        {t('phoneParts.computers.runsOn')}
       </T>
       <Icon color={color.text} size={15} strokeWidth={1.9} />
       <T v="callout" c={color.text} numberOfLines={1} style={{ flex: 1, fontWeight: '600' }}>
-        {on?.computer.name ?? 'This Mac'}
+        {on?.computer.name ?? t('phoneParts.computers.thisMac')}
       </T>
       <ChevronRight color={color.text2} size={16} />
     </Press>

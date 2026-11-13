@@ -26,6 +26,8 @@ import { threadFamilyRow } from '../threads/threads-model.js';
 import { useNow } from '../chat/Items.js';
 import s from './Sidebar.module.css';
 import o from './other-worktrees.module.css';
+import { useT } from '../lib/i18n.js';
+import { t } from '@beluga/shared/i18n/index.js';
 
 /**
  * What a workspace's right-click menu offers: its toolbar's actions, named and drawn the same
@@ -36,11 +38,11 @@ export function workspaceItems(state: AppState, ws: Workspace, run: ReturnType<t
   const here = state.view.kind === 'workspace' && state.view.id === ws.id;
   const sections = inSections([...(primary ? [primary] : []), ...icons, ...more.flat()]);
   return [
-    { label: 'Open', icon: 'chevronRight', onSelect: () => run({ type: 'open_ws', id: ws.id }) },
+    { label: t('common.open'), icon: 'chevronRight', onSelect: () => run({ type: 'open_ws', id: ws.id }) },
     // Remind Me Later (and, with the categories on, Settle and the rest).
     ...triageItems(state, `ws:${ws.id}`, run, client),
-    ...(renamable(ws) && rename ? [{ label: 'Rename…', icon: 'pencil' as const, onSelect: rename }] : []),
-    ...(ws.kind === 'chat' && regenerate ? [{ label: regenerate.pending ? 'Regenerating title…' : 'Regenerate title', icon: 'refresh' as const, disabled: regenerate.pending, onSelect: regenerate.run }] : []),
+    ...(renamable(ws) && rename ? [{ label: t('layout.groups.rename'), icon: 'pencil' as const, onSelect: rename }] : []),
+    ...(ws.kind === 'chat' && regenerate ? [{ label: regenerate.pending ? t('layout.wsrow.regenerating') : t('layout.wsrow.regenerate'), icon: 'refresh' as const, disabled: regenerate.pending, onSelect: regenerate.run }] : []),
     // Its link, to mention it in another chat (BLG-878).
     ...copyLinkItems(ws, client).map((item) => ({ ...item, separate: false })),
     ...sections.flatMap((section) =>
@@ -62,21 +64,20 @@ const renamable = (ws: Workspace): boolean => ws.kind === 'chat' || (ws.kind ===
 
 /** Rename it, then say what happened to its branch when it isn't what you'd expect. */
 function renameWorkspace(client: ReturnType<typeof useBeluga>['client'], ws: Workspace, name: string): void {
-  const what = ws.kind === 'worktree' ? 'worktree' : 'chat';
   client.api.workspaces.rename(ws.id, name).then(
     (done) => {
-      if (done?.branchKept === 'pushed') toast(client, `Renamed. The branch stays ${done.branch}: it’s pushed already, and its pull request follows that name.`, 'info');
+      if (done?.branchKept === 'pushed') toast(client, t('layout.wsrow.renamedBranchKept', { branch: done.branch ?? '' }), 'info');
     },
-    (err: unknown) => toast(client, err instanceof Error ? err.message : `Cannot rename the ${what}`, 'error'),
+    (err: unknown) => toast(client, err instanceof Error ? err.message : t(ws.kind === 'worktree' ? 'layout.wsrow.cannotRenameWorktree' : 'layout.wsrow.cannotRenameChat'), 'error'),
   );
 }
 
 /** What archiving is doing now, in words. */
-const ARCHIVING: Record<NonNullable<AppState['archiving'][string]>, string> = {
-  saving: 'Archiving: saving everything of yours',
-  compressing: 'Archiving: compressing your ignored files',
-  removing: 'Archiving: removing the folder',
-};
+const ARCHIVING = (): Record<NonNullable<AppState['archiving'][string]>, string> => ({
+  saving: t('layout.wsrow.archivingSaving'),
+  compressing: t('layout.wsrow.archivingCompressing'),
+  removing: t('layout.wsrow.archivingRemoving'),
+});
 
 /** A row's sub-agents and child threads, folded under it or not (SubAgents.tsx): the arrow in its gutter turns them. */
 export interface WorkspaceFold {
@@ -96,6 +97,7 @@ export interface WorkspaceFold {
  * someone wrote while you were elsewhere, Claude's pulse while it works; otherwise its git state.
  */
 export const WorkspaceRow = memo(function WorkspaceRow({ ws, indent, fold, inFamily }: { ws: Workspace; indent: number; fold?: WorkspaceFold; inFamily?: boolean }) {
+  const tl = useT();
   const actions = useActions();
   const { client } = useBeluga();
   const [renaming, setRenaming] = useState(false);
@@ -125,9 +127,9 @@ export const WorkspaceRow = memo(function WorkspaceRow({ ws, indent, fold, inFam
     setRegenerating(true);
     try {
       await client.api.workspaces.regenerateTitle(ws.id);
-      toast(client, 'Chat title regenerated', 'success');
+      toast(client, tl('layout.wsrow.titleRegenerated'), 'success');
     } catch (err) {
-      toast(client, err instanceof Error ? err.message : 'Cannot regenerate the chat title', 'error');
+      toast(client, err instanceof Error ? err.message : tl('layout.wsrow.cannotRegenerate'), 'error');
     } finally {
       setRegenerating(false);
     }
@@ -146,11 +148,11 @@ export const WorkspaceRow = memo(function WorkspaceRow({ ws, indent, fold, inFam
         aria-busy
         icon={<Icon name={icon} size={14} />}
         label={ws.name}
-        detail={`${ws.name}: making the worktree from ${ws.base ?? 'the latest origin'}…`}
+        detail={tl('layout.wsrow.making', { name: ws.name, base: ws.base ?? tl('layout.wsrow.latestOrigin') })}
         onClick={() => client.store.dispatch({ type: 'view', view: { kind: 'workspace', id: ws.id, tab: 'chat' } })}
         trailing={
           <>
-            <span className={s.making} role="progressbar" aria-label="Making the worktree" />
+            <span className={s.making} role="progressbar" aria-label={tl('layout.wsrow.makingWorktree')} />
             {mark}
           </>
         }
@@ -180,8 +182,8 @@ export const WorkspaceRow = memo(function WorkspaceRow({ ws, indent, fold, inFam
               <button
                 type="button"
                 className={s.agentFold}
-                aria-label={fold.open ? `Fold the ${fold.noun} of ${ws.name}` : `Show the ${fold.noun} of ${ws.name}`}
-                title={fold.open ? `Fold away ${fold.summary}` : `Show ${fold.summary}`}
+                aria-label={fold.open ? tl('layout.wsrow.foldThe', { noun: fold.noun, name: ws.name }) : tl('layout.wsrow.showThe', { noun: fold.noun, name: ws.name })}
+                title={fold.open ? tl('layout.wsrow.foldAway', { summary: fold.summary }) : tl('layout.wsrow.showSummary', { summary: fold.summary })}
                 onClick={(e) => (e.stopPropagation(), fold.toggle())}
               >
                 <Icon name="chevronRight" size={9} className={cx(s.agentDisclosure, fold.open && s.agentDisclosureOpen)} />
@@ -217,7 +219,7 @@ export const WorkspaceRow = memo(function WorkspaceRow({ ws, indent, fold, inFam
             </>
           )
         }
-        detail={archiving ? `${ws.name}: ${ARCHIVING[archiving]}` : `${ws.name}: ${signal.tip || st.label}${fold ? ` · ${fold.summary}` : ''}${where ? `\n${where.path}` : ''}`}
+        detail={archiving ? `${ws.name}: ${ARCHIVING()[archiving]}` : `${ws.name}: ${signal.tip || st.label}${fold ? ` · ${fold.summary}` : ''}${where ? `\n${where.path}` : ''}`}
         onClick={(event) => {
           if (ws.kind === 'chat' && selection?.click(ws.id, event.shiftKey)) {
             event.preventDefault();
@@ -228,13 +230,13 @@ export const WorkspaceRow = memo(function WorkspaceRow({ ws, indent, fold, inFam
         trailing={
           archiving ? (
             <>
-              <span className={s.archiving} data-archiving={archiving}>Archiving…</span>
+              <span className={s.archiving} data-archiving={archiving}>{tl('layout.wsrow.archiving')}</span>
               {mark}
             </>
           ) : (
             <>
               {ws.startedByAgent ? (
-                <span className={s.agentCount} title={`Started by ${ws.startedByAgent.name}, an external agent`} data-driven-by={ws.startedByAgent.id}>
+                <span className={s.agentCount} title={tl('layout.wsrow.startedBy', { name: ws.startedByAgent.name })} data-driven-by={ws.startedByAgent.id}>
                   <Icon name="plug" size={11} />
                 </span>
               ) : null}
@@ -272,6 +274,7 @@ export const WorkspaceRow = memo(function WorkspaceRow({ ws, indent, fold, inFam
  * A worktree's branch follows (type feature/login for exactly that branch).
  */
 function WorkspaceNameField({ initial, kind, onDone }: { initial: string; kind: 'chat' | 'worktree'; onDone: (name: string | undefined) => void }) {
+  const tl = useT();
   const [name, setName] = useState(initial);
   const box = useRef<HTMLInputElement>(null);
   const done = useRef(false);
@@ -291,8 +294,8 @@ function WorkspaceNameField({ initial, kind, onDone }: { initial: string; kind: 
     <input
       ref={box}
       className={s.renameField}
-      aria-label={kind === 'worktree' ? 'Worktree name' : 'Chat name'}
-      title={kind === 'worktree' ? 'Its branch takes the name too. Type a / for an exact branch, like feature/login.' : undefined}
+      aria-label={kind === 'worktree' ? tl('layout.wsrow.worktreeName') : tl('layout.wsrow.chatName')}
+      title={kind === 'worktree' ? tl('layout.wsrow.renameTip') : undefined}
       aria-invalid={!name.trim()}
       value={name}
       maxLength={200}

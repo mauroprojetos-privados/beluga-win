@@ -7,6 +7,7 @@ import type { ShareService } from './shares.js';
 import { type DomainState, type LogItem, type SaidBy, type Store, clean, peerName } from './store.js';
 import { shareNameOf } from './workspace-controller.js';
 import type { Intent } from './intents.js';
+import { t } from '../shared/i18n/index.js';
 
 /** What to share with a friend: a project (all its worktrees, now and later), or one worktree (`workspaceId`; `projectId` may come with it). */
 export interface FriendShareInput {
@@ -124,7 +125,7 @@ export class WorkspaceSharing {
     this.deps.send({ kind: 'ws_invite', ws: { id: wsId, name: wsWireName(ws.name), project, ...(ws.branch ? { branch: ws.branch } : {}), agent: placeAgent(ws, defaultAgentOf(state.self)) }, role, ...(opts.can ? { can: opts.can } : {}), share: shareNameOf(wsId), history }, { to: peerId });
     this.broadcastRoster(wsId);
     this.onChange?.();
-    if (!opts.quiet) this.deps.toast(`${peer.name} ${role === 'contribute' ? 'can now work with you' : 'can now follow along'} in ${ws.name}`, 'success');
+    if (!opts.quiet) this.deps.toast(role === 'contribute' ? t('toasts.friendShare.canWork', { name: peer.name, what: ws.name }) : t('toasts.friendShare.canFollow', { name: peer.name, what: ws.name }), 'success');
     return true;
   }
 
@@ -135,7 +136,7 @@ export class WorkspaceSharing {
     this.deps.send({ kind: 'ws_leave', id: wsId }, { to: peerId });
     this.broadcastRoster(wsId);
     this.onChange?.();
-    if (!quiet) this.deps.toast(`${peerName(this.deps.store.getState(), peerId)} was removed from the workspace`, 'success');
+    if (!quiet) this.deps.toast(t('toasts.workspaceSharing.removed', { name: peerName(this.deps.store.getState(), peerId) }), 'success');
   }
 
   /** Called when who's in your workspaces changes (guests' contacts follow it). */
@@ -195,7 +196,7 @@ export class WorkspaceSharing {
     }
     // Came in with a link: go straight to the first workspace you were let into.
     if (this.deps.store.getState().self?.guest) this.deps.intend({ type: 'navigate', view: { kind: 'shared', owner: from, id: body.ws.id, tab: 'chat' }, unless: 'shared' });
-    this.deps.toast(`${peerName(state, from)} invited you to ${clean(body.ws.name)}${body.role === 'view' ? ' (to follow along)' : ''}. It's in Projects`, 'success');
+    this.deps.toast(body.role === 'view' ? t('toasts.workspaceSharing.invitedFollow', { who: peerName(state, from), name: clean(body.ws.name) }) : t('toasts.workspaceSharing.invited', { who: peerName(state, from), name: clean(body.ws.name) }), 'success');
   }
 
   onRoster(from: string, body: BodyOf<'ws_roster'>): void {
@@ -212,7 +213,7 @@ export class WorkspaceSharing {
     if (shared) {
       this.deps.store.dispatch({ type: 'shared_remove', owner: from, id: body.id });
       this.deps.intend({ type: 'close_tab', id: body.id });
-      this.deps.toast(`You're no longer in ${shared.name}`, 'warn');
+      this.deps.toast(t('toasts.workspaceSharing.noLongerIn', { name: shared.name }), 'warn');
       return;
     }
     // A member left one of your workspaces.

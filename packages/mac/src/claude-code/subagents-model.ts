@@ -2,6 +2,7 @@ import type { AgentOrigin, CcAgent, CcSession } from '../../../../src/core/claud
 import type { AppState } from '../../../../src/core/store.js';
 import type { Workspace } from '../../../../src/workspaces/types.js';
 import { worktreeOrigin } from '../../../../src/workspaces/origin.js';
+import { t as tr } from '../../../../src/shared/i18n/index.js';
 
 /**
  * Sub-agents as the Mac app shows them: Claude's helpers, never your own work. Each is tied to
@@ -77,7 +78,7 @@ export function cappedAgents<T>(list: readonly T[], cap: number, keep: (x: T) =>
 /** A folded group of sub-agents, in words: "4 sub-agents · 1 running". */
 export function subAgentsSummary(list: readonly Pick<SubAgent, 'agent'>[]): string {
   const running = list.filter((s) => s.agent.status === 'running').length;
-  return `${list.length} sub-agent${list.length === 1 ? '' : 's'}${running ? ` · ${running} running` : ''}`;
+  return `${tr('github.sa.subAgents', { count: list.length })}${running ? tr('github.sa.running', { count: running }) : ''}`;
 }
 
 /**
@@ -110,22 +111,23 @@ export interface Residue {
   readonly clearable: boolean;
 }
 
-const count = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
+const count = (n: number, word: 'commits' | 'files' | 'uncommitted'): string => tr(`github.sa.${word}`, { count: n });
 
 /** What `s` left: from its worktree's git status (`worktree`: the workspace at its worktree's path, if Beluga has it). */
 export function agentResidue(s: SubAgent, worktree?: Pick<Workspace, 'status'>): Residue {
   const done = s.agent.status !== 'running' && s.agent.status !== 'idle';
   if (!s.agent.worktree) {
-    return { kind: 'shared', commits: 0, files: 0, short: done ? 'Nothing of its own' : '', long: 'Worked in the folder of the conversation that started it: anything it changed is in that folder’s changes, nothing separate to clean up.', clearable: done };
+    return { kind: 'shared', commits: 0, files: 0, short: done ? tr('github.sa.nothingOwn') : '', long: tr('github.sa.sharedLong'), clearable: done };
   }
   // Its worktree is gone already (removed or archived): nothing left here.
-  if (!worktree) return { kind: 'none', commits: 0, files: 0, short: 'Nothing left', long: 'Its worktree is gone: nothing left behind.', clearable: done };
+  if (!worktree) return { kind: 'none', commits: 0, files: 0, short: tr('github.sa.nothingLeft'), long: tr('github.sa.goneLong'), clearable: done };
   const st = worktree.status;
-  if (!st) return { kind: 'unknown', commits: 0, files: 0, short: 'Checking…', long: 'Its worktree hasn’t been looked at yet.', clearable: false };
-  const parts = [st.ahead ? count(st.ahead, 'commit') : '', st.changed ? count(st.changed, 'file') : ''].filter(Boolean);
-  if (!parts.length) return { kind: 'none', commits: 0, files: 0, short: 'Nothing left', long: 'Its worktree has no commits that aren’t in main and no uncommitted files: safe to clear.', clearable: done };
-  const long = [st.ahead ? `${count(st.ahead, 'commit')} not in main` : '', st.changed ? count(st.changed, 'uncommitted file') : ''].filter(Boolean).join(' and ');
-  return { kind: 'some', commits: st.ahead, files: st.changed, short: parts.join(' · '), long: `Left ${long} in its worktree${s.agent.worktree.branch ? ` (branch ${s.agent.worktree.branch})` : ''}. Archiving it keeps them.`, clearable: false };
+  if (!st) return { kind: 'unknown', commits: 0, files: 0, short: tr('github.sa.checking'), long: tr('github.sa.uncheckedLong'), clearable: false };
+  const parts = [st.ahead ? count(st.ahead, 'commits') : '', st.changed ? count(st.changed, 'files') : ''].filter(Boolean);
+  if (!parts.length) return { kind: 'none', commits: 0, files: 0, short: tr('github.sa.nothingLeft'), long: tr('github.sa.cleanLong'), clearable: done };
+  const long = [st.ahead ? tr('github.sa.notInMain', { commits: count(st.ahead, 'commits') }) : '', st.changed ? count(st.changed, 'uncommitted') : ''].filter(Boolean).join(` ${tr('common.and')} `);
+  const branch = s.agent.worktree.branch;
+  return { kind: 'some', commits: st.ahead, files: st.changed, short: parts.join(' · '), long: branch ? tr('github.sa.leftLongBranch', { what: long, branch }) : tr('github.sa.leftLong', { what: long }), clearable: false };
 }
 
 /** "claude-opus-5-5" → "Opus 5.5", "sonnet" → "Sonnet", anything else as it is. */
@@ -138,10 +140,11 @@ export function modelLabel(model: string | undefined): string | undefined {
 }
 
 /** "medium" → "Medium effort". */
-export const effortLabel = (effort: string | undefined): string | undefined => (effort ? `${effort[0]!.toUpperCase()}${effort.slice(1)} effort` : undefined);
+export const effortLabel = (effort: string | undefined): string | undefined => (effort ? tr('github.sa.effort', { effort: `${effort[0]!.toUpperCase()}${effort.slice(1)}` }) : undefined);
 
 /** What a sub-agent is called in a list: what it was asked to do, else its name, else a short id. */
-export const agentTitle = (a: Pick<CcAgent, 'description' | 'name' | 'id'>): string => (a.description && a.description !== 'Sub-agent' ? a.description : (a.name ?? `Agent ${a.id.slice(0, 7)}`));
+export const agentTitle = (a: Pick<CcAgent, 'description' | 'name' | 'id'>): string => (a.description && a.description !== 'Sub-agent' ? a.description : (a.name ?? tr('github.sa.agentId', { id: a.id.slice(0, 7) })));
+
 
 /** Who to tell: the agent's name when it has one (SendMessage takes it), else its id. */
 export const addressOf = (a: Pick<CcAgent, 'name' | 'id'>): string => a.name ?? a.id;

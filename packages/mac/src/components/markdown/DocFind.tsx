@@ -4,6 +4,7 @@ import { IconButton } from '../ui.js';
 import { rangesIn, scrollParent } from './md-dom.js';
 import f from '../../chat/find.module.css';
 import { chordLabel } from '../../lib/shortcuts-model.js';
+import { useT } from '../../lib/i18n.js';
 
 type HighlightCtor = new (...ranges: Range[]) => unknown;
 const registry = (): Map<string, unknown> | undefined => (globalThis.CSS as unknown as { highlights?: Map<string, unknown> } | undefined)?.highlights;
@@ -44,6 +45,7 @@ function reveal(range: Range, within: HTMLElement): void {
  * ⇧Return / ⇧⌘G for the one before, Esc to close. `version` changes when the file's text does.
  */
 export function DocFind({ root, version }: { root: RefObject<HTMLElement | null>; version: string }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [at, setAt] = useState(0);
@@ -97,14 +99,14 @@ export function DocFind({ root, version }: { root: RefObject<HTMLElement | null>
     page?.focus({ preventScroll: true });
   };
   return (
-    <div className={f.bar} role="search" aria-label="Find in this file">
+    <div className={f.bar} role="search" aria-label={t('components.markdown.findInFile')}>
       <Icon name="search" size={13} className={f.glass} />
       <input
         ref={input}
         autoFocus
         className={`${f.input} selectable`}
-        placeholder="Find in this file"
-        aria-label="Find in this file"
+        placeholder={t('components.markdown.findInFile')}
+        aria-label={t('components.markdown.findInFile')}
         value={query}
         spellCheck={false}
         onChange={(e) => {
@@ -123,14 +125,14 @@ export function DocFind({ root, version }: { root: RefObject<HTMLElement | null>
         }}
       />
       <span className={f.count} aria-live="polite">
-        {query.trim() ? (count ? `${current + 1} of ${count}` : 'No matches') : ''}
+        {query.trim() ? (count ? t('components.markdown.matchOf', { at: current + 1, count }) : t('components.noMatches')) : ''}
       </span>
       <span className={f.steps}>
-        <IconButton icon="chevronUp" label="Previous match" keys={chordLabel('Shift+Cmd+G')} disabled={!count} onClick={() => setAt((a) => a - 1)} />
-        <IconButton icon="chevronDown" label="Next match" keys={chordLabel('Cmd+G')} disabled={!count} onClick={() => setAt((a) => a + 1)} />
+        <IconButton icon="chevronUp" label={t('components.markdown.previousMatch')} keys={chordLabel('Shift+Cmd+G')} disabled={!count} onClick={() => setAt((a) => a - 1)} />
+        <IconButton icon="chevronDown" label={t('components.markdown.nextMatch')} keys={chordLabel('Cmd+G')} disabled={!count} onClick={() => setAt((a) => a + 1)} />
       </span>
       <button type="button" className={f.done} onClick={close}>
-        Done
+        {t('common.done')}
       </button>
     </div>
   );

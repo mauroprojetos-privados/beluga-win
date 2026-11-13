@@ -26,7 +26,10 @@ export const BOARD_HANDLERS = {
     const rest = { ...given, private: only ?? Boolean(describe && asksPrivate(describe)) };
     // New Task's words may ask for several tasks and say who each is for (BLG-319).
     if (!title?.trim() && describe) return work.createDescribed(rest, describe, { several: true });
-    return work.board.create({ ...rest, title: title ?? '', ...(goal?.trim() ? { brief: { goal } } : {}) }, work.me());
+    const made = work.board.create({ ...rest, title: title ?? '', ...(goal?.trim() ? { brief: { goal } } : {}) }, work.me());
+    // Made by hand: a quick look says what kind of work it is (docs/routing.md).
+    work.classifyLater(made.id);
+    return made;
   },
   'board.update': (s, ref, patch) => {
     const work = needBoard(s);

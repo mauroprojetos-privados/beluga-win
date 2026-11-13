@@ -3,6 +3,7 @@ import { Icon } from '../components/Icon.js';
 import { Avatar, cx } from '../components/ui.js';
 import { reducedMotion } from '../lib/reduced-motion.js';
 import { useCallEngine } from './use-call.js';
+import { useT } from '../lib/i18n.js';
 import c from './call.module.css';
 
 /**
@@ -11,6 +12,7 @@ import c from './call.module.css';
  * syllable without React drawing anything; with reduced motion it only shows, steady, while they talk.
  */
 export function CallAvatar({ peerId, name, size = 28, speaking, muted, sharing }: { peerId: string; name: string; size?: number; speaking: boolean; muted?: boolean; sharing?: boolean }) {
+  const t = useT();
   const engine = useCallEngine();
   const ring = useRef<HTMLSpanElement>(null);
   const reduced = reducedMotion();
@@ -33,11 +35,11 @@ export function CallAvatar({ peerId, name, size = 28, speaking, muted, sharing }
       <span ref={ring} className={c.voiceRing} aria-hidden="true" />
       <Avatar name={name} id={peerId} size={size} />
       {muted ? (
-        <span className={c.badge} title={`${name} is muted`}>
+        <span className={c.badge} title={t('network.avatar.muted', { name })}>
           <Icon name="micOff" size={9} />
         </span>
       ) : sharing ? (
-        <span className={cx(c.badge, c.badgeShare)} title={`${name} is sharing`}>
+        <span className={cx(c.badge, c.badgeShare)} title={t('network.call.isSharing', { name })}>
           <Icon name="screenShare" size={9} />
         </span>
       ) : null}

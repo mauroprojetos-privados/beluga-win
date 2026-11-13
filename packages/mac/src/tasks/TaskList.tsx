@@ -13,6 +13,7 @@ import { taskDropProps } from './use-task-drop.js';
 import { revealing, setTasksPrefs, tuckOrder, useSelfId, useSolo, useTaskActions, useTasksPrefs, useTucking } from './use-tasks.js';
 import t from './tasks.module.css';
 import { WaitingMark, WorkingMark } from '../team/Team.js';
+import { useT } from '../lib/i18n.js';
 
 /**
  * Tasks as a list, grouped by status (each group folds, and its + adds a task there). A row's
@@ -23,6 +24,7 @@ import { WaitingMark, WorkingMark } from '../team/Team.js';
 export function TaskList({ issues, statuses, projectId, repo, emptyGroups, archived = false }: { issues: readonly Issue[]; statuses: readonly IssueStatus[]; projectId?: string; repo?: string; emptyGroups: boolean; archived?: boolean }) {
   const prefs = useTasksPrefs();
   const { open } = useTaskActions();
+  const tr = useT();
   const [cursor, setCursor] = useState<string>();
   const groups = statuses
     .map((status) => ({ status, items: issues.filter((i) => i.status === status).sort((a, b) => PRIORITY_INFO[a.priority].rank - PRIORITY_INFO[b.priority].rank || byRank(a, b)) }))
@@ -54,7 +56,7 @@ export function TaskList({ issues, statuses, projectId, repo, emptyGroups, archi
   let pop = 0;
   const outs = tuckOrder(useTucking(), visible);
   return (
-    <div ref={list} className={t.list} role="grid" aria-label="Tasks" tabIndex={0} onKeyDown={onKeyDown}>
+    <div ref={list} className={t.list} role="grid" aria-label={tr('tasks.tasks')} tabIndex={0} onKeyDown={onKeyDown}>
       {groups.map((g) => {
         const folded = prefs.folded.includes(g.status);
         return (
@@ -67,10 +69,10 @@ export function TaskList({ issues, statuses, projectId, repo, emptyGroups, archi
                 <span className={t.groupCount}>{g.items.length}</span>
               </button>
               {g.status === 'done' && !archived ? <ArchiveDoneButton projectId={projectId} /> : null}
-              {archived ? null : <IconButton icon="plus" label={`New Task in ${STATUS_INFO[g.status].label}`} onClick={() => openSheet({ kind: 'new_task', status: g.status, ...(projectId ? { boardId: projectId } : {}), ...(repo ? { projectId: repo } : {}) })} />}
+              {archived ? null : <IconButton icon="plus" label={tr('tasks.k.newTaskIn', { status: STATUS_INFO[g.status].label })} onClick={() => openSheet({ kind: 'new_task', status: g.status, ...(projectId ? { boardId: projectId } : {}), ...(repo ? { projectId: repo } : {}) })} />}
             </header>
             {folded ? null : g.items.map((issue) => <Row key={issue.id} issue={issue} {...(revealing(issue.parent) ? { pop: pop++ } : {})} {...(outs?.has(issue.id) ? { out: outs.get(issue.id)! } : {})} cursor={cursor === issue.id} onCursor={() => setCursor(issue.id)} />)}
-            {!folded && !g.items.length ? <div className={t.groupEmpty}>Nothing here</div> : null}
+            {!folded && !g.items.length ? <div className={t.groupEmpty}>{tr('tasks.v.nothingHere')}</div> : null}
           </section>
         );
       })}
@@ -85,6 +87,7 @@ const Row = memo(function Row({ issue, pop, out, cursor, onCursor }: { issue: Is
   const menu = useIssueMenu();
   const stop = (e: { stopPropagation: () => void }): void => e.stopPropagation();
   const epic = useApp((s) => isEpic(s.board, issue));
+  const tr = useT();
   return (
     <ActionsContext items={() => menu(issue)}>
       <div
@@ -96,11 +99,11 @@ const Row = memo(function Row({ issue, pop, out, cursor, onCursor }: { issue: Is
         style={(out ?? pop) !== undefined ? ({ '--pop': out ?? pop } as CSSProperties) : undefined}
         onClick={() => open(issue)}
         onMouseDown={onCursor}
-        aria-label={`${issue.key} ${issue.title}, ${STATUS_INFO[issue.status].label}${issue.private ? ', private' : ''}`}
+        aria-label={issue.private ? tr('tasks.k.rowAriaPrivate', { key: issue.key, title: issue.title, status: STATUS_INFO[issue.status].label }) : tr('tasks.k.rowAria', { key: issue.key, title: issue.title, status: STATUS_INFO[issue.status].label })}
       >
         <span className={t.rowCell} onClick={stop}>
           <PriorityPicker issue={issue}>
-            <button type="button" className={t.iconHit} aria-label={`Priority: ${PRIORITY_INFO[issue.priority].label}`}>
+            <button type="button" className={t.iconHit} aria-label={tr('tasks.k.priorityAria', { what: PRIORITY_INFO[issue.priority].label })}>
               <PriorityIcon priority={issue.priority} />
             </button>
           </PriorityPicker>
@@ -108,13 +111,13 @@ const Row = memo(function Row({ issue, pop, out, cursor, onCursor }: { issue: Is
         <span className={t.key}>{issue.key}</span>
         <span className={t.rowCell} onClick={stop}>
           <StatusPicker issue={issue}>
-            <button type="button" className={t.iconHit} aria-label={`Status: ${STATUS_INFO[issue.status].label}`}>
+            <button type="button" className={t.iconHit} aria-label={tr('tasks.k.statusAria', { what: STATUS_INFO[issue.status].label })}>
               <StatusIcon status={issue.status} />
             </button>
           </StatusPicker>
         </span>
         {epic ? (
-          <Tip label="Epic: a task with sub-tasks">
+          <Tip label={tr('tasks.k.epicTip')}>
             <span className={t.epicMark}>
               <Icon name="epic" size={13} />
             </span>
@@ -128,7 +131,7 @@ const Row = memo(function Row({ issue, pop, out, cursor, onCursor }: { issue: Is
         <WorkingMark issueId={issue.id} />
         {solo ? null : <span className={t.rowCell} onClick={stop}>
           <AssigneePicker projectId={issue.projectId} value={issue.assignee} onChange={(a) => void act(() => api.update(issue.id, { assignee: a }))} align="end">
-            <button type="button" className={t.iconHit} aria-label={`${assigneeWords(issue.assignee, selfId)}. Change who it's for`}>
+            <button type="button" className={t.iconHit} aria-label={tr('tasks.k.changeWho', { who: assigneeWords(issue.assignee, selfId) })}>
               <AssigneeMark assignee={issue.assignee} selfId={selfId} changeable />
             </button>
           </AssigneePicker>

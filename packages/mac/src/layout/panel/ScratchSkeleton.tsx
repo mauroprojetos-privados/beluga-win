@@ -5,6 +5,7 @@ import { Button, Empty, cx } from '../../components/ui.js';
 import { GHOST_WIDTHS } from './scratch-model.js';
 import k from './scratch.module.css';
 import { revealLabel } from '../../lib/os-words.js';
+import { useT } from '../../lib/i18n.js';
 
 /**
  * The Scratch tab before it has a listing: the list and the preview drawn in outline, softly
@@ -23,11 +24,12 @@ function GhostRow({ width }: { width: number }) {
 }
 
 export function ScratchSkeleton() {
+  const t = useT();
   return (
     <div className={cx(k.skeleton, k.live)} aria-busy>
       <div className={k.status} role="status">
         <Icon name="pulse" size={13} />
-        <span>Looking in the scratch folder…</span>
+        <span>{t('layout.scratch.looking')}</span>
       </div>
       <div className={k.ghosts} aria-hidden>
         {GHOST_WIDTHS.map((w) => (
@@ -62,19 +64,20 @@ function BelugaMark() {
 
 /** Looked, and nothing's there yet: what will land here, and where it is. */
 export function ScratchEmpty({ working, off, dir, onReveal }: ScratchEmptyProps) {
+  const t = useT();
   return (
     <div className={k.empty}>
       <Empty
         icon="image"
         mark={<BelugaMark />}
-        title="Nothing in scratch yet"
-        detail={off ? 'Your agent isn’t given a scratch folder (see Settings), so nothing lands here.' : 'Screenshots, logs, JSON and notes your agent saves while it works show up here, newest first.'}
+        title={t('layout.scratch.nothingYet')}
+        detail={off ? t('layout.scratch.off') : t('layout.scratch.emptyDetail')}
         action={
           <>
             {working ? (
               <div className={k.emptyWorking} role="status">
                 <DotMatrix size={12} />
-                <span>Your agent is working</span>
+                <span>{t('layout.scratch.working')}</span>
               </div>
             ) : null}
             {onReveal ? (
@@ -91,10 +94,11 @@ export function ScratchEmpty({ working, off, dir, onReveal }: ScratchEmptyProps)
 
 /** On top of the list while Claude works: a file row on its way, its size and time still to come. */
 export function NextFileRow() {
+  const t = useT();
   return (
     <div className={cx(k.next, k.live)} role="status">
       <DotMatrix size={12} />
-      <span className={k.nextLabel}>Your agent is working</span>
+      <span className={k.nextLabel}>{t('layout.scratch.working')}</span>
       <span className={cx(k.bar, k.nextSize)} aria-hidden />
       <span className={cx(k.bar, k.nextAgo)} aria-hidden />
     </div>

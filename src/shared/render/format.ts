@@ -1,4 +1,6 @@
 import type { Cell, Column, ColumnType, Row } from '../view-spec.js';
+import { t } from '../i18n/index.js';
+import { formatDateWith } from '../i18n/format.js';
 
 /**
  * How a view's cells read: numbers with their digits grouped, bytes as KB/MB, dates in your
@@ -76,13 +78,13 @@ export function formatCell(c: Cell, col: { readonly type: ColumnType; readonly d
 /** "3 minutes ago", for when the rows were fetched. */
 export function ago(at: number, now = Date.now()): string {
   const s = Math.max(0, Math.round((now - at) / 1000));
-  if (s < 10) return 'just now';
-  if (s < 60) return `${s}s ago`;
+  if (s < 10) return t('helpers.ago.justNow');
+  if (s < 60) return t('helpers.ago.secs', { n: s });
   const m = Math.round(s / 60);
-  if (m < 60) return `${m} min ago`;
+  if (m < 60) return t('helpers.ago.min', { n: m });
   const h = Math.round(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return dateF.format(new Date(at));
+  if (h < 24) return t('helpers.ago.hShort', { n: h });
+  return formatDateWith(at, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 export const numericTypes: ReadonlySet<ColumnType> = new Set(['number', 'percent', 'currency', 'bytes']);

@@ -4,6 +4,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import { readJson, writeJson } from '../../net/mesh/files.js';
 import { AgentRef } from '../../protocol.js';
+import { CATEGORY_INFO, CATEGORY_SOURCES, DIFFICULTIES, WORK_CATEGORIES, type CategorySource, type Difficulty, type WorkCategory } from '../routing/model.js';
 import { agentName } from '../../shared/agent-label.js';
 import type { Store } from '../store.js';
 import { unexplained } from './criteria.js';
@@ -80,6 +81,11 @@ export interface NewIssue {
   readonly title: string;
   readonly status?: IssueStatus;
   readonly priority?: Priority;
+  readonly difficulty?: Difficulty;
+  /** Its kind of work and why (docs/routing.md), and who said so. */
+  readonly category?: WorkCategory;
+  readonly categoryWhy?: string;
+  readonly categoryBy?: CategorySource;
   readonly assignee?: Assignee;
   readonly labels?: readonly string[];
   readonly estimate?: number;
@@ -107,6 +113,9 @@ export interface IssueDraft {
   readonly acceptance: readonly string[];
   readonly labels: readonly string[];
   readonly priority?: Priority;
+  readonly difficulty?: Difficulty;
+  readonly category?: WorkCategory;
+  readonly categoryWhy?: string;
 }
 
 export interface IssuePatch {
@@ -122,6 +131,8 @@ export interface IssuePatch {
   readonly parent?: string | null;
   /** The repo it runs in (a project id): it stays on its board, which covers the repo from then on. */
   readonly projectId?: string;
+  /** Its kind of work (docs/routing.md), as you set it: kept as a correction of the kind it had. null: none. */
+  readonly category?: WorkCategory | null;
 }
 
 /** A board of its own: what it's called, the repos it covers, and its key prefix (worked out from the name when left out). */
@@ -191,6 +202,13 @@ const SavedIssue = z
     origin: z.enum(['manual', 'worktree', 'claude', 'plan', 'sync', 'github']).default('manual'),
     // The agent that works it (BLG-497): one that doesn't read is let go (your default works it).
     agent: AgentRef.optional().catch(undefined),
+    // How hard it is (docs/routing.md): one that doesn't read is let go.
+    difficulty: z.enum(DIFFICULTIES).optional().catch(undefined),
+    // Its kind of work (docs/routing.md): one that doesn't read is let go, with its why.
+    category: z.enum(WORK_CATEGORIES).optional().catch(undefined),
+    categoryWhy: z.string().max(200).optional().catch(undefined),
+    categoryBy: z.enum(CATEGORY_SOURCES).optional().catch(undefined),
+    categoryWas: z.enum(WORK_CATEGORIES).optional().catch(undefined),
   })
   .passthrough();
 
@@ -337,6 +355,8 @@ export class Board {
       ...(input.drafting ? { drafting: true } : {}),
       status,
       priority: input.priority ?? 'none',
+      ...(input.difficulty ? { difficulty: input.difficulty } : {}),
+      ...(input.category ? { category: input.category, categoryBy: input.categoryBy ?? 'drafter', ...(input.categoryWhy ? { categoryWhy: oneLine(input.categoryWhy, 200) } : {}) } : {}),
       labels: this.allowedLabels(boardId, input.labels ?? [], [], by, origin),
       ...(input.estimate ? { estimate: input.estimate } : {}),
       ...(input.due && DAY.test(input.due) ? { due: input.due } : {}),
@@ -445,6 +465,16 @@ export class Board {
       const name = (id: string): string => this.deps.projectName(id) ?? 'another repo';
       notes.push({ kind: 'project', text: `moved this to run in ${name(patch.projectId)}`, was: issue.projectId, now: patch.projectId });
     }
+    if (patch.category !== undefined && (patch.category ?? undefined) !== issue.category) {
+      const kind = patch.category ?? undefined;
+      next.category = kind;
+      next.categoryWhy = undefined;
+      next.categoryBy = kind ? 'you' : undefined;
+      // The first kind it had before you changed it: what routing's record counts as corrected.
+      next.categoryWas = issue.categoryWas ?? (issue.categoryBy !== 'you' ? issue.category : undefined);
+      const word = (k: WorkCategory | undefined): string => (k ? CATEGORY_INFO[k].label : '');
+      notes.push({ kind: 'note', text: kind ? `called this ${word(kind)} work` : 'cleared its kind of work', was: word(issue.category), now: word(kind) });
+    }
     if (!notes.length) return issue;
     const at = this.now();
     // One field changed again by the same person moments later: one line, from where it started.
@@ -508,6 +538,9 @@ export class Board {
         brief,
         labels: cleanLabels([...issue.labels, ...inSet(labelsFor(this.state(), boardOf(issue)), draft.labels).known]),
         ...(draft.priority && issue.priority === 'none' ? { priority: draft.priority } : {}),
+        ...(draft.difficulty && !issue.difficulty ? { difficulty: draft.difficulty } : {}),
+        // A kind you set meanwhile stays yours.
+        ...(draft.category && !issue.category ? { category: draft.category, categoryBy: 'drafter' as const, ...(draft.categoryWhy ? { categoryWhy: oneLine(draft.categoryWhy, 200) } : {}) } : {}),
       },
       [this.entry(by, 'brief', 'wrote the title and goal')],
     );
@@ -550,9 +583,19 @@ export class Board {
   setAgent(ref: string, agent: AgentRef | undefined, by: Actor): Issue {
     const issue = this.need(ref);
     const was = issue.agent;
-    if (was?.runtime === agent?.runtime && was?.model === agent?.model && was?.label === agent?.label) return issue;
+    if (was?.runtime === agent?.runtime && was?.model === agent?.model && was?.label === agent?.label && was?.combo === agent?.combo) return issue;
     const text = agent ? `chose ${agentName(agent, { model: true })} to work this` : 'left this to the default agent';
-    return this.change(issue, { agent: agent ? { runtime: agent.runtime, label: agent.label, ...(agent.model ? { model: agent.model } : {}) } : undefined }, [this.entry(by, 'note', text)]);
+    return this.change(issue, { agent: agent ? { runtime: agent.runtime, label: agent.label, ...(agent.model ? { model: agent.model } : {}), ...(agent.combo ? { combo: agent.combo, ...(agent.comboName ? { comboName: agent.comboName } : {}) } : {}) } : undefined }, [this.entry(by, 'note', text)]);
+  }
+
+  /**
+   * The kind a quick look gave a task made by hand (docs/routing.md): quiet, and only while it has
+   * none (one you or its drafter set meanwhile stays).
+   */
+  setClassified(ref: string, category: WorkCategory, why?: string): Issue {
+    const issue = this.need(ref);
+    if (issue.category) return issue;
+    return this.change(issue, { category, categoryBy: 'classifier', ...(why ? { categoryWhy: oneLine(why, 200) } : {}) }, [], true);
   }
 
   /** Drop a card in a column, between two others (the board): its status and its place. */

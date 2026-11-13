@@ -17,6 +17,8 @@ import { useGlide } from './use-glide.js';
 import { LiveDot, LockMark, TaskChatMark, TaskStateIcon } from './marks.js';
 import p from './plans.module.css';
 import c from './PlanCanvas.module.css';
+import { useLocale, useT } from '../lib/i18n.js';
+import { t as tx } from '@beluga/shared/i18n/index.js';
 
 /**
  * A plan as a living graph: each milestone a box, its tasks inside laid out by what waits on what,
@@ -145,6 +147,9 @@ const passedOf = (m: MilestoneView): boolean => m.state === 'passed' || (!!m.run
 
 function Canvas({ view, keys, selected, onSelect, onStart, startable }: PlanCanvasProps) {
   const theme = useDocTheme();
+  const t = useT();
+  // The lines' words are said in the language shown: a change draws them again.
+  const locale = useLocale();
   const flow = useReactFlow<PlanNode, PlanEdge>();
   useSharpZoom();
   const shape = useMemo(() => graphShape(view.plan), [view.plan]);
@@ -370,14 +375,14 @@ function Canvas({ view, keys, selected, onSelect, onStart, startable }: PlanCanv
             if (j) join = { ...j, stem: cut.stem };
           }
         }
-        return { id: e.id, source: e.from, target: e.to, ariaLabel: `${titleOf(e.from)} leads to ${titleOf(e.to)}`, type: 'line', data: { kind: 'next', state: link.state, current: now(e), ...(route ? { route } : {}), ...(label ? { label } : {}), ...(siblings.length > 1 ? { joined: true } : {}), ...(join ? { join } : {}) } };
+        return { id: e.id, source: e.from, target: e.to, ariaLabel: tx('plans.c.leadsTo', { from: titleOf(e.from), to: titleOf(e.to) }), type: 'line', data: { kind: 'next', state: link.state, current: now(e), ...(route ? { route } : {}), ...(label ? { label } : {}), ...(siblings.length > 1 ? { joined: true } : {}), ...(join ? { join } : {}) } };
       }
       const state: LineData['state'] = finished(e.from) ? 'done' : working(e.from) ? 'live' : 'waiting';
       const look: LineData['look'] = folded.has(lane.get(e.from) ?? '') ? 'gone' : focus ? (e.from === focus || e.to === focus ? 'hot' : 'dim') : undefined;
       const route = laid.routes.get(e.id);
       return { id: e.id, source: e.from, target: e.to, type: 'line', data: { kind: 'blocks', state, current: now(e), ...(route ? { route } : {}), ...(look ? { look } : {}) } };
     });
-  }, [laid, shape, lane, byTask, byMs, view, folded, hot, selected]);
+  }, [laid, shape, lane, byTask, byMs, view, folded, hot, selected, locale]);
 
   // Framed once laid out: the whole plan if it reads, else the milestones being worked on (else the current one).
   const wrap = useRef<HTMLDivElement>(null);
@@ -439,12 +444,12 @@ function Canvas({ view, keys, selected, onSelect, onStart, startable }: PlanCanv
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} className={p.dots} />
         <Panel position="bottom-left" className={p.zoom}>
-          <IconButton icon="minus" label="Zoom Out" onClick={() => void flow.zoomOut({ duration: 200 })} />
-          <IconButton icon="plus" label="Zoom In" onClick={() => void flow.zoomIn({ duration: 200 })} />
-          <IconButton icon="outline" label="Fit to View" onClick={() => fit(350)} />
+          <IconButton icon="minus" label={t('plans.c.zoomOut')} onClick={() => void flow.zoomOut({ duration: 200 })} />
+          <IconButton icon="plus" label={t('plans.c.zoomIn')} onClick={() => void flow.zoomIn({ duration: 200 })} />
+          <IconButton icon="outline" label={t('plans.c.fit')} onClick={() => fit(350)} />
         </Panel>
       </ReactFlow>
-      {failed ? <div className={p.canvasNote}>Couldn’t lay this plan out.</div> : !laid ? <div className={p.canvasNote}>Laying out…</div> : null}
+      {failed ? <div className={p.canvasNote}>{t('plans.c.couldntLayOut')}</div> : !laid ? <div className={p.canvasNote}>{t('plans.layingOut')}</div> : null}
     </div>
   );
 }
@@ -468,13 +473,14 @@ function Glow() {
 
 const TaskNode = memo(function TaskNode({ data }: NodeProps<Node<TaskData, 'task'>>) {
   const { view: t } = data;
+  const tr = useT();
   // A started task says how it's doing now (its step and for how long, or that it stopped).
   const now = useClock(t.pulse?.kind === 'working' || t.pulse?.kind === 'command');
   const info = taskWords(t, now);
   if (COMPACT_STATES.has(t.state)) {
     // Finished: a slim row (its tick, key and title); its details are a click away.
     return (
-      <div className={cx(p.task, p[`task_${t.state}`], c.taskCompact, data.selected && p.taskSelected, data.linked && p.taskLinked, data.mark && p.taskMarked)} data-state={t.state} data-linked={data.linked ? 'true' : undefined} aria-label={`${t.task.title}, ${info.label}`}>
+      <div className={cx(p.task, p[`task_${t.state}`], c.taskCompact, data.selected && p.taskSelected, data.linked && p.taskLinked, data.mark && p.taskMarked)} data-state={t.state} data-linked={data.linked ? 'true' : undefined} aria-label={tr('plans.o.taskAria', { title: t.task.title, state: info.label })}>
         <Ends />
         <TaskStateIcon state={t.state === 'canceled' ? 'canceled' : 'done'} />
         <span className={p.taskKey}>{data.key ?? t.task.id}</span>
@@ -485,20 +491,20 @@ const TaskNode = memo(function TaskNode({ data }: NodeProps<Node<TaskData, 'task
       </div>
     );
   }
-  const sub = info.sub ?? (t.state === 'asking' ? 'Your agent asked you something' : t.forYou && t.state === 'ready' ? 'For you' : undefined);
+  const sub = info.sub ?? (t.state === 'asking' ? tr('plans.c.agentAskedYou') : t.forYou && t.state === 'ready' ? tr('plans.d.forYou') : undefined);
   return (
     <div
       className={cx(p.task, p[`task_${t.state}`], c.taskCard, data.selected && p.taskSelected, data.linked && p.taskLinked, data.mark && p.taskMarked)}
       data-state={t.state}
       data-linked={data.linked ? 'true' : undefined}
-      aria-label={`${t.task.title}, ${info.label}`}
+      aria-label={tr('plans.o.taskAria', { title: t.task.title, state: info.label })}
     >
       <Ends />
       {t.state === 'running' ? <Glow /> : null}
       <div className={p.taskTop}>
         <TaskStateIcon state={t.state} />
         <span className={p.taskKey}>{data.key ?? t.task.id}</span>
-        {data.mark ? <span className={p.markChip}>{data.mark === 'added' ? 'New' : 'Changed'}</span> : null}
+        {data.mark ? <span className={p.markChip}>{data.mark === 'added' ? tr('plans.o.new') : tr('plans.o.changed')}</span> : null}
         <span className={p.grow} />
         <TaskChatMark {...(t.worktree ? { worktree: t.worktree } : {})} />
         {t.task.estimate ? <span className={p.points}>{t.task.estimate}</span> : null}
@@ -518,7 +524,7 @@ const TaskNode = memo(function TaskNode({ data }: NodeProps<Node<TaskData, 'task
             }}
           >
             <Icon name={t.forYou ? 'hand' : 'play'} size={9} />
-            {t.forYou ? 'Decide…' : 'Start'}
+            {t.forYou ? tr('plans.d.decide') : tr('tasks.start')}
           </button>
         ) : (
           <span className={cx(p.taskState, p[`tone_${info.tone}`])}>{info.label}</span>
@@ -532,8 +538,8 @@ const TaskNode = memo(function TaskNode({ data }: NodeProps<Node<TaskData, 'task
 /** What a milestone's gate says of itself. */
 function gateLabel(m: MilestoneView): string {
   const checked = m.run.check?.verdict === 'pass';
-  if (m.state === 'merging') return milestoneLink(m).label === 'Merging' ? 'Merging…' : milestoneLink(m).label;
-  return m.state === 'passed' ? 'Passed' : m.state === 'checking' ? 'Checking…' : m.state === 'failed' ? 'Failed check' : m.state === 'gate' ? (checked ? 'Checked · pass it' : 'Pass it') : 'Not yet';
+  if (m.state === 'merging') return m.merging?.conflict ? milestoneLink(m).label : tx('plans.merging');
+  return m.state === 'passed' ? tx('plans.c.passed') : m.state === 'checking' ? tx('plans.c.checking') : m.state === 'failed' ? tx('plans.c.failedCheck') : m.state === 'gate' ? (checked ? tx('plans.c.checkedPass') : tx('plans.c.passIt')) : tx('plans.d.flowNotYet');
 }
 
 const MilestoneNode = memo(function MilestoneNode({ data }: NodeProps<Node<MilestoneData, 'milestone'>>) {
@@ -546,6 +552,7 @@ const MilestoneNode = memo(function MilestoneNode({ data }: NodeProps<Node<Miles
   const clock = useClock(!data.folded && (m.agentNow?.kind === 'working' || m.agentNow?.kind === 'command'));
   const live = data.folded ? undefined : milestoneNowWords(m, clock);
   const { openWorktree } = usePlanActions();
+  const t = useT();
   // Where the line from what it waits on comes in: a lock, open once those gates pass.
   const badge = data.gated ? (
     <span className={cx(c.inBadge, locked ? c.inBadgeLocked : c.inBadgeOpen)} title={lockWords(data.waitsOn, m.dependsOn.length, data.branch)} aria-hidden="true">
@@ -559,17 +566,16 @@ const MilestoneNode = memo(function MilestoneNode({ data }: NodeProps<Node<Miles
         <Handle id="in" type="target" position={Position.Top} className={p.handle} isConnectable={false} />
         <Handle id="out" type="source" position={Position.Bottom} className={p.handle} isConnectable={false} />
         {badge}
-        <button type="button" className={cx(c.foldRow, 'nodrag', 'nopan')} aria-expanded="false" aria-label={`${m.milestone.title}: passed. Show its ${n} ${n === 1 ? 'task' : 'tasks'}`} onClick={(e) => (e.stopPropagation(), data.onFold(m.milestone.id, false))}>
+        <button type="button" className={cx(c.foldRow, 'nodrag', 'nopan')} aria-expanded="false" aria-label={t('plans.c.foldedAria', { title: m.milestone.title, count: n })} onClick={(e) => (e.stopPropagation(), data.onFold(m.milestone.id, false))}>
           <span className={p.msIndex}>
             <Icon name="check" size={11} />
           </span>
           <span className={c.foldTitle}>{m.milestone.title}</span>
-          <span className={c.foldMeta}>
-            {m.finished}/{m.total} {m.total === 1 ? 'task' : 'tasks'} done
-          </span>
-          <span className={c.foldGate} data-criteria={m.milestone.id} data-state={m.state} aria-label={`Criteria of ${m.milestone.title}: Passed`}>
+          <span className={c.foldMeta}>{t('plans.c.nDone', { finished: m.finished, count: m.total })}</span>
+          <span className={c.foldGate} data-criteria={m.milestone.id} data-state={m.state} aria-label={t('plans.c.criteriaOf', { title: m.milestone.title, state: t('plans.c.passed') })}>
             <Icon name="check" size={10} />
-            {m.milestone.criteria.length ? `${m.milestone.criteria.length} ${m.milestone.criteria.length === 1 ? 'criterion' : 'criteria'} · ` : ''}Passed
+            {m.milestone.criteria.length ? t('plans.c.nCriteria', { count: m.milestone.criteria.length }) : ''}
+            {t('plans.c.passed')}
           </span>
           <Icon name="chevronDown" size={12} className={c.foldChevron} />
         </button>
@@ -597,7 +603,7 @@ const MilestoneNode = memo(function MilestoneNode({ data }: NodeProps<Node<Miles
                 {m.finished}/{m.total}
               </span>
             ) : (
-              <span className={p.msCount}>{m.milestone.tasks.length} tasks</span>
+              <span className={p.msCount}>{t('plans.o.nTasks', { n: m.milestone.tasks.length })}</span>
             )}
             {m.state !== 'draft' ? (
               <span className={p.msProgress} aria-hidden="true">
@@ -608,13 +614,13 @@ const MilestoneNode = memo(function MilestoneNode({ data }: NodeProps<Node<Miles
             {data.starting ? (
               <span className={c.starting} role="status">
                 <Working />
-                Starting its agent…
+                {t('plans.c.startingAgent')}
               </span>
             ) : null}
             {/* Where its work starts: the plan's branch, with what it waited on merged in. */}
             {data.gated && data.branch && !locked && !passed ? (
               <span className={c.fromBranch} title={lockWords([], m.dependsOn.length, data.branch)}>
-                from {data.branch}
+                {t('plans.c.fromBranch', { branch: data.branch })}
               </span>
             ) : null}
           </span>
@@ -624,8 +630,8 @@ const MilestoneNode = memo(function MilestoneNode({ data }: NodeProps<Node<Miles
           <button
             type="button"
             className={cx(c.agentNow, p[`tone_${live.tone}`], 'nodrag', 'nopan')}
-            title={`${live.label}${live.sub ? ` · ${live.sub}` : ''}: open its chat`}
-            aria-label={`${live.label}${live.sub ? `, ${live.sub}` : ''}. Open the Agent’s Chat`}
+            title={t('plans.c.agentTip', { what: `${live.label}${live.sub ? ` · ${live.sub}` : ''}` })}
+            aria-label={t('plans.c.agentAria', { what: `${live.label}${live.sub ? `, ${live.sub}` : ''}` })}
             onClick={(e) => (e.stopPropagation(), openWorktree(m.agent!.worktree))}
           >
             {live.tone === 'claude' ? <LiveDot /> : <Icon name="chat" size={11} />}
@@ -637,11 +643,11 @@ const MilestoneNode = memo(function MilestoneNode({ data }: NodeProps<Node<Miles
         {locked ? (
           <span className={c.lockChip} title={lockWords(data.waitsOn, m.dependsOn.length, data.branch)}>
             <LockMark size={10} />
-            Locked
+            {t('plans.c.locked')}
           </span>
         ) : null}
         {passed ? (
-          <button type="button" className={cx(c.foldButton, 'nodrag', 'nopan')} aria-expanded="true" aria-label={`Fold ${m.milestone.title}`} title="Fold" onClick={(e) => (e.stopPropagation(), data.onFold(m.milestone.id, true))}>
+          <button type="button" className={cx(c.foldButton, 'nodrag', 'nopan')} aria-expanded="true" aria-label={t('plans.c.foldTitle', { title: m.milestone.title })} title={t('plans.c.fold')} onClick={(e) => (e.stopPropagation(), data.onFold(m.milestone.id, true))}>
             <Icon name="chevronUp" size={12} />
           </button>
         ) : null}
@@ -684,6 +690,7 @@ const GateNode = memo(function GateNode({ data }: NodeProps<Node<GateData, 'gate
   // Its checker's conversation, one click from its state (“Checking…”); the rest of the gate still opens its details.
   const checker = useCheckerChat(m);
   const { openWorktree } = usePlanActions();
+  const tr = useT();
   return (
     <div
       ref={gate}
@@ -691,21 +698,21 @@ const GateNode = memo(function GateNode({ data }: NodeProps<Node<GateData, 'gate
       // Folded away, the summary row stands for it.
       {...(data.folded ? {} : { 'data-criteria': m.milestone.id })}
       data-state={m.state}
-      aria-label={`Criteria of ${m.milestone.title}: ${label}`}
+      aria-label={tr('plans.c.criteriaOf', { title: m.milestone.title, state: label })}
     >
       <Ends />
       <div className={c.gateHead}>
         <span className={c.gateMark}>
           <Icon name={state === 'passed' ? 'check' : state === 'failed' ? 'x' : 'flag'} size={10} />
         </span>
-        <span className={c.gateTitle}>Pass criteria</span>
+        <span className={c.gateTitle}>{tr('plans.c.passCriteria')}</span>
         {criteria.length ? <span className={c.gateCount}>{criteria.length}</span> : null}
         {checker ? (
           <button
             type="button"
             className={cx(c.gateState, c.gateWatch, 'nodrag', 'nopan')}
-            title={checking ? 'Watch the check' : 'Open the check'}
-            aria-label={`${label}: ${checking ? 'Watch the Check' : 'Open the Check'}`}
+            title={checking ? tr('plans.c.watchCheck') : tr('plans.c.openCheck')}
+            aria-label={tr('plans.c.gateAria', { label, what: checking ? tr('plans.watchCheck') : tr('plans.d.openCheck') })}
             onClick={(e) => (e.stopPropagation(), openWorktree(checker))}
           >
             <Icon name="eye" size={11} />
@@ -726,7 +733,7 @@ const GateNode = memo(function GateNode({ data }: NodeProps<Node<GateData, 'gate
           ))}
         </ul>
       ) : (
-        <div className={c.gateNone}>Passes when its tasks are done</div>
+        <div className={c.gateNone}>{tr('plans.c.passesWhenDone')}</div>
       )}
       <span className={c.gatePort} aria-hidden="true" />
     </div>

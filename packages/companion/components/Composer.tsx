@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Keyboard, Platform, ScrollView, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { composerPlan, FIELD_LINE_HEIGHT, FIELD_PAD, fieldHeight, MAX_PHOTOS } from '../lib/composer';
+import { t as tx } from '../lib/language';
 import { pickPhoto } from '../lib/pick';
 import { color, ink, spring, tint } from '../lib/theme';
 import { appendSpoken } from '../lib/dictate';
@@ -62,9 +63,9 @@ export function QueueTray({ queue, onSteer, onRemove }: { readonly queue: readon
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, paddingTop: 4, paddingBottom: 2 }}>
           <Clock color={color.text3} size={13} />
           <T v="caption" style={{ fontWeight: '600', flex: 1 }}>
-            Queued · {queue.length}
+            {tx('phoneParts.composer.queued', { count: queue.length })}
           </T>
-          <T v="caption">{queue[0]?.waiting ? 'waiting for a free agent' : 'after what your agent is doing'}</T>
+          <T v="caption">{queue[0]?.waiting ? tx('phoneParts.composer.waitingAgent') : tx('phoneParts.composer.afterAgent')}</T>
         </View>
         {queue[0]?.waiting ? (
           <View style={{ marginHorizontal: 6, marginBottom: 2, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 12, backgroundColor: tint.sky }}>
@@ -83,12 +84,12 @@ export function QueueTray({ queue, onSteer, onRemove }: { readonly queue: readon
             <T v="callout" c={color.text} numberOfLines={1} style={{ flex: 1 }}>
               {q.text}
             </T>
-            <Press onPress={() => (haptic.commit(), onSteer(q.id))} accessibilityLabel="Steer with it now" style={{ height: 30, paddingHorizontal: 10, borderRadius: 15, justifyContent: 'center', backgroundColor: tint.sky }}>
+            <Press onPress={() => (haptic.commit(), onSteer(q.id))} accessibilityLabel={tx('phoneParts.composer.steerWithIt')} style={{ height: 30, paddingHorizontal: 10, borderRadius: 15, justifyContent: 'center', backgroundColor: tint.sky }}>
               <T v="caption" c={ink.sky} style={{ fontWeight: '700' }}>
-                Steer
+                {tx('phoneParts.composer.steer')}
               </T>
             </Press>
-            <Press onPress={() => onRemove(q.id)} accessibilityLabel="Remove from the queue" hitSlop={6} style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: color.sunken }}>
+            <Press onPress={() => onRemove(q.id)} accessibilityLabel={tx('phoneParts.composer.unqueue')} hitSlop={6} style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: color.sunken }}>
               <X color={color.text2} size={14} />
             </Press>
           </Animated.View>
@@ -107,7 +108,7 @@ function PhotoStrip({ photos, onRemove }: { readonly photos: readonly Photo[]; r
         {photos.map((p) => (
           <Animated.View key={p.uri} entering={FadeIn.duration(200)} exiting={FadeOut.duration(140)} style={{ width: 64, height: 64 }}>
             <Image source={{ uri: p.uri }} style={{ width: 64, height: 64, borderRadius: 14, backgroundColor: color.sunken }} contentFit="cover" />
-            <Press onPress={() => onRemove(p.uri)} accessibilityLabel="Remove photo" hitSlop={8} style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: color.card }}>
+            <Press onPress={() => onRemove(p.uri)} accessibilityLabel={tx('phoneParts.composer.removePhoto')} hitSlop={8} style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: color.card }}>
               <X color={color.text2} size={13} strokeWidth={1.9} />
             </Press>
           </Animated.View>
@@ -204,11 +205,11 @@ export function Composer({
     if (p) setPics((l) => (l.some((x) => x.uri === p.uri) ? l : [...l, p].slice(0, MAX_PHOTOS)));
   };
   // What can go with the message: one is its own button, more are behind one +.
-  const adds: readonly Option[] = [...(canAttach ? [{ Icon: ImagePlus, label: 'Add a photo', tone: 'sky' as const, hidden: full, onPress: () => void attach() }] : []), ...more];
+  const adds: readonly Option[] = [...(canAttach ? [{ Icon: ImagePlus, label: tx('phoneParts.composer.addPhoto'), tone: 'sky' as const, hidden: full, onPress: () => void attach() }] : []), ...more];
   const One = adds.length === 1 ? adds[0]!.Icon : undefined;
   const recording = voiceActive(voice.view);
   // While Claude works, one quiet line says what the button does (no second button).
-  const hint = plan.more.length ? 'Goes after what your agent is doing · hold ↑ to steer now' : working && plan.tap === 'queue' && pics.length ? 'Photos go after what your agent is doing' : undefined;
+  const hint = plan.more.length ? tx('phoneParts.composer.goesAfter') : working && plan.tap === 'queue' && pics.length ? tx('phoneParts.composer.photosAfter') : undefined;
   return (
     <View style={{ paddingHorizontal: 10, paddingBottom: bottom + 8, paddingTop: 6, gap: 6 }}>
       {above}
@@ -230,7 +231,7 @@ export function Composer({
         <PhotoStrip photos={pics} onRemove={(uri) => setPics((l) => l.filter((p) => p.uri !== uri))} />
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 2 }}>
           {recording ? null : adds.length > 1 ? (
-            <Press onPress={() => (Keyboard.dismiss(), setAdding(true))} accessibilityLabel="Add" accessibilityHint={adds.map((o) => o.label).join(', ')} hitSlop={4} style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}>
+            <Press onPress={() => (Keyboard.dismiss(), setAdding(true))} accessibilityLabel={tx('phoneParts.composer.add')} accessibilityHint={adds.map((o) => o.label).join(', ')} hitSlop={4} style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}>
               <Plus color={color.text2} size={22} />
             </Press>
           ) : One ? (
@@ -295,7 +296,7 @@ export function Composer({
           <Animated.View style={btn}>
             {plan.tap === 'stop' ? (
               <Animated.View key="stop" entering={FadeIn.duration(140)} exiting={FadeOut.duration(120)}>
-                <Press onPress={() => (haptic.commit(), onStop?.())} accessibilityLabel="Stop" style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: tint.rose }}>
+                <Press onPress={() => (haptic.commit(), onStop?.())} accessibilityLabel={tx('common.stop')} style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: tint.rose }}>
                   <Square color={color.error} fill={color.error} size={13} />
                 </Press>
               </Animated.View>
@@ -306,8 +307,8 @@ export function Composer({
                   onLongPress={plan.more.length ? () => (haptic.commit(), Keyboard.dismiss(), setMenu(true)) : undefined}
                   delayLongPress={320}
                   disabled={!live}
-                  accessibilityLabel={plan.tap === 'queue' ? 'Queue: after what your agent is doing' : 'Send'}
-                  accessibilityHint={plan.more.length ? 'Hold to steer your agent now instead' : undefined}
+                  accessibilityLabel={plan.tap === 'queue' ? tx('phoneParts.composer.queueLabel') : tx('common.send')}
+                  accessibilityHint={plan.more.length ? tx('phoneParts.composer.holdToSteer') : undefined}
                   style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: live ? color.primary : color.sunken }}
                 >
                   <ArrowUp color={live ? color.onPrimary : color.text3} size={20} strokeWidth={2} />
@@ -322,13 +323,13 @@ export function Composer({
         window
         visible={menu}
         onClose={() => setMenu(false)}
-        title="While your agent works"
+        title={tx('phoneParts.composer.whileWorks')}
         options={[
-          { Icon: Navigation, label: 'Steer now', sub: 'Your agent reads it at its next step', tone: 'sky', onPress: () => send('steer') },
-          { Icon: ListPlus, label: 'Queue', sub: 'After what your agent is doing', tone: 'mint', onPress: () => send('send') },
+          { Icon: Navigation, label: tx('phoneParts.composer.steerNow'), sub: tx('phoneParts.composer.steerNowSub'), tone: 'sky', onPress: () => send('steer') },
+          { Icon: ListPlus, label: tx('phoneParts.composer.queue'), sub: tx('phoneParts.composer.queueSub'), tone: 'mint', onPress: () => send('send') },
         ]}
       />
-      <Options window visible={adding} onClose={() => setAdding(false)} title="Add" options={adds} />
+      <Options window visible={adding} onClose={() => setAdding(false)} title={tx('phoneParts.composer.add')} options={adds} />
     </View>
   );
 }

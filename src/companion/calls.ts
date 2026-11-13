@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { API, type Method } from '../ipc/api.js';
-import { ChatMessageView, DataListView, DocumentView, FilePageView, FolderView, FoundView, MergeCheckView, MergeView, SignedLinkView, SubAgentDetailView, TerminalView, TerminalsView, TranscriptView, TurnView, VoiceMacView } from './protocol.js';
+import { ChatMessageView, ComboReportView, DataListView, DocumentView, FilePageView, FolderView, FoundView, MergeCheckView, MergeView, SignedLinkView, SubAgentDetailView, TerminalView, TerminalsView, TranscriptView, TurnView, VoiceMacView } from './protocol.js';
 
 /**
  * Every call the phone may make, typed: each `phone` method of coverage.ts with its arguments
@@ -28,6 +28,15 @@ export type TaskDraftResult = z.infer<typeof TaskDraftResult>;
 /** What `put` answers: a piece taken, then the file's ref. */
 /** A sentinel's run as the phone reads it (src/core/sentinel/model.ts RunSummary; more fields pass through). */
 export const SentinelRunResult = z.object({ id: z.string(), sentinelId: z.string(), state: z.string(), startedAt: z.number(), headline: z.string() }).passthrough();
+/** 1.51 (docs/routing.md): your combos, each with its chain and what it would run on now (or why nothing can). */
+export const CombosResult = z.object({
+  combos: z.array(z.object({ id: z.string(), name: z.string(), summary: z.string(), privacy: z.string(), now: z.string().optional(), why: z.string().optional(), targets: z.array(z.object({ label: z.string(), why: z.string().optional() }).passthrough()) }).passthrough()),
+  custom: z.boolean(),
+});
+/** The combo and target a run used ("Economy · Codex"); none when it ran on no combo. */
+export const RunRouteResult = z.object({ requestId: z.string(), combo: z.string(), name: z.string(), runtime: z.string(), model: z.string().optional(), target: z.string(), words: z.string() }).optional();
+/** 1.53 (docs/bots.md): a bot as `bots.list` gives it (src/core/bots/schema.ts BotInfo; more fields pass through). */
+const BotResult = z.object({ id: z.string(), name: z.string(), icon: z.string(), channel: z.string(), mac: z.boolean(), orchestrates: z.boolean(), autonomy: z.string(), problems: z.array(z.string()), status: z.object({ planId: z.string(), planTitle: z.string(), done: z.number(), total: z.number(), waiting: z.string().optional(), draft: z.literal(true).optional() }).optional() }).passthrough();
 export const PutResult =z.union([z.object({ received: z.number().int().min(0) }), z.object({ ref: z.string() })]);
 
 export const PhoneCalls = {
@@ -203,6 +212,21 @@ export const PhoneCalls = {
   // 1.29 (BLG-392): what a sentinel keeps, its files and histories as refs; a run's file opened on the Mac.
   'sentinel.dataList': entry('sentinel.dataList', DataListView),
   'sentinel.runFileOpen': entry('sentinel.runFileOpen', done),
+  // 1.51 (docs/routing.md): combos, read-only on the phone.
+  'routing.combos': entry('routing.combos', CombosResult),
+  'routing.runRoute': entry('routing.runRoute', RunRouteResult),
+  // Needs You's Try Again for a used-up combo: the target that goes on ("Economy · Codex").
+  'routing.retry': entry('routing.retry', z.string()),
+  // Runs through combos, by combo and target; 1.52: with how tasks went, savings and suggestions.
+  'routing.usage': entry('routing.usage', z.array(ComboReportView)),
+  // 1.53 (docs/bots.md): your bots and what each is doing; editing them is the Mac's.
+  'bots.list': entry('bots.list', z.array(BotResult)),
+  'bots.status': entry('bots.status', z.object({ status: BotResult.shape.status, line: z.string().optional() })),
+  // 1.55: a bot's own chats, started and deleted from the phone (which is open is the Mac's).
+  'bots.newChat': entry('bots.newChat', z.string()),
+  'bots.deleteChat': entry('bots.deleteChat', done),
+  // Your stack (docs/stack.md): its Needs You card's Check Again (the view comes back in Home's needs).
+  'stack.check': entry('stack.check', done),
 } as const;
 
 export type PhoneMethod = keyof typeof PhoneCalls;

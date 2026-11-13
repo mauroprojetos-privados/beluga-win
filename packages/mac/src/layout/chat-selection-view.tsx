@@ -3,9 +3,11 @@ import type { Workspace } from '@beluga/workspaces/types.js';
 import { type ActionItem } from '../components/SpecMenu.js';
 import { toast, useBeluga } from '../lib/beluga.js';
 import { openSheet } from '../lib/sheets.js';
-import { chatBulkActions, chatCount, chatJoins, chatSelectionStore, joinValue, retainVisibleChats, visibleChatIds } from './chat-selection.js';
+import { chatBulkActions, chatJoins, chatSelectionStore, joinValue, retainVisibleChats, visibleChatIds } from './chat-selection.js';
 import { toolbarActions } from './toolbar-actions.js';
 import s from './Sidebar.module.css';
+import { useT } from '../lib/i18n.js';
+import { t } from '@beluga/shared/i18n/index.js';
 
 interface SidebarSelection {
   readonly ids: readonly string[];
@@ -78,7 +80,7 @@ export function SidebarChatSelection({ children }: { children: ReactNode }) {
       const result = await store.run(chats, async (chat) => {
         // A chat can become a worktree while the confirmation is open.
         const latest = client.store.getState().projects.flatMap((p) => p.workspaces).find((w) => w.id === chat.id);
-        if (!latest || latest.kind !== 'chat' || latest.archived || latest.pending) throw new Error('This chat is no longer available.');
+        if (!latest || latest.kind !== 'chat' || latest.archived || latest.pending) throw new Error(t('layout.chatsel.gone'));
         // Quiet: one message for the whole batch below, not one per chat.
         if (action.id === 'archive') return await client.api.workspaces.archive(chat.id, false, { quiet: true }) === true;
         await client.api.workspaces.remove(chat.id, { quiet: true });
@@ -89,12 +91,12 @@ export function SidebarChatSelection({ children }: { children: ReactNode }) {
       store.retain(visible());
       if (result.failed.length) {
         const message = result.failed.map((chat) => `${chat.name}: ${chat.reason}`).join('\n');
-        toast(client, `${action.label} failed for ${result.failed.length} of ${chatCount(count)}. ${message}`, 'error');
-        openSheet({ kind: 'confirm', title: `${chatCount(result.failed.length)} failed`, message, confirm: 'OK', run: () => undefined });
-      } else toast(client, `${action.done} ${chatCount(count)}.`, 'success');
+        toast(client, t(`layout.chatsel.${action.id}.failed`, { count, failed: result.failed.length, message }), 'error');
+        openSheet({ kind: 'confirm', title: t('layout.chatsel.failedTitle', { count: result.failed.length }), message, confirm: t('common.ok'), run: () => undefined });
+      } else toast(client, t(`layout.chatsel.${action.id}.done`, { count }), 'success');
     };
     return chatBulkActions.map((action) => ({
-      label: `${action.label} ${chatCount(count, 'Chat')}…`,
+      label: t(`layout.chatsel.${action.id}.menu`, { count }),
       icon: action.icon,
       danger: true,
       disabled: store.get().busy || count === 0 || chats.some((chat: Workspace) => {
@@ -103,9 +105,9 @@ export function SidebarChatSelection({ children }: { children: ReactNode }) {
       }),
       onSelect: () => openSheet({
         kind: 'confirm',
-        title: `${action.label} ${chatCount(count)}?`,
-        message: action.message,
-        confirm: `${action.label} ${chatCount(count, 'Chat')}`,
+        title: t(`layout.chatsel.${action.id}.title`, { count }),
+        message: t(`layout.chatsel.${action.id}.message`),
+        confirm: t(`layout.chatsel.${action.id}.confirm`, { count }),
         destructive: action.id === 'delete',
         run: () => void run(action),
       }),
@@ -131,6 +133,7 @@ export function SidebarChatSelection({ children }: { children: ReactNode }) {
 export const useChatSelection = (): SidebarSelection | undefined => useContext(SelectionContext);
 
 export function ChatSelectionCount() {
+  const tl = useT();
   const selection = useChatSelection();
   const count = selection?.ids.length ?? 0;
   // The last count stays while the bar folds away.
@@ -141,8 +144,8 @@ export function ChatSelectionCount() {
     <div className={s.chatSelection} data-open={count > 0} role="status" aria-live="polite" aria-hidden={!count}>
       <div className={s.chatSelectionFold}>
         <div className={s.chatSelectionBar}>
-          <span>{chatCount(shown)} selected{selection.busy ? ' · Working…' : ''}</span>
-          <button type="button" onClick={selection.clear} disabled={selection.busy || !count} tabIndex={count ? 0 : -1} aria-label="Clear chat selection">Clear</button>
+          <span>{tl(selection.busy ? 'layout.chatsel.selectedWorking' : 'layout.chatsel.selected', { count: shown })}</span>
+          <button type="button" onClick={selection.clear} disabled={selection.busy || !count} tabIndex={count ? 0 : -1} aria-label={tl('layout.chatsel.clearSelection')}>{tl('layout.sub.clear')}</button>
         </div>
       </div>
     </div>

@@ -1,3 +1,5 @@
+import { t } from '../../../../src/shared/i18n/index.js';
+
 export type DuringTurnAction = 'queue' | 'steer';
 
 /** Why a message sent now can't steer the running turn: Plan First (the host stops the turn for it), or an agent that can't. */
@@ -43,18 +45,18 @@ export function answeringIn(questions: readonly { readonly channel: string; read
 /** The send control while a card waits: it answers the card, it never steers or queues. */
 export function answerSend(kind: Answering, agent: string): { readonly label: string; readonly tip: string } {
   return kind === 'plan'
-    ? { label: 'Send Changes', tip: `Send what to change: ${agent} revises the plan and shows it to you again` }
-    : { label: 'Answer', tip: `Send your own answer to ${agent}'s question` };
+    ? { label: t('chat.send.sendChanges'), tip: t('chat.send.sendChangesTip', { agent }) }
+    : { label: t('chat.send.answer'), tip: t('chat.send.answerTip', { agent }) };
 }
 
 /** What the composer says when a message can't steer here. */
 export function steerBlockNote(block: SteerBlock): string {
-  return block === 'plan' ? 'In Plan First, messages queue.' : 'This agent cannot steer. Messages queue.';
+  return block === 'plan' ? t('chat.send.planQueues') : t('chat.send.cantSteer');
 }
 
 /** The ⌥↩ shortcut as Settings › Keyboard names it: the action it does with your default. */
 export function otherKeyShortcut(preferred: DuringTurnAction): { readonly label: string; readonly hint: string } {
   return preferred === 'steer'
-    ? { label: 'Queue', hint: 'Waits for the current turn to finish. Steer is your default (Settings › General › Writing)' }
-    : { label: 'Steer', hint: 'The agent reads it at its next step. Queue is your default (Settings › General › Writing)' };
+    ? { label: t('chat.send.queue'), hint: t('chat.send.queueHint') }
+    : { label: t('chat.queue.steer'), hint: t('chat.send.steerHint') };
 }

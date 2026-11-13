@@ -5,6 +5,7 @@ import type { PreviewRef } from '@beluga/shared/preview/ref.js';
 import { shareNameOf } from '@beluga/shared/share-names.js';
 import { Segmented } from '../../components/ui.js';
 import { useApp } from '../../lib/beluga.js';
+import { useT } from '../../lib/i18n.js';
 
 /**
  * Files' Preview view of a component file (Settings › Experimental › Live previews): offered for a
@@ -44,14 +45,15 @@ export function usePreviewing(path: string): [boolean, (on: boolean) => void] {
 }
 
 export function PreviewToggle({ previewing, onChange }: { previewing: boolean; onChange: (on: boolean) => void }) {
+  const t = useT();
   return (
     <Segmented
-      label="Show as"
+      label={t('views.files.showAs')}
       value={previewing ? 'preview' : 'source'}
       onChange={(v) => onChange(v === 'preview')}
       options={[
-        { value: 'preview', label: 'Preview' },
-        { value: 'source', label: 'Source' },
+        { value: 'preview', label: t('views.files.preview') },
+        { value: 'source', label: t('views.files.source') },
       ]}
     />
   );

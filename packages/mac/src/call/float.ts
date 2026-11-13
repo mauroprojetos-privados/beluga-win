@@ -4,6 +4,7 @@ import { inApp } from '../lib/boot.js';
 import { openCall } from './use-call.js';
 import type { CallEngine } from './engine.js';
 import { type FloatAction, type FloatState, floatState } from './float-model.js';
+import { t } from '@beluga/shared/i18n/index.js';
 
 /**
  * The floating call card (BLG-706, src-tauri/src/call_float.rs): while Beluga isn't the window
@@ -64,7 +65,7 @@ async function wire(client: SocketClient, engine: CallEngine): Promise<void> {
 export function syncFloat(client: SocketClient, engine: CallEngine, mine: CallView | undefined, ringing: readonly CallView[], speaking: ReadonlySet<string>): void {
   void wire(client, engine);
   const st = client.store.getState();
-  const nameOf = (c: string): string => (c === 'room' ? 'The room' : c.startsWith('dm:') ? (st.network.friends.find((f) => f.peerId === c.slice(3))?.name ?? 'a friend') : `#${st.network.groups.find((g) => g.id === c.slice(6))?.name ?? 'channel'}`);
+  const nameOf = (c: string): string => (c === 'room' ? t('network.cams.theRoom') : c.startsWith('dm:') ? (st.network.friends.find((f) => f.peerId === c.slice(3))?.name ?? t('network.notes.aFriend')) : `#${st.network.groups.find((g) => g.id === c.slice(6))?.name ?? t('network.notes.channel')}`);
   latest = floatState(mine, ringing, speaking, nameOf);
   void send();
 }

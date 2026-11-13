@@ -3,6 +3,7 @@ import { Button, Dot } from '../../components/ui.js';
 import { useApi, useApp } from '../../lib/beluga.js';
 import { connectionHint, connectionLine } from './connection-model.js';
 import s from './connection.module.css';
+import { useT } from '../../lib/i18n.js';
 
 /** Ticks once a second, only while something counts down. */
 function useNow(on: boolean): number {
@@ -21,6 +22,7 @@ function useNow(on: boolean): number {
  * chat gets one line per outage, never one per try). Gone once you're back.
  */
 export function ConnectionStatus() {
+  const t = useT();
   const api = useApi();
   const trouble = useApp((st) => st.connection);
   const now = useNow(trouble?.state === 'reconnecting');
@@ -28,14 +30,14 @@ export function ConnectionStatus() {
   const line = connectionLine(trouble, now);
   return (
     <div className={s.wrap}>
-      <div className={s.status} role="status" aria-label="Room connection" title={connectionHint(trouble)}>
+      <div className={s.status} role="status" aria-label={t('views.room.connection')} title={connectionHint(trouble)}>
         <Dot tone={trouble.state === 'offline' ? 'error' : 'warn'} />
         <span className={s.text}>
           <span className={s.lead}>{line.lead}</span> · {line.detail}
         </span>
         {line.canRetry ? (
           <Button variant="plain" className={s.button} onClick={() => void api.session.retryConnection()}>
-            Retry Now
+            {t('views.room.retryNow')}
           </Button>
         ) : null}
       </div>

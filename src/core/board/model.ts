@@ -7,6 +7,7 @@
  */
 
 import type { AgentRef } from '../../protocol.js';
+import type { CategorySource, Difficulty, WorkCategory } from '../routing/model.js';
 import type { LabelDef } from './labels.js';
 import { agentLabel } from '../../shared/agent-label.js';
 
@@ -207,6 +208,17 @@ export interface Issue {
   readonly drafting?: boolean;
   readonly status: IssueStatus;
   readonly priority: Priority;
+  /** How hard it is, as its drafter judged (docs/routing.md): the combo it starts on when it names no agent. */
+  readonly difficulty?: Difficulty;
+  /**
+   * What kind of work it is (docs/routing.md, Phase 3), with its one line of why: the combo it starts
+   * on when it names no agent (over its difficulty's). `categoryBy`: who set it; `categoryWas`, the
+   * kind it had before you changed it (a correction routing's record reads, Phase 5).
+   */
+  readonly category?: WorkCategory;
+  readonly categoryWhy?: string;
+  readonly categoryBy?: CategorySource;
+  readonly categoryWas?: WorkCategory;
   readonly labels: readonly string[];
   readonly estimate?: number;
   /** YYYY-MM-DD. */

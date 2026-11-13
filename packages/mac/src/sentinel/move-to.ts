@@ -8,6 +8,7 @@ import { openSheet } from '../lib/sheets.js';
 import { type MoveTarget, useMoveTargets } from '../machines/move-targets.js';
 import { onMachine } from '../machines/pane-model.js';
 import { placeMark } from '../machines/MachineMark.js';
+import { t as tx } from '@beluga/shared/i18n/index.js';
 
 /**
  * Move To ▸ in a sentinel's ••• (BLG-807): your other computers (This Mac from a computer's page),
@@ -23,7 +24,7 @@ export function useSentinelMoveTo(item: Sentinel): ActionItem | undefined {
   if (where.none) return undefined;
 
   const go = async (target: MoveTarget, pause: boolean): Promise<void> => {
-    toast(home, `Moving “${item.name}” to ${target.place.name}…`, 'info');
+    toast(home, tx('sentinel.moveTo.moving', { name: item.name, place: target.place.name }), 'info');
     try {
       const to = await where.clientFor(target);
       const moved = await moveSentinel({
@@ -35,7 +36,7 @@ export function useSentinelMoveTo(item: Sentinel): ActionItem | undefined {
         projectThere: (project) => where.projectOn(target, to, project, () => undefined),
         pause,
       });
-      const said = moved.notes.length ? moved.notes.join('. ') : `Moved to ${target.place.name}${moved.on ? ': it’s on there' : ', paused as it was'}`;
+      const said = moved.notes.length ? moved.notes.join('. ') : moved.on ? tx('sentinel.moveTo.movedOn', { place: target.place.name }) : tx('sentinel.moveTo.movedPaused', { place: target.place.name });
       toast(home, said, moved.notes.length ? 'warn' : 'success');
       const page = { kind: 'sentinel_page' as const, id: moved.landing.id };
       actions.run({ type: 'view', view: target.machine ? onMachine(target.machine.id, page) : page });
@@ -44,29 +45,29 @@ export function useSentinelMoveTo(item: Sentinel): ActionItem | undefined {
       if (moved.landing.missing.length && m && !m.secrets) {
         openSheet({
           kind: 'confirm',
-          title: `Send your variables to ${m.name}?`,
-          message: `“${item.name}” needs ${moved.landing.missing.join(', ')}, which ${m.name} doesn’t have. Keep My Secrets in Sync sends your variables (Settings › Environment) there and keeps them in step; then its sources are tested again. It stays paused until you turn it on.`,
-          confirm: 'Keep My Secrets in Sync',
+          title: tx('sentinel.moveTo.sendTitle', { machine: m.name }),
+          message: tx('sentinel.moveTo.sendMessage', { name: item.name, missing: moved.landing.missing.join(', '), machine: m.name }),
+          confirm: tx('sentinel.moveTo.keepSync'),
           run: () =>
             void (async () => {
               await home.call('machines.secrets', m.id, true);
               await to.call('sentinel.test', moved.landing.id);
-              toast(home, `Your variables are on ${m.name}, and “${item.name}” was tested again there`, 'success');
+              toast(home, tx('sentinel.moveTo.synced', { machine: m.name, name: item.name }), 'success');
             })().catch((e: unknown) => toast(home, e instanceof Error ? e.message : String(e), 'error')),
         });
       }
     } catch (err) {
       if (err instanceof MoveAsk) {
-        openSheet({ kind: 'confirm', title: `Pause and move it to ${target.place.name}?`, message: 'It’s running now. It pauses, its run ends, then it moves with its runs, numbers and tiles.', confirm: 'Pause and Move', run: () => void go(target, true) });
+        openSheet({ kind: 'confirm', title: tx('sentinel.moveTo.pauseTitle', { place: target.place.name }), message: tx('sentinel.moveTo.pauseMessage'), confirm: tx('sentinel.moveTo.pauseMove'), run: () => void go(target, true) });
         return;
       }
-      toast(home, `Couldn’t move “${item.name}” to ${target.place.name}: ${err instanceof Error ? err.message : String(err)}. It stays here as it was.`, 'error');
+      toast(home, tx('sentinel.moveTo.failed', { name: item.name, place: target.place.name, why: err instanceof Error ? err.message : String(err) }), 'error');
     }
   };
 
   return {
-    label: running ? 'Pause and Move To' : 'Move To',
-    hint: running ? 'Its run ends first' : 'Its runs, numbers and tiles go with it',
+    label: running ? tx('sentinel.moveTo.pauseMoveTo') : tx('sentinel.moveTo.moveTo'),
+    hint: running ? tx('sentinel.moveTo.runEnds') : tx('sentinel.moveTo.goesWith'),
     separate: true,
     disabled: !where.targets.length,
     submenu: where.targets.map((t) => ({ label: t.place.name, mark: placeMark(t.machine), onSelect: () => void go(t, running) })),

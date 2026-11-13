@@ -12,6 +12,7 @@ import { agoWords, comments, labelColor, stateOf } from './issues-model.js';
 import { useIssueActions, useIssueStage } from './use-issues.js';
 import s from './issues.module.css';
 import { TeammateOnIssue } from '../team/Team.js';
+import { useT } from '../lib/i18n.js';
 
 /** An issue's state as GitHub draws it: a ring with a dot while open, with a check once done, grey when closed otherwise. */
 export function IssueStateIcon({ issue, size = 15 }: { issue: Pick<GhIssue, 'state' | 'reason'>; size?: number }) {
@@ -49,6 +50,7 @@ export function StagePill({ stage }: { stage: IssueStage }) {
 export function useIssueMenu(projectId: string): (issue: Pick<GhIssue, 'number' | 'title' | 'url'>, stage: IssueStage, opts?: { readonly open?: boolean }) => ActionItem[] {
   const a = useIssueActions();
   const { client } = useBeluga();
+  const t = useT();
   return (issue, stage, opts = {}) => {
     const n = issue.number;
     const ws = stage.kind === 'investigating' || stage.kind === 'investigated' || stage.kind === 'fixing' ? stage.ws : undefined;
@@ -58,25 +60,25 @@ export function useIssueMenu(projectId: string): (issue: Pick<GhIssue, 'number' 
     const work: ActionItem[] =
       stage.kind === 'new' || stage.kind === 'task'
         ? [
-            { label: 'Investigate', icon: 'search', disabled: writing, hint: writing ? 'Once the agent has written the task up' : 'The agent finds out why and reproduces it; nothing is fixed yet', onSelect: () => void a.investigate(projectId, n) },
-            { label: 'Fix It', icon: 'wrench', disabled: writing, hint: writing ? 'Once the agent has written the task up' : `In a new worktree, with a pull request that closes #${n}`, onSelect: () => void a.fix(projectId, n) },
+            { label: t('github.menu.investigate'), icon: 'search', disabled: writing, hint: writing ? t('github.menu.onceWritten') : t('github.menu.investigateHint'), onSelect: () => void a.investigate(projectId, n) },
+            { label: t('github.fixIt'), icon: 'wrench', disabled: writing, hint: writing ? t('github.menu.onceWritten') : t('github.menu.fixHint', { number: n }), onSelect: () => void a.fix(projectId, n) },
             ...(stage.kind === 'new'
               ? [
-                  { label: 'Make a Task', icon: 'task' as const, hint: 'The agent writes it up from the issue', onSelect: () => void a.toTask(projectId, n) },
-                  { label: 'Make a Task After a Quick Look', hint: 'The agent reads the code first, then writes it up', onSelect: () => void a.toTask(projectId, n, true) },
+                  { label: t('github.menu.makeTask'), icon: 'task' as const, hint: t('github.menu.makeTaskHint'), onSelect: () => void a.toTask(projectId, n) },
+                  { label: t('github.menu.makeTaskLook'), hint: t('github.menu.makeTaskLookHint'), onSelect: () => void a.toTask(projectId, n, true) },
                 ]
               : []),
           ]
         : stage.kind === 'investigated'
-          ? [{ label: 'Fix It', icon: 'wrench', hint: 'Where the agent investigated, with a pull request that closes it', onSelect: () => void a.fix(projectId, n) }]
+          ? [{ label: t('github.fixIt'), icon: 'wrench', hint: t('github.menu.fixWhereInvestigated'), onSelect: () => void a.fix(projectId, n) }]
           : [];
     return [
-      ...(opts.open === false ? [] : [{ label: 'Open', icon: 'issue' as const, onSelect: () => a.openIssue(projectId, n) }]),
+      ...(opts.open === false ? [] : [{ label: t('github.menu.open'), icon: 'issue' as const, onSelect: () => a.openIssue(projectId, n) }]),
       ...work.map((w, i) => (i === 0 && opts.open !== false ? { ...w, separate: true } : w)),
-      ...(ws ? [{ label: 'Open the Conversation', icon: 'chat' as const, separate: !work.length, onSelect: () => a.openWorktree(ws) }] : []),
-      ...(task ? [{ label: `Open ${task.key}`, icon: 'task' as const, separate: !work.length && !ws, onSelect: () => a.openTask(task.id) }] : []),
-      { label: 'Open on GitHub', icon: 'external', separate: true, onSelect: () => a.openOnGitHub(issue.url) },
-      { label: 'Copy Link', icon: 'copy', onSelect: () => void copyText(issue.url).then(() => toast(client, `Copied the link to #${n}`, 'success')) },
+      ...(ws ? [{ label: t('github.openTheConversation'), icon: 'chat' as const, separate: !work.length, onSelect: () => a.openWorktree(ws) }] : []),
+      ...(task ? [{ label: t('github.openKey', { key: task.key }), icon: 'task' as const, separate: !work.length && !ws, onSelect: () => a.openTask(task.id) }] : []),
+      { label: t('github.openOnGitHub'), icon: 'external', separate: true, onSelect: () => a.openOnGitHub(issue.url) },
+      { label: t('github.menu.copyLink'), icon: 'copy', onSelect: () => void copyText(issue.url).then(() => toast(client, t('github.menu.copied', { number: n }), 'success')) },
     ];
   };
 }
@@ -86,6 +88,7 @@ export const IssueRow = memo(function IssueRow({ projectId, repo, issue, compact
   const stage = useIssueStage(projectId, repo, issue.number);
   const menu = useIssueMenu(projectId);
   const { openIssue } = useIssueActions();
+  const t = useT();
   const closed = issue.state === 'closed';
   return (
     <ActionsContext items={() => menu(issue, stage)}>
@@ -95,7 +98,7 @@ export const IssueRow = memo(function IssueRow({ projectId, repo, issue, compact
         className={cx(s.row, compact && s.rowCompact)}
         onClick={() => openIssue(projectId, issue.number)}
         onKeyDown={(e) => e.key === 'Enter' && openIssue(projectId, issue.number)}
-        aria-label={`#${issue.number} ${issue.title}, ${stateOf(issue).label}`}
+        aria-label={t('github.row.label', { number: issue.number, title: issue.title, state: stateOf(issue).label })}
         data-issue={issue.number}
       >
         <IssueStateIcon issue={issue} />
@@ -106,7 +109,7 @@ export const IssueRow = memo(function IssueRow({ projectId, repo, issue, compact
           </span>
           <span className={s.rowSub}>
             #{issue.number} · {issue.author ? `${issue.author} · ` : ''}
-            {closed && issue.closedAt ? `closed ${agoWords(issue.closedAt)}` : `opened ${agoWords(issue.createdAt)}`}
+            {closed && issue.closedAt ? t('github.row.closed', { when: agoWords(issue.closedAt) }) : t('github.row.opened', { when: agoWords(issue.createdAt) })}
           </span>
         </span>
         <TeammateOnIssue projectId={projectId} number={issue.number} />
@@ -124,7 +127,8 @@ export const IssueRow = memo(function IssueRow({ projectId, repo, issue, compact
         <span className={s.when}>{ago(issue.updatedAt)}</span>
         <span className={s.rowMore} onClick={(e) => e.stopPropagation()}>
           <ActionsDropdown items={menu(issue, stage)}>
-            <IconButton icon="more" label={`What to do with #${issue.number}`} />
+            <IconButton icon="more" label={t('github.row.whatToDo', { number: issue.number })} />
+
           </ActionsDropdown>
         </span>
       </div>

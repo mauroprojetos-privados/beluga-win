@@ -3,6 +3,7 @@ import type { ThreadChildren } from '@beluga/shared/threads.js';
 import { Alert } from '../../components/Alert.js';
 import { useThreadsChoice } from '../../dialogs/native/ThreadsChoice.js';
 import type { WorktreeRow } from './worktrees-model.js';
+import { useT } from '../../lib/i18n.js';
 
 /**
  * Before archiving, removing build files from or deleting several worktrees at once: what
@@ -13,27 +14,26 @@ import type { WorktreeRow } from './worktrees-model.js';
 
 export type Batch = 'archive' | 'free' | 'delete';
 
-const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
-
 export function BatchAlert({ batch, rows, rebuildable, onConfirm, onCancel }: { batch: Batch; rows: readonly WorktreeRow[]; rebuildable: number; onConfirm: (children?: ThreadChildren) => void; onCancel: () => void }) {
+  const t = useT();
   const n = rows.length;
   const threads = useThreadsChoice(rows.map((r) => r.ws.id), batch === 'delete' ? 'delete' : 'archive');
   const go = (): void => onConfirm(threads.children);
-  const freed = rebuildable ? `about ${formatBytes(rebuildable)}` : 'their space';
+  const freed = rebuildable ? t('project.batch.about', { size: formatBytes(rebuildable) }) : t('project.batch.theirSpace');
   const outside = rows.filter((r) => r.madeBy.kind === 'outside').length;
   if (batch === 'free') {
     return (
       <Alert
         icon="archive"
         tone="info"
-        title={`Remove build files from ${plural(n, 'worktree')}?`}
+        title={t('project.batch.freeTitle', { count: n })}
         message={
           <>
-            <p>Deletes what the project makes again by itself: node_modules, build output and caches ({freed}).</p>
-            <p>Your work stays: files, commits, uncommitted changes, ignored files like .env, and the worktrees themselves. To work in one again, run its setup (npm install and the like).</p>
+            <p>{t('project.batch.freeDeletes', { freed })}</p>
+            <p>{t('project.batch.freeStays')}</p>
           </>
         }
-        confirm={{ label: 'Remove Build Files', onClick: () => onConfirm() }}
+        confirm={{ label: t('project.batch.removeBuildFiles'), onClick: () => onConfirm() }}
         onCancel={onCancel}
       />
     );
@@ -49,19 +49,19 @@ export function BatchAlert({ batch, rows, rebuildable, onConfirm, onCancel }: { 
       <Alert
         icon="alert"
         tone="danger"
-        title={`Delete ${plural(n, 'worktree')} permanently?`}
+        title={t('project.batch.deleteTitle', { count: n })}
         message={
           <>
             <p>
-              {n === 1 ? 'Its folder goes, with its conversation' : 'Their folders go, with their conversations'}
-              {branches ? ` and ${branches === 1 ? 'the branch' : `the ${branches} branches`} Beluga made${commits ? ` (${plural(commits, 'commit')} not in main)` : ''}` : ''}.
-              {files ? ` ${plural(files, 'uncommitted file')} ${files === 1 ? 'is' : 'are'} lost.` : ''}
+              {t(n === 1 ? 'project.batch.itsFolder' : 'project.batch.theirFolders')}
+              {branches ? t('project.batch.andBranches', { count: branches }) + (commits ? t('project.batch.commitsNotInMain', { count: commits }) : '') : ''}.
+              {files ? ` ${t('project.batch.filesLost', { count: files })}` : ''}
             </p>
-            {theirs ? <p>{n === 1 ? 'It was' : theirs === 1 ? 'One was' : `${theirs} were`} made outside Beluga or by a sub-agent: {theirs === 1 ? 'its branch is' : 'their branches are'} kept, and git won’t delete one with uncommitted changes.</p> : null}
-            <p>You can’t undo this. To keep the work, archive {n === 1 ? 'it' : 'them'} instead.</p>
+            {theirs ? <p>{n === 1 ? t('project.batch.theirsIt') : theirs === 1 ? t('project.batch.theirsOne') : t('project.batch.theirsMany', { n: theirs })}</p> : null}
+            <p>{t(n === 1 ? 'project.batch.cantUndoIt' : 'project.batch.cantUndoThem')}</p>
           </>
         }
-        confirm={{ label: `Delete ${plural(n, 'Worktree')}`, destructive: true, onClick: go }}
+        confirm={{ label: t('project.batch.deleteConfirm', { count: n }), destructive: true, onClick: go }}
         onCancel={onCancel}
       >
         {threads.box}
@@ -71,23 +71,22 @@ export function BatchAlert({ batch, rows, rebuildable, onConfirm, onCancel }: { 
   if (batch === 'delete') {
     const branches = rows.filter((r) => r.madeBy.kind === 'beluga' && r.ws.branch).length;
     const saved = rows.filter((r) => r.ws.archive).length;
+    const savedWords = saved ? (saved === n ? t('project.batch.theirArchives') : t('project.batch.archives', { count: saved })) : '';
+    const branchWords = branches ? t('project.batch.branchesMade', { count: branches }) : '';
     return (
       <Alert
         icon="alert"
         tone="danger"
-        title={`Delete ${plural(n, 'archived worktree')} permanently?`}
+        title={t('project.batch.deleteArchivedTitle', { count: n })}
         message={
           <>
             <p>
-              {saved ? `${saved === n ? 'Their archives' : plural(saved, 'archive')} (uncommitted work and files of yours kept when archived) ` : ''}
-              {saved && branches ? 'and ' : ''}
-              {branches ? `${branches === 1 ? 'the branch' : `${branches} branches`} Beluga made (commits only there) ` : ''}
-              {saved || branches ? 'go, with their conversations.' : 'Their conversations go.'} Branches other tools made are kept.
+              {savedWords && branchWords ? t('project.batch.bothGo', { saved: savedWords, branches: branchWords }) : savedWords || branchWords ? t('project.batch.go', { what: savedWords || branchWords }) : t('project.batch.conversationsGo')} {t('project.batch.otherBranchesKept')}
             </p>
-            <p>You can’t undo this.</p>
+            <p>{t('project.batch.cantUndo')}</p>
           </>
         }
-        confirm={{ label: `Delete ${plural(n, 'Worktree')}`, destructive: true, onClick: go }}
+        confirm={{ label: t('project.batch.deleteConfirm', { count: n }), destructive: true, onClick: go }}
         onCancel={onCancel}
       >
         {threads.box}
@@ -98,15 +97,15 @@ export function BatchAlert({ batch, rows, rebuildable, onConfirm, onCancel }: { 
     <Alert
       icon="archive"
       tone="info"
-      title={`Archive ${plural(n, 'worktree')}?`}
+      title={t('project.batch.archiveTitle', { count: n })}
       message={
         <>
-          <p>Everything of yours in them is kept: uncommitted work, new files and ignored files like .env. Their build files are removed ({freed}), and the folders go.</p>
-          <p>Their branches and conversations stay. Restore any of them from Archived on this page, as it was.</p>
-          {outside ? <p>{outside === 1 ? 'One was' : `${outside} were`} made outside Beluga: the app that made {outside === 1 ? 'it' : 'them'} may still have {outside === 1 ? 'it' : 'them'} open.</p> : null}
+          <p>{t('project.batch.archiveKept', { freed })}</p>
+          <p>{t('project.batch.archiveStays')}</p>
+          {outside ? <p>{outside === 1 ? t('project.batch.outsideOne') : t('project.batch.outsideMany', { n: outside })}</p> : null}
         </>
       }
-      confirm={{ label: `Archive ${plural(n, 'Worktree')}`, onClick: go }}
+      confirm={{ label: t('project.batch.archiveConfirm', { count: n }), onClick: go }}
       onCancel={onCancel}
     >
       {threads.box}

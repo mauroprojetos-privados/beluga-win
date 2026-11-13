@@ -3,6 +3,7 @@ import type { GhRunFull, GhWorkflow, RunsList } from '@beluga/core/ci/model.js';
 import { isLive, pollEvery } from '@beluga/core/ci/model.js';
 import type { GitHubRepo } from '@beluga/workspaces/github.js';
 import { toast, useApi, useBeluga } from '../lib/beluga.js';
+import { t } from '@beluga/shared/i18n/index.js';
 import { useActions } from '../lib/actions.js';
 import { openSheet } from '../lib/sheets.js';
 import { keepSeen, lastSeen } from '../lib/last-seen.js';
@@ -124,9 +125,10 @@ export function useCiActions() {
       }
     };
     return {
-      rerun: (projectId: string, id: number, failed: boolean) => act(() => api.ci.rerun(projectId, id, failed ? { failed: true } : undefined), failed ? 'Running the failed jobs again' : 'Running it again'),
+      rerun: (projectId: string, id: number, failed: boolean) => act(() => api.ci.rerun(projectId, id, failed ? { failed: true } : undefined), failed ? t('github.ci.runningFailedAgain') : t('github.ci.runningAgain')),
       cancel: (projectId: string, id: number, title: string, then?: () => void): void =>
-        openSheet({ kind: 'confirm', title: 'Cancel this run?', message: `“${title}” stops where it is. You can run it again later.`, confirm: 'Cancel Run', destructive: true, run: () => void act(() => api.ci.cancel(projectId, id), 'Cancelling the run').then((ok) => ok && then?.()) }),
+        openSheet({ kind: 'confirm', title: t('github.ci.cancelTitle'), message: t('github.ci.cancelMessage', { title }), confirm: t('github.ci.cancelRun'), destructive: true, run: () => void act(() => api.ci.cancel(projectId, id), t('github.ci.cancelling')).then((ok) => ok && then?.()) }),
+
       log: (projectId: string, jobId: number): Promise<string> => api.ci.log(projectId, jobId),
       openRun: (projectId: string, runId: number): void => actions.run({ type: 'view', view: { kind: 'gh_run', projectId, runId } }),
       openList: (projectId?: string, page?: 'workflows'): void => actions.run({ type: 'view', view: { kind: 'actions', ...(projectId ? { projectId } : {}), ...(page ? { page } : {}) } }),

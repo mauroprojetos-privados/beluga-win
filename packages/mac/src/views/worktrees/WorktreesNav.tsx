@@ -6,6 +6,7 @@ import { useActions } from '../../lib/actions.js';
 import { useApp } from '../../lib/beluga.js';
 import { Row } from '../../layout/sidebar-parts.js';
 import s from '../../layout/Sidebar.module.css';
+import { useT } from '../../lib/i18n.js';
 
 const worktrees = (st: AppState): Workspace[] => st.projects.flatMap((p) => p.workspaces).filter((w) => w.kind === 'worktree');
 
@@ -15,6 +16,7 @@ const worktrees = (st: AppState): Workspace[] => st.projects.flatMap((p) => p.wo
  */
 export function WorktreesNav() {
   const actions = useActions();
+  const t = useT();
   const selected = useApp((st) => st.view.kind === 'worktrees');
   const count = useApp((st) => worktrees(st).filter((w) => !w.archived).length);
   const archived = useApp((st) => worktrees(st).filter((w) => w.archived).length);
@@ -24,8 +26,8 @@ export function WorktreesNav() {
     <Row
       className={s.fold}
       icon={<Icon name="branch" size={13} />}
-      label="Worktrees"
-      detail={`${count} worktree${count === 1 ? '' : 's'}${bytes ? `, ${formatBytes(bytes)} on disk` : ''}${archived ? `, ${archived} archived` : ''}: who made them, what's left in them, and what to archive, restore or delete`}
+      label={t('project.worktrees.worktrees')}
+      detail={t('project.worktrees.nav.count', { count }) + (bytes ? t('project.worktrees.nav.onDisk', { size: formatBytes(bytes) }) : '') + (archived ? t('project.worktrees.nav.archived', { n: archived }) : '') + t('project.worktrees.nav.what')}
       selected={selected}
       onClick={() => actions.run({ type: 'view', view: { kind: 'worktrees' } })}
       trailing={bytes ? <span className={s.archiving}>{formatBytes(bytes)}</span> : null}

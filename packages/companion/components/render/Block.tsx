@@ -5,6 +5,7 @@ import { Maximize2 } from 'lucide-react-native';
 import { openFull } from '../../lib/fullscreen';
 import type { ProseView } from '../../lib/link/protocol';
 import { parseGraph, parseView, readFileTree, readJson, readTaskKeys, viewFenceType } from '../../lib/render';
+import { t as tx } from '../../lib/language';
 import { color, type } from '../../lib/theme';
 import { statusOf, taskHref } from '../Tasks';
 import { Card, Press, T, toneBg, toneInk } from '../ui';
@@ -34,7 +35,7 @@ export function Block({ entry, at, math }: { readonly entry: ProseView['code'][n
   }, [block.text, block.kind, entry.lang]);
   const tree = useMemo(() => (block.kind === 'tree' ? (readFileTree(block.text) ?? null) : undefined), [block.text, block.kind]);
   const json = useMemo(() => (block.kind === 'json' ? (readJson(block.text) ?? null) : undefined), [block.text, block.kind]);
-  if (graph) return graph.ok ? <GraphCard graph={graph.graph} /> : <Problem incomplete={graph.incomplete} error={graph.error} what="graph" />;
+  if (graph) return graph.ok ? <GraphCard graph={graph.graph} /> : <Problem incomplete={graph.incomplete} error={graph.error} what="graph" /* i18n-ignore: a key, said by Problem */ />;
   if (view) return view.ok ? <ViewCard view={view.view} {...(at ? { at } : {})} warnings={view.warnings.length} /> : <Problem incomplete={view.incomplete} error={view.error} what="view" />;
   if (block.kind === 'tasks') return <TaskCards keys={readTaskKeys(block.text)} />;
   if (block.kind === 'text') return <TextTable text={block.text} />;
@@ -54,7 +55,7 @@ export function TextTable({ text, full }: { readonly text: string; readonly full
   return (
     <View style={{ borderRadius: 14, backgroundColor: color.code, overflow: 'hidden' }}>
       {full ? null : (
-        <Press onPress={() => openFull({ kind: 'text', text })} accessibilityLabel="Full screen" hitSlop={6} style={{ position: 'absolute', right: 6, top: 6, zIndex: 1, width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: color.card }}>
+        <Press onPress={() => openFull({ kind: 'text', text })} accessibilityLabel={tx('phoneParts.view.fullScreen')} hitSlop={6} style={{ position: 'absolute', right: 6, top: 6, zIndex: 1, width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: color.card }}>
           <Maximize2 color={color.text2} size={13} />
         </Press>
       )}
@@ -65,10 +66,10 @@ export function TextTable({ text, full }: { readonly text: string; readonly full
   );
 }
 
-function Problem({ incomplete, error, what }: { readonly incomplete: boolean; readonly error: string; readonly what: string }) {
+function Problem({ incomplete, error, what }: { readonly incomplete: boolean; readonly error: string; readonly what: 'graph' | 'view' }) {
   return (
     <Card style={{ padding: 12 }}>
-      <T v="callout">{incomplete ? `Showing a ${what}…` : `This ${what} can’t be shown: ${error}`}</T>
+      <T v="callout">{incomplete ? tx(what === 'graph' ? 'phoneParts.block.showingGraph' : 'phoneParts.block.showingView') : tx(what === 'graph' ? 'phoneParts.block.badGraph' : 'phoneParts.block.badView', { error })}</T>
     </Card>
   );
 }
@@ -90,7 +91,7 @@ function TaskCards({ keys }: { readonly keys: readonly string[] }) {
               {k}
             </T>
             <T v="callout" c={color.text} numberOfLines={1} style={{ flex: 1 }}>
-              {t?.title ?? 'Not on the board here'}
+              {t?.title ?? tx('phoneParts.block.notOnBoard')}
             </T>
           </Press>
         );

@@ -39,7 +39,7 @@ const ALWAYS_OK = new Set([
   ...['who_can', 'wait_for', 'check', 'cancel', 'answer_question'].map((n) => `mcp__beluga__${n}`),
   // The task board: your own runs, and a friend's you trust (BLG-701: only its repo's board, and a
   // Trusted friend's changes ask you, see boardAsks); each change is in the task's activity.
-  ...['task_define', 'task_get', 'task_list', 'task_create', 'board_create', 'task_update', 'task_brief_edit', 'task_note', 'task_relate', 'task_attach_proof'].map((n) => `mcp__beluga_board__${n}`),
+  ...['task_define', 'task_get', 'task_list', 'task_create', 'board_create', 'task_update', 'task_brief_edit', 'task_note', 'task_stop', 'task_relate', 'task_attach_proof'].map((n) => `mcp__beluga_board__${n}`),
   // Sentinels (core/sentinel): only your own runs have them; a new one starts paused until you turn it on,
   // and a change to what one can do pauses it. sentinel_remove and sentinel_delete_runs aren't here: deleting asks you.
   // sentinel_test and sentinel_try_source only read: a database read-only, a file, an address without your
@@ -58,7 +58,8 @@ const ALWAYS_OK = new Set([
   // "Your Mac": only its own conversation has these, in your own runs (core/assistant). They look at
   // this Mac or start work you asked for (a worktree, a task, a plan), the way the board's tools do,
   // or archive a worktree you asked to (lossless; one with Claude still working waits for your yes).
-  ...['screenshot', 'device_info', 'list_work', 'start_worktree', 'start_task', 'start_plan', 'archive_worktree'].map((n) => `mcp__beluga_mac__${n}`),
+  // A bot's (docs/bots.md): plan_dispatch writes a plan the way plan tools do (its Approve follows the bot's autonomy); knowledge_search reads only its own sources.
+  ...['screenshot', 'device_info', 'list_work', 'start_worktree', 'start_task', 'start_plan', 'archive_worktree', 'plan_dispatch', 'knowledge_search'].map((n) => `mcp__beluga_mac__${n}`),
   // Your phone (BLG-150): looking at it never asks (like the Mac's screenshot). Acting on it falls
   // to 'ask', then the owner-approval gate honours the phone's own setting (Off · Ask · Use · Full).
   ...['phone_status', 'phone_screenshot', 'phone_screen', 'phone_apps', 'phone_info', 'phone_pull', 'phone_notifications', 'phone_macro_list'].map((n) => `mcp__beluga_phone__${n}`),

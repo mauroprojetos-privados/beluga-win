@@ -23,7 +23,7 @@ import type { ScriptFix, SetupFix, WorkedOutScripts } from '../agent/setup-fixer
 import type { SetupTools } from '../agent/types.js';
 import { buildSetupAppend } from '../agent/prompt.js';
 import { claudeCodeCommand } from '../agent/claude-code.js';
-import { CONTINUE_PROMPT } from '../shared/run-failure.js';
+import { CONTINUE_PROMPT, decodeFailure } from '../shared/run-failure.js';
 import type { NoticeEvent } from './notify.js';
 import { type SearchSource, searchConversations } from './search.js';
 import { type LogItem, type MergedMark, type Prefs, type Store, mergedText, shippedText } from './store.js';
@@ -44,6 +44,7 @@ import { type AgentRef, defaultAgentOf } from '../protocol.js';
 import type { RuntimeChoice } from '../shared/agent-runtimes.js';
 import type { HandoffMode } from '../shared/agent-handoff.js';
 import { type GitFixId, type GitSetup, type GitTrouble, explainGitTrouble, httpsRemoteOf, troubleLine } from '../shared/git-trouble.js';
+import { t } from '../shared/i18n/index.js';
 
 export interface WorkbenchDeps {
   readonly store: Store;
@@ -286,6 +287,7 @@ export class Workbench {
   private diskTimer?: NodeJS.Timeout;
   private agentTimer?: NodeJS.Timeout;
   private agentEvery?: NodeJS.Timeout;
+  private offSignedOut?: () => void;
   /** The round of measuring under way: a second ask joins it rather than walking every folder again. */
   private measuring?: Promise<void>;
   private prTimer?: NodeJS.Timeout;
@@ -354,6 +356,11 @@ export class Workbench {
     if (runtimes) this.deps.store.dispatch({ type: 'runtimes', runtimes });
     this.refreshModels();
     void this.checkRuntimes();
+    // A ready runtime isn't asked again by the timer: a run that ends signed out (a login that ran out
+    // meanwhile) asks now, so the pickers and routing stop treating it as ready.
+    this.offSignedOut = this.deps.store.onAction?.((a) => {
+      if (a.type === 'agent_event' && a.event === 'error' && decodeFailure(a.text)?.kind === 'signed_out') void this.checkRuntimes();
+    });
     // Claude Code kept current, quietly: a newer one's models (a new Opus) show in the picker once it's in.
     if (this.deps.updateAgent) {
       const update = (): void => void this.deps.updateAgent!().then((moved) => moved && this.refreshModels(), () => undefined);
@@ -380,6 +387,7 @@ export class Workbench {
     clearInterval(this.diskTimer);
     clearInterval(this.prTimer);
     clearTimeout(this.runtimeTimer);
+    this.offSignedOut?.();
     for (const off of this.watchers.values()) off();
     this.deps.terminals?.closeAll();
   }
@@ -393,11 +401,11 @@ export class Workbench {
     if (id && this.manager.find(id)) {
       this.manager.setModel(id, value || undefined);
       void this.deps.controller.refresh();
-      this.deps.toast(`${label} in this conversation from the next message`, 'success');
+      this.deps.toast(t('toasts.workbench.modelHere', { model: label }), 'success');
       return;
     }
     this.deps.setPrefs({ model: value || undefined });
-    this.deps.toast(`New conversations use ${label}`, 'success');
+    this.deps.toast(t('toasts.workbench.modelNew', { model: label }), 'success');
   }
 
   /**
@@ -421,7 +429,7 @@ export class Workbench {
   private worktree(id: string): Workspace | undefined {
     const ws = this.manager.find(id);
     if (!ws || ws.kind !== 'worktree' || !ws.branch) {
-      this.deps.toast('Pull requests are for worktrees (a branch of their own)', 'warn');
+      this.deps.toast(t('toasts.workbench.prForWorktrees'), 'warn');
       return undefined;
     }
     return ws;
@@ -432,7 +440,7 @@ export class Workbench {
     const ws = this.worktree(id);
     if (!ws?.branch) return;
     if (this.deps.store.getState().gh === false) {
-      this.deps.toast('Install the GitHub CLI first: brew install gh, then gh auth login', 'warn');
+      this.deps.toast(t('toasts.workbench.installGh'), 'warn');
       return;
     }
     const project = this.manager.list.find((p) => p.id === ws.projectId);
@@ -443,7 +451,7 @@ export class Workbench {
     // Its last PR went to a fork's original: this one goes to the fork, as the menu says (before the run reads where gh points).
     if (prTargetOf(ws.path, ws.branch)) void setPrTarget(ws.path, ws.branch, undefined).catch(() => undefined).finally(ask);
     else ask();
-    this.deps.toast(`${this.agent()} is preparing the pull request…`);
+    this.deps.toast(t('toasts.workbench.preparingPr', { agent: this.agent() }));
   }
 
   /**
@@ -466,16 +474,16 @@ export class Workbench {
     }
     // Create PR on the original (BLG-727): into the repository the project's origin was forked from.
     const fork = opts.original ? this.manager.list.find((p) => p.id === ws.projectId)?.fork : undefined;
-    if (opts.original && !fork) return fail('This project’s origin isn’t a fork on GitHub, so there’s no original to open it on');
+    if (opts.original && !fork) return fail(t('toasts.workbench.notAFork'));
     if (this.creatingPr.has(id)) return { ok: false, message: 'The pull request is already being opened' };
     this.creatingPr.add(id);
     const branch = ws.branch;
     try {
-      this.deps.toast(`Opening a pull request for ${branch}${fork ? ` on ${fork.owner}/${fork.repo}` : ''}…`);
+      this.deps.toast(fork ? t('toasts.workbench.openingPrOn', { branch, repo: `${fork.owner}/${fork.repo}` }) : t('toasts.workbench.openingPr', { branch }));
       try {
         if ((ws.status?.changed ?? 0) > 0) await this.manager.commitAll(id, titleOfBranch(branch));
       } catch (err) {
-        return fail(`Couldn’t commit what’s left: ${firstLine(err)}`);
+        return fail(t('toasts.workbench.commitLeftFailed', { error: firstLine(err) }));
       }
       const base = this.prBase(ws);
       const subjects = await commitSubjects(ws.path, `origin/${base}`).catch(() => []);
@@ -484,13 +492,15 @@ export class Workbench {
       try {
         pr = await (this.deps.createPr ?? createPr)(ws.path, { base: fork?.branch ?? base, head: branch, ...text, ...(opts.draft ? { draft: true } : {}), ...(opts.https ? { https: true } : {}), ...(fork ? { to: fork } : {}) });
       } catch (err) {
-        return this.troubleOr(ws, err, 'GitHub didn’t open the pull request');
+        return this.troubleOr(ws, err, t('toasts.workbench.prNotOpened'));
       }
       this.troubles.delete(id);
       this.pushedAt.set(id, this.now());
       this.deps.store.dispatch({ type: 'pr', id, pr });
       void this.deps.controller.refresh();
-      const message = `Opened PR #${pr.number}${fork ? ` on ${fork.owner}/${fork.repo}` : ''}${opts.draft ? ' as a draft' : ''}: ${pr.title || text.title}`;
+      const title = pr.title || text.title;
+      const repo = fork ? `${fork.owner}/${fork.repo}` : '';
+      const message = fork ? (opts.draft ? t('toasts.workbench.openedPrOnDraft', { number: pr.number, repo, title }) : t('toasts.workbench.openedPrOn', { number: pr.number, repo, title })) : opts.draft ? t('toasts.workbench.openedPrDraft', { number: pr.number, title }) : t('toasts.workbench.openedPr', { number: pr.number, title });
       this.deps.toast(message, 'success');
       return { ok: true, message };
     } finally {
@@ -515,28 +525,28 @@ export class Workbench {
       return { ok: false, message };
     };
     try {
-      this.deps.toast(`Merging ${branch} into origin/${base}…`);
+      this.deps.toast(t('toasts.workbench.mergingToBase', { branch, base }));
       try {
         if ((ws.status?.changed ?? 0) > 0) await this.manager.commitAll(id, titleOfBranch(branch));
       } catch (err) {
-        return warn(`Couldn’t commit what’s left: ${firstLine(err)}`);
+        return warn(t('toasts.workbench.commitLeftFailed', { error: firstLine(err) }));
       }
       let result: Awaited<ReturnType<typeof mergeToBase>>;
       try {
         result = await (this.deps.mergeToBase ?? mergeToBase)(ws.path, branch, base, opts);
       } catch (err) {
-        return this.troubleOr(ws, err, `Couldn’t merge into origin/${base}`);
+        return this.troubleOr(ws, err, t('toasts.workbench.mergeToBaseFailed', { base }));
       }
       this.troubles.delete(id);
       if (!result.ok) {
-        if (result.reason === 'moved') return warn(`Someone pushed to ${base} just now: nothing was pushed, try again`);
+        if (result.reason === 'moved') return warn(t('toasts.workbench.baseMoved', { base }));
         const files = result.files.slice(0, 3).join(', ') + (result.files.length > 3 ? '…' : '');
-        return warn(`${branch} conflicts with origin/${base} (${files}): nothing was pushed. Create a PR, or ask your agent to bring ${base} in first`);
+        return warn(t('toasts.workbench.baseConflicts', { branch, base, files }));
       }
       this.sayMerged(id, { into: base });
       void this.deps.controller.refresh();
       void this.refreshPrs(id);
-      const message = `Merged ${branch} into ${base} on GitHub${result.how === 'fast_forward' ? '' : ' (a merge commit)'}`;
+      const message = result.how === 'fast_forward' ? t('toasts.workbench.mergedToBase', { branch, base }) : t('toasts.workbench.mergedToBaseCommit', { branch, base });
       this.deps.toast(message, 'success');
       return { ok: true, message };
     } finally {
@@ -581,7 +591,7 @@ export class Workbench {
     const again = (https = false): Promise<GitHubOutcome> => {
       if (retry === 'merge_base') return this.mergeToBase(id, https ? { https: true } : {});
       if (retry !== 'none') return this.quickPr(id, { ...(draft ? { draft: true } : {}), ...(retry === 'pr_original' ? { original: true } : {}), ...(https ? { https: true } : {}) });
-      const message = 'GitHub is set up: try it again';
+      const message = t('toasts.workbench.githubSetUp');
       this.deps.toast(message, 'success');
       return Promise.resolve({ ok: true, message });
     };
@@ -593,9 +603,9 @@ export class Workbench {
       case 'use_https': {
         try {
           const { from, to } = await (this.deps.useHttpsRemote ?? useHttpsRemote)(ws.path);
-          this.deps.toast(`origin is ${to} now (it was ${from})`, 'success');
+          this.deps.toast(t('toasts.workbench.originNow', { to, from }), 'success');
         } catch (err) {
-          const message = `Couldn’t switch origin to HTTPS: ${firstLine(err)}`;
+          const message = t('toasts.workbench.httpsFailed', { error: firstLine(err) });
           this.deps.toast(message, 'error');
           return { ok: false, message };
         }
@@ -623,7 +633,7 @@ export class Workbench {
     this.closeTerminal(key);
     const session = this.openSession(key, ws, command);
     if (!session) return { ok: false, message: 'There’s no terminal here to run it in' };
-    this.deps.toast(fix === 'install_gh' ? 'Installing the GitHub CLI in the terminal…' : fix === 'gh_login' ? 'Log in to GitHub in the terminal and your browser…' : 'Follow the steps in the terminal…');
+    this.deps.toast(fix === 'install_gh' ? t('toasts.workbench.installingGh') : fix === 'gh_login' ? t('toasts.workbench.ghLogin') : t('toasts.workbench.followSteps'));
     const code = await new Promise<number | null | 'stopped'>((resolve) => {
       const timer = setTimeout(() => resolve('stopped'), GITHUB_STEP_MS);
       timer.unref?.();
@@ -636,7 +646,7 @@ export class Workbench {
       this.watchExit(key, session, done);
     });
     if (code !== 0) {
-      const message = code === 'stopped' ? 'Stopped waiting for the GitHub step in the terminal' : `The GitHub step in the terminal didn’t finish (exit ${code ?? '?'}): have a look there`;
+      const message = code === 'stopped' ? t('toasts.workbench.githubStepStopped') : t('toasts.workbench.githubStepFailed', { code: code ?? '?' });
       this.deps.toast(message, 'warn');
       return { ok: false, message, ...(trouble ? { trouble } : {}) };
     }
@@ -663,7 +673,7 @@ export class Workbench {
     const session = this.openSession(key, { path: ws?.path ?? os.homedir() }, `${shQuote(claudeCodeCommand())} auth login --${how}`);
     if (!session) return { ok: false, message: 'There’s no terminal here to run it in' };
     this.deps.store.dispatch({ type: 'terminal_name', id: key, name: 'Claude sign-in' });
-    this.deps.toast('Sign in to Claude in your browser…');
+    this.deps.toast(t('toasts.workbench.signInClaude'));
     const code = await new Promise<number | null | 'stopped'>((resolve) => {
       const timer = setTimeout(() => resolve('stopped'), GITHUB_STEP_MS);
       timer.unref?.();
@@ -673,12 +683,12 @@ export class Workbench {
       });
     });
     if (code !== 0) {
-      const message = code === 'stopped' ? 'Stopped waiting for Claude’s sign-in in the terminal' : `Claude’s sign-in didn’t finish (exit ${code ?? '?'}): have a look in the terminal`;
+      const message = code === 'stopped' ? t('toasts.workbench.claudeSignInStopped') : t('toasts.workbench.claudeSignInFailed', { code: code ?? '?' });
       this.deps.toast(message, 'warn');
       return { ok: false, message };
     }
     this.deps.askClaude(CONTINUE_PROMPT, channel);
-    const message = 'Signed in: Claude goes on where it left off';
+    const message = t('toasts.workbench.claudeSignedIn');
     this.deps.toast(message, 'success');
     return { ok: true, message };
   }
@@ -698,7 +708,7 @@ export class Workbench {
     this.deps.controller.open(id);
     const fork = prOnOriginal(this.manager.list.find((p) => p.id === ws.projectId)?.fork, pr);
     this.deps.askClaude(resolvePrConflictsPrompt(pr, this.prBase(ws), fork ? { url: fork.url, branch: fork.branch } : undefined), `ws:${id}`);
-    this.deps.toast(`${this.agent()} is resolving PR #${pr.number}’s conflicts…`);
+    this.deps.toast(t('toasts.workbench.resolvingConflicts', { agent: this.agent(), number: pr.number }));
   }
 
   /**
@@ -720,14 +730,14 @@ export class Workbench {
     const ws = this.worktree(id);
     const pr = this.deps.store.getState().prs[id];
     if (!ws?.branch) return;
-    if (!pr || pr.state !== 'MERGED') return this.deps.toast('Continue After Merge is for a worktree whose pull request merged', 'info');
-    if ((ws.status?.changed ?? 0) > 0) return this.deps.toast(`${ws.name} has uncommitted changes: commit them first`, 'warn');
+    if (!pr || pr.state !== 'MERGED') return this.deps.toast(t('toasts.workbench.continueNeedsMerged'), 'info');
+    if ((ws.status?.changed ?? 0) > 0) return this.deps.toast(t('toasts.workbench.uncommitted', { name: ws.name }), 'warn');
     const base = this.prBase(ws);
     const target = `origin/${base}`;
     try {
       await fetchRemote(ws.path);
     } catch (err) {
-      return this.deps.toast(`Couldn’t fetch ${target}: ${err instanceof Error ? err.message : String(err)}`, 'error');
+      return this.deps.toast(t('toasts.workbench.fetchFailed', { target, error: err instanceof Error ? err.message : String(err) }), 'error');
     }
     const done = await contentIn(ws.path, 'HEAD', target);
     this.manager.setPrDone(id, pr.number, { url: pr.url, into: base, ...(pr.head ? { head: pr.head } : {}) });
@@ -738,16 +748,16 @@ export class Workbench {
       try {
         await resetTo(ws.path, target);
       } catch (err) {
-        return this.deps.toast(`Couldn’t move ${ws.branch} to ${target}: ${err instanceof Error ? err.message : String(err)}`, 'error');
+        return this.deps.toast(t('toasts.workbench.moveFailed', { branch: ws.branch, target, error: err instanceof Error ? err.message : String(err) }), 'error');
       }
       await this.deps.controller.refresh();
-      this.deps.toast(`PR #${pr.number} is done. ${ws.branch} now starts from the latest ${base}: the next change gets a new pull request`, 'success');
+      this.deps.toast(t('toasts.workbench.prDone', { number: pr.number, branch: ws.branch, base }), 'success');
       return;
     }
     await this.deps.controller.refresh();
     this.deps.controller.open(id);
     this.deps.askClaude(catchUpPrompt(pr, base), `ws:${id}`);
-    this.deps.toast(`${ws.branch} has work since PR #${pr.number}: ${this.agent()} is bringing in the latest ${base}`);
+    this.deps.toast(t('toasts.workbench.catchingUp', { branch: ws.branch, number: pr.number, agent: this.agent(), base }));
   }
 
   fixChecks(id: string): void {
@@ -778,9 +788,9 @@ export class Workbench {
       this.deps.toast(message, reason === 'busy' ? 'info' : 'error');
       return { ok: false, reason, message };
     };
-    if (!ws?.branch || !pr) return fail('no_pr', 'This worktree has no pull request to merge yet');
-    if (pr.state !== 'OPEN') return fail('closed', pr.state === 'MERGED' ? `PR #${pr.number} is already merged` : `PR #${pr.number} is closed`);
-    if (this.merging.has(id)) return fail('busy', `PR #${pr.number} is already being merged`);
+    if (!ws?.branch || !pr) return fail('no_pr', t('toasts.workbench.noPrToMerge'));
+    if (pr.state !== 'OPEN') return fail('closed', pr.state === 'MERGED' ? t('toasts.workbench.alreadyMerged', { number: pr.number }) : t('toasts.workbench.prClosed', { number: pr.number }));
+    if (this.merging.has(id)) return fail('busy', t('toasts.workbench.beingMerged', { number: pr.number }));
     this.merging.add(id);
     try {
       // GitHub merges what it has: commits made here since the last push would be left behind, and lost with the worktree. Push them first.
@@ -792,11 +802,10 @@ export class Workbench {
       if (unpushed > 0 || here.carries === false) {
         // Counted as the chip counts them (status.unpushed: main merged in here isn't more work).
         const n = ws.status?.unpushed || unpushed;
-        const commits = n === 0 ? 'the latest commits' : n === 1 ? '1 commit' : `${n} commits`;
-        const them = n === 1 ? 'it' : 'them';
+        const commits = n === 0 ? t('toasts.workbench.latestCommits') : t('toasts.workbench.commits', { count: n });
         // A fork's pull request checked out here (BLG-756): Beluga can't push to it, so merging would leave them out.
-        if (pullOfBranch(ws.path, ws.branch) !== undefined) return fail('unpushed', `PR #${pr.number} is from someone’s fork, so Beluga can’t push ${commits} here to it, and merging it would leave ${them} out. Suggest ${them} on the PR, or open a PR of your own`);
-        this.deps.toast(`Pushing ${commits} to ${ws.branch} before merging PR #${pr.number}…`);
+        if (pullOfBranch(ws.path, ws.branch) !== undefined) return fail('unpushed', t('toasts.workbench.forkCantMerge', { count: n, number: pr.number, commits }));
+        this.deps.toast(t('toasts.workbench.pushingBeforeMerge', { commits, branch: ws.branch, number: pr.number }));
         try {
           await (this.deps.pushForPr ?? pushForPr)(ws.path, ws.branch);
         } catch (err) {
@@ -805,7 +814,7 @@ export class Workbench {
             this.deps.toast(trouble.title, 'warn');
             return { ok: false, reason: 'github', message: troubleLine(trouble), trouble };
           }
-          return fail('unpushed', `Couldn’t push ${commits} in ${ws.name}, so PR #${pr.number} isn’t merged (it would leave ${them} out): ${firstLine(err)}`);
+          return fail('unpushed', t('toasts.workbench.pushBeforeMergeFailed', { count: n, commits, name: ws.name, number: pr.number, error: firstLine(err) }));
         }
         this.troubles.delete(id);
         this.pushedAt.set(id, this.now());
@@ -814,7 +823,7 @@ export class Workbench {
         if (fromWait) {
           this.manager.setMergeWait(ws.id, { number: pr.number, method: opts.method, since: this.now(), ...(opts.deleteBranch ? { deleteBranch: true } : {}), ...(here.head ? { head: here.head } : {}) });
           await this.deps.controller.refresh();
-          const message = `Pushed ${commits} to PR #${pr.number}: it merges once their checks pass`;
+          const message = t('toasts.workbench.pushedWaiting', { commits, number: pr.number });
           this.deps.toast(message, 'success');
           return { ok: true, result: 'queued', message };
         }
@@ -832,7 +841,7 @@ export class Workbench {
         // GitHub may know more now (a conflict, a review): show it.
         await this.refreshPrs(id);
         // Skipping the checks is an admin's right: without it GitHub says forbidden or blocked.
-        if (opts.admin && (problem.reason === 'permission' || problem.reason === 'blocked')) return fail(problem.reason, 'Merging past the checks needs admin rights on this repository. Wait for the checks, or use “Merge When Checks Pass”.');
+        if (opts.admin && (problem.reason === 'permission' || problem.reason === 'blocked')) return fail(problem.reason, t('toasts.workbench.needsAdmin'));
         return fail(problem.reason, problem.message);
       }
       // You merged it: no "was merged" notification on top.
@@ -840,9 +849,9 @@ export class Workbench {
       await this.refreshPrs(id);
       const merged = this.deps.store.getState().prs[id]?.state === 'MERGED';
       if (merged && opts.deleteBranch) {
-        await (this.deps.deleteRemoteBranch ?? deleteRemoteBranch)(ws.path, ws.branch).catch((err: unknown) => this.deps.toast(`Merged, but the branch on GitHub wasn’t deleted: ${err instanceof Error ? err.message : String(err)}`, 'warn'));
+        await (this.deps.deleteRemoteBranch ?? deleteRemoteBranch)(ws.path, ws.branch).catch((err: unknown) => this.deps.toast(t('toasts.workbench.branchNotDeleted', { error: err instanceof Error ? err.message : String(err) }), 'warn'));
       }
-      const message = merged ? `Merged PR #${pr.number}` : opts.auto ? `PR #${pr.number} merges when its checks pass` : `PR #${pr.number} is queued to merge`;
+      const message = merged ? t('toasts.workbench.mergedPr', { number: pr.number }) : opts.auto ? t('toasts.workbench.mergesWhenChecks', { number: pr.number }) : t('toasts.workbench.queuedToMerge', { number: pr.number });
       this.deps.toast(message, 'success');
       return { ok: true, result: merged ? 'merged' : 'queued', message };
     } finally {
@@ -857,7 +866,7 @@ export class Workbench {
   private async mergeWhenReady(ws: Workspace, pr: PullRequest, opts: MergeOptions, pushed?: string): Promise<MergeOutcome> {
     this.manager.setMergeWait(ws.id, { number: pr.number, method: opts.method, since: this.now(), ...(opts.deleteBranch ? { deleteBranch: true } : {}), ...(pushed ? { head: pushed } : {}) });
     await this.deps.controller.refresh();
-    const message = `PR #${pr.number} merges once its checks pass`;
+    const message = t('toasts.workbench.mergesOnceChecks', { number: pr.number });
     this.deps.toast(message, 'success');
     // Maybe they already have: look now.
     await this.refreshPrs(ws.id);
@@ -875,14 +884,14 @@ export class Workbench {
       try {
         await (this.deps.disableAutoMerge ?? disableAutoMerge)(ws.path, pr.number);
       } catch (err) {
-        const message = `GitHub didn’t turn off auto-merge: ${firstLine(err)}`;
+        const message = t('toasts.workbench.autoMergeOffFailed', { error: firstLine(err) });
         this.deps.toast(message, 'error');
         return { ok: false, message };
       }
       await this.refreshPrs(id);
     }
     await this.deps.controller.refresh();
-    const message = pr ? `PR #${pr.number} won’t merge by itself` : 'Not waiting to merge anymore';
+    const message = pr ? t('toasts.workbench.wontMergeItself', { number: pr.number }) : t('toasts.workbench.notWaiting');
     this.deps.toast(message, 'success');
     return { ok: true, message };
   }
@@ -921,12 +930,12 @@ export class Workbench {
     // A head it can't place (someone pushed on top) isn't waited on: the merge itself checks again.
     if (wait.head && pr.head && pr.head !== wait.head && (await (this.deps.headCarries ?? headCarries)(ws.path, pr.head)).carries === false) {
       if (this.now() - wait.since < PUSHED_HEAD_WAIT_MS) return;
-      return stop(`PR #${pr.number} still doesn’t have the commits pushed for it: not merging it`);
+      return stop(t('toasts.workbench.stopMissingCommits', { number: pr.number }));
     }
-    if (pr.conflicts) return stop(`PR #${pr.number} conflicts with its base: not merging it`);
-    if (pr.checks === 'failing') return stop(`Checks failed on PR #${pr.number}: not merging it`);
-    if (pr.review === 'CHANGES_REQUESTED') return stop(`Changes were requested on PR #${pr.number}: not merging it`);
-    if (pr.draft) return stop(`PR #${pr.number} is a draft: mark it ready, then merge`);
+    if (pr.conflicts) return stop(t('toasts.workbench.stopConflicts', { number: pr.number }));
+    if (pr.checks === 'failing') return stop(t('toasts.workbench.stopChecks', { number: pr.number }));
+    if (pr.review === 'CHANGES_REQUESTED') return stop(t('toasts.workbench.stopChanges', { number: pr.number }));
+    if (pr.draft) return stop(t('toasts.workbench.stopDraft', { number: pr.number }));
     if (pr.checks === 'pending') return;
     if (pr.checks === 'none' && this.now() - wait.since < NO_CHECKS_GRACE_MS) return;
     // Waiting on a review, or the branch's rules: those can pass later.
@@ -944,17 +953,17 @@ export class Workbench {
     const ws = this.worktree(id);
     const pr = this.deps.store.getState().prs[id];
     if (!ws || !pr || pr.state !== 'OPEN') {
-      this.deps.toast('This worktree has no open pull request', 'error');
+      this.deps.toast(t('toasts.workbench.noOpenPr'), 'error');
       return { ok: false, message: 'This worktree has no open pull request' };
     }
     try {
       await (this.deps.prStep ?? prStep)(ws.path, pr.number, step);
     } catch (err) {
-      return this.troubleOr(ws, err, `GitHub didn’t ${step === 'ready' ? 'mark it ready' : 'update the branch'}`);
+      return this.troubleOr(ws, err, step === 'ready' ? t('toasts.workbench.readyFailed') : t('toasts.workbench.updateBranchFailed'));
     }
     if (step === 'update_branch') this.pushedAt.set(id, this.now());
     await this.refreshPrs(id);
-    const message = step === 'ready' ? `PR #${pr.number} is ready for review` : `PR #${pr.number} has the latest ${(ws.base ?? 'base').replace(/^origin\//, '')} now`;
+    const message = step === 'ready' ? t('toasts.workbench.readyForReview', { number: pr.number }) : t('toasts.workbench.hasLatest', { number: pr.number, base: (ws.base ?? 'base').replace(/^origin\//, '') });
     this.deps.toast(message, 'success');
     return { ok: true, message };
   }
@@ -973,7 +982,7 @@ export class Workbench {
     // origin wouldn't reach the PR, and would stop the branch following refs/pull/<n>/head.
     const pull = pullOfBranch(ws.path, ws.branch);
     if (pull !== undefined) {
-      const message = `PR #${pull} is from someone’s fork: Beluga can’t push to it, so your commits stay here. Suggest them on the PR, or open a PR of your own`;
+      const message = t('toasts.workbench.forkCantPush', { number: pull });
       this.deps.toast(message, 'info');
       return { ok: false, message };
     }
@@ -981,7 +990,7 @@ export class Workbench {
     try {
       await (this.deps.pushForPr ?? pushForPr)(ws.path, ws.branch);
     } catch (err) {
-      return this.troubleOr(ws, err, `Couldn’t push ${ws.branch}`);
+      return this.troubleOr(ws, err, t('toasts.workbench.pushFailed', { branch: ws.branch }));
     } finally {
       this.creatingPr.delete(id);
     }
@@ -989,7 +998,7 @@ export class Workbench {
     this.pushedAt.set(id, this.now());
     await this.deps.controller.refresh();
     await this.refreshPrs(id);
-    const message = pr?.state === 'OPEN' ? `Pushed ${ws.branch}: PR #${pr.number}’s checks run again` : `Pushed ${ws.branch}`;
+    const message = pr?.state === 'OPEN' ? t('toasts.workbench.pushedChecks', { branch: ws.branch, number: pr.number }) : t('toasts.workbench.pushed', { branch: ws.branch });
     this.deps.toast(message, 'success');
     return { ok: true, message };
   }
@@ -1001,19 +1010,19 @@ export class Workbench {
     if (!ws || !pr || pr.state !== 'OPEN') return { ok: false, message: 'This worktree has no open pull request' };
     const runs = failedRunIds(pr);
     if (!runs.length) {
-      const message = `None of PR #${pr.number}’s failed checks are GitHub Actions runs Beluga can start again: open the PR to re-run them`;
+      const message = t('toasts.workbench.noRerunnable', { number: pr.number });
       this.deps.toast(message, 'info');
       return { ok: false, message };
     }
     try {
       for (const run of runs) await (this.deps.rerunFailed ?? rerunFailed)(ws.path, run);
     } catch (err) {
-      return this.troubleOr(ws, err, 'GitHub didn’t re-run the checks');
+      return this.troubleOr(ws, err, t('toasts.workbench.rerunFailed'));
     }
     // Looked at often again, as after a push: the checks show as running soon.
     this.pushedAt.set(id, this.now());
     await this.refreshPrs(id);
-    const message = `PR #${pr.number}’s failed checks are running again`;
+    const message = t('toasts.workbench.rerunning', { number: pr.number });
     this.deps.toast(message, 'success');
     return { ok: true, message };
   }
@@ -1044,7 +1053,7 @@ export class Workbench {
     try {
       await (this.deps.postOnPr ?? postOnPr)(ws.path, pr.number, post);
     } catch (err) {
-      return this.troubleOr(ws, err, post.kind === 'resolve' ? 'GitHub didn’t resolve it' : post.kind === 'unresolve' ? 'GitHub didn’t open it again' : 'GitHub didn’t post it');
+      return this.troubleOr(ws, err, post.kind === 'resolve' ? t('toasts.workbench.resolveFailed') : post.kind === 'unresolve' ? t('toasts.workbench.unresolveFailed') : t('toasts.workbench.postFailed'));
     }
     const message = post.kind === 'resolve' ? 'Resolved' : post.kind === 'unresolve' ? 'Opened again' : post.kind === 'reply' ? 'Replied on GitHub' : `Commented on PR #${pr.number}`;
     return { ok: true, message };
@@ -1059,7 +1068,7 @@ export class Workbench {
       const got = await this.prConversation(id);
       thread = got.ok ? got.conversation.threads.find((t) => t.id === threadId) : undefined;
       if (!thread) {
-        this.deps.toast('That comment isn’t on GitHub anymore', 'warn');
+        this.deps.toast(t('toasts.workbench.commentGone'), 'warn');
         return;
       }
     }
@@ -1256,7 +1265,7 @@ export class Workbench {
     const file = ensurePrPromptFile();
     const opened = (): void => {
       this.deps.store.dispatch({ type: 'pr_custom', custom: true });
-      this.deps.toast(`Opened ${tilde(file)}. Save it; the next PR uses it`, 'success');
+      this.deps.toast(t('toasts.workbench.openedPrPrompt', { file: tilde(file) }), 'success');
     };
     // The system's own way to open it: when there's no editor to start, or yours didn't start.
     const openHere = (): void => {
@@ -1289,7 +1298,7 @@ export class Workbench {
   resetPrPrompt(): void {
     resetPrPrompt();
     this.deps.store.dispatch({ type: 'pr_custom', custom: false });
-    this.deps.toast('Pull requests use the built-in instructions again', 'success');
+    this.deps.toast(t('toasts.workbench.prPromptReset'), 'success');
   }
 
   // ------------------------------------------------------- terminal & scripts
@@ -1459,17 +1468,17 @@ export class Workbench {
     const setup = project ? this.manager.scripts(project.id).setup : undefined;
     const command = setup?.command;
     if (!ws || !project || !command) {
-      if (!auto) this.deps.toast('This project has no setup command. Set one in its ⋯ menu', 'warn');
+      if (!auto) this.deps.toast(t('toasts.workbench.noSetup'), 'warn');
       return;
     }
     if (!this.deps.terminals) return;
     const fit = checkSetup(ws.path, command);
     if (fit.kind === 'skip') {
-      this.learnSetup(project.id, { none: true }, `No setup for ${project.name}: ${fit.reason}. New worktrees skip it from now on`);
+      this.learnSetup(project.id, { none: true }, t('toasts.workbench.setupSkipped', { project: project.name, reason: fit.reason }));
       return;
     }
     if (fit.kind === 'swap') {
-      this.learnSetup(project.id, { command: fit.command }, `Setup for ${project.name} is now \`${fit.command}\`: ${fit.reason}`);
+      this.learnSetup(project.id, { command: fit.command }, t('toasts.workbench.setupNowWhy', { project: project.name, command: fit.command, why: fit.reason }));
       return this.startSetup(ws, fit.command);
     }
     const fromRepo = setup.source === 'beluga.json' || setup.source === 'klaud.json' || setup.source === 'conductor.json';
@@ -1486,7 +1495,7 @@ export class Workbench {
         this.askingSetup.set(key, asking);
       }
       void asking.then((answer) => {
-        if (answer === 'no') return void this.deps.toast('Setup skipped. Run it any time from the Terminal tab');
+        if (answer === 'no') return void this.deps.toast(t('toasts.workbench.setupDeclined'));
         if (answer === 'always') this.manager.approveScript(project.id, command);
         this.startSetup(ws, command);
       });
@@ -1502,7 +1511,7 @@ export class Workbench {
       void this.deps.controller.refresh();
       this.deps.toast(note, 'success');
     } catch (err) {
-      this.deps.toast(`Couldn't remember the setup: ${err instanceof Error ? err.message : String(err)}`, 'error');
+      this.deps.toast(t('toasts.workbench.rememberSetupFailed', { error: err instanceof Error ? err.message : String(err) }), 'error');
     }
   }
 
@@ -1517,11 +1526,11 @@ export class Workbench {
     const session = this.openSession(setupId(wsId), ws, clonedSetup(command, ws.path, sources) ?? command);
     if (!session) return;
     this.deps.store.dispatch({ type: 'setup', id: wsId, run: { status: 'running', command } });
-    this.deps.toast(`Setting up ${ws.name}: ${command}`);
+    this.deps.toast(t('toasts.workbench.settingUp', { name: ws.name, command }));
     this.watchExit(setupId(wsId), session, (code) => {
       if (code === 0) {
         this.deps.store.dispatch({ type: 'setup', id: wsId, run: { status: 'done', command } });
-        this.deps.toast(`${ws.name} is set up`, 'success');
+        this.deps.toast(t('toasts.workbench.setUp', { name: ws.name }), 'success');
         return;
       }
       if (learn && this.deps.fixSetup) return void this.retrySetup(ws, command, code, session.backlog());
@@ -1559,13 +1568,13 @@ export class Workbench {
   private async fixFailed(ws: Workspace, kind: 'setup' | 'run', command: string, code: number | null, output: string): Promise<void> {
     if (!this.manager.find(ws.id)) return;
     if (kind === 'run' && this.deps.fixRun) {
-      this.deps.toast(`Looking at why the run failed in ${ws.name}…`);
+      this.deps.toast(t('toasts.workbench.runFailedLooking', { name: ws.name }));
       const fix = await this.deps.fixRun(ws.path, command, output);
       const project = this.manager.find(ws.id) && this.manager.list.find((p) => p.id === ws.projectId);
       if (!project) return;
       if (fix && 'command' in fix && fix.command !== command) {
         this.remember(project.id, { run: fix.command }, ['run']);
-        this.deps.toast(`Run for ${project.name} is now \`${fix.command}\` (\`${command}\` failed)`, 'success');
+        this.deps.toast(t('toasts.workbench.runNow', { project: project.name, command: fix.command, failed: command }), 'success');
         this.closeTerminal(runId(ws.id));
         this.run(ws.id);
         return;
@@ -1585,15 +1594,15 @@ export class Workbench {
 
   /** Setup failed: ask what it should be, remember the answer, and run that (once). */
   private async retrySetup(ws: Workspace, command: string, code: number | null, output: string): Promise<void> {
-    this.deps.toast(`Setup failed in ${ws.name}. Looking for the right one…`);
+    this.deps.toast(t('toasts.workbench.setupFailedLooking', { name: ws.name }));
     const fix = await this.deps.fixSetup!(ws.path, command, output);
     const project = this.manager.find(ws.id) && this.manager.list.find((p) => p.id === ws.projectId);
     if (!project || !fix || ('command' in fix && fix.command === command)) return this.setupFailed(ws, command, code, output);
     if ('none' in fix) {
       this.deps.store.dispatch({ type: 'setup', id: ws.id });
-      return this.learnSetup(project.id, fix, `${project.name} needs no setup. New worktrees skip it from now on`);
+      return this.learnSetup(project.id, fix, t('toasts.workbench.needsNoSetup', { project: project.name }));
     }
-    this.learnSetup(project.id, fix, `Setup for ${project.name} is now \`${fix.command}\` (\`${command}\` failed)`);
+    this.learnSetup(project.id, fix, t('toasts.workbench.setupNow', { project: project.name, command: fix.command, failed: command }));
     this.startSetup(ws, fix.command, false);
   }
 
@@ -1647,7 +1656,7 @@ export class Workbench {
     if (!want.setup && !want.run) return undefined;
     const asked = this.deps.workOutScripts(dir, { ...want, ...(system ? { system } : {}) });
     if (!asked) return undefined;
-    this.deps.toast(`Working out how to ${want.setup && want.run ? 'set up and run' : want.setup ? 'set up' : 'run'} ${project.name}…`);
+    this.deps.toast(want.setup && want.run ? t('toasts.workbench.workingOutBoth', { project: project.name }) : want.setup ? t('toasts.workbench.workingOutSetup', { project: project.name }) : t('toasts.workbench.workingOutRun', { project: project.name }));
     const done = asked
       .then((found) => {
         // No answer (Claude couldn't): the next new worktree tries again.
@@ -1660,19 +1669,19 @@ export class Workbench {
         const setup = guessed && found.setup && ('none' in found.setup || found.setup.command === guessed) ? undefined : found.setup;
         if (setup && 'none' in setup) {
           learned.skipSetup = true;
-          said.push('no setup needed');
+          said.push(t('toasts.workbench.saidNoSetup'));
         } else if (setup) {
           learned.setup = setup.command;
           mine.push('setup');
-          said.push(`setup \`${setup.command}\``);
+          said.push(t('toasts.workbench.saidSetup', { command: setup.command }));
         }
         if (found.run && 'command' in found.run) {
           learned.run = found.run.command;
           mine.push('run');
-          said.push(`run \`${found.run.command}\``);
-        } else if (found.run) said.push('nothing to run');
+          said.push(t('toasts.workbench.saidRun', { command: found.run.command }));
+        } else if (found.run) said.push(t('toasts.workbench.saidNothing'));
         this.remember(project.id, learned, mine);
-        if (said.length) this.deps.toast(`${project.name}: ${said.join(', ')}. Change them in its ⋯ menu (Setup and run commands)`, 'success');
+        if (said.length) this.deps.toast(t('toasts.workbench.workedOut', { project: project.name, found: said.join(', ') }), 'success');
       })
       .catch(() => undefined)
       .finally(() => this.workingOut.delete(project.id));
@@ -1687,7 +1696,7 @@ export class Workbench {
   onWorktreeRestored(ws: Workspace, remake: readonly string[]): void {
     const project = this.manager.list.find((p) => p.id === ws.projectId);
     if (project?.scripts?.setup?.command) return this.runSetup(ws.id, true);
-    if (remake.length) this.deps.toast(`Restored. Its dependencies and builds were cleared when it was archived: run ${remake.map((r) => `\`${r}\``).join(', then ')} to make them again`, 'info');
+    if (remake.length) this.deps.toast(t('toasts.workbench.restoredRemake', { commands: remake.map((r) => `\`${r}\``).join(t('toasts.workbench.thenJoin')) }), 'info');
   }
 
   /**
@@ -1704,11 +1713,11 @@ export class Workbench {
       if (looking && ws) {
         void looking.then(() => {
           if (this.manager.find(wsId) && project && this.manager.scripts(project.id).run) this.run(wsId);
-          else this.deps.toast(`${this.agent()} couldn't find a way to run this project. Set one in its ⋯ menu (Setup and run commands)`, 'warn');
+          else this.deps.toast(t('toasts.workbench.noRunFound', { agent: this.agent() }), 'warn');
         });
         return undefined;
       }
-      this.deps.toast("This project has no run command. Set one in its ⋯ menu (Setup and run commands)", 'warn');
+      this.deps.toast(t('toasts.workbench.noRun'), 'warn');
       return undefined;
     }
     const current = this.deps.terminals?.get(runId(wsId));
@@ -1746,9 +1755,10 @@ export class Workbench {
         this.manager.setScripts(projectId, { [kind]: undefined, ...learned });
       } else this.manager.setScripts(projectId, { [kind]: value, ...learned });
       void this.deps.controller.refresh();
-      const label = kind === 'setup' ? 'Setup' : 'Run';
       const root = this.manager.list.find((x) => x.id === projectId)?.root;
-      this.deps.toast(value ? `${label}: ${value}${team ? ` (saved to ${root ? projectFileName(root) : PROJECT_FILES[0]})` : ''}` : `${label} command cleared`, 'success');
+      const file = root ? projectFileName(root) : PROJECT_FILES[0];
+      const setup = kind === 'setup';
+      this.deps.toast(value ? (team ? t(setup ? 'toasts.workbench.setupSetTeam' : 'toasts.workbench.runSetTeam', { command: value, file }) : t(setup ? 'toasts.workbench.setupSet' : 'toasts.workbench.runSet', { command: value })) : t(setup ? 'toasts.workbench.setupCleared' : 'toasts.workbench.runCleared'), 'success');
     } catch (err) {
       this.deps.toast(err instanceof Error ? err.message : String(err), 'error');
     }
@@ -1772,7 +1782,7 @@ export class Workbench {
         if (!this.manager.list.some((p) => p.id === project.id)) return 'That project is gone.';
         if (value === this.manager.scripts(project.id).setup?.command) return `The setup is already \`${value}\`.`;
         this.remember(project.id, { setup: value, skipSetup: undefined }, ['setup']);
-        this.deps.toast(`Setup for ${project.name} is now \`${value}\`: ${why}`, 'success');
+        this.deps.toast(t('toasts.workbench.setupNowWhy', { project: project.name, command: value, why }), 'success');
         return `Saved: new worktrees of ${project.name} run \`${value}\` (the owner approves it once the first time it runs by itself).`;
       },
     };
@@ -1784,22 +1794,29 @@ export class Workbench {
     if (!p?.scripts) return;
     this.manager.setScripts(projectId, { setup: p.scripts.setup?.command, run: p.scripts.run?.command }, { inRepo: true });
     void this.deps.controller.refresh();
-    this.deps.toast(`Saved to ${p.name}/${projectFileName(p.root)}. Commit it to share it`, 'success');
+    this.deps.toast(t('toasts.workbench.savedToRepo', { path: `${p.name}/${projectFileName(p.root)}` }), 'success');
   }
 
   // ------------------------------------------------------- usage & space
 
   /** Claude reported tokens and cost for a run in a workspace. */
-  onUsage(channel: string, json: string): void {
+  /** A run's usage report, added to its workspace. → what it added (tokens and cost), for the run's card; undefined: not a workspace's, or not usage. */
+  onUsage(channel: string, json: string): { readonly tokens: number; readonly cost: number } | undefined {
     const id = channel.startsWith('ws:') ? channel.slice(3) : undefined;
-    if (!id) return;
+    if (!id) return undefined;
     try {
       const u = JSON.parse(json) as { input?: number; output?: number; cacheRead?: number; cacheWrite?: number; cost?: number; session?: string; free?: boolean; tps?: number };
       const num = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : 0);
-      this.manager.addUsage(id, { input: num(u.input), output: num(u.output), cacheRead: num(u.cacheRead), cacheWrite: num(u.cacheWrite), cost: num(u.cost), session: typeof u.session === 'string' ? u.session : undefined, ...(u.free === true ? { free: true, ...(num(u.tps) ? { tps: num(u.tps) } : {}) } : {}) });
+      const before = this.manager.find(id)?.usage;
+      const after = this.manager.addUsage(id, { input: num(u.input), output: num(u.output), cacheRead: num(u.cacheRead), cacheWrite: num(u.cacheWrite), cost: num(u.cost), session: typeof u.session === 'string' ? u.session : undefined, ...(u.free === true ? { free: true, ...(num(u.tps) ? { tps: num(u.tps) } : {}) } : {}) });
       void this.deps.controller.refresh();
+      if (!after) return undefined;
+      // The growth: the reports are running totals per conversation (manager.addUsage works it out).
+      const total = (x: { input: number; output: number; cacheWrite: number } | undefined): number => (x ? x.input + x.output + x.cacheWrite : 0);
+      return { tokens: Math.max(0, total(after) - total(before)), cost: Math.max(0, after.cost - (before?.cost ?? 0)) };
     } catch {
       // Not usage we understand.
+      return undefined;
     }
   }
 
@@ -1850,7 +1867,7 @@ export class Workbench {
   async agentSignIn(id: string): Promise<boolean> {
     const command = await this.deps.signInCommand?.(id);
     if (!command || !this.deps.open) {
-      this.deps.toast('Signing in from here isn’t available. Run its sign-in in Terminal.', 'warn');
+      this.deps.toast(t('toasts.workbench.signInUnavailable'), 'warn');
       return false;
     }
     const file = path.join(os.tmpdir(), `beluga-sign-in-${id.replace(/[^\w-]/g, '')}.command`);
@@ -1959,16 +1976,16 @@ export class Workbench {
     const name = at > 0 ? text.slice(0, at).trim() : text.trim().split(/\s+/).slice(0, 4).join(' ');
     const prompt = at > 0 ? text.slice(at + 1).trim() : text.trim();
     if (!name || !prompt) {
-      this.deps.toast('Usage: /template save <name>: <what the agent should do>', 'warn');
+      this.deps.toast(t('toasts.workbench.templateUsage'), 'warn');
       return;
     }
     this.deps.store.dispatch({ type: 'templates', templates: addTemplate(name, prompt, plan) });
-    this.deps.toast(`Template "${name}" saved. It shows up when you start a worktree or chat`, 'success');
+    this.deps.toast(t('toasts.workbench.templateSaved', { name }), 'success');
   }
 
   removeTemplate(id: string): void {
     this.deps.store.dispatch({ type: 'templates', templates: removeTemplate(id) });
-    this.deps.toast('Template removed', 'success');
+    this.deps.toast(t('toasts.workbench.templateRemoved'), 'success');
   }
 
 }

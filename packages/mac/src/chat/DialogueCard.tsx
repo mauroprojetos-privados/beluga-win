@@ -4,6 +4,7 @@ import { type DialogueAction, dialogueHeader } from '@beluga/core/dialogues/view
 import { Icon } from '../components/Icon.js';
 import { Button, cx } from '../components/ui.js';
 import { toast, useApi, useApp, useBeluga } from '../lib/beluga.js';
+import { useT } from '../lib/i18n.js';
 import s from './dialogue.module.css';
 
 export type DialogueItem = Extract<LogItem, { type: 'system' }> & { readonly dialogue: { readonly id: string } };
@@ -20,6 +21,7 @@ const errorText = (err: unknown): string => (err instanceof Error ? err.message 
 export const DialogueCard = memo(function DialogueCard({ item }: { item: DialogueItem }) {
   const api = useApi();
   const { client } = useBeluga();
+  const t = useT();
   const dialogue = useApp((st) => st.dialogues[item.dialogue.id]);
   const [turns, setTurns] = useState<string>('');
   const [budget, setBudget] = useState<string>('');
@@ -37,7 +39,7 @@ export const DialogueCard = memo(function DialogueCard({ item }: { item: Dialogu
     call.catch((err: unknown) => toast(client, errorText(err), 'error'));
   };
   return (
-    <div className={cx(s.card, s[h.tone])} data-dialogue={dialogue.id} data-dialogue-status={dialogue.status} role="group" aria-label={`Dialogue: ${h.topic}`}>
+    <div className={cx(s.card, s[h.tone])} data-dialogue={dialogue.id} data-dialogue-status={dialogue.status} role="group" aria-label={t('chat.dialogue.aria', { topic: h.topic })}>
       <div className={s.head}>
         <Icon name="people" size={14} />
         <span className={s.mode}>{h.mode}</span>
@@ -53,13 +55,13 @@ export const DialogueCard = memo(function DialogueCard({ item }: { item: Dialogu
         <div className={s.caps}>
           {dialogue.mode === 'cross-reference' ? null : (
             <label>
-              Turns
+              {t('chat.dialogue.turns')}
               <input type="number" min={1} max={200} placeholder={String(dialogue.turnCap)} value={turns} onChange={(e) => setTurns(e.target.value)} />
             </label>
           )}
           <label>
-            Budget (k tokens)
-            <input type="number" min={1} placeholder={dialogue.budget ? String(Math.round(dialogue.budget / 1000)) : 'none'} value={budget} onChange={(e) => setBudget(e.target.value)} />
+            {t('chat.dialogue.budget')}
+            <input type="number" min={1} placeholder={dialogue.budget ? String(Math.round(dialogue.budget / 1000)) : t('chat.dialogue.none')} value={budget} onChange={(e) => setBudget(e.target.value)} />
           </label>
         </div>
       ) : null}
@@ -67,7 +69,7 @@ export const DialogueCard = memo(function DialogueCard({ item }: { item: Dialogu
         <div className={s.actions}>
           {h.actions.map((a, i) => (
             <Button key={a} size="small" variant={i === 0 && a !== 'stop' ? 'primary' : 'quiet'} icon={a === 'stop' || a === 'cancel' ? 'stop' : 'play'} onClick={() => run(a)} data-dialogue-action={a}>
-              {a === 'start' ? 'Start' : a === 'cancel' ? 'Cancel' : a === 'continue' ? 'Continue' : 'Stop'}
+              {a === 'start' ? t('chat.dialogue.start') : a === 'cancel' ? t('common.cancel') : a === 'continue' ? t('chat.items.continue') : t('common.stop')}
             </Button>
           ))}
         </div>

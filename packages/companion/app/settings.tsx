@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 import { router, useFocusEffect } from 'expo-router';
-import { ArrowDownToLine, AtSign, Bell, Cable, RefreshCw, Search, TriangleAlert, ChevronDown, ChevronUp, CircleCheck, Download, Hand, HardDrive, Info, LogOut, Mic, Monitor, MonitorSmartphone, Moon, MoonStar, Network, ShieldCheck, SlidersHorizontal, Smartphone, Sun } from 'lucide-react-native';
+import { ArrowDownToLine, AtSign, Bell, Cable, Route, RefreshCw, Search, TriangleAlert, ChevronDown, ChevronUp, CircleCheck, Download, Hand, HardDrive, Info, LogOut, Mic, Monitor, MonitorSmartphone, Moon, MoonStar, Network, ShieldCheck, SlidersHorizontal, Smartphone, Sun } from 'lucide-react-native';
 import { Segments } from '../components/Segments';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState, Platform, ScrollView, Switch, View } from 'react-native';
@@ -9,6 +9,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Header, Screen, useScrolled } from '../components/Screen';
 import { Card, haptic, Pill, Row, T } from '../components/ui';
 import { appearance, type Choice } from '../lib/appearance';
+import { language, macLanguage, type PhoneLanguage, useT } from '../lib/language';
+import { LOCALE_NAMES } from '../../../src/shared/i18n/locales';
 import { useLink, useSupports, useView } from '../lib/hooks';
 import { calls } from '../lib/link/calls';
 import type { HomeView } from '../lib/link/protocol';
@@ -40,12 +42,16 @@ export default function Settings() {
   const insets = useSafeAreaInsets();
   const link = useLink();
   const supportsAgents = useSupports('externalAgents');
+  const supportsRouting = useSupports('routing');
   const [p, setP] = useState<NotifyPrefs>(prefs());
   const [perm, setPerm] = useState<string>('');
   const [asleep, setAsleep] = useState(store.demo?.sleeping ?? false);
   const [confirm, setConfirm] = useState(false);
   const [advanced, setAdvanced] = useState(false);
   const [look, setLook] = useState<Choice>(appearance.get());
+  const t = useT();
+  const [lang, setLang] = useState<PhoneLanguage>(language.get());
+  const macSays = macLanguage();
   const saved = useSaved();
   const home = useView<HomeView>('home');
   const [stay, setStayOn] = useState(stayOn());
@@ -120,7 +126,7 @@ export default function Settings() {
     setAwake(mode);
     void store.call(calls.keepAwake(mode), { queue: false }).catch(() => {
       setAwake(undefined);
-      store.toast({ text: 'Your Mac is away: change this when it’s linked.', tone: 'warn' });
+      store.toast({ text: t('phoneApp.settings.awayChange'), tone: 'warn' });
     });
   };
   useEffect(() => {
@@ -142,16 +148,16 @@ export default function Settings() {
 
   return (
     <Screen>
-      <Header scrolled={scrolled} back title="Settings" />
+      <Header scrolled={scrolled} back title={t('common.settings')} />
       <ScrollView onScroll={onScroll} scrollEventThrottle={32} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 40, gap: 20 }}>
         <Animated.View entering={FadeIn.duration(300)}>
           <Card>
-            <Row first Icon={Monitor} tone="mint" label={link.mac?.name ?? link.pairing?.macName ?? 'Your Mac'} sub={link.mode === 'demo' ? 'Demo Mac' : `Beluga ${link.mac?.version ?? ''}`} right={<Pill label={link.phase === 'open' ? 'Linked' : link.phase === 'asleep' ? 'Asleep' : 'Away'} tone={link.phase === 'open' ? 'mint' : 'sky'} />} />
+            <Row first Icon={Monitor} tone="mint" label={link.mac?.name ?? link.pairing?.macName ?? t('phone.home.yourMac')} sub={link.mode === 'demo' ? t('phoneApp.settings.demoMac') : t('phoneApp.settings.belugaVersion', { version: link.mac?.version ?? '' })} right={<Pill label={link.phase === 'open' ? t('phone.home.linked') : link.phase === 'asleep' ? t('phone.home.asleep') : t('phone.home.away')} tone={link.phase === 'open' ? 'mint' : 'sky'} />} />
             <Row
               Icon={Bell}
               tone="butter"
-              label="Notifications"
-              sub={perm === 'denied' ? 'Off in Android settings: tap to turn them on' : undefined}
+              label={t('phoneApp.settings.notifications')}
+              sub={perm === 'denied' ? t('phoneApp.settings.notificationsOff') : undefined}
               right={toggle(all && perm !== 'denied', () => {})}
               // Off in Android: the switch takes you there (lib/notifications.ts), whatever the app's own choice.
               onPress={() => (perm === 'denied' ? void permission(true).then(setPerm) : save({ needsYou: !all, done: !all, mentions: !all }))}
@@ -161,8 +167,8 @@ export default function Settings() {
               <Row
                 Icon={Cable}
                 tone="lavender"
-                label="Stay connected"
-                sub={stay ? 'Tells you when your agent finishes or needs you, screen off too' : 'Notifications with the app closed. Uses a little battery'}
+                label={t('phoneApp.settings.stay')}
+                sub={stay ? t('phoneApp.settings.stayOnSub') : t('phoneApp.settings.stayOffSub')}
                 right={toggle(stay, () => {})}
                 onPress={toggleStay}
                 chevron={false}
@@ -172,8 +178,8 @@ export default function Settings() {
               <Row
                 Icon={TriangleAlert}
                 tone="butter"
-                label="Let it run in the background"
-                sub="Android’s battery saver may cut the link off. Allow Beluga to fix it."
+                label={t('phoneApp.settings.background')}
+                sub={t('phoneApp.settings.backgroundSub')}
                 onPress={askBatteryUnrestricted}
               />
             ) : null}
@@ -182,8 +188,8 @@ export default function Settings() {
               <Row
                 Icon={MonitorSmartphone}
                 tone="sky"
-                label="Let your Mac use this phone"
-                sub={control ? 'Your agent on your Mac can look at this phone and tap, type and open apps when you ask' : 'Ask your agent on your Mac to do things here: screenshots, taps, open apps, install a build'}
+                label={t('phoneApp.settings.control')}
+                sub={control ? t('phoneApp.settings.controlOnSub') : t('phoneApp.settings.controlOffSub')}
                 right={toggle(control, () => {})}
                 onPress={toggleControl}
                 chevron={false}
@@ -193,8 +199,8 @@ export default function Settings() {
               <Row
                 Icon={Download}
                 tone="peach"
-                label="Get Beluga Link"
-                sub="The small app your Mac taps and types with. How to install it"
+                label={t('phoneApp.settings.getLink')}
+                sub={t('phoneApp.settings.getLinkSub')}
                 onPress={() => router.push('/link')}
               />
             ) : null}
@@ -202,20 +208,21 @@ export default function Settings() {
               <Row
                 Icon={ShieldCheck}
                 tone="peach"
-                label="Turn on Beluga Link"
-                sub="Android › Accessibility › Beluga Link. A downloaded app first needs “Allow restricted settings” from its App info ⋮ menu."
+                label={t('phoneApp.settings.turnOnLink')}
+                sub={t('phoneApp.settings.turnOnLinkSub')}
                 onPress={openAccessibilitySettings}
               />
             ) : null}
             {update.release && update.phase !== 'current' ? (
-              <Row Icon={ArrowDownToLine} tone="mint" label={`Update to Beluga ${update.release.version}`} sub={update.phase === 'downloading' ? `Downloading ${Math.round((update.progress ?? 0) * 100)}%` : update.phase === 'ready' ? 'Ready to install' : 'See what’s new'} onPress={() => setUpdateOpen(true)} />
+              <Row Icon={ArrowDownToLine} tone="mint" label={t('phoneApp.settings.updateTo', { version: update.release.version })} sub={update.phase === 'downloading' ? t('phoneApp.settings.downloading', { percent: Math.round((update.progress ?? 0) * 100) }) : update.phase === 'ready' ? t('phoneApp.settings.readyToInstall') : t('phoneApp.settings.seeWhatsNew')} onPress={() => setUpdateOpen(true)} />
             ) : null}
-            {supportsAgents ? <Row Icon={Cable} tone="lavender" label="External agents" sub="What they did, and stopping them" onPress={() => router.push('/agents')} /> : null}
-            <Row Icon={HardDrive} tone="sky" label="Storage" sub={saved.length ? `${saved.length} saved · ${sizeOf(totalBytes(saved))}` : 'What Beluga keeps on this phone'} onPress={() => router.push('/storage')} />
+            {supportsRouting ? <Row Icon={Route} tone="mint" label={t('phoneApp.settings.routing')} sub={t('phoneApp.settings.routingSub')} onPress={() => router.push('/routing')} /> : null}
+            {supportsAgents ? <Row Icon={Cable} tone="lavender" label={t('phoneApp.settings.agents')} sub={t('phoneApp.settings.agentsSub')} onPress={() => router.push('/agents')} /> : null}
+            <Row Icon={HardDrive} tone="sky" label={t('phoneApp.settings.storage')} sub={saved.length ? t('phoneApp.settings.storageSaved', { count: saved.length, size: sizeOf(totalBytes(saved)) }) : t('phoneApp.settings.storageSub')} onPress={() => router.push('/storage')} />
             <Row
               Icon={LogOut}
               tone="rose"
-              label={confirm ? 'Tap again to sign out' : link.mode === 'demo' ? 'Leave the demo' : 'Sign out'}
+              label={confirm ? t('phoneApp.settings.tapAgain') : link.mode === 'demo' ? t('phoneApp.settings.leaveDemo') : t('phoneApp.settings.signOut')}
               onPress={async () => {
                 if (!confirm) {
                   haptic.warn();
@@ -223,7 +230,7 @@ export default function Settings() {
                   return;
                 }
                 const r = await store.signOut();
-                if (link.mode === 'bare' && !r.onMac) store.toast({ text: 'Signed out here. Your Mac was away: remove this phone there too (Settings › Phone).', tone: 'warn' });
+                if (link.mode === 'bare' && !r.onMac) store.toast({ text: t('phoneApp.settings.signedOutAway'), tone: 'warn' });
                 router.replace('/pair');
               }}
               chevron={false}
@@ -233,7 +240,7 @@ export default function Settings() {
 
             <View style={{ gap: 8 }}>
               <T v="eyebrow" style={{ paddingHorizontal: 6 }}>
-                Appearance
+                {t('phoneApp.settings.appearance')}
               </T>
               <Segments
                 value={look}
@@ -242,15 +249,36 @@ export default function Settings() {
                   appearance.set(c);
                 }}
                 options={[
-                  { key: 'system', label: 'System', Icon: Smartphone },
-                  { key: 'light', label: 'Light', Icon: Sun },
-                  { key: 'dark', label: 'Dark', Icon: Moon },
+                  { key: 'system', label: t('phoneApp.settings.system'), Icon: Smartphone },
+                  { key: 'light', label: t('phoneApp.settings.light'), Icon: Sun },
+                  { key: 'dark', label: t('phoneApp.settings.dark'), Icon: Moon },
                 ]}
               />
             </View>
 
+            <View style={{ gap: 8 }}>
+              <T v="eyebrow" style={{ paddingHorizontal: 6 }}>
+                {t('language.title')}
+              </T>
+              <Segments
+                value={lang}
+                onChange={(c: PhoneLanguage) => {
+                  setLang(c);
+                  language.set(c);
+                }}
+                options={[
+                  { key: 'mac', label: t('language.macShort'), Icon: Monitor },
+                  { key: 'en', label: LOCALE_NAMES.en },
+                  { key: 'pt-BR', label: 'Português' }, // i18n-ignore
+                ]}
+              />
+              <T v="caption" style={{ paddingHorizontal: 6 }}>
+                {lang === 'mac' && macSays ? t('language.followMac', { language: LOCALE_NAMES[macSays] }) : t('language.phoneHint')}
+              </T>
+            </View>
+
         <Card>
-          <Row first Icon={SlidersHorizontal} tone="lavender" label="Advanced" onPress={() => setAdvanced((a) => !a)} chevron={false} right={advanced ? <ChevronUp color={color.text3} size={18} /> : <ChevronDown color={color.text3} size={18} />} />
+          <Row first Icon={SlidersHorizontal} tone="lavender" label={t('phoneApp.settings.advanced')} onPress={() => setAdvanced((a) => !a)} chevron={false} right={advanced ? <ChevronUp color={color.text3} size={18} /> : <ChevronDown color={color.text3} size={18} />} />
         </Card>
 
         {advanced ? (
@@ -258,15 +286,15 @@ export default function Settings() {
             {link.mode === 'bare' ? (
               <View style={{ gap: 8 }}>
                 <T v="eyebrow" style={{ paddingHorizontal: 6 }}>
-                  Connection
+                  {t('phoneApp.settings.connection')}
                 </T>
                 <Card>
                   <Row
                     first
                     Icon={Network}
                     tone={link.path === 'relay' ? 'lavender' : 'mint'}
-                    label={link.phase === 'open' && link.path ? pathLabel(link.path) : link.diagnosis?.title ?? 'Not linked right now'}
-                    sub={link.phase === 'open' && link.path === 'relay' ? 'A direct connection didn’t work on this network; the relay carries only encrypted bytes.' : undefined}
+                    label={link.phase === 'open' && link.path ? pathLabel(link.path) : link.diagnosis?.title ?? t('phoneApp.settings.notLinked')}
+                    sub={link.phase === 'open' && link.path === 'relay' ? t('phoneApp.settings.relaySub') : undefined}
                     chevron={false}
                   />
                 </Card>
@@ -275,45 +303,45 @@ export default function Settings() {
             {link.mode !== 'demo' && canKeepAwake ? (
               <View style={{ gap: 8 }}>
                 <T v="eyebrow" style={{ paddingHorizontal: 6 }}>
-                  Keep your Mac awake
+                  {t('phoneApp.settings.keepAwake')}
                 </T>
                 <Segments
                   value={keepAwake}
                   onChange={chooseAwake}
                   options={[
-                    { key: 'off', label: 'Never' },
-                    { key: 'power', label: 'On power' },
-                    { key: 'always', label: 'Always' },
+                    { key: 'off', label: t('phoneApp.settings.never') },
+                    { key: 'power', label: t('phoneApp.settings.onPower') },
+                    { key: 'always', label: t('phoneApp.settings.always') },
                   ]}
                 />
                 <T v="caption" c={color.text3} style={{ paddingHorizontal: 6 }}>
-                  A sleeping Mac can’t be reached or woken from here, so Beluga keeps it from sleeping. Its display still sleeps; closing the lid still sleeps it.
+                  {t('phoneApp.settings.keepAwakeHint')}
                 </T>
               </View>
             ) : null}
             <View style={{ gap: 8 }}>
               <T v="eyebrow" style={{ paddingHorizontal: 6 }}>
-                Notify me about
+                {t('phoneApp.settings.notifyAbout')}
               </T>
               <Card>
-                <Row first Icon={Hand} tone="peach" label="Needs you" right={toggle(p.needsYou, () => {})} onPress={() => save({ ...p, needsYou: !p.needsYou })} chevron={false} />
-                <Row Icon={CircleCheck} tone="mint" label="Done" sub={stay ? 'When your agent finishes' : 'Things you asked from the phone'} right={toggle(p.done, () => {})} onPress={() => save({ ...p, done: !p.done })} chevron={false} />
-                <Row Icon={AtSign} tone="sky" label="Mentions" right={toggle(p.mentions, () => {})} onPress={() => save({ ...p, mentions: !p.mentions })} chevron={false} />
+                <Row first Icon={Hand} tone="peach" label={t('phoneApp.settings.needsYou')} right={toggle(p.needsYou, () => {})} onPress={() => save({ ...p, needsYou: !p.needsYou })} chevron={false} />
+                <Row Icon={CircleCheck} tone="mint" label={t('phoneApp.settings.done')} sub={stay ? t('phoneApp.settings.doneOnSub') : t('phoneApp.settings.doneOffSub')} right={toggle(p.done, () => {})} onPress={() => save({ ...p, done: !p.done })} chevron={false} />
+                <Row Icon={AtSign} tone="sky" label={t('phoneApp.settings.mentions')} right={toggle(p.mentions, () => {})} onPress={() => save({ ...p, mentions: !p.mentions })} chevron={false} />
               </Card>
             </View>
 
             {link.mode === 'demo' ? (
               <View style={{ gap: 8 }}>
                 <T v="eyebrow" style={{ paddingHorizontal: 6 }}>
-                  Demo
+                  {t('phoneApp.settings.demo')}
                 </T>
                 <Card>
                   <Row
                     first
                     Icon={MoonStar}
                     tone="sky"
-                    label="Mac asleep"
-                    sub="See the phone without its Mac"
+                    label={t('phoneApp.settings.macAsleep')}
+                    sub={t('phoneApp.settings.macAsleepSub')}
                     right={toggle(asleep, () => {})}
                     chevron={false}
                     onPress={() => {
@@ -328,15 +356,15 @@ export default function Settings() {
             {updatesAvailable() ? (
               <View style={{ gap: 8 }}>
                 <T v="eyebrow" style={{ paddingHorizontal: 6 }}>
-                  Updates
+                  {t('phoneApp.settings.updates')}
                 </T>
                 <Card>
                   <Row
                     first
                     Icon={ArrowDownToLine}
                     tone="mint"
-                    label="Update automatically"
-                    sub={autoOn() ? 'Installs once you leave the app' : 'You choose when, from the pill on Home'}
+                    label={t('phoneApp.settings.updateAuto')}
+                    sub={autoOn() ? t('phoneApp.settings.autoOnSub') : t('phoneApp.settings.autoOffSub')}
                     right={toggle(autoOn(), () => {})}
                     onPress={() => {
                       haptic.tap();
@@ -345,13 +373,13 @@ export default function Settings() {
                     chevron={false}
                   />
                   {autoOn() && !canInstall ? (
-                    <Row Icon={ShieldCheck} tone="butter" label="Let Beluga install its updates" sub="Android › Install unknown apps › Beluga. Then they go in without asking." onPress={appUpdate.allowInstalls} />
+                    <Row Icon={ShieldCheck} tone="butter" label={t('phoneApp.settings.allowInstalls')} sub={t('phoneApp.settings.allowInstallsSub')} onPress={appUpdate.allowInstalls} />
                   ) : null}
                   <Row
                     Icon={Search}
                     tone="sky"
-                    label="Check for updates"
-                    sub={checkOn() ? 'At launch and every 4 hours' : 'Only when you tap Check Now'}
+                    label={t('phoneApp.settings.checkUpdates')}
+                    sub={checkOn() ? t('phoneApp.settings.checkOnSub') : t('phoneApp.settings.checkOffSub')}
                     right={toggle(checkOn(), () => {})}
                     onPress={() => {
                       haptic.tap();
@@ -362,8 +390,8 @@ export default function Settings() {
                   <Row
                     Icon={RefreshCw}
                     tone="plain"
-                    label={update.phase === 'checking' ? 'Checking…' : 'Check Now'}
-                    sub={update.checkedAt ? `Last looked ${new Date(update.checkedAt).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })}${update.phase === 'current' ? ' · up to date' : ''}` : undefined}
+                    label={update.phase === 'checking' ? t('phoneApp.settings.checking') : t('phoneApp.settings.checkNow')}
+                    sub={update.checkedAt ? t(update.phase === 'current' ? 'phoneApp.settings.lastLookedCurrent' : 'phoneApp.settings.lastLooked', { when: new Date(update.checkedAt).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' }) }) : undefined}
                     onPress={() => void checkForUpdate(true)}
                     chevron={false}
                   />
@@ -372,7 +400,7 @@ export default function Settings() {
             ) : null}
 
             <Card>
-              <Row first Icon={Info} tone="plain" label="About" sub={`App ${appVersion() ?? (Constants.expoConfig?.version ?? '')} · link ${COMPANION_PROTO.major}.${COMPANION_PROTO.minor}${link.mac ? ` · Mac ${link.mac.version}` : ''}`} />
+              <Row first Icon={Info} tone="plain" label={t('phoneApp.settings.about')} sub={link.mac ? t('phoneApp.settings.aboutSubMac', { app: appVersion() ?? (Constants.expoConfig?.version ?? ''), link: `${COMPANION_PROTO.major}.${COMPANION_PROTO.minor}`, mac: link.mac.version }) : t('phoneApp.settings.aboutSub', { app: appVersion() ?? (Constants.expoConfig?.version ?? ''), link: `${COMPANION_PROTO.major}.${COMPANION_PROTO.minor}` })} />
             </Card>
           </Animated.View>
         ) : null}
@@ -390,5 +418,7 @@ function VoiceRow() {
   useFocusEffect(useCallback(() => again((n) => n + 1), []));
   const c = voiceChoice();
   const suggested = voiceSetting().preset === 'suggested';
-  return <Row Icon={Mic} tone="peach" label="Voice" sub={`${c.where === 'mac' ? 'On your Mac' : 'On this phone'} · ${VOICE_MODELS[c.model].label}${suggested ? ' (suggested)' : ''}`} onPress={() => router.push('/voice')} />;
+  const t = useT();
+  const where = c.where === 'mac' ? t('phoneApp.settings.voiceOnMac') : t('phoneApp.settings.voiceOnPhone');
+  return <Row Icon={Mic} tone="peach" label={t('phoneApp.settings.voice')} sub={t(suggested ? 'phoneApp.settings.voiceSubSuggested' : 'phoneApp.settings.voiceSub', { where, model: VOICE_MODELS[c.model].label })} onPress={() => router.push('/voice')} />;
 }

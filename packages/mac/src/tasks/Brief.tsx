@@ -9,6 +9,7 @@ import { useMyAgentName } from '../lib/agent-words.js';
 import { ago, checklist, toggleCheck } from './tasks-model.js';
 import { useSelfId, useTaskActions } from './use-tasks.js';
 import t from './tasks.module.css';
+import { useT } from '../lib/i18n.js';
 
 /**
  * A task's brief: what later agents and people rely on, in sections. Click a section to edit it
@@ -59,11 +60,12 @@ const GHOST_CRITERIA = [72, 86, 64] as const;
  */
 function BriefWriting() {
   const who = useMyAgentName();
+  const tr = useT();
   return (
     <div className={cx(t.brief, t.briefWriting)} aria-busy="true">
       <div className={t.writingStatus} role="status">
         <Dot tone="claude" live />
-        {who} is writing this task…
+        {tr('tasks.b.writing', { who })}
       </div>
       <section className={t.section} aria-hidden="true">
         <header className={t.sectionHead}>
@@ -96,6 +98,7 @@ function Section({ issue, section, startEditing, onDone }: { issue: Issue; secti
   const text = issue.brief[section] ?? '';
   const [draft, setDraft] = useState<string | undefined>(startEditing ? '' : undefined);
   const { api, act } = useTaskActions();
+  const tr = useT();
   const area = useRef<HTMLTextAreaElement>(null);
   const editing = draft !== undefined;
   const revisions = issue.revisions.filter((r) => r.section === section);
@@ -133,14 +136,14 @@ function Section({ issue, section, startEditing, onDone }: { issue: Issue; secti
         <h3 className={t.sectionTitle}>{info.label}</h3>
         {ticks?.total ? (
           <span className={cx(t.sectionCount, ticks.done === ticks.total && t.sectionCountDone)}>
-            {ticks.done} of {ticks.total}
-            {ticks.deferred ? ` · ${ticks.deferred} deferred` : ''}
-            {ticks.notDone ? ` · ${ticks.notDone} not done` : ''}
+            {tr('tasks.b.nOf', { done: ticks.done, total: ticks.total })}
+            {ticks.deferred ? tr('tasks.b.nDeferred', { n: ticks.deferred }) : ''}
+            {ticks.notDone ? tr('tasks.b.nNotDone', { n: ticks.notDone }) : ''}
           </span>
         ) : null}
         <span className={t.grow} />
         {revisions.length ? <History issue={issue} section={section} /> : null}
-        {editing ? null : <IconButton icon="pencil" label={`Edit ${info.label}`} onClick={() => setDraft(text)} />}
+        {editing ? null : <IconButton icon="pencil" label={tr('tasks.b.edit', { what: info.label })} onClick={() => setDraft(text)} />}
       </header>
       {editing ? (
         <div className={t.editor}>
@@ -164,13 +167,13 @@ function Section({ issue, section, startEditing, onDone }: { issue: Issue; secti
             }}
           />
           <div className={t.editorBar}>
-            <span className={t.editorHint}>Markdown{section === 'acceptance' ? ' · “- [ ]” makes a checkbox · “— deferred: why” after one explains it' : ''}</span>
+            <span className={t.editorHint}>{section === 'acceptance' ? tr('tasks.b.mdHintChecks') : tr('tasks.b.mdHint')}</span>
             <span className={t.grow} />
             <Button size="small" variant="quiet" onClick={cancel}>
-              Cancel
+              {tr('common.cancel')}
             </Button>
             <Button size="small" variant="primary" onClick={() => void save()}>
-              Save
+              {tr('common.save')}
             </Button>
           </div>
         </div>
@@ -196,6 +199,7 @@ function Section({ issue, section, startEditing, onDone }: { issue: Issue; secti
  * ("— deferred: why", "— not done: why") shows its own state and the reason; other lines as they are.
  */
 function Checklist({ text, onToggle, onEdit }: { text: string; onToggle: (index: number) => void; onEdit: () => void }) {
+  const tr = useT();
   let n = -1;
   return (
     <ul className={t.checklist} onDoubleClick={onEdit}>
@@ -209,14 +213,14 @@ function Checklist({ text, onToggle, onEdit }: { text: string; onToggle: (index:
         const notDone = c.state === 'not_done';
         return (
           <li key={i} className={cx(t.check, done && t.checkDone, deferred && t.checkDeferred, notDone && t.checkNotDone)} data-state={c.state}>
-            <button type="button" role="checkbox" aria-checked={done} aria-label={deferred ? 'Deferred: tick it when it’s true' : notDone ? 'Not done: tick it when it’s true' : undefined} className={t.checkBox} onClick={() => onToggle(index)}>
+            <button type="button" role="checkbox" aria-checked={done} aria-label={deferred ? tr('tasks.b.deferredAria') : notDone ? tr('tasks.b.notDoneAria') : undefined} className={t.checkBox} onClick={() => onToggle(index)}>
               {done ? <Icon name="check" size={10} /> : deferred ? <Icon name="clock" size={10} /> : notDone ? <Icon name="minus" size={10} /> : null}
             </button>
             <span className={t.checkText}>
               <Markdown text={c.text} tasks />
               {c.reason ? (
                 <span className={t.checkReason}>
-                  <span className={t.checkReasonLabel}>{deferred ? 'Deferred' : 'Not done'}</span> · {c.reason}
+                  <span className={t.checkReasonLabel}>{deferred ? tr('plans.d.deferred') : tr('plans.d.notDone')}</span> · {c.reason}
                 </span>
               ) : null}
             </span>
@@ -232,15 +236,16 @@ function History({ issue, section }: { issue: Issue; section: BriefSection }) {
   const selfId = useSelfId();
   const { api, act } = useTaskActions();
   const [open, setOpen] = useState(false);
+  const tr = useT();
   const revisions = issue.revisions.filter((r) => r.section === section).slice().reverse();
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
-        <IconButton icon="clock" label={`${SECTION_INFO[section].label}: ${revisions.length} ${revisions.length === 1 ? 'version' : 'versions'}`} />
+        <IconButton icon="clock" label={tr('tasks.b.versionsLabel', { what: SECTION_INFO[section].label, count: revisions.length })} />
       </Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content className={t.history} align="end" sideOffset={6} collisionPadding={10} aria-label="Versions">
-          <div className={t.historyHead}>{SECTION_INFO[section].label} · history</div>
+        <Popover.Content className={t.history} align="end" sideOffset={6} collisionPadding={10} aria-label={tr('tasks.b.versions')}>
+          <div className={t.historyHead}>{tr('tasks.b.history', { what: SECTION_INFO[section].label })}</div>
           <ol className={t.historyList}>
             {revisions.map((r, i) => (
               <li key={r.id} className={t.historyItem}>
@@ -249,17 +254,17 @@ function History({ issue, section }: { issue: Issue; section: BriefSection }) {
                   <span className={t.historyWhen}>{ago(r.at)}</span>
                   {r.reason ? <span className={t.historyWhy}>{r.reason}</span> : null}
                 </div>
-                <div className={t.historyBefore}>{r.before.trim() ? r.before : <em>Empty before</em>}</div>
+                <div className={t.historyBefore}>{r.before.trim() ? r.before : <em>{tr('tasks.b.emptyBefore')}</em>}</div>
                 {r.before.trim() || i > 0 ? (
                   <Button
                     size="small"
                     variant="quiet"
                     onClick={() => {
                       setOpen(false);
-                      void act(() => api.restoreRevision(issue.id, r.id), 'Restored that version');
+                      void act(() => api.restoreRevision(issue.id, r.id), tr('tasks.b.restored'));
                     }}
                   >
-                    Restore This
+                    {tr('tasks.b.restoreThis')}
                   </Button>
                 ) : null}
               </li>

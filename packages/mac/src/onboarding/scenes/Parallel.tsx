@@ -1,5 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react';
 import { Icon } from '../../components/Icon.js';
+import { t } from '@beluga/shared/i18n/index.js';
+import { useT } from '../../lib/i18n.js';
 import { EASE_OUT, SPRING } from '../fx.js';
 import { useBeats } from './use-beats.js';
 import s from './scenes.module.css';
@@ -48,10 +50,11 @@ const REPOS: readonly Repo[] = [
 ];
 
 const BEAT_MS = 1500;
-const LABEL: Record<Status, string> = { working: 'Agent working', pr: 'Pull request', merged: 'Merged' };
+const LABEL = (): Record<Status, string> => ({ working: t('components.onboarding.scene.parallel.working'), pr: t('components.onboarding.scene.parallel.pr'), merged: t('components.onboarding.scene.parallel.merged') });
 const ICON: Record<Status, 'spark' | 'pr' | 'merge'> = { working: 'spark', pr: 'pr', merged: 'merge' };
 
 function LaneRow({ lane, step, live }: { readonly lane: Lane; readonly step: number; readonly live: boolean }) {
+  useT();
   const status = lane.steps[Math.min(step, lane.steps.length - 1)]!;
   return (
     <div className={s.lane}>
@@ -64,7 +67,7 @@ function LaneRow({ lane, step, live }: { readonly lane: Lane; readonly step: num
       <AnimatePresence mode="popLayout" initial={false}>
         <motion.span key={status} className={s.pill} data-status={status} initial={{ opacity: 0, y: 6, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.9 }} transition={SPRING}>
           <Icon name={ICON[status]} size={11} />
-          {LABEL[status]}
+          {LABEL()[status]}
         </motion.span>
       </AnimatePresence>
     </div>
@@ -72,6 +75,7 @@ function LaneRow({ lane, step, live }: { readonly lane: Lane; readonly step: num
 }
 
 export function Parallel() {
+  const t = useT();
   // Nine beats: three repositories in front in turn, three steps each.
   const beat = useBeats(Array.from({ length: 9 }, () => BEAT_MS), 2);
   const front = Math.floor(beat / 3);
@@ -93,9 +97,9 @@ export function Parallel() {
               <div className={s.repoHead}>
                 <Icon name="folder" size={13} />
                 <strong>{repo.name}</strong>
-                <span className={s.dim}>{repo.lanes.length} worktrees</span>
+                <span className={s.dim}>{t('components.onboarding.scene.parallel.worktrees', { count: repo.lanes.length })}</span>
                 <span className={s.repoGh}>
-                  <Icon name="globe" size={11} /> GitHub
+                  <Icon name="globe" size={11} /> GitHub{/* i18n-ignore */}
                 </span>
               </div>
               {repo.lanes.map((lane) => (

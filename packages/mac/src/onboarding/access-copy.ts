@@ -1,6 +1,8 @@
 import type { IconName } from '../components/Icon.js';
 import type { Grant, PrivacyPane } from '../lib/privacy-model.js';
 import type { AccessStep } from './onboarding-model.js';
+// Relative, not @beluga: tests at the repo's root import this file too.
+import { t } from '../../../../src/shared/i18n/index.js';
 
 /**
  * The permission steps' words: what each lets Claude do, in one sentence, and where it lives in
@@ -20,56 +22,97 @@ export interface AccessCopy {
   readonly how: string;
 }
 
+// Getters: each line is said in the app's language when the step draws, not when this loads.
 export const ACCESS_COPY: Readonly<Record<AccessStep, AccessCopy>> = {
   screen: {
     pane: 'screen',
     icon: 'eye',
-    name: 'Screen Recording',
-    title: 'Let your agent see your screen.',
-    why: 'Your agent can take a screenshot of your screen or one app’s window when it needs to see what you see, like a page it just changed.',
-    without: 'Without it, screenshots don’t work. Everything else does.',
-    how: 'Turn on Beluga in the list. If macOS asks to quit and reopen Beluga, go ahead: you’ll be back on this step.',
+    get name() {
+      return t('components.onboarding.access.screen.name');
+    },
+    get title() {
+      return t('components.onboarding.access.screen.title');
+    },
+    get why() {
+      return t('components.onboarding.access.screen.why');
+    },
+    get without() {
+      return t('components.onboarding.access.screen.without');
+    },
+    get how() {
+      return t('components.onboarding.access.screen.how');
+    },
   },
   accessibility: {
     pane: 'accessibility',
     icon: 'hand',
-    name: 'Accessibility',
-    title: 'Let your agent use your other apps.',
-    why: 'With it, your agent can click, type and read the controls in other apps for you when a task needs more than the terminal.',
-    without: 'Without it, your agent stays in your worktrees and the terminal.',
-    how: 'Turn on Beluga in the list.',
+    get name() {
+      return t('components.onboarding.access.accessibility.name');
+    },
+    get title() {
+      return t('components.onboarding.access.accessibility.title');
+    },
+    get why() {
+      return t('components.onboarding.access.accessibility.why');
+    },
+    get without() {
+      return t('components.onboarding.access.accessibility.without');
+    },
+    get how() {
+      return t('components.onboarding.access.turnOn');
+    },
   },
   disk: {
     pane: 'disk',
     icon: 'folder',
-    name: 'Full Disk Access',
-    title: 'Fewer “allow access” prompts.',
-    why: 'Your agent can open projects in Documents, Desktop or iCloud Drive without macOS asking each time, and Beluga can tell when a Focus is holding its notifications.',
-    without: 'Without it, macOS asks the first time your agent opens a protected folder.',
-    how: 'Turn on Beluga in the list, or add it with +.',
+    get name() {
+      return t('components.onboarding.access.disk.name');
+    },
+    get title() {
+      return t('components.onboarding.access.disk.title');
+    },
+    get why() {
+      return t('components.onboarding.access.disk.why');
+    },
+    get without() {
+      return t('components.onboarding.access.disk.without');
+    },
+    get how() {
+      return t('components.onboarding.access.disk.how');
+    },
   },
   automation: {
     pane: 'automation',
     icon: 'wand',
-    name: 'Automation',
-    title: 'Let your agent work with Finder and friends.',
-    why: 'Your agent can ask apps like Finder, Safari or Music to do things through AppleScript, such as revealing a file or reading the open page.',
-    without: 'Without it, macOS asks the first time your agent talks to an app.',
-    how: 'Allow it when macOS asks. Each app your agent works with gets its own switch.',
+    get name() {
+      return t('components.onboarding.access.automation.name');
+    },
+    get title() {
+      return t('components.onboarding.access.automation.title');
+    },
+    get why() {
+      return t('components.onboarding.access.automation.why');
+    },
+    get without() {
+      return t('components.onboarding.access.automation.without');
+    },
+    get how() {
+      return t('components.onboarding.access.automation.how');
+    },
   },
 };
 
 /** The step's main button: what pressing it does now. */
 export function accessAction(grant: Grant | undefined): string {
-  return grant === 'granted' ? 'Open System Settings' : 'Allow in System Settings';
+  return grant === 'granted' ? t('components.onboarding.access.openSettings') : t('components.onboarding.access.allowInSettings');
 }
 
-/** The footer's button on a permission step: go on, or pass on this one. */
+/** The footer's button on a permission step: go on, or pass on this one (its English; the footer says it in the app's language). */
 export const accessNext = (grant: Grant | undefined): 'Continue' | 'Not Now' => (grant === 'granted' ? 'Continue' : 'Not Now');
 
 /** The line under the step's title: how it stands. */
 export function grantText(grant: Grant | undefined, asked: boolean): string {
-  if (grant === 'granted') return 'Allowed';
-  if (grant === 'off') return asked ? 'Waiting for you in System Settings' : 'Not allowed yet';
-  return asked ? 'Opened System Settings' : 'Optional';
+  if (grant === 'granted') return t('components.onboarding.access.allowed');
+  if (grant === 'off') return asked ? t('components.onboarding.access.waiting') : t('components.onboarding.access.notYet');
+  return asked ? t('components.onboarding.access.opened') : t('components.onboarding.access.optional');
 }

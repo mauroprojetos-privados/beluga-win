@@ -5,9 +5,11 @@ import { Group, Row, Select, Switch } from '../dialogs/settings-controls.js';
 import { openNet } from './net-sheets.js';
 import { errorText, quietly, useNetwork } from './use-net.js';
 import { upFirst, yourComputer } from '../lib/os-words.js';
+import { say, useT } from '../lib/i18n.js';
 
 /** Settings › People & access: talking with friends directly (the Beluga network), on or off. */
 export function NetworkSettings() {
+  const t = useT();
   const { client, ui } = useBeluga();
   const net = useNetwork();
   const [busy, setBusy] = useState(false);
@@ -29,66 +31,66 @@ export function NetworkSettings() {
   const shareUsage = useApp((st) => st.prefs.shareUsage);
   const readReceipts = useApp((st) => st.prefs.readReceipts);
   return (
-    <Group title="Friends">
+    <Group title={say('Friends')}>
       <Row
-        label="Talk with friends directly"
+        label={say('Talk with friends directly')}
         detail={
           error ? (
             <span style={{ color: 'var(--error)' }}>{error}</span>
           ) : busy ? (
-            'Turning it on…'
+            t('network.settings.turningItOn')
           ) : net.enabled ? (
-            `${upFirst(yourComputer())} connects straight to your friends’ computers, end-to-end encrypted. ${friends} friend${friends === 1 ? '' : 's'}, ${groups} channel${groups === 1 ? '' : 's'}.`
+            t('network.settings.onDetail', { computer: upFirst(yourComputer()), friends: t('network.settings.friends', { count: friends }), channels: t('network.settings.channels', { count: groups }) })
           ) : (
-            'Messages, channels and files go from computer to computer, end-to-end encrypted. No server, no account.'
+            t('network.settings.offDetail')
           )
         }
       >
-        <Switch label="Talk with friends directly" on={net.enabled || busy} onChange={(v) => void turn(v)} />
+        <Switch label={say('Talk with friends directly')} on={net.enabled || busy} onChange={(v) => void turn(v)} />
       </Row>
       {net.enabled ? (
-        <Row label="Add a friend" detail="Send them a code or a link; they’re your friend once they use it.">
+        <Row label={say('Add a friend')} detail={t('network.settings.addFriendDetail')}>
           <Button
             onClick={() => {
               ui.patch({ settings: undefined });
               openNet({ kind: 'add_friend' });
             }}
           >
-            Add a Friend…
+            {t('network.settings.addFriendButton')}
           </Button>
         </Row>
       ) : null}
       {net.enabled ? (
-        <Row label="Who can ask your agent in chats" detail="Your agent answers only messages that ask for it, on your own sign-in, from that chat’s history. You can always ask it yourself; people who aren’t your friends need your trust.">
+        <Row label={say('Who can ask your agent in chats')} detail={t('network.settings.whoAskDetail')}>
           <Select<'everyone' | 'trusted' | 'off'>
-            label="Who can ask your agent in chats"
+            label={say('Who can ask your agent in chats')}
             value={chatClaude}
             options={[
-              { value: 'everyone', label: 'Friends in the chat' },
-              { value: 'trusted', label: 'People I trust' },
-              { value: 'off', label: 'Only me' },
+              { value: 'everyone', label: t('network.settings.friendsInChat') },
+              { value: 'trusted', label: t('network.settings.peopleITrust') },
+              { value: 'off', label: t('network.settings.onlyMe') },
             ]}
             onChange={(v) => void client.api.session.setPrefs({ chatClaude: v })}
           />
         </Row>
       ) : null}
       {net.enabled ? (
-        <Row label="Who sees your usage" detail="How much of your Claude Code, Codex and other plans you have left, and when it resets, on your profile. Never your conversations or code.">
+        <Row label={say('Who sees your usage')} detail={t('network.settings.usageDetail')}>
           <Select<'trusted' | 'everyone' | 'off'>
-            label="Who sees your usage"
+            label={say('Who sees your usage')}
             value={shareUsage}
             options={[
-              { value: 'trusted', label: 'People I trust' },
-              { value: 'everyone', label: 'All my friends' },
-              { value: 'off', label: 'No one' },
+              { value: 'trusted', label: t('network.settings.peopleITrust') },
+              { value: 'everyone', label: t('network.settings.allFriends') },
+              { value: 'off', label: t('network.settings.noOne') },
             ]}
             onChange={(v) => void client.api.session.setPrefs({ shareUsage: v })}
           />
         </Row>
       ) : null}
       {net.enabled ? (
-        <Row label="Say when you’ve seen a message" detail="Friends see Seen under their message once it was on your screen here or on your phone. Off, they only see Delivered.">
-          <Switch label="Say when you’ve seen a message" on={readReceipts} onChange={(v) => void client.api.session.setPrefs({ readReceipts: v })} />
+        <Row label={say('Say when you’ve seen a message')} detail={t('network.settings.seenDetail')}>
+          <Switch label={say('Say when you’ve seen a message')} on={readReceipts} onChange={(v) => void client.api.session.setPrefs({ readReceipts: v })} />
         </Row>
       ) : null}
     </Group>

@@ -3,16 +3,18 @@ import { Button } from '../components/ui.js';
 import { useApp } from '../lib/beluga.js';
 import s from './sheet.module.css';
 import { thisComputer } from '../lib/os-words.js';
+import { useT } from '../lib/i18n.js';
 
 /** Someone sent you a beluga:// link: join their room (and leave the one you're in)? */
 export function JoinSheet({ invite, onJoin, onCancel }: { invite: string; onJoin: () => void; onCancel: () => void }) {
+  const t = useT();
   const room = useApp((st) => st.room);
   const others = useApp((st) => st.peers.length - 1);
   const host = (() => {
     try {
-      return new URL(invite.replace(/^p2p:/, 'http:')).host || 'a friend';
+      return new URL(invite.replace(/^p2p:/, 'http:')).host || undefined;
     } catch {
-      return 'a friend';
+      return undefined;
     }
   })();
   return (
@@ -21,17 +23,17 @@ export function JoinSheet({ invite, onJoin, onCancel }: { invite: string; onJoin
         <Dialog.Overlay className={s.overlay} />
         <Dialog.Content className={s.sheet} aria-describedby={undefined}>
           <div className={s.head}>
-            <Dialog.Title className={s.title}>Join {host === 'a friend' ? 'their room' : `the room at ${host}`}?</Dialog.Title>
+            <Dialog.Title className={s.title}>{host ? t('sheets.join.titleAt', { host }) : t('sheets.join.title')}</Dialog.Title>
           </div>
           <div className={s.intro}>
-            <p>You'll leave {room}{others > 0 ? ` and the ${others} ${others === 1 ? 'person' : 'people'} in it` : ''}. Your projects, chats and worktrees stay on {thisComputer()}.</p>
+            <p>{others > 0 ? t('sheets.join.leaveWith', { room, count: others, computer: thisComputer() }) : t('sheets.join.leave', { room, computer: thisComputer() })}</p>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '8px 16px 16px' }}>
             <Button variant="quiet" onClick={onCancel}>
-              Stay here
+              {t('sheets.join.stay')}
             </Button>
             <Button variant="primary" onClick={onJoin} autoFocus>
-              Join
+              {t('sheets.join.join')}
             </Button>
           </div>
         </Dialog.Content>

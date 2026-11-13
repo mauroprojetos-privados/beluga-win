@@ -2,6 +2,7 @@ import { motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../components/Icon.js';
 import { Tables } from '../onboarding/scenes/Tables.js';
+import { useT } from '../lib/i18n.js';
 
 /**
  * The README's table scene: the onboarding's, answered with a longer table, then a pointer tries
@@ -13,22 +14,24 @@ const PLANS = ['Team', 'Pro', 'Starter'] as const;
 const NAMES = ['Northwind', 'Acme Labs', 'Globex', 'Initech', 'Umbrella', 'Hooli', 'Stark Ind.', 'Wayne Co', 'Pied Piper', 'Vandelay', 'Soylent', 'Tyrell', 'Cyberdyne', 'Gringotts', 'Monarch', 'Oscorp', 'Wonka', 'Aperture', 'Dunder', 'Massive Dyn.', 'Hanso', 'Nakatomi', 'Prestige', 'Virtucon'];
 const MRR = [480, 120, 960, 29, 240, 720, 1440, 99, 360, 59, 199, 640, 880, 149, 420, 79, 260, 540, 49, 1120, 300, 189, 69, 830];
 
+// The README's sample answer, in English like the README (and the pointer's steps below find it by these words).
 const VIEW = JSON.stringify({
   type: 'table',
-  title: 'Churned last month',
+  title: 'Churned last month', // i18n-ignore
   summary: `subscriptions · ${NAMES.length} rows`,
   pageSize: 6,
   columns: [
-    { key: 'customer', label: 'Customer' },
-    { key: 'plan', label: 'Plan', type: 'badge' },
-    { key: 'mrr', label: 'MRR', type: 'currency', currency: 'USD' },
-    { key: 'left', label: 'Left on', type: 'date' },
+    { key: 'customer', label: 'Customer' }, // i18n-ignore
+    { key: 'plan', label: 'Plan', type: 'badge' }, // i18n-ignore
+    { key: 'mrr', label: 'MRR', type: 'currency', currency: 'USD' }, // i18n-ignore
+    { key: 'left', label: 'Left on', type: 'date' }, // i18n-ignore
   ],
   controls: [
     {
       id: 'plan',
       type: 'buttons',
-      label: 'Plan',
+      label: 'Plan', // i18n-ignore
+      // i18n-ignore
       options: [{ label: 'All' }, ...PLANS.map((p) => ({ label: p, where: [{ key: 'plan', value: p }] }))],
     },
   ],
@@ -102,13 +105,14 @@ function Pointer() {
 }
 
 export function TablesTour() {
+  const t = useT();
   return (
     <Tables
       view={VIEW}
       extra={<Pointer />}
       tip={
         <>
-          <Icon name="hand" size={11} /> Sort, filter, search and page through it, right in the chat.
+          <Icon name="hand" size={11} /> {t('components.showcase.tablesTip')}
         </>
       }
     />

@@ -19,6 +19,8 @@ import { useOverviewPrefs } from './overview/use-overview-prefs.js';
 import s from './overview.module.css';
 import { primaryKey } from '../lib/shortcuts-model.js';
 import { openFolderThere } from '../lib/remote-open.js';
+import { t } from '@beluga/shared/i18n/index.js';
+import { useT } from '../lib/i18n.js';
 
 const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 const sameRows = (a: readonly OverviewItem[], b: readonly OverviewItem[]): boolean => sameDeep(a, b, 3);
@@ -29,6 +31,7 @@ const sameRows = (a: readonly OverviewItem[], b: readonly OverviewItem[]): boole
  * reads an archived conversation, ⌘⌫ deletes one (after asking).
  */
 export function OverviewView() {
+  const t = useT();
   const actions = useActions();
   const { client } = useBeluga();
   const api = client.api;
@@ -89,18 +92,18 @@ export function OverviewView() {
       // The core opens it once it's back (and says so if it couldn't).
       api.workspaces
         .restore(item.ws.id)
-        .catch((err: unknown) => toast(client, `Couldn’t restore ${item.ws.name}: ${errorText(err)}`, 'error'))
+        .catch((err: unknown) => toast(client, t('views.overview.restoreFailed', { name: item.ws.name, error: errorText(err) }), 'error'))
         .finally(() => setRestoring(undefined));
     },
     read: (item) => setPeek(item.ws.id),
-    finder: (item) => void openFolderThere(client, item.project.root).catch((err: unknown) => toast(client, `Couldn’t open the folder: ${errorText(err)}`, 'error')),
+    finder: (item) => void openFolderThere(client, item.project.root).catch((err: unknown) => toast(client, t('views.overview.openFolderFailed', { error: errorText(err) }), 'error')),
     remove: (item) => setDeleting(item.ws.id),
   };
   const open = (item: OverviewItem): void => (item.archived ? act.read(item) : item.plan ? actions.run({ type: 'view', view: { kind: 'plan', id: item.plan.plan.id } }) : actions.run({ type: 'open_ws', id: item.ws.id }));
   const remove = (item: OverviewItem, children?: ThreadChildren): void => {
     setDeleting(undefined);
     setPeek(undefined);
-    (children ? api.workspaces.remove(item.ws.id, { children }) : api.workspaces.remove(item.ws.id)).catch((err: unknown) => toast(client, `Couldn’t delete ${item.ws.name}: ${errorText(err)}`, 'error'));
+    (children ? api.workspaces.remove(item.ws.id, { children }) : api.workspaces.remove(item.ws.id)).catch((err: unknown) => toast(client, t('views.overview.deleteFailed', { name: item.ws.name, error: errorText(err) }), 'error'));
   };
 
   const onListKey = (e: KeyboardEvent): void => {
@@ -141,7 +144,7 @@ export function OverviewView() {
       />
       {!searching && !project && (prefs.filter === 'all' || prefs.filter === 'active') ? <EarningsCard /> : null}
       <div ref={listRef} onKeyDown={onListKey}>
-        {prefs.filter === 'needs' && there.length ? <RemoteList title="Needs you on your computers" rows={there} /> : null}
+        {prefs.filter === 'needs' && there.length ? <RemoteList title={t('views.overview.needsOnComputers')} rows={there} /> : null}
         {groups.length || (prefs.filter === 'needs' && there.length) ? (
           groups.map((g) => <Group key={g.project.id} group={g} filter={prefs.filter} current={current} onSelect={setSelected} onOpen={open} act={act} />)
         ) : (
@@ -162,10 +165,11 @@ export function OverviewView() {
   );
 }
 
-const projectName = (p: Project): string => (p.root ? p.name : 'Chats');
+const projectName = (p: Project): string => (p.root ? p.name : t('views.overview.chats'));
 
 /** One project: its icon, name and count, its live rows, then its archived ones under a quiet heading. */
 function Group({ group, filter, current, onSelect, onOpen, act }: { group: OverviewGroup; filter: string; current: string | undefined; onSelect: (id: string) => void; onOpen: (i: OverviewItem) => void; act: ArchivedActions }) {
+  const t = useT();
   const actions = useActions();
   const { project: p, active, archived } = group;
   const now = Date.now();
@@ -177,7 +181,7 @@ function Group({ group, filter, current, onSelect, onOpen, act }: { group: Overv
       <span className={s.count}>{active.length + archived.length}</span>
       <span className={s.groupActions}>
         <Button size="small" variant="quiet" icon={p.root ? 'branch' : 'plus'} onClick={() => actions.run(p.root ? { type: 'new_worktree', projectId: p.id } : { type: 'new_chat', projectId: 'chats' })}>
-          {p.root ? 'New Worktree' : 'New Chat'}
+          {p.root ? t('views.overview.newWorktree') : t('views.overview.newChat')}
         </Button>
       </span>
     </h2>
@@ -186,7 +190,7 @@ function Group({ group, filter, current, onSelect, onOpen, act }: { group: Overv
     <section className={s.group} aria-label={name}>
       {p.root ? <SpecContext menu={{ kind: 'project', id: p.id }}>{title}</SpecContext> : title}
       {active.length ? (
-        <div className={s.table} role="list" aria-label={`${name}: workspaces`}>
+        <div className={s.table} role="list" aria-label={t('views.overview.workspacesLabel', { name })}>
           {active.map((i) => (
             <ActiveRow key={i.ws.id} item={i} now={now} selected={i.ws.id === current} onSelect={onSelect} onOpen={onOpen} />
           ))}
@@ -197,11 +201,11 @@ function Group({ group, filter, current, onSelect, onOpen, act }: { group: Overv
           {filter !== 'archived' ? (
             <h3 className={s.subhead}>
               <Icon name="archive" size={12} />
-              Archived
+              {t('views.overview.archived')}
               <span className={s.count}>{archived.length}</span>
             </h3>
           ) : null}
-          <div className={s.table} role="list" aria-label={`${name}: archived`}>
+          <div className={s.table} role="list" aria-label={t('views.overview.archivedLabel', { name })}>
             {archived.map((i) => (
               <ArchivedRow key={i.ws.id} item={i} selected={i.ws.id === current} onSelect={onSelect} onOpen={onOpen} act={act} />
             ))}
@@ -214,17 +218,18 @@ function Group({ group, filter, current, onSelect, onOpen, act }: { group: Overv
 
 /** Nothing matches: say why, and offer the way back. */
 function NothingHere({ search, filter, project, othersHere, onClearSearch, onAllProjects, onShowAll }: { search: string | undefined; filter: Parameters<typeof emptyText>[0]; project: Project | undefined; othersHere: boolean; onClearSearch: () => void; onAllProjects: () => void; onShowAll: () => void }) {
+  const t = useT();
   if (search) {
     return (
       <Empty
         icon="search"
-        title={`No results for “${search}”`}
-        detail={`Nothing${project ? ` in ${projectName(project)}` : ''} has that in its name, branch or last message${filter === 'all' ? '' : ' here'}.`}
+        title={t('views.overview.noResults', { search })}
+        detail={project ? (filter === 'all' ? t('views.overview.noResultsDetailIn', { project: projectName(project) }) : t('views.overview.noResultsDetailInHere', { project: projectName(project) })) : filter === 'all' ? t('views.overview.noResultsDetail') : t('views.overview.noResultsDetailHere')}
         action={
           <EmptyActions>
-            <Button onClick={onClearSearch}>Clear Search</Button>
-            {filter !== 'all' && othersHere ? <Button variant="quiet" onClick={onShowAll}>Show All</Button> : null}
-            {project ? <Button variant="quiet" onClick={onAllProjects}>All Projects</Button> : null}
+            <Button onClick={onClearSearch}>{t('views.overview.clearSearch')}</Button>
+            {filter !== 'all' && othersHere ? <Button variant="quiet" onClick={onShowAll}>{t('views.overview.showAll')}</Button> : null}
+            {project ? <Button variant="quiet" onClick={onAllProjects}>{t('views.overview.allProjects')}</Button> : null}
           </EmptyActions>
         }
       />
@@ -237,33 +242,34 @@ function NothingHere({ search, filter, project, othersHere, onClearSearch, onAll
       icon={icon}
       title={text.title}
       detail={text.detail}
-      action={project ? <EmptyActions><Button onClick={onAllProjects}>Show All Projects</Button></EmptyActions> : undefined}
+      action={project ? <EmptyActions><Button onClick={onAllProjects}>{t('views.overview.showAllProjects')}</Button></EmptyActions> : undefined}
     />
   );
 }
 
 /** No workspaces at all: what this is, and the one action that fills it. */
 function NothingYet() {
+  const t = useT();
   const actions = useActions();
   const project = useApp((st) => st.projects.find((p) => p.root));
   return (
     <Empty
       icon="grid"
-      title="No workspaces yet"
-      detail={project ? `Start a worktree in ${project.name}: its own branch, with your agent on your task.` : 'Add your projects, then give your agent a task in a worktree of its own.'}
+      title={t('views.overview.noWorkspacesYet')}
+      detail={project ? t('views.overview.startIn', { name: project.name }) : t('views.overview.addFirst')}
       action={
         <EmptyActions>
           {project ? (
             <Button variant="primary" icon="branch" onClick={() => actions.run({ type: 'new_worktree', projectId: project.id })}>
-              New Worktree
+              {t('views.overview.newWorktree')}
             </Button>
           ) : (
             <Button variant="primary" icon="plus" onClick={() => actions.run({ type: 'add_project' })}>
-              Add Projects…
+              {t('views.overview.addProjects')}
             </Button>
           )}
           <Button icon="chat" onClick={() => actions.run({ type: 'new_chat', projectId: 'chats' })}>
-            New Chat
+            {t('views.overview.newChat')}
           </Button>
         </EmptyActions>
       }

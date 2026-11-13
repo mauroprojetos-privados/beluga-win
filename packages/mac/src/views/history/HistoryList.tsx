@@ -6,6 +6,8 @@ import { useActions } from '../../lib/actions.js';
 import { type GraphRow, laneColor, layoutGraph, segmentPath } from './graph.js';
 import { type Pill, authorColor, fullDate, initials, pillsOf, timeAgo } from './history-model.js';
 import s from './history.module.css';
+import { t } from '@beluga/shared/i18n/index.js';
+import { useLocale } from '../../lib/i18n.js';
 
 /** How the list looks: `full` one line per commit (a page, the project home); `compact` two (the panel). */
 export type ListVariant = 'full' | 'compact';
@@ -103,6 +105,7 @@ interface RowProps {
 }
 
 const CommitRow = memo(function CommitRow({ commit: c, row, lanes, variant, selected, refs, now, onSelect }: RowProps) {
+  useLocale();
   const pills = pillsOf(c.refs, refs);
   const head = c.refs.some((r) => r.kind === 'head');
   const when = timeAgo(c.date, now);
@@ -115,7 +118,7 @@ const CommitRow = memo(function CommitRow({ commit: c, row, lanes, variant, sele
     <div
       role="option"
       aria-selected={selected}
-      aria-label={`${c.subject}, ${c.author.name}, ${when}${c.incoming ? ', not in your checkout yet' : ''}`}
+      aria-label={t(c.incoming ? 'views.historyList.rowLabelIncoming' : 'views.historyList.rowLabel', { subject: c.subject, author: c.author.name, when })}
       data-hash={c.hash}
       className={cx(s.row, s[`row_${variant}`], selected && s.rowOn, c.incoming && s.rowIncoming)}
       style={{ height: ROW[variant] }}
@@ -133,7 +136,7 @@ const CommitRow = memo(function CommitRow({ commit: c, row, lanes, variant, sele
                 +{pills.length - MAX_PILLS}
               </span>
             ) : null}
-            {c.incoming ? <span className={cx(s.pill, s.pill_incoming)} title="On the remote, not in your checkout yet: Update main brings it in">incoming</span> : null}
+            {c.incoming ? <span className={cx(s.pill, s.pill_incoming)} title={t('views.historyList.incomingTitle')}>{t('views.historyList.incoming')}</span> : null}
             <span className={s.subject} title={c.subject}>
               {c.subject}
             </span>
@@ -158,7 +161,7 @@ const CommitRow = memo(function CommitRow({ commit: c, row, lanes, variant, sele
               {pills.slice(0, 2).map((p) => (
                 <RefPill key={`${p.tone}:${p.label}`} pill={p} />
               ))}
-              {c.incoming ? <span className={cx(s.pill, s.pill_incoming)}>incoming</span> : null}
+              {c.incoming ? <span className={cx(s.pill, s.pill_incoming)}>{t('views.historyList.incoming')}</span> : null}
               <span className={s.authorName}>{c.author.name}</span>
               <span className={s.dot}>·</span>
               {time}
@@ -184,7 +187,8 @@ export interface HistoryListProps {
 }
 
 /** Commits with their graph: lanes in color, merges reaching over, your worktrees' branches highlighted. */
-export function HistoryList({ commits, variant, selected, onSelect, refs, onEnd, loading, label = 'Commits' }: HistoryListProps) {
+export function HistoryList({ commits, variant, selected, onSelect, refs, onEnd, loading, label }: HistoryListProps) {
+  useLocale();
   const graph = useMemo(() => layoutGraph(commits), [commits]);
   const lanes = Math.max(1, Math.min(MAX_LANES, graph.width));
   const end = useRef<HTMLDivElement>(null);
@@ -210,12 +214,12 @@ export function HistoryList({ commits, variant, selected, onSelect, refs, onEnd,
     if (next) onSelect(next.hash);
   };
   return (
-    <div ref={list} className={cx(s.list, s[`list_${variant}`])} role="listbox" aria-label={label} tabIndex={0} onKeyDown={onKey}>
+    <div ref={list} className={cx(s.list, s[`list_${variant}`])} role="listbox" aria-label={label ?? t('views.history.commits')} tabIndex={0} onKeyDown={onKey}>
       {commits.map((c, i) => (
         <CommitRow key={c.hash} commit={c} row={graph.rows[i]!} lanes={lanes} variant={variant} selected={c.hash === selected} refs={refs} now={now} onSelect={onSelect} />
       ))}
       {onEnd ? <div ref={end} className={s.end} /> : null}
-      {loading && commits.length ? <div className={s.loadingMore}>Loading more…</div> : null}
+      {loading && commits.length ? <div className={s.loadingMore}>{t('views.historyList.loadingMore')}</div> : null}
     </div>
   );
 }

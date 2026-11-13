@@ -1,5 +1,6 @@
 import type { ImportedKey, TermAction } from '../../../../src/terminal/import/keys.js';
 import { type KeyPress, chordLabel, chordsOf } from './shortcuts-model.js';
+import { type Key, t } from '../../../../src/shared/i18n/index.js';
 
 /**
  * The terminal view's keys (BLG-537): what iTerm2 and Ghostty both do by default (⌘T a tab, ⌘D a
@@ -55,36 +56,38 @@ export function termKeyFor(keys: readonly TermKey[], e: KeyPress): TermKey | und
   return chords.length ? keys.find((k) => chords.includes(k.chord)) : undefined;
 }
 
-const LABELS: Readonly<Record<string, string>> = {
-  new_tab: 'New tab',
-  close: 'Close the pane (or the tab)',
-  next_tab: 'Next tab',
-  prev_tab: 'Previous tab',
-  split_right: 'Split right',
-  split_down: 'Split down',
-  focus_left: 'Pane to the left',
-  focus_right: 'Pane to the right',
-  focus_up: 'Pane above',
-  focus_down: 'Pane below',
-  focus_prev: 'Previous pane',
-  focus_next: 'Next pane',
-  zoom: 'Zoom the pane (and back)',
-  find: 'Find',
-  clear: 'Clear',
-  font_up: 'Bigger text',
-  font_down: 'Smaller text',
-  font_reset: 'Text back to its size',
-  copy: 'Copy',
-  paste: 'Paste',
-  select_all: 'Select all',
-  newest_visual: 'Open the newest graph or table',
+/** Each action's words, in the app's language when said (macLib.termKeys.*). */
+const LABELS: Readonly<Record<string, Key>> = {
+  new_tab: 'macLib.termKeys.new_tab',
+  close: 'macLib.termKeys.close',
+  next_tab: 'macLib.termKeys.next_tab',
+  prev_tab: 'macLib.termKeys.prev_tab',
+  split_right: 'macLib.termKeys.split_right',
+  split_down: 'macLib.termKeys.split_down',
+  focus_left: 'macLib.termKeys.focus_left',
+  focus_right: 'macLib.termKeys.focus_right',
+  focus_up: 'macLib.termKeys.focus_up',
+  focus_down: 'macLib.termKeys.focus_down',
+  focus_prev: 'macLib.termKeys.focus_prev',
+  focus_next: 'macLib.termKeys.focus_next',
+  zoom: 'macLib.termKeys.zoom',
+  find: 'macLib.termKeys.find',
+  clear: 'macLib.termKeys.clear',
+  font_up: 'macLib.termKeys.font_up',
+  font_down: 'macLib.termKeys.font_down',
+  font_reset: 'macLib.termKeys.font_reset',
+  copy: 'macLib.termKeys.copy',
+  paste: 'macLib.termKeys.paste',
+  select_all: 'macLib.termKeys.select_all',
+  newest_visual: 'macLib.termKeys.newest_visual',
 };
 
 /** A key's action in words ("Split right", "Tab 3", "Types Esc b"). */
 export function actionLabel(action: TermAction): string {
-  if (action.startsWith('tab:')) return `Tab ${action.slice(4)}`;
-  if (action.startsWith('text:')) return `Types ${visible(action.slice(5))}`;
-  return LABELS[action] ?? action;
+  if (action.startsWith('tab:')) return t('macLib.termKeys.tab', { n: action.slice(4) });
+  if (action.startsWith('text:')) return t('macLib.termKeys.types', { text: visible(action.slice(5)) });
+  const key = LABELS[action];
+  return key ? t(key) : action;
 }
 
 /** Characters as people read them (Esc, ⏎, ⇥, ^A). */
@@ -112,7 +115,7 @@ export function termKeyRows(keys: readonly TermKey[]): Array<{ label: string; ke
     .filter(([a]) => !a.startsWith('tab:') || a === 'tab:1')
     .sort(([a], [b]) => order(a) - order(b))
     .map(([action, list]) => ({
-      label: action === 'tab:1' ? 'Tab 1 to 9' : actionLabel(action as TermAction),
+      label: action === 'tab:1' ? t('macLib.termKeys.tabs') : actionLabel(action as TermAction),
       keys: action === 'tab:1' ? `${chordLabel('Cmd+1')} … ${chordLabel('Cmd+9')}` : list.map((k) => chordLabel(k.chord)).join('  '),
       ...(list.some((k) => k.from) ? { from: list.find((k) => k.from)!.from! } : {}),
     }));

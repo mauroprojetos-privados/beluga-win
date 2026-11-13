@@ -10,7 +10,7 @@ import type { BoardTools } from './types.js';
  * sub-tasks and mark what waits on what. Every change shows in the task's activity as Claude's.
  */
 
-export const BOARD_TOOL_NAMES = ['task_define', 'task_get', 'task_list', 'task_create', 'board_create', 'task_update', 'task_brief_edit', 'task_note', 'task_relate', 'task_attach_proof'].map((n) => `mcp__beluga_board__${n}`);
+export const BOARD_TOOL_NAMES = ['task_define', 'task_get', 'task_list', 'task_create', 'board_create', 'task_update', 'task_brief_edit', 'task_note', 'task_stop', 'task_relate', 'task_attach_proof'].map((n) => `mcp__beluga_board__${n}`);
 
 const key = z.string().min(2).max(40).optional().describe('The task’s key, like BOB-12. Leave out for the task this worktree is doing');
 const STATUS = z.enum(['backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled']);
@@ -148,6 +148,7 @@ export function createBoardToolDefs(board: BoardTools) {
       (a) => guarded(() => board.editBrief(a.key, a.section, a.content, a.reason, a.mode)),
     ),
     tool('task_note', 'Leave a note on a task’s activity: what you did, found or tried. Short.', { key, text: z.string().min(1).max(8000) }, (a) => guarded(() => board.note(a.key, a.text))),
+    tool('task_stop', 'Stop a task of yours that you can’t do as written: one of its "Stop and say why if" happened, or its context is wrong. Say why in one or two lines. Then go on with the tasks that don’t build on it.', { key, reason: z.string().min(1).max(1000) }, (a) => guarded(() => board.stop(a.key, a.reason))),
     tool(
       'task_relate',
       'Mark what waits on what: blocked_by (this task waits on other), blocks (other waits on this), related. remove: true takes it back.',

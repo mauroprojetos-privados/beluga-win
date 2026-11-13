@@ -7,6 +7,7 @@ import { useActions } from '../../lib/actions.js';
 import { type Recipient, type UiStore, toast, useApi, useApp, useBeluga } from '../../lib/beluga.js';
 import { Field, Sheet } from './parts.js';
 import s from './sharing.module.css';
+import { useT } from '../../lib/i18n.js';
 
 /** A conversation is on screen (where a message, or a command's output, shows up). */
 const chatShown = (v: View): boolean => v.kind === 'room' || ((v.kind === 'workspace' || v.kind === 'shared') && v.tab === 'chat');
@@ -26,6 +27,7 @@ export function addressTo(ui: UiStore, actions: Actions, view: View, to: Recipie
 export function RunCommandSheet({ peer, close }: { peer: PeerInfo; close: () => void }) {
   const api = useApi();
   const actions = useActions();
+  const t = useT();
   const { client } = useBeluga();
   const level = useApp((st) => st.granted[peer.peerId]?.level);
   const [cmd, setCmd] = useState('');
@@ -40,30 +42,32 @@ export function RunCommandSheet({ peer, close }: { peer: PeerInfo; close: () => 
   };
   return (
     <Sheet
-      title={`Run a Command on ${peer.name}’s Computer`}
-      subtitle={level === 'full' ? 'It runs right away. The output shows in the chat.' : `${peer.name} approves it first. The output shows in the chat.`}
+      title={t('native.workSheets.runOn', { name: peer.name })}
+      subtitle={level === 'full' ? t('native.peer.runsRightAway') : t('native.peer.approvesFirst', { name: peer.name })}
       icon="terminal"
       close={close}
       onReturn={run}
       footer={
         <>
           <span />
-          <ButtonRow onCancel={close} onOk={run} ok="Run" disabled={!cmd.trim()} />
+          <ButtonRow onCancel={close} onOk={run} ok={t('native.person.run')} disabled={!cmd.trim()} />
         </>
       }
     >
-      <Field label="Command" htmlFor="peer-command">
+      <Field label={t('native.workSheets.command')} htmlFor="peer-command">
+        {/* i18n-ignore: a command */}
         <input id="peer-command" className={s.input} style={{ fontFamily: 'var(--font-mono)' }} value={cmd} placeholder="npm test" spellCheck={false} autoFocus onChange={(e) => setCmd(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), run())} />
-        <span className={s.hint}>It runs in the folder {peer.name} shares, as {peer.name}.</span>
+        <span className={s.hint}>{t('native.peer.runsIn', { name: peer.name })}</span>
       </Field>
     </Sheet>
   );
 }
 
 function ButtonRow({ onCancel, onOk, ok, disabled }: { onCancel: () => void; onOk: () => void; ok: string; disabled?: boolean }) {
+  const t = useT();
   return (
     <>
-      <Button onClick={onCancel}>Cancel</Button>
+      <Button onClick={onCancel}>{t('common.cancel')}</Button>
       <Button variant="primary" disabled={disabled} onClick={onOk}>
         {ok}
       </Button>

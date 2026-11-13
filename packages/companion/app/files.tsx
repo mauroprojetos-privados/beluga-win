@@ -14,6 +14,7 @@ import type { FileEntryView, FolderView, FoundView, OutputView, Topic } from '..
 import { videoFormat } from '../lib/media';
 import { store } from '../lib/store';
 import { color, tint } from '../lib/theme';
+import { useT } from '../lib/language';
 
 /**
  * A worktree's files (BLG-42), read-only: folders and files with their icons, breadcrumbs to go
@@ -26,6 +27,7 @@ export default function Files() {
   const { scrolled, onScroll } = useScrolled();
   const { topic, name, path: start } = useLocalSearchParams<{ topic: string; name?: string; path?: string }>();
   const t = topic as Topic;
+  const say = useT();
   const insets = useSafeAreaInsets();
   const link = useLink();
   const [path, setPath] = useState(start ?? '');
@@ -44,7 +46,7 @@ export default function Files() {
     setError(undefined);
     // Asked once the link is open; until then what was seen this visit (or a spinner), or why not.
     if (link.phase !== 'open') {
-      if (!have && link.phase === 'asleep') setError('Your Mac is away. Its files come back when it answers.');
+      if (!have && link.phase === 'asleep') setError(say('phoneApp.files.away'));
       return;
     }
     store.call<FolderView>(calls.filesList(t, path), { queue: false }).then(
@@ -93,7 +95,7 @@ export default function Files() {
 
   const crumbs = useMemo(() => {
     const parts = path ? path.split('/') : [];
-    return [{ label: name ?? 'Worktree', path: '' }, ...parts.map((p, i) => ({ label: p, path: parts.slice(0, i + 1).join('/') }))];
+    return [{ label: name ?? say('phoneApp.conv.worktree'), path: '' }, ...parts.map((p, i) => ({ label: p, path: parts.slice(0, i + 1).join('/') }))];
   }, [path, name]);
 
   const open = (rel: string, dir: boolean, entry?: FileEntryView) => {
@@ -113,14 +115,14 @@ export default function Files() {
 
   return (
     <Screen>
-      <Header scrolled={scrolled} back eyebrow="Files · read only" title={name ?? 'Files'} lead={<IconBadge Icon={FolderTree} tone="sky" size={30} />} />
+      <Header scrolled={scrolled} back eyebrow={say('phoneApp.files.readOnly')} title={name ?? say('phoneApp.conv.files')} lead={<IconBadge Icon={FolderTree} tone="sky" size={30} />} />
       <Animated.View entering={FadeIn.duration(180)} style={{ paddingHorizontal: 16, paddingBottom: 8, gap: 10 }}>
         <Card r={18} style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, height: 42, gap: 8 }}>
           <Search color={color.text2} size={16} />
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="Find a file by name"
+            placeholder={say('phoneApp.files.find')}
             placeholderTextColor={color.text3}
             autoCapitalize="none"
             autoCorrect={false}
@@ -129,7 +131,7 @@ export default function Files() {
           />
           {finding ? <ActivityIndicator size="small" color={color.text3} /> : null}
           {query ? (
-            <Press onPress={() => setQuery('')} hitSlop={8} accessibilityLabel="Clear">
+            <Press onPress={() => setQuery('')} hitSlop={8} accessibilityLabel={say('phoneApp.files.clear')}>
               <X color={color.text2} size={17} />
             </Press>
           ) : null}
@@ -152,7 +154,7 @@ export default function Files() {
           </ScrollView>
         ) : (
           <T v="caption" style={{ paddingHorizontal: 4 }}>
-            {found.hits.length ? `${found.hits.length}${found.more ? '+' : ''} ${found.hits.length === 1 ? 'match' : 'matches'}` : 'Nothing by that name'}
+            {found.hits.length ? say(found.more ? 'phoneApp.files.matchesMore' : 'phoneApp.files.matches', { count: found.hits.length }) : say('phoneApp.files.nothing')}
           </T>
         )}
       </Animated.View>
@@ -165,7 +167,7 @@ export default function Files() {
           {path ? (
             <Press onPress={() => setPath('')}>
               <T v="callout" c={color.info}>
-                Back to the top
+                {say('phoneApp.files.top')}
               </T>
             </Press>
           ) : null}
@@ -185,7 +187,7 @@ export default function Files() {
           ListEmptyComponent={
             !found ? (
               <T v="callout" style={{ textAlign: 'center', marginTop: 30 }}>
-                This folder is empty
+                {say('phoneApp.files.empty')}
               </T>
             ) : undefined
           }
@@ -214,7 +216,7 @@ export default function Files() {
           ListFooterComponent={
             folder?.more && !found ? (
               <T v="caption" style={{ textAlign: 'center', marginTop: 12 }}>
-                The first 2,000 are shown. Search to find the rest.
+                {say('phoneApp.files.first2000')}
               </T>
             ) : undefined
           }

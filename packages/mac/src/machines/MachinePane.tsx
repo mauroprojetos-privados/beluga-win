@@ -12,6 +12,7 @@ import { paneOf, paneViewFor, windowViewFor } from './pane-model.js';
 import { background, retryMachine, useMachinePane } from './pane-clients.js';
 import { useMachineView } from './use-machines.js';
 import c from './machines.module.css';
+import { useT } from '../lib/i18n.js';
 
 /**
  * The window's center and panel (BLG-784): this Mac's, or, on a page of one of your computers,
@@ -35,20 +36,21 @@ function MachinePane({ machine }: { machine: string }) {
   const { client: home, ui: windowUi } = useBeluga();
   const pane = useMachinePane(machine, home, windowUi);
   const view = useMachineView(home, machine);
-  const name = view?.name ?? 'your computer';
+  const t = useT();
+  const name = view?.name ?? t('project.machines.yourComputer');
   if (!pane.client) {
     return (
       <main className={s.main} data-tauri-drag-region>
         <Empty
           icon="server"
           {...(view ? { mark: <MachineMark machine={view} size={22} /> } : {})}
-          title={pane.error ? `${name} can’t be reached` : `Opening ${name}…`}
+          title={pane.error ? t('project.machines.cantBeReached', { name }) : t('project.machines.opening', { name })}
           {...(pane.error ? { detail: pane.error } : {})}
           {...(pane.error
             ? {
                 action: (
                   <Button size="small" onClick={() => retryMachine(machine, home, windowUi)}>
-                    Try Again
+                    {t('common.retry')}
                   </Button>
                 ),
               }

@@ -6,6 +6,7 @@ import { builtInInstead } from '../shared/skills.js';
 import { answerTyped } from './collab-actions.js';
 import type { UiState } from './keymap.js';
 import type { UiAction } from './workspace-models.js';
+import { t } from '../shared/i18n/index.js';
 
 export interface SubmitContext {
   readonly client: BelugaClient;
@@ -82,7 +83,7 @@ export function submitTyped(c: SubmitContext, typed: string, urgent = false): vo
   }
   const pending = ui.pending;
   if (pending?.kind === 'peer_run' && pending.peerId) {
-    if (!text.trim()) return toast('Type a command first, or Esc to cancel');
+    if (!text.trim()) return toast(t('toasts.ui.typeCommand'));
     patchUi({ pending: undefined });
     void api.session.runOnPeerByHand(peerName(latest, pending.peerId), text.trim(), channelOf(latest.view));
     return;
@@ -90,7 +91,7 @@ export function submitTyped(c: SubmitContext, typed: string, urgent = false): vo
   if (pending) {
     // Only commands may be empty (to clear them); names and tasks need words.
     if (!text.trim() && pending.kind !== 'setup' && pending.kind !== 'run') {
-      toast(pending.kind === 'remote' ? 'Describe the task first, or Esc to cancel' : 'Type a name first, or Esc to cancel');
+      toast(pending.kind === 'remote' ? t('toasts.ui.describeFirst') : t('toasts.ui.nameFirst'));
       return;
     }
     patchUi({ pending: undefined });

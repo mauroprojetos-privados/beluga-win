@@ -28,6 +28,7 @@ import { newChatProject } from './project-home.js';
 import { type MenuBarCounts, SPOUT_EVERY_MS, spoutStep, trayTitle } from '../menubar/menubar-look.js';
 import { shownState } from '../network/net-model.js';
 import { SHOW_TILE, boardLinkOf } from './widget-links.js';
+import { t } from '../../../../src/shared/i18n/index.js';
 
 const isCommand = (id: string): id is CommandId => (COMMAND_IDS as readonly string[]).includes(id);
 
@@ -76,7 +77,7 @@ export function runMenuItem(id: string, client: SocketClient, ui: UiStore, actio
       if (project?.root) actions.run({ type: 'new_worktree', projectId: project.id });
       else {
         // A worktree needs a project: offer to add one, the way Add Project does.
-        client.store.dispatch({ type: 'toast', text: 'A worktree needs a project: add one first', level: 'warn' });
+        client.store.dispatch({ type: 'toast', text: t('macLib.native.needsProject'), level: 'warn' });
         actions.run({ type: 'add_project' });
       }
       return;
@@ -117,7 +118,7 @@ export function runMenuItem(id: string, client: SocketClient, ui: UiStore, actio
       const tab = id.slice('panel-'.length) as PanelTab;
       if (!PANEL_TABS.includes(tab)) return;
       return byMenu(`panel-${tab}`, () => {
-        if (!showPanelTab(state, tab)) client.store.dispatch({ type: 'toast', text: `No ${PANEL_LABELS[tab]} here`, level: 'info' });
+        if (!showPanelTab(state, tab)) client.store.dispatch({ type: 'toast', text: t('macLib.native.noTab', { tab: PANEL_LABELS[tab] }), level: 'info' });
       });
     }
     case 'appearance-system':

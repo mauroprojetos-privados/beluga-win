@@ -4,6 +4,7 @@ import { ScrollView, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { calls } from '../lib/link/calls';
 import type { SubAgentDetailView, SubAgentView, Topic, TurnView } from '../lib/link/protocol';
+import { t as tx } from '../lib/language';
 import { store } from '../lib/store';
 import { useOn } from '../lib/scope';
 import { color } from '../lib/theme';
@@ -23,7 +24,7 @@ import { IconBadge, Pill, Press, T, type Tone, toneBg, toneInk } from './ui';
 
 export const agentTone = (s: SubAgentView['status']): Tone => (s === 'running' ? 'lavender' : s === 'failed' ? 'rose' : 'mint');
 const agentIcon = (s: SubAgentView['status']) => (s === 'done' ? Check : s === 'failed' ? CircleAlert : Bot);
-const agentWord = (s: SubAgentView['status']): string => (s === 'running' ? 'Working' : s === 'failed' ? 'Failed' : 'Done');
+const agentWord = (s: SubAgentView['status']): string => (s === 'running' ? tx('phoneParts.working') : s === 'failed' ? tx('phoneParts.sentinels.failed') : tx('phoneParts.sentinels.done'));
 
 /** The agents the strip shows: the latest batch with one at work, then any other still working, in the order they started. */
 export function stripAgents(turns: readonly TurnView[]): SubAgentView[] {
@@ -87,7 +88,7 @@ function AgentNow({ a }: { readonly a: SubAgentView }) {
         <ToolBadge kind={a.tool ?? 'agent'} size={22} />
       </Breathe>
       <T v="callout" c={color.subagent} numberOfLines={1} style={{ flex: 1, fontWeight: '600' }}>
-        {a.step ?? 'Working'}
+        {a.step ?? tx('phoneParts.working')}
       </T>
       <TypingDots tone="lavender" />
       {time ? <T v="caption">{time}</T> : null}
@@ -146,7 +147,7 @@ export function SubAgentSheet({ topic, turn, agent, onClose }: { readonly topic:
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <IconBadge Icon={Bot} tone="lavender" size={30} />
               <T v="callout" style={{ flex: 1 }} numberOfLines={1}>
-                Sub-agent{a.type ? ` · ${a.type}` : ''}
+                {a.type ? tx('phoneParts.subs.ofType', { type: a.type }) : tx('phoneParts.subs.subAgent')}
               </T>
               <Pill label={agentWord(a.status)} tone={tone} />
             </View>
@@ -157,7 +158,7 @@ export function SubAgentSheet({ topic, turn, agent, onClose }: { readonly topic:
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 {time ? <Clock color={color.text3} size={13} /> : null}
                 <T v="caption">
-                  {[time, count ? `${count} ${count === 1 ? 'step' : 'steps'}` : ''].filter(Boolean).join(' · ')}
+                  {[time, count ? tx('phoneParts.live.steps', { count }) : ''].filter(Boolean).join(' · ')}
                 </T>
               </View>
             ) : null}
@@ -171,7 +172,7 @@ export function SubAgentSheet({ topic, turn, agent, onClose }: { readonly topic:
           {detail?.result ? (
             <Animated.View entering={FadeIn.duration(220)}>
               <T v="eyebrow" style={{ marginBottom: 10 }}>
-                {a.status === 'failed' ? 'What it said' : 'Its report'}
+                {a.status === 'failed' ? tx('phoneParts.subs.whatItSaid') : tx('phoneParts.subs.report')}
               </T>
               <Prose prose={detail.result} size={15} />
             </Animated.View>
@@ -179,17 +180,17 @@ export function SubAgentSheet({ topic, turn, agent, onClose }: { readonly topic:
           {before.length ? (
             <View>
               <T v="eyebrow" style={{ marginBottom: 10 }}>
-                Activity
+                {tx('phoneParts.view.activity')}
               </T>
               <StepList steps={before} shown={12} />
             </View>
           ) : a.status !== 'running' ? (
-            <T v="caption">No steps it took are kept.</T>
+            <T v="caption">{tx('phoneParts.subs.noSteps')}</T>
           ) : null}
           {a.outputs.length ? (
             <View>
               <T v="eyebrow" style={{ marginBottom: 10 }}>
-                Outputs · {a.outputs.length}
+                {tx('phoneParts.subs.outputs', { count: a.outputs.length })}
               </T>
               <OutputGrid items={a.outputs} cols={2} width={Math.min(width, 520) - 40} />
             </View>

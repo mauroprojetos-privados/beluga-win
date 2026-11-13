@@ -1,16 +1,22 @@
 import { isExternalRequester } from '../core/trust.js';
+import { type Key, type Params, t } from '../shared/i18n/index.js';
 import type { Approval, DomainState } from '../core/store.js';
-import { OFFER_DETAIL, knockWords, offerWords } from '../core/team/model.js';
+import type { TeamOffer } from '../core/team/model.js';
 import type { PendingQuestion } from '../core/collab-store.js';
 import type { TaskView as GwTask } from '../core/gateway/model.js';
 import { parseDecisionQid } from '../core/plans/decisions.js';
-import { type Plan, planTitle, reviewState } from '../core/plans/model.js';
+import { FAILS_TO_PAUSE, type Plan, planTitle, reviewState } from '../core/plans/model.js';
 import { firstLine, sentinelById } from '../core/sentinel/model.js';
 import { type PlanView as PlanProgress, planView } from '../core/plans/progress.js';
 import { type NeedsYou, Topic } from './protocol.js';
 import { plainLine, stripCode } from './strip.js';
 import { agentLabel } from '../shared/agent-label.js';
 import { type AgentRef, defaultAgentOf } from '../protocol.js';
+import { exhaustedCombos } from '../core/routing/model.js';
+import { hhmm } from '../shared/clock.js';
+import { botBehind } from '../core/bots/schema.js';
+import { isAssistant } from '../shared/assistant.js';
+import { stackKey, stackProblems } from '../core/stack-store.js';
 
 /**
  * Everything waiting for you, each with the API calls its buttons make: the phone's Needs You
@@ -19,7 +25,7 @@ import { type AgentRef, defaultAgentOf } from '../protocol.js';
  */
 
 export const clip = (s: string, max: number): string => (s.length > max ? `${s.slice(0, max - 1)}…` : s);
-export const agentRefView = (a: AgentRef): AgentRef => ({ runtime: clip(a.runtime, 32), label: clip(a.label, 64), ...(a.model ? { model: clip(a.model, 64) } : {}) });
+export const agentRefView = (a: AgentRef): AgentRef => ({ runtime: clip(a.runtime, 32), label: clip(a.label, 64), ...(a.model ? { model: clip(a.model, 64) } : {}), ...(a.comboName ? { comboName: clip(a.comboName, 64) } : {}) });
 const valid = (t: string): Topic | undefined => (Topic.safeParse(t).success ? (t as Topic) : undefined);
 
 /** A conversation's topic (`room` → `conv:room`, `ws:<id>` → `conv:ws:<id>`). */
@@ -47,8 +53,34 @@ function threadPlace(state: DomainState, channel: string | undefined): Pick<Need
   return ws?.thread ? { thread: clip(ws.name, 300) } : {};
 }
 
+/**
+ * A title said by key (protocol.ts `key`/`params`, docs/i18n.md): in this side's language, and with
+ * its key for a phone that says it in its own. An older phone reads the title.
+ */
+const keyed = (key: Key, params?: Params): { title: string; key: Key; params?: Params } => ({ title: clip(t(key, params), 500), key, ...(params ? { params } : {}) });
+/** A button said by key, the same way. */
+const btn = (key: Key, tone: 'main' | 'danger' | 'plain', method: string, args: unknown[]) => ({ label: clip(t(key), 40), key, tone, method, args });
+/** What an answer's send button says, by key. */
+const sendLabel = (key: Key): { label: string; key: Key } => ({ label: clip(t(key), 40), key });
+
+/** "Ata", "Ata and Mia", "Ata, Mia and 2 others", in the app's language. */
+function names(list: readonly string[]): string {
+  const [a = '', b = '', c = ''] = list;
+  if (list.length <= 1) return a;
+  if (list.length === 2) return t('daemon.needs.names.two', { a, b });
+  if (list.length === 3) return t('daemon.needs.names.three', { a, b, c });
+  return t('daemon.needs.names.more', { a, b, count: list.length - 2 });
+}
+
+/** A team offer's question (core/team/model.ts offerWords, asked): "Ata wants to team up on acme/api. Team up?". */
+function offerTitle(o: Pick<TeamOffer, 'name' | 'repo' | 'state' | 'team'>): { title: string; key: Key; params?: Params } {
+  const others = o.team?.filter((n) => n !== o.name) ?? [];
+  if (o.state === 'invited') return others.length ? keyed('daemon.needs.teamInvitedWith', { name: o.name, repo: o.repo, others: names(others) }) : keyed(o.team?.length ? 'daemon.needs.teamWantsJoin' : 'daemon.needs.teamWants', { name: o.name, repo: o.repo });
+  return keyed(others.length ? 'daemon.needs.teamAlsoInvite' : 'daemon.needs.teamAlso', { name: o.name, repo: o.repo });
+}
+
 function approvalItem(state: DomainState, a: Approval): NeedsYou {
-  const from = a.asker ?? (a.peer ? `${nameOf(state, a.peer) ?? 'a friend'}` : agentOf(state, undefined, ''));
+  const from = a.asker ?? (a.peer ? `${nameOf(state, a.peer) ?? t('daemon.needs.aFriend')}` : agentOf(state, undefined, ''));
   // A friends' chat opens that chat (a request from there, your Claude working there: BLG-207).
   // An external agent's own place has no chat to open.
   const topic = a.channel && !isExternalRequester(a.channel) ? (/^(dm|group):/.test(a.channel) ? chatTopic(a.channel) : convTopic(a.channel)) : undefined;
@@ -63,10 +95,10 @@ function approvalItem(state: DomainState, a: Approval): NeedsYou {
     ...(a.askedAt !== undefined ? { askedAt: a.askedAt } : {}),
     ...(a.timeoutMs !== undefined ? { timeoutMs: a.timeoutMs } : {}),
     actions: [
-      { label: a.once ? 'Allow once' : 'Approve', tone: 'main', method: 'host.answerApproval', args: ['yes', a.id] },
-      { label: 'Decline', tone: 'danger', method: 'host.answerApproval', args: ['no', a.id] },
+      btn(a.once ? 'needs.allowOnce' : 'needs.approve', 'main', 'host.answerApproval', ['yes', a.id]),
+      btn('needs.decline', 'danger', 'host.answerApproval', ['no', a.id]),
       // A friend's request for a secret is asked each time: no Always.
-      ...(a.once ? [] : [{ label: 'Always', tone: 'plain' as const, method: 'host.answerApproval', args: ['always', a.id] }]),
+      ...(a.once ? [] : [btn('needs.always', 'plain', 'host.answerApproval', ['always', a.id])]),
     ],
   };
 }
@@ -74,21 +106,21 @@ function approvalItem(state: DomainState, a: Approval): NeedsYou {
 /** Claude's question (or plan to approve), or a plan task waiting on your decision. */
 function questionItem(state: DomainState, q: PendingQuestion): NeedsYou {
   const topic = convTopic(q.channel);
-  const owner = agentOf(state, q.owner, nameOf(state, q.owner) ?? 'a friend');
+  const owner = agentOf(state, q.owner, nameOf(state, q.owner) ?? t('daemon.needs.aFriend'));
   const base = { id: `question:${q.qid}`, from: owner, ...(topic ? { topic } : {}), ...threadPlace(state, q.channel) };
   if (q.question.kind === 'plan') {
     return {
       ...base,
       kind: 'question',
-      title: `${owner.charAt(0).toUpperCase()}${owner.slice(1)} has a plan for you to approve`,
+      ...keyed('needs.planToApprove', { owner: `${owner.charAt(0).toUpperCase()}${owner.slice(1)}` }),
       detail: clip(stripCode(q.question.plan).text, 64_000),
       freeText: true,
       actions: [
-        { label: 'Approve', tone: 'main', method: 'questions.answer', args: [q.qid, { kind: 'plan', approve: true, feedback: '' }] },
-        { label: 'Keep planning', tone: 'danger', method: 'questions.answer', args: [q.qid, { kind: 'plan', approve: false, feedback: '' }] },
+        btn('needs.approve', 'main', 'questions.answer', [q.qid, { kind: 'plan', approve: true, feedback: '' }]),
+        btn('needs.keepPlanning', 'danger', 'questions.answer', [q.qid, { kind: 'plan', approve: false, feedback: '' }]),
       ],
       // Your words: what to change in the plan (it keeps planning with them).
-      answer: { method: 'questions.answer', args: [q.qid, { kind: 'plan', approve: false, feedback: '' }], slot: [1, 'feedback'], text: true, picks: false, label: 'Send changes' },
+      answer: { method: 'questions.answer', args: [q.qid, { kind: 'plan', approve: false, feedback: '' }], slot: [1, 'feedback'], text: true, picks: false, ...sendLabel('needs.sendChanges') },
     };
   }
   const [first, ...rest] = q.question.questions.filter((x) => !(x.question in q.picked));
@@ -103,12 +135,12 @@ function questionItem(state: DomainState, q: PendingQuestion): NeedsYou {
   // Several picks (joined with ", " as the Mac does) or your own words go where `slot` says: the
   // last question sends every answer (questions.answer); an earlier one is kept with questions.pick.
   const answer: NonNullable<NeedsYou['answer']> = last
-    ? { method: 'questions.answer', args: [q.qid, { kind: 'answers', answers: { ...picked, [head.question]: '' } }], slot: [1, 'answers', head.question], join: ', ', text: true, picks: head.options.length > 0, label: 'Send' }
-    : { method: 'questions.pick', args: [q.qid, head.question, ''], slot: [2], join: ', ', text: true, picks: head.options.length > 0, label: 'Next' };
+    ? { method: 'questions.answer', args: [q.qid, { kind: 'answers', answers: { ...picked, [head.question]: '' } }], slot: [1, 'answers', head.question], join: ', ', text: true, picks: head.options.length > 0, ...sendLabel('needs.send') }
+    : { method: 'questions.pick', args: [q.qid, head.question, ''], slot: [2], join: ', ', text: true, picks: head.options.length > 0, ...sendLabel('needs.next') };
   return {
     ...base,
     kind: decision ? 'decision' : 'question',
-    ...(decision ? { from: plan ? `the plan “${clip(planTitle(plan), 80)}”` : 'a plan' } : {}),
+    ...(decision ? { from: plan ? t('daemon.needs.thePlan', { title: clip(planTitle(plan), 80) }) : t('daemon.needs.aPlan') } : {}),
     ...(decision && planT ? { topic: planT } : {}),
     title: clip(plainLine(head.question, 500), 500),
     ...(rest.length ? { detail: clip(rest.map((r) => plainLine(r.question, 1000)).join('\n'), 64_000) } : {}),
@@ -118,7 +150,7 @@ function questionItem(state: DomainState, q: PendingQuestion): NeedsYou {
     // One question with a few options: a button each (the phone sends the rest, multi-select or words, itself).
     actions: [
       ...(single ? head.options.map((o) => ({ label: clip(o.label, 40), tone: 'plain' as const, method: 'questions.answer', args: [q.qid, { kind: 'answers', answers: { ...picked, [head.question]: o.label } }] })) : []),
-      { label: 'Skip', tone: 'danger', method: 'questions.answer', args: [q.qid, { kind: 'skip' }] },
+      btn('needs.skip', 'danger', 'questions.answer', [q.qid, { kind: 'skip' }]),
     ],
     answer,
   };
@@ -132,16 +164,16 @@ function gatewayItems(state: DomainState, t: GwTask): NeedsYou[] {
       {
         id: `confirm:${t.id}`,
         kind: 'confirm',
-        title: `Ask ${agentOf(state, t.peerId, clip(t.peerName, 60))}?`,
+        ...keyed('needs.askAgent', { agent: agentOf(state, t.peerId, clip(t.peerName, 60)) }),
         detail: clip(plainLine(t.ask, 64_000), 64_000),
         from: agentOf(state, undefined, ''),
         ...at,
         askedAt: t.createdAt,
         actions: [
-          { label: 'Ask', tone: 'main', method: 'gateway.confirm', args: [t.id, true] },
+          btn('needs.ask', 'main', 'gateway.confirm', [t.id, true]),
           // Send it, and let your Claude ask them without checking from now on.
-          { label: 'Always', tone: 'plain', method: 'gateway.confirm', args: [t.id, true, '', true] },
-          { label: 'Not now', tone: 'danger', method: 'gateway.confirm', args: [t.id, false] },
+          btn('needs.always', 'plain', 'gateway.confirm', [t.id, true, '', true]),
+          btn('needs.notNow', 'danger', 'gateway.confirm', [t.id, false]),
         ],
       },
     ];
@@ -165,9 +197,9 @@ function gatewayItems(state: DomainState, t: GwTask): NeedsYou[] {
         freeText: t.question.questions.length === 1,
         actions: [
           ...(single ? head.options.map((o) => ({ label: clip(o.label, 40), tone: 'plain' as const, method: 'gateway.answer', args: [t.id, [o.label]] })) : []),
-          { label: 'Skip', tone: 'danger', method: 'gateway.answer', args: [t.id, 'skip'] },
+          btn('needs.skip', 'danger', 'gateway.answer', [t.id, 'skip']),
         ],
-        ...(t.question.questions.length === 1 ? { answer: { method: 'gateway.answer', args: [t.id, ['']], slot: [1, 0], join: ', ', text: true, picks: head.options.length > 0, label: 'Send' } } : {}),
+        ...(t.question.questions.length === 1 ? { answer: { method: 'gateway.answer', args: [t.id, ['']], slot: [1, 0], join: ', ', text: true, picks: head.options.length > 0, ...sendLabel('needs.send') } } : {}),
       },
     ];
   }
@@ -177,15 +209,15 @@ function gatewayItems(state: DomainState, t: GwTask): NeedsYou[] {
       {
         id: `request:${t.id}`,
         kind: 'request',
-        title: clip(t.secret ? `${t.peerName} wants ${t.secret.label}` : t.summary ? `${t.peerName}: ${t.summary}` : `${t.peerName} asks ${agentOf(state, undefined, '')}`, 500),
+        ...(t.secret ? keyed('daemon.needs.wantsSecret', { name: t.peerName, secret: t.secret.label }) : t.summary ? keyed('daemon.needs.saysSummary', { name: t.peerName, summary: t.summary }) : keyed('daemon.needs.asksAgent', { name: t.peerName, agent: agentOf(state, undefined, '') })),
         detail: clip(plainLine(t.ask, 64_000), 64_000),
         from: clip(t.peerName, 100),
         ...(t.chat && chatTopic(t.chat) ? { topic: chatTopic(t.chat)! } : {}),
         askedAt: t.createdAt,
         actions: [
-          { label: t.secret ? 'Allow once' : 'Approve', tone: 'main', method: 'gateway.decide', args: [t.id, { answer: 'yes' }] },
-          { label: 'Decline', tone: 'danger', method: 'gateway.decide', args: [t.id, { answer: 'no' }] },
-          ...(t.secret ? [] : [{ label: 'Always', tone: 'plain' as const, method: 'gateway.decide', args: [t.id, { answer: 'always' }] }]),
+          btn(t.secret ? 'needs.allowOnce' : 'needs.approve', 'main', 'gateway.decide', [t.id, { answer: 'yes' }]),
+          btn('needs.decline', 'danger', 'gateway.decide', [t.id, { answer: 'no' }]),
+          ...(t.secret ? [] : [btn('needs.always', 'plain', 'gateway.decide', [t.id, { answer: 'always' }])]),
         ],
       },
     ];
@@ -205,47 +237,61 @@ function stuckItems(plan: Plan, progress: PlanProgress, at: Pick<NeedsYou, 'topi
     .map(([taskId, w]): NeedsYou => ({
       id: `plan:${plan.id}:stalled:${taskId}`,
       kind: 'decision',
-      title: clip(`“${titles.get(taskId) ?? 'A task'}” stopped twice: resume it?`, 500),
+      ...keyed('needs.taskStalled', { title: titles.get(taskId) ?? t('needs.aTask') }),
       detail: clip(w.reason, 64_000),
       ...at,
       askedAt: w.at,
-      actions: [{ label: 'Resume', tone: 'main', method: 'plans.resumeTask', args: [plan.id, taskId] }],
+      actions: [btn('needs.resume', 'main', 'plans.resumeTask', [plan.id, taskId])],
     }));
   const rescued = Object.entries(plan.rescue ?? {})
     .filter(([, r]) => r.yours)
     .map(([unitId, r]): NeedsYou => ({
       id: `plan:${plan.id}:rescue:${unitId}`,
       kind: 'stuck',
-      title: clip(`Stuck${titles.has(unitId) ? ` on “${titles.get(unitId)}”` : ''}`, 500),
-      detail: clip(r.tried.length ? `Beluga tried: ${r.tried.join('; ')}` : 'Beluga couldn’t move it on by itself', 64_000),
+      ...(titles.has(unitId) ? keyed('daemon.needs.stuckOn', { title: titles.get(unitId)! }) : keyed('daemon.needs.stuck')),
+      detail: clip(r.tried.length ? t('daemon.needs.belugaTried', { list: r.tried.join('; ') }) : t('daemon.needs.belugaCouldnt'), 64_000),
       ...at,
       askedAt: r.at,
       actions: [],
     }));
+  // A milestone whose check failed again and again: the plan paused itself and waits for you (no button: it opens the plan).
+  const failing = plan.paused
+    ? Object.entries(plan.runs ?? {})
+        .filter(([, run]) => (run.fails ?? 0) >= FAILS_TO_PAUSE && !run.passedAt)
+        .map(([milestoneId, run]): NeedsYou => ({
+          id: `plan:${plan.id}:failing:${milestoneId}`,
+          kind: 'stuck',
+          ...keyed('daemon.needs.failingMilestone', { title: titles.get(milestoneId) ?? t('daemon.needs.aMilestone'), count: run.fails! }),
+          detail: clip(plainLine(run.check?.notes ?? '', 4000), 4000),
+          ...at,
+          askedAt: run.check?.at ?? plan.updatedAt,
+          actions: [],
+        }))
+    : [];
   // A merge conflict Claude couldn't fix (a milestone into the plan's branch, or main into it for its PR): ask it again.
   const merging = Object.entries(plan.merging ?? {}).filter(([, m]) => m.conflict?.stuck);
   const conflicts = [
-    ...merging.map(([id, m]) => ({ key: id, files: m.conflict!.files, at: m.conflict!.at, what: `merging “${titles.get(id) ?? 'a milestone'}” into ${plan.branch ?? 'the plan’s branch'}` })),
-    ...(plan.mainMerge?.conflict?.stuck ? [{ key: 'main', files: plan.mainMerge.conflict.files, at: plan.mainMerge.conflict.at, what: `merging ${plan.mainMerge.main} into ${plan.branch ?? 'the plan’s branch'} for its pull request` }] : []),
+    ...merging.map(([id, m]) => ({ key: id, files: m.conflict!.files, at: m.conflict!.at, what: t('daemon.needs.mergingInto', { title: titles.get(id) ?? t('daemon.needs.aMilestone'), branch: plan.branch ?? t('daemon.needs.thePlansBranch') }) })),
+    ...(plan.mainMerge?.conflict?.stuck ? [{ key: 'main', files: plan.mainMerge.conflict.files, at: plan.mainMerge.conflict.at, what: t('daemon.needs.mergingMain', { main: plan.mainMerge.main, branch: plan.branch ?? t('daemon.needs.thePlansBranch') }) }] : []),
   ].map(
     (c): NeedsYou => ({
       id: `plan:${plan.id}:conflict:${c.key}`,
       kind: 'stuck',
-      title: clip('A merge conflict Claude couldn’t fix', 500),
-      detail: clip(`While ${c.what}: ${c.files.join(', ')}`, 64_000),
+      ...keyed('needs.conflictStuck'),
+      detail: clip(t('daemon.needs.whileMerging', { what: c.what, files: c.files.join(', ') }), 64_000),
       ...at,
       askedAt: c.at,
-      actions: [{ label: 'Ask Claude again', tone: 'main', method: 'plans.retryConflicts', args: [plan.id] }],
+      actions: [btn('needs.askClaudeAgain', 'main', 'plans.retryConflicts', [plan.id])],
     }),
   );
-  return [...stalled, ...rescued, ...conflicts];
+  return [...stalled, ...rescued, ...failing, ...conflicts];
 }
 
 /** What a plan waits for from you: approving its draft, passing a milestone at its gate, or what it couldn't move on itself. */
 function planItems(plan: Plan, progress: PlanProgress): NeedsYou[] {
   const title = clip(planTitle(plan), 200);
   const topic = planTopic(plan.id);
-  const at = { ...(topic ? { topic } : {}), from: 'your plan' };
+  const at = { ...(topic ? { topic } : {}), from: t('daemon.needs.yourPlan') };
   return [...gateItems(plan, progress, title, at), ...stuckItems(plan, progress, at)];
 }
 
@@ -262,14 +308,14 @@ function gateItems(plan: Plan, progress: PlanProgress, title: string, at: Pick<N
       {
         id: `plan:${plan.id}:review:${plan.draftRev}`,
         kind: 'decision',
-        title: `The reviewer found ${found.length === 1 ? 'one thing' : `${found.length} things`} to fix in “${title}”`,
+        ...keyed('needs.reviewFound', { count: found.length, title }),
         detail: clip(found.map((f, i) => `${i + 1}. ${plainLine(f.text, 1000)}`).join('\n'), 64_000),
         ...at,
         askedAt: plan.review.at,
         actions: [
-          { label: 'Fix', tone: 'main', method: 'plans.fixReview', args: [plan.id] },
-          { label: 'Approve anyway', tone: 'plain', method: 'plans.approve', args: [plan.id] },
-          { label: 'Discard', tone: 'danger', method: 'plans.discard', args: [plan.id] },
+          btn('needs.fix', 'main', 'plans.fixReview', [plan.id]),
+          btn('needs.approveAnyway', 'plain', 'plans.approve', [plan.id]),
+          btn('needs.discard', 'danger', 'plans.discard', [plan.id]),
         ],
       },
     ];
@@ -279,15 +325,15 @@ function gateItems(plan: Plan, progress: PlanProgress, title: string, at: Pick<N
       {
         id: `plan:${plan.id}:approve:${plan.draftRev}`,
         kind: 'decision',
-        title: next.kind === 'approve' ? `Approve the plan “${title}”?` : `Approve the changes to “${title}”?`,
+        ...keyed(next.kind === 'approve' ? 'needs.approvePlan' : 'needs.approveChanges', { title }),
         ...(plan.draft?.goal ? { detail: clip(plainLine(plan.draft.goal, 4000), 4000) } : {}),
         ...at,
         askedAt: plan.updatedAt,
         actions: [
-          { label: 'Approve', tone: 'main', method: 'plans.approve', args: [plan.id] },
+          btn('needs.approve', 'main', 'plans.approve', [plan.id]),
           // A first draft can be read by a fresh agent first, and approved once it reads well (BLG-772).
-          ...(next.kind === 'approve' ? [{ label: 'Verify, then approve', tone: 'plain' as const, method: 'plans.verify', args: [plan.id, { thenApprove: true }] }] : []),
-          { label: 'Discard', tone: 'danger', method: 'plans.discard', args: [plan.id] },
+          ...(next.kind === 'approve' ? [btn('needs.verifyThenApprove', 'plain', 'plans.verify', [plan.id, { thenApprove: true }])] : []),
+          btn('needs.discard', 'danger', 'plans.discard', [plan.id]),
         ],
       },
     ];
@@ -300,16 +346,16 @@ function gateItems(plan: Plan, progress: PlanProgress, title: string, at: Pick<N
       {
         id: `plan:${plan.id}:pass:${m.id}`,
         kind: 'decision',
-        title: failed ? `“${clip(m.title, 200)}” couldn’t merge: pass it again?` : `“${clip(m.title, 200)}” is ready: pass it?`,
+        ...keyed(failed ? 'needs.milestoneMergeFailed' : 'needs.milestoneReady', { title: clip(m.title, 200) }),
         detail: clip(failed ? failed.reason : m.criteria.join('\n'), 64_000),
         ...at,
         // Send it back takes your words (the answer template).
         freeText: true,
         actions: [
-          { label: 'Pass', tone: 'main', method: 'plans.pass', args: [plan.id, m.id] },
-          { label: 'Check again', tone: 'plain', method: 'plans.recheck', args: [plan.id, m.id] },
+          btn('needs.pass', 'main', 'plans.pass', [plan.id, m.id]),
+          btn('needs.checkAgain', 'plain', 'plans.recheck', [plan.id, m.id]),
         ],
-        answer: { method: 'plans.sendBack', args: [plan.id, m.id, ''], slot: [2], text: true, picks: false, label: 'Send back' },
+        answer: { method: 'plans.sendBack', args: [plan.id, m.id, ''], slot: [2], text: true, picks: false, ...sendLabel('needs.sendBack') },
       },
     ];
   }
@@ -321,18 +367,18 @@ export const progressOf = (state: DomainState, plan: Plan): PlanProgress => plan
 /** Someone came to the door with a link you made: let them in (with what the link offers) or turn them away. */
 function knockItems(state: DomainState): NeedsYou[] {
   return state.knocks.map((k) => {
-    const name = nameOf(state, k.peerId) ?? state.guests[k.peerId]?.name ?? 'Someone';
+    const name = nameOf(state, k.peerId) ?? state.guests[k.peerId]?.name ?? t('daemon.needs.someone');
     const link = state.links.find((l) => l.id === k.linkId);
     return {
       id: `knock:${k.peerId}`,
       kind: 'request',
-      title: clip(`${name} wants to come in`, 500),
-      detail: clip(link ? `With your link to ${link.label}` : 'With one of your links', 64_000),
+      ...keyed('needs.wantsToComeIn', { name }),
+      detail: clip(link ? t('daemon.needs.withLink', { label: link.label }) : t('daemon.needs.withALink'), 64_000),
       from: clip(name, 100),
       ...(k.ts ? { askedAt: k.ts } : {}),
       actions: [
-        { label: 'Let in', tone: 'main', method: 'invites.letIn', args: [k.peerId] },
-        { label: 'Turn away', tone: 'danger', method: 'invites.decline', args: [k.peerId] },
+        btn('needs.letIn', 'main', 'invites.letIn', [k.peerId]),
+        btn('needs.turnAway', 'danger', 'invites.decline', [k.peerId]),
       ],
     };
   });
@@ -348,13 +394,13 @@ function joinItems(state: DomainState): NeedsYou[] {
         return {
           id: `join:${g.id}:${r.peerId}`,
           kind: 'request',
-          title: clip(`${r.name} asks to join ${g.name}`, 500),
+          ...keyed('daemon.needs.asksToJoin', { name: r.name, group: g.name }),
           from: clip(r.name, 100),
           ...(topic ? { topic } : {}),
           askedAt: r.ts,
           actions: [
-            { label: 'Let in', tone: 'main' as const, method: 'network.groups.approve', args: [g.id, r.peerId] },
-            { label: 'Decline', tone: 'danger' as const, method: 'network.groups.decline', args: [g.id, r.peerId] },
+            btn('needs.letIn', 'main', 'network.groups.approve', [g.id, r.peerId]),
+            btn('needs.decline', 'danger', 'network.groups.decline', [g.id, r.peerId]),
           ],
         };
       }),
@@ -368,13 +414,13 @@ function offerItems(state: DomainState): NeedsYou[] {
     .map((o) => ({
       id: `friend:${o.peerId}`,
       kind: 'request' as const,
-      title: clip(o.via ? `${o.name} from the ${o.via} team wants to add you as a friend` : `${o.name} wants to add you as a friend`, 500),
-      detail: 'You’re in the same room. As friends you can talk, share and ask each other’s agents, with nobody hosting',
+      ...(o.via ? keyed('daemon.needs.friendOfferVia', { name: o.name, team: o.via }) : keyed('daemon.needs.friendOffer', { name: o.name })),
+      detail: t('daemon.needs.friendOfferDetail'),
       from: clip(o.name, 100),
       askedAt: o.at,
       actions: [
-        { label: 'Accept', tone: 'main' as const, method: 'network.friends.answerOffer', args: [o.peerId, true] },
-        { label: 'Not now', tone: 'danger' as const, method: 'network.friends.answerOffer', args: [o.peerId, false] },
+        btn('daemon.needs.accept', 'main', 'network.friends.answerOffer', [o.peerId, true]),
+        btn('needs.notNow', 'danger', 'network.friends.answerOffer', [o.peerId, false]),
       ],
     }));
 }
@@ -384,19 +430,19 @@ function callItems(state: DomainState): NeedsYou[] {
   return Object.values(state.network.calls ?? {})
     .filter((c) => c.mine === 'ringing')
     .map((c) => {
-      const by = state.network.friends.find((f) => f.peerId === c.ringBy)?.name ?? c.people.find((p) => p.peerId === c.ringBy)?.name ?? 'Someone';
+      const by = state.network.friends.find((f) => f.peerId === c.ringBy)?.name ?? c.people.find((p) => p.peerId === c.ringBy)?.name ?? t('daemon.needs.someone');
       const group = c.conversation.startsWith('group:') ? state.network.groups.find((g) => g.id === c.conversation.slice(6)) : undefined;
       return {
         id: `call:${c.id}`,
         kind: 'call',
-        title: clip(`${by} is calling${group ? ` in #${group.name}` : ''}`, 500),
-        detail: c.people.length > 1 ? clip(`${c.people.map((p) => p.name).join(', ')} are in the call`, 500) : 'Your Mac picks it up when you answer',
+        ...(group ? keyed('daemon.needs.callingIn', { name: by, group: group.name }) : keyed('daemon.needs.calling', { name: by })),
+        detail: c.people.length > 1 ? clip(t('daemon.needs.inTheCall', { names: c.people.map((p) => p.name).join(', ') }), 500) : t('daemon.needs.macPicksUp'),
         from: clip(by, 100),
         topic: 'chats' as const,
         ...(c.ringSince ? { askedAt: c.ringSince } : {}),
         actions: [
-          { label: 'Answer on Mac', tone: 'main' as const, method: 'calls.join', args: [c.conversation] },
-          { label: 'Decline', tone: 'danger' as const, method: 'calls.decline', args: [c.conversation] },
+          btn('daemon.needs.answerOnMac', 'main', 'calls.join', [c.conversation]),
+          btn('needs.decline', 'danger', 'calls.decline', [c.conversation]),
         ],
       };
     });
@@ -409,13 +455,13 @@ function teamOfferItems(state: DomainState): NeedsYou[] {
     .map((o) => ({
       id: `team:${o.peerId}:${o.projectId}`,
       kind: 'request' as const,
-      title: clip(`${offerWords(o)}. ${o.state === 'invited' && o.team?.length ? 'Join?' : 'Team up?'}`, 500),
-      detail: OFFER_DETAIL,
+      ...offerTitle(o),
+      detail: t('daemon.needs.teamDetail'),
       from: clip(o.name, 100),
       askedAt: o.at,
       actions: [
-        { label: 'Team Up', tone: 'main' as const, method: 'team.answer', args: [o.peerId, o.projectId, true] },
-        { label: 'Not Now', tone: 'danger' as const, method: 'team.answer', args: [o.peerId, o.projectId, false] },
+        btn('daemon.needs.teamUp', 'main', 'team.answer', [o.peerId, o.projectId, true]),
+        btn('daemon.needs.notNow', 'danger', 'team.answer', [o.peerId, o.projectId, false]),
       ],
     }));
 }
@@ -428,12 +474,12 @@ function assignedItems(state: DomainState): NeedsYou[] {
       {
         id: `team-task:${a.issueId}`,
         kind: 'request' as const,
-        title: clip(`${a.by} gave you ${a.key}: ${a.title}`, 500),
-        detail: 'It’s in your tasks, on your board for this repository.',
+        ...keyed('daemon.needs.gaveYou', { by: a.by, key: a.key, title: a.title }),
+        detail: t('daemon.needs.gaveYouDetail'),
         from: clip(a.by, 100),
         ...(topic ? { topic } : {}),
         askedAt: a.at,
-        actions: [{ label: 'Got It', tone: 'main' as const, method: 'team.ackAssignment', args: [a.issueId] }],
+        actions: [btn('daemon.needs.gotIt', 'main', 'team.ackAssignment', [a.issueId])],
       },
     ];
   });
@@ -446,15 +492,15 @@ function worktreeKnockItems(state: DomainState): NeedsYou[] {
     return {
       id: `wt-knock:${k.id}`,
       kind: 'request' as const,
-      title: clip(knockWords(k), 500),
+      ...keyed('daemon.needs.knocking', { name: k.name, worktree: k.worktree }),
       detail: clip(k.note ? `“${k.note}” · ${k.key}: ${k.title}` : `${k.key}: ${k.title}`, 64_000),
       from: clip(k.name, 100),
       ...(topic ? { topic } : {}),
       askedAt: k.at,
       actions: [
-        { label: 'Let In as Editor', tone: 'main' as const, method: 'team.answerKnock', args: [k.id, 'contribute'] },
-        { label: 'Not Now', tone: 'danger' as const, method: 'team.answerKnock', args: [k.id, 'decline'] },
-        { label: 'Let In as Viewer', tone: 'plain' as const, method: 'team.answerKnock', args: [k.id, 'view'] },
+        btn('daemon.needs.letInEditor', 'main', 'team.answerKnock', [k.id, 'contribute']),
+        btn('daemon.needs.notNow', 'danger', 'team.answerKnock', [k.id, 'decline']),
+        btn('daemon.needs.letInViewer', 'plain', 'team.answerKnock', [k.id, 'view']),
       ],
     };
   });
@@ -471,16 +517,16 @@ function sharedPlanItems(state: DomainState): NeedsYou[] {
     .map((p) => ({
       id: `team-plan:${p.owner}:${p.id}:${p.rev}`,
       kind: 'decision' as const,
-      title: clip(`${p.ownerName} shared the plan “${p.title}”: approve it?`, 500),
+      ...keyed('daemon.needs.sharedPlan', { owner: p.ownerName, title: p.title }),
       detail: clip(
-        [plainLine(p.body.goal, 2000), ...p.body.milestones.map((m, i) => `${i + 1}. ${m.title} (${m.tasks.length} task${m.tasks.length === 1 ? '' : 's'})`)].filter(Boolean).join('\n'),
+        [plainLine(p.body.goal, 2000), ...p.body.milestones.map((m, i) => t('daemon.needs.milestoneLine', { n: i + 1, title: m.title, count: m.tasks.length }))].filter(Boolean).join('\n'),
         64_000,
       ),
       from: clip(p.ownerName, 100),
       askedAt: p.updatedAt,
       freeText: true,
-      actions: [{ label: 'Approve', tone: 'main' as const, method: 'team.reviewPlan', args: [p.owner, p.id, { kind: 'approve' }] }],
-      answer: { method: 'team.reviewPlan', args: [p.owner, p.id, { kind: 'comment', text: '' }], slot: [2, 'text'], text: true, picks: false, label: 'Comment' },
+      actions: [btn('needs.approve', 'main', 'team.reviewPlan', [p.owner, p.id, { kind: 'approve' }])],
+      answer: { method: 'team.reviewPlan', args: [p.owner, p.id, { kind: 'comment', text: '' }], slot: [2, 'text'], text: true, picks: false, ...sendLabel('daemon.needs.comment') },
     }));
   const mine = Object.values(state.team.planShares).flatMap((share) => {
     const plan = state.plans.plans.find((p) => p.id === share.planId);
@@ -490,14 +536,14 @@ function sharedPlanItems(state: DomainState): NeedsYou[] {
       .map((r) => ({
         id: `team-suggest:${r.id}`,
         kind: 'decision' as const,
-        title: clip(`${r.name} suggests ${r.ops?.length === 1 ? 'a change' : `${r.ops?.length ?? 0} changes`} to “${planTitle(plan)}”`, 500),
+        ...keyed('daemon.needs.suggests', { name: r.name, count: r.ops?.length ?? 0, title: planTitle(plan) }),
         ...(r.text ? { detail: clip(r.text, 64_000) } : {}),
         from: clip(r.name, 100),
         ...(planTopic(plan.id) ? { topic: planTopic(plan.id)! } : {}),
         askedAt: r.at,
         actions: [
-          { label: 'Apply', tone: 'main' as const, method: 'team.applySuggestion', args: [plan.id, r.id] },
-          { label: 'Set Aside', tone: 'danger' as const, method: 'team.dismissSuggestion', args: [plan.id, r.id] },
+          btn('daemon.needs.apply', 'main', 'team.applySuggestion', [plan.id, r.id]),
+          btn('daemon.needs.setAside', 'danger', 'team.dismissSuggestion', [plan.id, r.id]),
         ],
       }));
   });
@@ -516,20 +562,20 @@ function sentinelItems(state: DomainState): NeedsYou[] {
     if (!sn) return [];
     const at = sn.steps.findIndex((st) => st.kind === 'merge');
     const step = at >= 0 ? (r.steps.find((x) => x.id === sn.steps[at]!.id) ?? r.steps[at]) : undefined;
-    const detail = [step?.why ? firstLine(step.why, 2000) : '', r.pr ? `Pull request #${r.pr.number}` : ''].filter(Boolean).join('\n');
+    const detail = [step?.why ? firstLine(step.why, 2000) : '', r.pr ? t('daemon.needs.pullRequest', { number: r.pr.number }) : ''].filter(Boolean).join('\n');
     const topic = sentinelTopic(sn.id);
     return [
       {
         id: `sentinel:${r.id}`,
         kind: 'decision' as const,
-        title: clip(firstLine(r.headline, 500) || `${sn.name} waits for you`, 500),
+        ...(firstLine(r.headline, 500) ? { title: clip(firstLine(r.headline, 500), 500) } : keyed('daemon.needs.sentinelWaits', { name: sn.name })),
         ...(detail ? { detail: clip(detail, 64_000) } : {}),
         from: clip(sn.name, 100),
         ...(topic ? { topic } : {}),
         askedAt: Math.round(step?.startedAt ?? r.startedAt),
         actions: [
-          { label: 'Merge', tone: 'main' as const, method: 'sentinel.decide', args: [r.id, 'merge'] },
-          { label: 'Not Now', tone: 'danger' as const, method: 'sentinel.decide', args: [r.id, 'skip'] },
+          btn('daemon.needs.merge', 'main', 'sentinel.decide', [r.id, 'merge']),
+          btn('daemon.needs.notNow', 'danger', 'sentinel.decide', [r.id, 'skip']),
         ],
       },
     ];
@@ -545,25 +591,25 @@ function dialogueItems(state: DomainState): NeedsYou[] {
     if (d.remoteChair || (d.status !== 'paused' && d.status !== 'proposed')) return [];
     const topic = convTopic(d.channel ?? 'room');
     const what = clip(firstLine(d.topic, 200), 200);
-    const base = { id: `dialogue:${d.id}`, kind: 'decision' as const, from: d.participants.map((p) => p.agent.label).join(' and '), ...(topic ? { topic } : {}), askedAt: Math.round(d.updatedAt) };
+    const base = { id: `dialogue:${d.id}`, kind: 'decision' as const, from: names(d.participants.map((p) => p.agent.label)), ...(topic ? { topic } : {}), askedAt: Math.round(d.updatedAt) };
     return [
       d.status === 'paused'
         ? {
             ...base,
-            title: clip(`Your agents paused after ${d.turns.filter((t) => t.by !== 'person').length} turns: continue?`, 500),
+            ...keyed('daemon.needs.dialoguePaused', { count: d.turns.filter((turn) => turn.by !== 'person').length }),
             detail: what,
             actions: [
-              { label: 'Continue', tone: 'main' as const, method: 'dialogues.continue', args: [d.id] },
-              { label: 'Stop', tone: 'danger' as const, method: 'dialogues.stop', args: [d.id] },
+              btn('daemon.needs.continue', 'main', 'dialogues.continue', [d.id]),
+              btn('daemon.needs.stop', 'danger', 'dialogues.stop', [d.id]),
             ],
           }
         : {
             ...base,
-            title: 'Start this dialogue between your agents?',
+            ...keyed('daemon.needs.dialogueStart'),
             detail: what,
             actions: [
-              { label: 'Start', tone: 'main' as const, method: 'dialogues.confirm', args: [d.id] },
-              { label: 'Cancel', tone: 'danger' as const, method: 'dialogues.stop', args: [d.id] },
+              btn('daemon.needs.start', 'main', 'dialogues.confirm', [d.id]),
+              btn('daemon.needs.cancel', 'danger', 'dialogues.stop', [d.id]),
             ],
           },
     ];
@@ -574,7 +620,17 @@ function dialogueItems(state: DomainState): NeedsYou[] {
 export function allNeeds(state: DomainState): NeedsYou[] {
   const dismissed = state.dismissedNeeds ?? [];
   const all = waitingNeeds(state);
-  return dismissed.length ? all.filter((n) => !dismissed.includes(n.id)) : all;
+  return withBots(state, dismissed.length ? all.filter((n) => !dismissed.includes(n.id)) : all);
+}
+
+/** 1.53 (docs/bots.md): what a bot's work asks names the bot (its own chat, a plan it dispatched, that plan's worktrees). */
+function withBots(state: DomainState, items: NeedsYou[]): NeedsYou[] {
+  if (!state.bots.bots.length) return items;
+  return items.map((n) => {
+    const channel = n.topic?.startsWith('conv:') ? n.topic.slice(5) : undefined;
+    const bot = channel && !isAssistant(channel) ? botBehind(state.bots.bots, channel) : undefined;
+    return bot ? { ...n, bot: clip(bot.name, 100) } : n;
+  });
 }
 
 /** Everything waiting for you, dismissed or not. */
@@ -594,6 +650,46 @@ export function waitingNeeds(state: DomainState): NeedsYou[] {
     ...sharedPlanItems(state),
     ...sentinelItems(state),
     ...dialogueItems(state),
+    ...comboItems(state),
+    ...stackItems(state),
+  ];
+}
+
+/**
+ * A conversation on a combo whose every target is out (docs/routing.md): its run stopped on a limit
+ * and nothing else in the combo can run now. Try Again hands it to the first that can; it also goes
+ * on by itself when the limit resets (auto-continue.ts).
+ */
+function comboItems(state: DomainState): NeedsYou[] {
+  return exhaustedCombos(state, Date.now(), hhmm).map(({ stop, name, why }) => ({
+    id: `combo:${stop.channel}`,
+    kind: 'combo',
+    ...keyed('daemon.needs.comboOut', { name }),
+    detail: clip(why, 64_000),
+    from: clip(name, 100),
+    ...(convTopic(stop.channel) ? { topic: convTopic(stop.channel)! } : {}),
+    askedAt: Math.round(stop.at),
+    actions: [btn('daemon.needs.tryAgain', 'main', 'routing.retry', [stop.channel])],
+  }));
+}
+
+/**
+ * Your stack (docs/stack.md): what's down or missing now, with how to fix each. One item, its id the
+ * set it names, so dismissing it hides that set only: a new outage asks again. Check Again looks now.
+ */
+function stackItems(state: DomainState): NeedsYou[] {
+  const problems = stackProblems(state.stack);
+  if (!problems.length) return [];
+  const names = problems.map((p) => t(`stack.name.${stackKey(p.id)}` as Key));
+  return [
+    {
+      id: `stack:${problems.map((p) => p.id).sort().join(',')}`,
+      kind: 'stack',
+      ...keyed('stack.needs.title', { list: names.join(', '), count: problems.length }),
+      detail: clip(problems.map((p, i) => t('stack.needs.line', { name: names[i]!, fix: t(`stack.fix.${stackKey(p.id)}` as Key) })).join('\n'), 64_000),
+      ...(state.stack.checkedAt ? { askedAt: Math.round(state.stack.checkedAt) } : {}),
+      actions: [btn('stack.needs.checkAgain', 'main', 'stack.check', [])],
+    },
   ];
 }
 

@@ -3,7 +3,7 @@
  * lives in dialogs/settings-index.ts, the field and the jump in dialogs/SettingsSearch.tsx.
  */
 
-export type SettingsPane = 'general' | 'appearance' | 'claude' | 'notifications' | 'workspaces' | 'terminal' | 'fire' | 'menubar' | 'environment' | 'people' | 'phone' | 'external' | 'computers' | 'voice' | 'keyboard' | 'advanced' | 'experimental' | 'about';
+export type SettingsPane = 'general' | 'appearance' | 'claude' | 'bots' | 'notifications' | 'workspaces' | 'terminal' | 'fire' | 'menubar' | 'environment' | 'people' | 'phone' | 'external' | 'computers' | 'voice' | 'keyboard' | 'stack' | 'advanced' | 'experimental' | 'about';
 
 /** Find… (⌘F) while Settings is open: runCommand sends it to Settings' search, not the conversation behind. */
 export const SETTINGS_FIND_EVENT = 'beluga:settings-find';
@@ -20,6 +20,16 @@ export interface SettingEntry<P extends string = string> {
   readonly keywords?: string;
   /** The label is a group's title: there is no row of that name. */
   readonly isGroup?: boolean;
+  /** The same words in the app's language (dialogs/settings-said.ts): matched beside the English, and shown. */
+  readonly said?: Said;
+}
+
+/** A setting's or a pane's words in the app's language, where they differ from the English. */
+export interface Said {
+  readonly label?: string;
+  readonly group?: string;
+  readonly detail?: string;
+  readonly keywords?: string;
 }
 
 export interface PaneInfo<P extends string = string> {
@@ -27,7 +37,12 @@ export interface PaneInfo<P extends string = string> {
   readonly label: string;
   /** Other words for the pane ("shortcuts" for Keyboard). */
   readonly keywords?: string;
+  /** Its name and other words in the app's language. */
+  readonly said?: Said;
 }
+
+/** An English text and the same in the app's language, as one text to match in. */
+const both = (english: string | undefined, said: string | undefined): string => foldText(said && said !== english ? `${english ?? ''} ${said}` : (english ?? ''));
 
 /** One result: a setting, or a whole pane (its name matched). */
 export interface SettingHit<P extends string = string> {
@@ -83,14 +98,14 @@ function place(text: string, word: string): number {
 export function scoreEntry(entry: SettingEntry, pane: PaneInfo, query: string): number {
   const ws = words(query);
   if (!ws.length) return 0;
-  const label = foldText(entry.label);
+  const label = both(entry.label, entry.said?.label);
   const fields = [
     [label, 10],
-    [foldText(entry.keywords ?? ''), 7],
-    [foldText(entry.group ?? ''), 4],
-    [foldText(entry.detail ?? ''), 2],
+    [both(entry.keywords, entry.said?.keywords), 7],
+    [both(entry.group, entry.said?.group), 4],
+    [both(entry.detail, entry.said?.detail), 2],
   ] as const;
-  const paneWords = foldText(`${pane.label} ${pane.keywords ?? ''}`);
+  const paneWords = `${both(pane.label, pane.said?.label)} ${both(pane.keywords, pane.said?.keywords)}`;
   let score = 0;
   let outsidePane = false;
   for (const w of ws) {
@@ -104,36 +119,39 @@ export function scoreEntry(entry: SettingEntry, pane: PaneInfo, query: string): 
   if (!outsidePane) return 0;
   // The whole phrase in the label, best at its start: "text s" puts Text size first.
   const phrase = foldText(query);
-  if (label.startsWith(phrase)) score += 40;
-  else if (place(label, phrase) >= 2) score += 25;
+  const said = entry.said?.label ? foldText(entry.said.label) : label;
+  if (label.startsWith(phrase) || said.startsWith(phrase)) score += 40;
+  else if (place(label, phrase) >= 2 || place(said, phrase) >= 2) score += 25;
   return score;
 }
 
 /** How well a pane matches: every word in its name or its other words, best at the start of its name. */
 function scorePane(pane: PaneInfo, query: string): number {
-  const label = foldText(pane.label);
-  const all = `${label} ${foldText(pane.keywords ?? '')}`;
+  const label = both(pane.label, pane.said?.label);
+  const names = [foldText(pane.label), ...(pane.said?.label ? [foldText(pane.said.label)] : [])];
+  const all = `${label} ${both(pane.keywords, pane.said?.keywords)}`;
   const ws = words(query);
   if (!ws.length || !ws.every((w) => place(all, w))) return 0;
   const phrase = foldText(query);
   // Its exact name beats a row of the same name elsewhere ("Terminal" the pane, not the toolbar button).
-  return label === phrase ? 80 : label.startsWith(phrase) ? 70 : ws.every((w) => place(label, w)) ? 45 : 20;
+  return names.includes(phrase) ? 80 : names.some((n) => n.startsWith(phrase)) ? 70 : ws.every((w) => place(label, w)) ? 45 : 20;
 }
 
 /**
  * The settings that match, grouped by pane: the pane with the best match first (then in sidebar
  * order), the best match first within it. Empty for an empty query.
  */
-export function searchSettings<P extends string>(query: string, entries: readonly SettingEntry<P>[], panes: readonly PaneInfo<P>[]): PaneResults<P>[] {
+export function searchSettings<P extends string>(query: string, entries: readonly SettingEntry<P>[], panes: readonly PaneInfo<P>[], openPane = 'Open the pane'): PaneResults<P>[] {
   if (!words(query).length) return [];
   const groups = panes.map((pane, order) => {
     const hits: SettingHit<P>[] = [];
     const paneScore = scorePane(pane, query);
-    if (paneScore) hits.push({ key: `pane:${pane.id}`, pane: pane.id, label: pane.label, detail: 'Open the pane', entry: null, score: paneScore });
+    if (paneScore) hits.push({ key: `pane:${pane.id}`, pane: pane.id, label: pane.said?.label ?? pane.label, detail: openPane, entry: null, score: paneScore });
     entries.forEach((entry, i) => {
       if (entry.pane !== pane.id) return;
       const score = scoreEntry(entry, pane, query);
-      if (score) hits.push({ key: `${pane.id}:${i}`, pane: pane.id, label: entry.label, ...(entry.detail ? { detail: entry.detail } : {}), entry, score });
+      const detail = entry.said?.detail ?? entry.detail;
+      if (score) hits.push({ key: `${pane.id}:${i}`, pane: pane.id, label: entry.said?.label ?? entry.label, ...(detail ? { detail } : {}), entry, score });
     });
     // Stable: equal scores keep the pane's own order.
     const sorted = hits.map((h, i) => [h, i] as const).sort((a, b) => b[0].score - a[0].score || a[1] - b[1]).map(([h]) => h);

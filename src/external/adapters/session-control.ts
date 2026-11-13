@@ -8,6 +8,7 @@ import { ToolRefusal } from '../domain/decide.js';
 import { STANDALONE_CHATS } from '../domain/grant.js';
 import { needAllowedRuntime } from './runs.js';
 import type { AgentId, ChatControl, QuestionRef, RunReceipt, RunSnapshot } from '../ports/chat-control.js';
+import { t } from '../../shared/i18n/index.js';
 
 const WS_PREFIX = 'ws:';
 const RUNS_KEPT = 1000;
@@ -65,7 +66,7 @@ export function sessionControl(session: Session, opts: { readonly runCap?: (agen
       if (!usedProjects.has(`${by.id} ${projectId}`)) {
         usedProjects.add(`${by.id} ${projectId}`);
         const project = session.store.getState().projects.find((p) => p.id === projectId);
-        session.toast(projectId === STANDALONE_CHATS ? `${by.name} started a chat` : `${by.name} is working in ${project?.name ?? 'a project'} for the first time`, 'info');
+        session.toast(projectId === STANDALONE_CHATS ? t('toasts.external.startedChat', { name: by.name }) : t('toasts.external.firstTime', { name: by.name, project: project?.name ?? t('toasts.external.aProject') }), 'info');
       }
       if (runtime && !session.runsAgent({ runtime, label: runtime })) throw new Error('That agent does not run on this computer.');
       const agent = runtime ? { runtime, label: runtime } : undefined;

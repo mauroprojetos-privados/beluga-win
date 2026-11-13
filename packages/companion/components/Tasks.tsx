@@ -8,6 +8,7 @@ import { agentPicksSupported } from '../lib/agent-picks';
 import { type Call, calls } from '../lib/link/calls';
 import type { TaskSummary, TasksView } from '../lib/link/protocol';
 import { store } from '../lib/store';
+import { t, useT } from '../lib/language';
 import { color, radius } from '../lib/theme';
 import { AgentChoice, type PickedAgent } from './AgentChoice';
 import { ProjectMark } from './ProjectMark';
@@ -24,45 +25,60 @@ import type { TaskDraftResult } from '../../../src/companion/calls';
  */
 
 export const STATUS: Record<string, { Icon: LucideIcon; tone: Tone; label: string }> = {
-  in_progress: { Icon: CircleDot, tone: 'peach', label: 'In Progress' },
-  in_review: { Icon: Eye, tone: 'sky', label: 'In Review' },
-  in_plan: { Icon: Eye, tone: 'sky', label: 'Merged into Plan' },
-  todo: { Icon: Circle, tone: 'plain', label: 'Ready' },
-  backlog: { Icon: CircleDashed, tone: 'plain', label: 'Backlog' },
-  done: { Icon: Check, tone: 'mint', label: 'Done' },
-  canceled: { Icon: XCircle, tone: 'plain', label: 'Canceled' },
+  in_progress: { Icon: CircleDot, tone: 'peach', get label() { return t('phoneParts.tasks.inProgress'); } },
+  in_review: { Icon: Eye, tone: 'sky', get label() { return t('phoneParts.tasks.inReview'); } },
+  in_plan: { Icon: Eye, tone: 'sky', get label() { return t('phoneParts.tasks.inPlan'); } },
+  todo: { Icon: Circle, tone: 'plain', get label() { return t('phoneParts.tasks.ready'); } },
+  backlog: { Icon: CircleDashed, tone: 'plain', get label() { return t('phoneParts.tasks.backlog'); } },
+  done: { Icon: Check, tone: 'mint', get label() { return t('phoneParts.tasks.done'); } },
+  canceled: { Icon: XCircle, tone: 'plain', get label() { return t('phoneParts.tasks.canceled'); } },
 };
 export const statusOf = (s: string) => STATUS[s] ?? STATUS.todo!;
-export const PRIORITY: Record<string, { label: string; tone: Tone }> = { urgent: { label: 'Urgent', tone: 'rose' }, high: { label: 'High', tone: 'butter' }, medium: { label: 'Medium', tone: 'plain' }, low: { label: 'Low', tone: 'plain' } };
+export const PRIORITY: Record<string, { label: string; tone: Tone }> = {
+  urgent: { get label() { return t('phoneParts.tasks.urgent'); }, tone: 'rose' },
+  high: { get label() { return t('phoneParts.tasks.high'); }, tone: 'butter' },
+  medium: { get label() { return t('phoneParts.tasks.medium'); }, tone: 'plain' },
+  low: { get label() { return t('phoneParts.tasks.low'); }, tone: 'plain' },
+};
 
-export const taskHref = (t: { id: string }): string => `/task/${encodeURIComponent(t.id)}`;
+export const taskHref = (task: { id: string }): string => `/task/${encodeURIComponent(task.id)}`;
 
-export function TaskRow({ t, first }: { readonly t: TaskSummary; readonly first?: boolean }) {
-  const st = statusOf(t.status);
-  const pr = PRIORITY[t.priority];
+export function TaskRow({ t: task, first }: { readonly t: TaskSummary; readonly first?: boolean }) {
+  const t = useT();
+  const st = statusOf(task.status);
+  const pr = PRIORITY[task.priority];
   return (
     <View>
       {!first ? <Hairline style={{ marginLeft: 56 }} /> : null}
-      <Press onPress={() => router.push(taskHref(t))} accessibilityLabel={`${t.key} ${t.title}${t.private ? ', private' : ''}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 14 }}>
+      <Press onPress={() => router.push(taskHref(task))} accessibilityLabel={t(task.private ? 'phoneParts.tasks.rowPrivate' : 'phoneParts.tasks.row', { key: task.key, title: task.title })} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 14 }}>
         <View style={{ width: 30, height: 30, alignItems: 'center', justifyContent: 'center' }}>
           <st.Icon color={toneInk(st.tone)} size={18} />
         </View>
         <View style={{ flex: 1, gap: 2 }}>
           <T v="body" numberOfLines={2} style={{ fontWeight: '500' }}>
-            {t.title}
+            {task.title}
           </T>
           <T v="caption" numberOfLines={1}>
             <T v="caption" style={{ fontWeight: '600', fontVariant: ['tabular-nums'] }}>
-              {t.key}
+              {task.key}
             </T>
-            {[t.epic ? (t.epic.total ? `Epic, ${t.epic.done}/${t.epic.total} done` : 'Epic') : undefined, t.epicKey ? `in ${t.epicKey}` : undefined, t.onBoard ? `on ${t.onBoard}` : undefined, t.repo, t.assignee, t.working, t.checks ? `${t.checks.done}/${t.checks.total} checked` : undefined, t.pr ? `PR #${t.pr.number}` : undefined]
+            {[
+              task.epic ? (task.epic.total ? t('phoneParts.tasks.epicDone', { done: task.epic.done, total: task.epic.total }) : t('phoneParts.tasks.epic')) : undefined,
+              task.epicKey ? t('phoneParts.tasks.inEpic', { key: task.epicKey }) : undefined,
+              task.onBoard ? t('phoneParts.tasks.onBoard', { board: task.onBoard }) : undefined,
+              task.repo,
+              task.assignee,
+              task.working,
+              task.checks ? t('phoneParts.tasks.checked', { done: task.checks.done, total: task.checks.total }) : undefined,
+              task.pr ? t('phoneParts.tasks.pr', { number: task.pr.number }) : undefined,
+            ]
               .filter(Boolean)
               .map((x) => `  ·  ${x}`)
               .join('')}
           </T>
         </View>
-        {t.private ? <Lock color={color.text3} size={14} /> : null}
-        {pr && (t.priority === 'urgent' || t.priority === 'high') ? <Pill label={pr.label} tone={pr.tone} /> : null}
+        {task.private ? <Lock color={color.text3} size={14} /> : null}
+        {pr && (task.priority === 'urgent' || task.priority === 'high') ? <Pill label={pr.label} tone={pr.tone} /> : null}
       </Press>
     </View>
   );
@@ -70,6 +86,7 @@ export function TaskRow({ t, first }: { readonly t: TaskSummary; readonly first?
 
 /** Every project's tasks by status (Work › Tasks, and /tasks). */
 export function TasksList() {
+  const t = useT();
   const tasksOn = useSupports('tasks');
   const drafts = useSupports('draftTask');
   const tasks = useView<TasksView>(tasksOn ? 'tasks' : undefined);
@@ -78,22 +95,22 @@ export function TasksList() {
   if (!tasksOn) {
     return (
       <Card style={{ marginHorizontal: 16, padding: 18 }}>
-        <T v="heading">Tasks need a newer Beluga</T>
+        <T v="heading">{t('phoneParts.tasks.needsNewer')}</T>
         <T v="callout" style={{ marginTop: 4 }}>
-          Update Beluga on your Mac to see its tasks here.
+          {t('phoneParts.tasks.needsNewerHint')}
         </T>
       </Card>
     );
   }
   const list = tasks?.data.projects ?? [];
-  if (!tasks) return <T v="callout" style={{ paddingHorizontal: 20 }}>Loading tasks…</T>;
+  if (!tasks) return <T v="callout" style={{ paddingHorizontal: 20 }}>{t('phoneParts.tasks.loading')}</T>;
   return (
     <View style={{ gap: 24 }}>
       {!list.length ? (
         <Card style={{ marginHorizontal: 16, padding: 18 }}>
-          <T v="heading">No tasks yet</T>
+          <T v="heading">{t('phoneParts.tasks.none')}</T>
           <T v="callout" style={{ marginTop: 4 }}>
-            Tasks your agent and you open on your Mac show up here.
+            {t('phoneParts.tasks.noneHint')}
           </T>
         </Card>
       ) : null}
@@ -108,10 +125,10 @@ export function TasksList() {
             count={p.groups.reduce((n, g) => n + g.tasks.length + (g.more ?? 0), 0)}
             right={
               drafts ? (
-                <Press onPress={() => setAdding({ id: p.id, name: p.name, icon: p.icon })} accessibilityLabel={`New task in ${p.name}`} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 28, paddingHorizontal: 10, borderRadius: radius.s, borderWidth: StyleSheet.hairlineWidth * 2, borderColor: color.hairline }}>
+                <Press onPress={() => setAdding({ id: p.id, name: p.name, icon: p.icon })} accessibilityLabel={t('phoneParts.tasks.newIn', { name: p.name })} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 28, paddingHorizontal: 10, borderRadius: radius.s, borderWidth: StyleSheet.hairlineWidth * 2, borderColor: color.hairline }}>
                   <Plus color={color.text2} size={14} />
                   <T v="caption" c={color.text2} style={{ fontWeight: '600' }}>
-                    New
+                    {t('phoneParts.tasks.new')}
                   </T>
                 </Press>
               ) : null
@@ -124,12 +141,12 @@ export function TasksList() {
                 <T v="caption">{g.tasks.length + (g.more ?? 0)}</T>
               </View>
               <Card style={{ marginHorizontal: 16 }}>
-                {g.tasks.map((t, i) => (
-                  <TaskRow key={t.id} t={t} first={i === 0} />
+                {g.tasks.map((task, i) => (
+                  <TaskRow key={task.id} t={task} first={i === 0} />
                 ))}
                 {g.more ? (
                   <T v="caption" style={{ padding: 12, paddingLeft: 58 }}>
-                    and {g.more} more on your Mac
+                    {t('phoneParts.tasks.moreOnMac', { count: g.more })}
                   </T>
                 ) : null}
               </Card>
@@ -147,6 +164,7 @@ export function TasksList() {
  * labels), and Add. The draft is the Mac's own task drafter's; nothing is added until you say.
  */
 export function NewTaskSheet({ project, onClose }: { readonly project?: { id: string; name: string; icon?: string }; readonly onClose: () => void }) {
+  const t = useT();
   const [text, setText] = useState('');
   const [draft, setDraft] = useState<TaskDraftResult | undefined>();
   const [busy, setBusy] = useState<'draft' | 'add' | undefined>();
@@ -185,7 +203,7 @@ export function NewTaskSheet({ project, onClose }: { readonly project?: { id: st
     const r = await store.call<{ id: string; key: string; more?: Array<{ id: string; key: string }> }>(call, { queue: false }).catch((e: Error) => (store.toast({ text: e.message, tone: 'error' }), undefined));
     setBusy(undefined);
     if (!r) return;
-    store.toast({ text: `Added ${andList([r.key, ...(r.more ?? []).map((m) => m.key)])}`, tone: 'ok' });
+    store.toast({ text: t('phoneParts.tasks.added', { keys: andList([r.key, ...(r.more ?? []).map((m) => m.key)]) }), tone: 'ok' });
     close();
     setTimeout(() => router.push(taskHref(r)), 300);
   };
@@ -195,9 +213,9 @@ export function NewTaskSheet({ project, onClose }: { readonly project?: { id: st
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           {p ? <ProjectMark name={p.name} icon={p.icon} size={30} /> : null}
           <T v="title" style={{ flex: 1, fontSize: 21 }}>
-            New task
+            {t('phoneParts.tasks.newTask')}
           </T>
-          <Press onPress={close} accessibilityLabel="Close" hitSlop={10} style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: color.sunken }}>
+          <Press onPress={close} accessibilityLabel={t('common.close')} hitSlop={10} style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: color.sunken }}>
             <X color={color.text2} size={17} />
           </Press>
         </View>
@@ -208,16 +226,16 @@ export function NewTaskSheet({ project, onClose }: { readonly project?: { id: st
               value={text}
               onChangeText={setText}
               multiline
-              placeholder={several ? 'Say what it is, or a few tasks and who does each' : 'Say what it is: your agent writes the rest'}
+              placeholder={several ? t('phoneParts.tasks.sayMany') : t('phoneParts.tasks.sayOne')}
               placeholderTextColor={color.text3}
               style={{ color: color.text, fontSize: 18, lineHeight: 25, minHeight: 84, maxHeight: 180, textAlignVertical: 'top', ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : {}) }}
             />
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <Sparkles color={color.claude} size={15} />
               <T v="caption" style={{ flex: 1 }}>
-                {several ? 'Your agent drafts each task and who it’s for. You see them first.' : 'Your agent drafts the title, goal and checks. You see it first.'}
+                {several ? t('phoneParts.tasks.draftsMany') : t('phoneParts.tasks.draftsOne')}
               </T>
-              <Press disabled={!text.trim() || !!busy} onPress={() => void ask()} accessibilityLabel="Draft it" style={{ width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', backgroundColor: text.trim() ? color.primary : color.sunken }}>
+              <Press disabled={!text.trim() || !!busy} onPress={() => void ask()} accessibilityLabel={t('phoneParts.tasks.draftIt')} style={{ width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', backgroundColor: text.trim() ? color.primary : color.sunken }}>
                 {busy === 'draft' ? <ActivityIndicator color={color.onPrimary} /> : <ArrowUp color={text.trim() ? color.onPrimary : color.text3} size={22} strokeWidth={2} />}
               </Press>
             </View>
@@ -229,11 +247,11 @@ export function NewTaskSheet({ project, onClose }: { readonly project?: { id: st
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Sparkles color={color.claude} size={14} />
                   <T v="caption" c={color.claude} style={{ fontWeight: '700' }}>
-                    {draft.epic ? `An epic and ${count - 1} sub-task${count === 2 ? '' : 's'}` : `${count} tasks`}
+                    {draft.epic ? t('phoneParts.tasks.epicAndSubs', { count: count - 1 }) : t('phoneParts.tasks.count', { count })}
                   </T>
                 </View>
               ) : null}
-              <DraftCard draft={draft} epic={draft.epic} heading={count > 1 ? undefined : 'Your agent’s draft'} />
+              <DraftCard draft={draft} epic={draft.epic} heading={count > 1 ? undefined : t('phoneParts.tasks.agentDraft')} />
               {(draft.more ?? []).map((m, i) => (
                 <View key={i} style={draft.epic ? { marginLeft: 14 } : undefined}>
                   <DraftCard draft={m} />
@@ -242,13 +260,13 @@ export function NewTaskSheet({ project, onClose }: { readonly project?: { id: st
             </ScrollView>
             {agentPicksSupported() ? (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-                <T v="caption">Worked by</T>
+                <T v="caption">{t('phoneParts.tasks.workedBy')}</T>
                 <AgentChoice value={agent} onChange={setAgent} />
               </View>
             ) : null}
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <Button label="Change" quiet flex={1} onPress={() => setDraft(undefined)} />
-              <Button label={busy === 'add' ? 'Adding…' : count > 1 ? `Add ${count} tasks` : 'Add task'} Icon={Plus} flex={1.4} disabled={!!busy} onPress={() => void add()} />
+              <Button label={t('phoneParts.tasks.change')} quiet flex={1} onPress={() => setDraft(undefined)} />
+              <Button label={busy === 'add' ? t('phoneParts.tasks.adding') : count > 1 ? t('phoneParts.tasks.addCount', { count }) : t('phoneParts.tasks.addTask')} Icon={Plus} flex={1.4} disabled={!!busy} onPress={() => void add()} />
             </View>
           </Animated.View>
         )}
@@ -259,6 +277,7 @@ export function NewTaskSheet({ project, onClose }: { readonly project?: { id: st
 
 /** One drafted task: its title, goal, checks and labels, how much it matters, and who it's for. */
 function DraftCard({ draft, heading, epic }: { readonly draft: Omit<TaskDraftResult, 'more' | 'epic'>; readonly heading?: string; readonly epic?: boolean }) {
+  const t = useT();
   const top = heading || epic || draft.priority || draft.for;
   return (
     <Card style={{ padding: 14, gap: 8, ...(epic ? { backgroundColor: toneBg('lavender') } : {}) }}>
@@ -276,7 +295,7 @@ function DraftCard({ draft, heading, epic }: { readonly draft: Omit<TaskDraftRes
             <>
               <Layers color={toneInk('lavender')} size={13} />
               <T v="caption" c={toneInk('lavender')} style={{ fontWeight: '700' }}>
-                Epic
+                {t('phoneParts.tasks.epic')}
               </T>
             </>
           ) : null}
@@ -284,7 +303,7 @@ function DraftCard({ draft, heading, epic }: { readonly draft: Omit<TaskDraftRes
           {draft.for ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <User color={color.text2} size={13} />
-              <T v="caption">For {draft.for}</T>
+              <T v="caption">{t('phoneParts.tasks.for', { name: draft.for })}</T>
             </View>
           ) : null}
           {draft.priority ? <Pill label={PRIORITY[draft.priority]?.label ?? draft.priority} tone={PRIORITY[draft.priority]?.tone ?? 'plain'} /> : null}
@@ -319,4 +338,4 @@ function DraftCard({ draft, heading, epic }: { readonly draft: Omit<TaskDraftRes
 const withAgent = (c: Call<'companion.addTask'>, agent: PickedAgent): Call => ({ ...c, args: [{ ...c.args[0], agent }] }) as Call<'companion.addTask'> as unknown as Call;
 
 /** "BLG-1", "BLG-1 and BLG-2", "BLG-1, BLG-2 and BLG-3". */
-const andList = (items: readonly string[]): string => (items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`);
+const andList = (items: readonly string[]): string => (items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} ${t('common.and')} ${items.at(-1)}`);

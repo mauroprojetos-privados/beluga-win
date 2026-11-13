@@ -5,6 +5,7 @@ import { GestureDetector, GestureHandlerRootView, usePanGesture } from 'react-na
 import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scheduleOnRN } from 'react-native-worklets';
+import { t } from '../lib/language';
 import { color, elevation, spring } from '../lib/theme';
 import { KeyboardLift } from './KeyboardLift';
 
@@ -68,7 +69,7 @@ export function Sheet({ visible, onDismiss, children, header, maxHeight = 0.86, 
   const body = (
     <View style={[StyleSheet.absoluteFill, { zIndex: 50 }]} pointerEvents="box-none">
       <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: color.scrim }, dim]}>
-        <Pressable style={{ flex: 1 }} onPress={close} accessibilityLabel="Close" />
+        <Pressable style={{ flex: 1 }} onPress={close} accessibilityLabel={t('common.close')} />
       </Animated.View>
       {/* The card sits at the bottom of a layer the keyboard lifts (as the code entry's screen is), so a field, its chips and Send stay above it (BLG-46). */}
       <KeyboardLift style={[StyleSheet.absoluteFill, { justifyContent: 'flex-end', paddingTop: insets.top + 8 }]} pointerEvents="box-none">

@@ -23,6 +23,7 @@ import { type ReaderMode, hasRenderedLook, hasText, initialMode } from './reader
 import r from './reader.module.css';
 import { revealLabel } from '../../lib/os-words.js';
 import { useRevealFileLabel } from '../../lib/remote-open.js';
+import { useT } from '../../lib/i18n.js';
 
 /** Space, Page Up/Down, Home and End scroll the page even when nothing has the keyboard. */
 const PAGE_KEYS = new Set([' ', 'PageDown', 'PageUp', 'Home', 'End']);
@@ -97,6 +98,7 @@ function useScratchArrows(viewer: ViewerState, wsId: string, editing: boolean): 
  * in it; Esc goes back to the chat).
  */
 export function FileFocus({ viewer, wsId }: { viewer: ViewerState; wsId: string }) {
+  const t = useT();
   const { client } = useBeluga();
   // On a computer's page the file is downloaded instead (BLG-852).
   const revealFile = useRevealFileLabel();
@@ -105,7 +107,7 @@ export function FileFocus({ viewer, wsId }: { viewer: ViewerState; wsId: string 
   const selfId = useApp((st) => st.selfId);
   const local = useApp((st) => localPathOf(st, viewer));
   // Opened from a project's page (its main folder's Files): Esc goes back to the project.
-  const back = useApp((st) => (st.view.kind === 'project' ? 'Back to Project' : 'Back to Chat'));
+  const back = t(useApp((st) => (st.view.kind === 'project' ? 'views.focus.backToProject' : 'views.focus.backToChat')));
   const page = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const [mode, setModeNow] = useState<ReaderMode>(() => (pendingLine(viewer) ? 'source' : initialMode(viewer)));
@@ -164,10 +166,11 @@ export function FileFocus({ viewer, wsId }: { viewer: ViewerState; wsId: string 
         <button type="button" className={r.back} onClick={closeFocus} aria-label={back}>
           <Icon name="back" size={12} />
           {back}
+          {/* i18n-ignore: a key's name */}
           <Kbd>Esc</Kbd>
         </button>
         <span className={r.divider} />
-        <nav className={r.crumbs} aria-label="Path" title={viewer.path}>
+        <nav className={r.crumbs} aria-label={t('views.focus.path')} title={viewer.path}>
           <Icon name="file" size={13} className={r.crumbIcon} />
           {wsName ? <span className={r.crumb}>{wsName}</span> : null}
           {folders.map((f, i) => (
@@ -176,32 +179,32 @@ export function FileFocus({ viewer, wsId }: { viewer: ViewerState; wsId: string 
             </span>
           ))}
           <span className={r.crumbFile}>{name}</span>
-          {viewer.by ? <span className={r.following}>following {viewer.by}</span> : null}
+          {viewer.by ? <span className={r.following}>{t('views.files.following', { name: viewer.by })}</span> : null}
         </nav>
         <span className={r.flex} />
         {markdown && isText && !editing ? (
           <Segmented
-            label="Show as"
+            label={t('views.files.showAs')}
             value={mode}
             onChange={setMode}
             options={[
-              { value: 'rendered', label: 'Rendered' },
-              { value: 'source', label: 'Source' },
+              { value: 'rendered', label: t('views.focus.rendered') },
+              { value: 'source', label: t('views.files.source') },
             ]}
           />
         ) : null}
         {component && !editing ? <PreviewToggle previewing={previewing} onChange={setPreviewing} /> : null}
-        {showsCode && !drawing ? <IconButton icon="wrap" label={prefs.readerWrap ? 'Don’t wrap long lines' : 'Wrap long lines'} active={prefs.readerWrap} onClick={() => setPrefs({ readerWrap: !prefs.readerWrap })} /> : null}
+        {showsCode && !drawing ? <IconButton icon="wrap" label={prefs.readerWrap ? t('views.focus.noWrap') : t('views.focus.wrap')} active={prefs.readerWrap} onClick={() => setPrefs({ readerWrap: !prefs.readerWrap })} /> : null}
         <EditTools viewer={viewer} wsId={wsId} selfId={selfId} />
         <span className={r.tools}>
-          {isText ? <IconButton icon={copied ? 'check' : 'copy'} label={copied ? 'Copied' : 'Copy the text'} onClick={() => copy(viewer.content)} /> : null}
-          {local ? <IconButton icon="external" label="Open in Editor" onClick={() => void openWithDefaultApp(client, local)} /> : null}
+          {isText ? <IconButton icon={copied ? 'check' : 'copy'} label={copied ? t('views.focus.copied') : t('views.focus.copyText')} onClick={() => copy(viewer.content)} /> : null}
+          {local ? <IconButton icon="external" label={t('views.reader.openInEditor')} onClick={() => void openWithDefaultApp(client, local)} /> : null}
           {local ? <IconButton icon="folder" label={revealFile} onClick={() => void revealInFinder(client, local)} /> : null}
-          {!local ? <IconButton icon="download" label="Save a copy…" onClick={() => void saveFile(client, viewer)} /> : null}
+          {!local ? <IconButton icon="download" label={t('views.files.saveCopy')} onClick={() => void saveFile(client, viewer)} /> : null}
         </span>
       </header>
       <div className={r.body}>
-        <div ref={page} className={r.page} tabIndex={0} {...{ [SCROLL_ROOT]: '' }} aria-label={`${name}, ${markdown && mode === 'rendered' ? 'formatted' : 'contents'}`}>
+        <div ref={page} className={r.page} tabIndex={0} {...{ [SCROLL_ROOT]: '' }} aria-label={markdown && mode === 'rendered' ? t('views.focus.formatted', { name }) : t('views.focus.contents', { name })}>
           <div ref={content} className={r.pageInner}>
             {drawing && component ? <ComponentPreview previewRef={component} wsId={wsId} /> : <FileContent
               viewer={viewer}

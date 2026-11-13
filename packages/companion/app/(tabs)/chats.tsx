@@ -7,22 +7,24 @@ import { chatHref } from '../../components/Conv';
 import { Header, Screen, useScrolled } from '../../components/Screen';
 import { Avatar, Card, Hairline, IconBadge, Press, T } from '../../components/ui';
 import { ago, useView } from '../../lib/hooks';
+import { useT } from '../../lib/language';
 import type { ChatsView } from '../../lib/link/protocol';
 import { color, ink, TAB_BAR_H, tint } from '../../lib/theme';
 
 /** Chats: your friends' DMs and channels, as on the Mac. */
 export default function Chats() {
+  const t = useT();
   const { scrolled, onScroll } = useScrolled();
   const insets = useSafeAreaInsets();
   const view = useView<ChatsView>('chats');
   const chats = view?.data.chats ?? [];
   return (
     <Screen>
-      <Header scrolled={scrolled} title="Chats" at={view?.at} />
+      <Header scrolled={scrolled} title={t('phone.tabs.chats')} at={view?.at} />
       <ScrollView onScroll={onScroll} scrollEventThrottle={32} contentContainerStyle={{ paddingTop: 8, paddingBottom: TAB_BAR_H + insets.bottom + 40 }}>
         {!chats.length ? (
           <T v="callout" style={{ paddingHorizontal: 20 }}>
-            {view ? 'No chats yet. Friends you add on your Mac show up here.' : 'Loading chats…'}
+            {view ? t('phone.chats.empty') : t('phone.chats.loading')}
           </T>
         ) : (
           <Card style={{ marginHorizontal: 16 }}>

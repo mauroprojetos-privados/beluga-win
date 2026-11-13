@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type { SupportAsk } from '@beluga/core/support-store.js';
+import { wordRecord } from '../../../../src/shared/i18n/words.js';
 
 /**
  * Supporting Beluga: where the star and the coffee go, and the sheets opened by hand (Settings ›
@@ -15,7 +16,7 @@ export const MAINTAINER = { login: 'kayraucklnc', url: 'https://github.com/kayra
 /** The coffee amounts offered, in US dollars, with what each one buys. */
 export const COFFEE_AMOUNTS = [5, 10, 20, 50] as const;
 export type CoffeeAmount = (typeof COFFEE_AMOUNTS)[number];
-export const COFFEE_WORDS: Readonly<Record<CoffeeAmount, string>> = { 5: 'A coffee', 10: 'Coffee & cake', 20: 'Lunch', 50: 'A whole day' };
+export const COFFEE_WORDS: Readonly<Record<CoffeeAmount, string>> = wordRecord({ 5: 'macLib.support.coffee5', 10: 'macLib.support.coffee10', 20: 'macLib.support.coffee20', 50: 'macLib.support.coffee50' });
 
 /**
  * Stripe Payment Links: public checkout pages anyone may open (no keys, nothing secret, safe in a

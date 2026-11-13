@@ -1,6 +1,8 @@
 import type { IconName } from '../components/Icon.js';
 import type { Step } from './onboarding-model.js';
 import { thisComputer } from '../lib/os-words.js';
+// Relative, not @beluga: tests at the repo's root import this file too.
+import { t } from '../../../../src/shared/i18n/index.js';
 
 /** The tour's words, one idea a step. Every line says what the app really does. */
 export interface TourCopy {
@@ -11,68 +13,141 @@ export interface TourCopy {
   readonly points: readonly string[];
 }
 
+// Getters: each line is said in the app's language when the step draws, not when this loads.
 export const TOUR_COPY: Readonly<Partial<Record<Step, TourCopy>>> = {
   parallel: {
-    eyebrow: 'Parallel',
     icon: 'branch',
-    title: 'Work on everything at once.',
-    body: 'Every task gets its own worktree on its own branch, with an agent working in it. Run as many as you like, in one repository or across all of them.',
-    points: ['Worktrees and branches made for you', 'Pull requests opened and followed on GitHub', 'Sub-agents for the pieces in between'],
+    get eyebrow() {
+      return t('components.onboarding.tour.parallel.eyebrow');
+    },
+    get title() {
+      return t('components.onboarding.tour.parallel.title');
+    },
+    get body() {
+      return t('components.onboarding.tour.parallel.body');
+    },
+    get points() {
+      return [t('components.onboarding.tour.parallel.point1'), t('components.onboarding.tour.parallel.point2'), t('components.onboarding.tour.parallel.point3')];
+    },
   },
   agents: {
-    eyebrow: 'Live',
     icon: 'eye',
-    title: 'See every agent work. Steer any of them.',
-    body: 'Steps arrive as your agent works: the files it reads, the commands it runs, the screenshots it takes, the sub-agents and background tasks it starts. Say something mid-run and it changes course.',
-    points: ['Sub-agents and background commands, live', 'Screenshots, logs and test output in one place', 'Redirect a run, or queue what comes next'],
+    get eyebrow() {
+      return t('components.onboarding.tour.agents.eyebrow');
+    },
+    get title() {
+      return t('components.onboarding.tour.agents.title');
+    },
+    get body() {
+      return t('components.onboarding.tour.agents.body');
+    },
+    get points() {
+      return [t('components.onboarding.tour.agents.point1'), t('components.onboarding.tour.agents.point2'), t('components.onboarding.tour.agents.point3')];
+    },
   },
   tables: {
-    eyebrow: 'In the chat',
     icon: 'table',
-    title: 'Answers you can sort, not just read.',
-    body: 'Ask about your data and your agent finds the database, picks the way in (Postgres, SQLite, a file, a URL), connects and runs the query. The answer comes back as a live table in the conversation.',
-    points: ['Headings sort, long tables search and page', 'A table turns into a chart in a click', 'File trees, JSON, terminal output and diagrams too'],
+    get eyebrow() {
+      return t('components.onboarding.tour.tables.eyebrow');
+    },
+    get title() {
+      return t('components.onboarding.tour.tables.title');
+    },
+    get body() {
+      return t('components.onboarding.tour.tables.body');
+    },
+    get points() {
+      return [t('components.onboarding.tour.tables.point1'), t('components.onboarding.tour.tables.point2'), t('components.onboarding.tour.tables.point3')];
+    },
   },
   machines: {
-    eyebrow: 'Your computers',
     icon: 'server',
-    title: 'Your app here. The work on any computer.',
-    body: `Pair a Mac mini at home, a cloud server or a Linux box, and any task can run there while you follow it from ${thisComputer()} or your phone. Make one your Always On, and it keeps working, and answers your friends, while you’re away.`,
-    points: ['Pick where a task runs, beside the mode and model', 'Close the lid, and your phone keeps up', 'One Always On computer stands in for you'],
+    get eyebrow() {
+      return t('components.onboarding.tour.machines.eyebrow');
+    },
+    get title() {
+      return t('components.onboarding.tour.machines.title');
+    },
+    get body() {
+      return t('components.onboarding.tour.machines.body', { computer: thisComputer() });
+    },
+    get points() {
+      return [t('components.onboarding.tour.machines.point1'), t('components.onboarding.tour.machines.point2'), t('components.onboarding.tour.machines.point3')];
+    },
   },
   friends: {
-    eyebrow: 'Together',
     icon: 'people',
-    title: 'Your agent, and your friends’ agents.',
-    body: 'Add friends and your agents work together. Yours asks theirs for what only their computer has: a file, an account, a page they’re signed in to. They allow it, the result comes back, and yours carries on. Computer to computer, end-to-end encrypted.',
-    points: ['Files, screenshots and errands between computers', 'You approve, or trust a friend once', 'Invite to one project, or to everything'],
+    get eyebrow() {
+      return t('components.onboarding.tour.friends.eyebrow');
+    },
+    get title() {
+      return t('components.onboarding.tour.friends.title');
+    },
+    get body() {
+      return t('components.onboarding.tour.friends.body');
+    },
+    get points() {
+      return [t('components.onboarding.tour.friends.point1'), t('components.onboarding.tour.friends.point2'), t('components.onboarding.tour.friends.point3')];
+    },
   },
   sentinel: {
-    eyebrow: 'Sentinel',
     icon: 'sentinel',
-    title: 'Say when. Say what. Beluga keeps watch.',
-    body: 'A sentinel is work you describe once, in a sentence. It waits for its moment (seven in the morning, a failing test, a Stripe payment, your site going quiet), then works through its steps in order and leaves you a report.',
-    points: ['When: a schedule, GitHub, Stripe, Sentry, a site, a webhook', 'Then: an agent, a script, a service, a pull request, a merge', 'Starts paused. You choose if the agent may look, work or ship'],
+    get eyebrow() {
+      return t('components.onboarding.tour.sentinel.eyebrow');
+    },
+    get title() {
+      return t('components.onboarding.tour.sentinel.title');
+    },
+    get body() {
+      return t('components.onboarding.tour.sentinel.body');
+    },
+    get points() {
+      return [t('components.onboarding.tour.sentinel.point1'), t('components.onboarding.tour.sentinel.point2'), t('components.onboarding.tour.sentinel.point3')];
+    },
   },
   uses: {
-    eyebrow: 'Sentinel at work',
     icon: 'pulse',
-    title: 'Real work, done while you sleep.',
-    body: 'A few of the sentinels people set up first. Tell Ask Sentinel what you want in your own words and your agent builds it, steps and all, ready for you to turn on.',
-    points: ['A fix waiting for your merge by morning', 'Your numbers on a board, your desktop and your phone', 'Every run kept, with its report'],
+    get eyebrow() {
+      return t('components.onboarding.tour.uses.eyebrow');
+    },
+    get title() {
+      return t('components.onboarding.tour.uses.title');
+    },
+    get body() {
+      return t('components.onboarding.tour.uses.body');
+    },
+    get points() {
+      return [t('components.onboarding.tour.uses.point1'), t('components.onboarding.tour.uses.point2'), t('components.onboarding.tour.uses.point3')];
+    },
   },
   earnings: {
-    eyebrow: 'Earnings',
     icon: 'gauge',
-    title: 'Know what every project earns.',
-    body: 'Connect Stripe or RevenueCat and each project shows its revenue right next to the work, kept up to date as sales come in.',
-    points: [`A read-only key, kept on ${thisComputer()}`, 'Per project and per month', 'In the currency you think in'],
+    get eyebrow() {
+      return t('components.onboarding.tour.earnings.eyebrow');
+    },
+    get title() {
+      return t('components.onboarding.tour.earnings.title');
+    },
+    get body() {
+      return t('components.onboarding.tour.earnings.body');
+    },
+    get points() {
+      return [t('components.onboarding.tour.earnings.point1', { computer: thisComputer() }), t('components.onboarding.tour.earnings.point2'), t('components.onboarding.tour.earnings.point3')];
+    },
   },
   archive: {
-    eyebrow: 'Archive',
     icon: 'archive',
-    title: 'Archive without a second thought.',
-    body: 'Done with a worktree? Archive it. Its folder goes, node_modules and builds with it, so your disk stays light. The branch and the whole conversation stay.',
-    points: ['Folders removed, branches kept', 'Every conversation kept', 'Restore checks the branch out again'],
+    get eyebrow() {
+      return t('components.onboarding.tour.archive.eyebrow');
+    },
+    get title() {
+      return t('components.onboarding.tour.archive.title');
+    },
+    get body() {
+      return t('components.onboarding.tour.archive.body');
+    },
+    get points() {
+      return [t('components.onboarding.tour.archive.point1'), t('components.onboarding.tour.archive.point2'), t('components.onboarding.tour.archive.point3')];
+    },
   },
 };

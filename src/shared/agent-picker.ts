@@ -1,6 +1,7 @@
 import type { AgentRef } from '../protocol.js';
 import type { RuntimeChoice, RuntimeModel } from './agent-runtimes.js';
 import { modelName } from './agent-label.js';
+import { type ComboChoice, comboAgent } from '../core/routing/model.js';
 
 /**
  * The agent picker (BLG-446), as the Mac's composer and the phone show it: runtimes as groups
@@ -16,6 +17,13 @@ export interface PickerState {
   readonly models: readonly RuntimeModel[];
   readonly prefs: { readonly model?: string };
   readonly projects: ReadonlyArray<{ readonly workspaces: ReadonlyArray<{ readonly id: string; readonly agent?: AgentRef; readonly model?: string }> }>;
+  /** Your combos as they stand now (core/routing/model.ts comboChoices): listed above the models. */
+  readonly combos?: readonly ComboChoice[];
+}
+
+/** A combo as the picker lists it: on when this conversation picked it. */
+export interface PickerCombo extends ComboChoice {
+  readonly on: boolean;
 }
 
 export interface PickerModel extends RuntimeModel {
@@ -44,6 +52,10 @@ export interface AgentPicker {
   readonly label: string;
   /** Default first, then the rest in Beluga's order. */
   readonly groups: readonly PickerGroup[];
+  /** The combo this conversation picked (its runs go to its first target that can run), when it did. */
+  readonly combo?: { readonly id: string; readonly name: string };
+  /** Your combos, above the models (a conversation's or a new worktree's own pick: not for new conversations). */
+  readonly combos: readonly PickerCombo[];
 }
 
 /** What picking an entry does: a model of the same runtime is a model change, another runtime an agent change. */
@@ -86,8 +98,13 @@ export function agentPicker(state: PickerState, channel: string, defaultRuntime 
   const group = groups.find((g) => g.current);
   const picked = group?.models.find((m) => m.on);
   const modelWords = picked?.label ?? (model ? modelName(model) : 'Default');
-  const label = runtime === defaultRuntime ? modelWords : `${group?.label ?? runtime} · ${modelWords}`;
-  return { ...(conversation ? { conversation } : {}), runtime, model, label, groups };
+  const combo = pinned?.combo ? { id: pinned.combo, name: pinned.comboName ?? state.combos?.find((c) => c.id === pinned.combo)?.name ?? pinned.label } : undefined;
+  const label = combo ? combo.name : runtime === defaultRuntime ? modelWords : `${group?.label ?? runtime} · ${modelWords}`;
+  // Combos are a conversation's (or a new worktree's) own pick: a screen shows them only there (new conversations take your agent's model).
+  const combos = (state.combos ?? []).map((c) => ({ ...c, on: c.id === combo?.id }));
+  // A combo picked: none of the runtime's models is the pick.
+  const shownGroups = combo ? groups.map((g) => ({ ...g, models: g.models.map((m) => ({ ...m, on: false })) })) : groups;
+  return { ...(conversation ? { conversation } : {}), runtime, model, label, groups: shownGroups, ...(combo ? { combo } : {}), combos };
 }
 
 /**
@@ -97,7 +114,8 @@ export function agentPicker(state: PickerState, channel: string, defaultRuntime 
  * take your default agent's models here; another runtime is the new worktree's own pick.
  */
 export function pickAction(picker: AgentPicker, group: Pick<PickerGroup, 'runtime' | 'label' | 'isDefault'>, model: string): PickAction | undefined {
-  if (group.runtime === picker.runtime) return { kind: 'model', value: model };
+  // On a combo, any model picked leaves it: an agent change, even on the combo's own runtime.
+  if (group.runtime === picker.runtime && !(picker.combo && picker.conversation)) return { kind: 'model', value: model };
   if (!picker.conversation) return group.isDefault ? { kind: 'model', value: model } : undefined;
   if (group.isDefault) return { kind: 'agent', agent: model ? { runtime: group.runtime, label: group.label, model } : null };
   return { kind: 'agent', agent: { runtime: group.runtime, label: group.label, ...(model ? { model } : {}) } };
@@ -115,7 +133,18 @@ export function placeAgent(ws: { readonly agent?: AgentRef; readonly model?: str
 }
 
 /** The agent and model a conversation runs on now, as an agent (what a task's page shows for its worktree). */
-export function pickedAgent(p: Pick<AgentPicker, 'runtime' | 'model' | 'groups'>): AgentRef {
+export function pickedAgent(p: Pick<AgentPicker, 'runtime' | 'model' | 'groups' | 'combo'>): AgentRef {
+  if (p.combo) return { runtime: p.runtime, label: p.combo.name.slice(0, 64), combo: p.combo.id, comboName: p.combo.name.slice(0, 64) };
   const group = p.groups.find((g) => g.current);
   return { runtime: p.runtime, label: group?.label ?? p.runtime, ...(p.model ? { model: p.model } : {}) };
+}
+
+/**
+ * What picking a combo does: the conversation's agent becomes the combo (its runs go to its first
+ * target that can run, docs/routing.md). Undefined where combos can't be picked (new conversations)
+ * or when it's the pick already.
+ */
+export function pickCombo(picker: Pick<AgentPicker, 'conversation' | 'combo'>, combo: Pick<ComboChoice, 'id' | 'name' | 'targets'>): PickAction | undefined {
+  if (!picker.conversation || picker.combo?.id === combo.id) return undefined;
+  return { kind: 'agent', agent: comboAgent({ id: combo.id, name: combo.name, targets: combo.targets.map((t) => t.target) }) };
 }

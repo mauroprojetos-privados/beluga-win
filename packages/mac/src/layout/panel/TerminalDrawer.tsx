@@ -6,6 +6,7 @@ import { setPrefs, usePrefs } from '../../lib/prefs.js';
 import { ResizeHandle, usePresence } from './ResizeHandle.js';
 import { TerminalPane } from './TerminalPane.js';
 import s from './panel.module.css';
+import { useT } from '../../lib/i18n.js';
 
 const SLIDE_MS = 200;
 
@@ -14,6 +15,7 @@ const SLIDE_MS = 200;
  * conversation, across the center, as tall as you drag it.
  */
 export function TerminalDrawer({ column }: { column: React.RefObject<HTMLElement | null> }) {
+  const t = useT();
   const prefs = usePrefs();
   const view = useApp((st) => st.view);
   const open = prefs.drawer && drawerFits(view);
@@ -27,7 +29,7 @@ export function TerminalDrawer({ column }: { column: React.RefObject<HTMLElement
     <div className={cx(s.drawer, presence.closing && s.drawerClosing, drag !== undefined && s.dragging)} style={{ height: `${Math.round(size * 1000) / 10}%` }}>
       <ResizeHandle
         axis="y"
-        label="Resize the terminal drawer"
+        label={t('layout.drawer.resize')}
         className={s.drawerEdge}
         onMove={(y) => {
           const r = column.current?.getBoundingClientRect();

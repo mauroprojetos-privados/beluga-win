@@ -1,7 +1,20 @@
 import { type AgentRef, CLAUDE_AGENT } from '../protocol.js';
+import { LANGUAGE_IN_ENGLISH, type Locale } from '../shared/i18n/locales.js';
 import { agentLabel } from '../shared/agent-label.js';
 import type { AgentRunInput, OpenPr } from './types.js';
 import { underPart } from '../shared/path-inside.js';
+
+/**
+ * The languages (docs/i18n.md): answers in the app's, commits and pull requests in the project's.
+ * English for both says nothing (it's what the rest of the prompt already assumes).
+ */
+export function buildLanguageAppend(language?: { readonly answerIn: Locale; readonly commitIn: Locale }): string {
+  if (!language || (language.answerIn === 'en' && language.commitIn === 'en')) return '';
+  const lines = ['', ''];
+  if (language.answerIn !== 'en') lines.push(`Language: answer the user in ${LANGUAGE_IN_ENGLISH[language.answerIn]}, in chat, questions, plans and reports, whatever language these instructions are in. Code, identifiers, commands and file names stay as they are.`);
+  lines.push(`Commit messages, pull request titles and descriptions, and code comments are written in ${LANGUAGE_IN_ENGLISH[language.commitIn]}, whatever language you answer in${language.commitIn === 'en' ? '' : ' (unless the repository clearly uses another one)'}.`);
+  return lines.join('\n');
+}
 
 /** `agent`: the agent this prompt is for ("You are kay's Codex"); default Claude, the runner's. */
 export function buildSystemAppend(ownerName: string, agent: AgentRef = CLAUDE_AGENT): string {

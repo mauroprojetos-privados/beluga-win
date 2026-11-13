@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { AgentRef } from '../protocol.js';
 import { LABEL_COLORS, LABEL_ICONS } from '../core/board/labels.js';
+import { WORK_CATEGORIES } from '../core/routing/model.js';
 import { BRIEF_SECTIONS, ISSUE_STATUSES, MAX_PROJECT_CONTEXT, PRIORITIES, SYNC_PROVIDERS, personOf } from '../core/board/model.js';
 
 /**
@@ -52,7 +53,8 @@ export const BOARD_API = {
       }).refine((t) => Boolean(t.title?.trim() || t.describe?.trim()), 'A task needs a title or a description'),
     ]),
   },
-  // Change a task's title, status, priority, assignee (null: no one), labels, estimate, due date, parent (null: none) or the repo it runs in (it stays on its board).
+  // Change a task's title, status, priority, assignee (null: no one), labels, estimate, due date, parent (null: none), the repo it runs in (it stays on its board)
+  // or its kind of work (docs/routing.md; null: none): kept as a correction of the kind it was given.
   'board.update': {
     args: z.tuple([
       ref,
@@ -66,6 +68,7 @@ export const BOARD_API = {
         due: day.nullable().optional(),
         parent: ref.nullable().optional(),
         projectId: projectId.optional(),
+        category: z.enum(WORK_CATEGORIES).nullable().optional(),
       }),
     ]),
   },

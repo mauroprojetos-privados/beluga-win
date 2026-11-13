@@ -6,6 +6,7 @@ import { HistoryList } from '../../views/history/HistoryList.js';
 import { useRefContext } from '../../views/history/HistoryView.js';
 import { type LogQuery, useFilters, useHistoryProject, useHistoryVersion, useLog } from '../../views/history/use-history.js';
 import h from '../../views/history/history.module.css';
+import { useT } from '../../lib/i18n.js';
 
 const PAGE = 80;
 
@@ -15,6 +16,7 @@ const PAGE = 80;
  * The panel mounts one per target (keyed), so a new target starts fresh.
  */
 export function HistoryTab({ target }: { target: string }) {
+  const t = useT();
   const project = useHistoryProject(target);
   const isProject = project?.id === target;
   const version = useHistoryVersion(project);
@@ -23,7 +25,7 @@ export function HistoryTab({ target }: { target: string }) {
   const filters = useFilters(target, version);
   const log = useLog(target, query, PAGE, version);
   const refs = useRefContext(project?.id ?? '', filters?.current);
-  if (!project) return <Empty icon="clock" title="No history here" detail="History shows for projects and their worktrees." />;
+  if (!project) return <Empty icon="clock" title={t('layout.history.none')} detail={t('layout.history.noneDetail')} />;
   if (selected) {
     return (
       <div className={h.tab}>
@@ -36,11 +38,11 @@ export function HistoryTab({ target }: { target: string }) {
       <HistoryFilters filters={filters} query={query} onChange={setQuery} compact />
       <div className={h.tabList}>
         {log.error && !log.commits.length ? (
-          <Empty icon="alert" title="Couldn’t read the history" detail={log.error} />
+          <Empty icon="alert" title={t('layout.history.couldntRead')} detail={log.error} />
         ) : !log.commits.length && !log.loading ? (
-          <Empty icon="search" title="No commits match" detail="Try another branch, author or path." />
+          <Empty icon="search" title={t('layout.history.noMatch')} detail={t('layout.history.noMatchDetail')} />
         ) : !log.commits.length ? (
-          <div className={h.dimPad}>Reading the history…</div>
+          <div className={h.dimPad}>{t('layout.history.reading')}</div>
         ) : (
           <HistoryList commits={log.commits} variant="compact" onSelect={setSelected} refs={refs} {...(log.more ? { onEnd: log.loadMore } : {})} loading={log.loading} />
         )}

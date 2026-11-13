@@ -5,6 +5,7 @@ import { useDocTheme } from '../markdown/use-doc-theme.js';
 import type { ViewData } from './use-view-data.js';
 import { formatCell, formatNumber } from './format.js';
 import { useHoverTip } from './HoverTip.js';
+import { useT } from '../../lib/i18n.js';
 import v from './views.module.css';
 
 /**
@@ -14,10 +15,11 @@ import v from './views.module.css';
  */
 
 export function HeatmapView({ view, data }: { view: View; data: ViewData }) {
+  const t = useT();
   const dark = useDocTheme() === 'dark';
   const plan = useMemo(() => planHeatmap(view, data.rows, data.columns), [view, data.rows, data.columns]);
   const { show, hide, tip } = useHoverTip();
-  if (!plan) return <div className={v.empty}>{data.loading ? 'Loading…' : 'Nothing to draw as a heatmap'}</div>;
+  if (!plan) return <div className={v.empty}>{data.loading ? t('common.loading') : t('components.views.heatmap.empty')}</div>;
   const scale = scaleOf(view, dark);
   const fmt = (n: number): string => (plan.valueColumn ? formatCell(n, plan.valueColumn) : formatNumber(n));
   const labelCh = Math.min(18, Math.max(3, ...plan.ys.map((y) => y.length)));
@@ -31,7 +33,7 @@ export function HeatmapView({ view, data }: { view: View; data: ViewData }) {
   return (
     <div className={v.heat} onMouseLeave={hide}>
       <div className={v.heatScroll}>
-        <div className={v.heatGrid} style={style} role="grid" aria-label={view.title ?? 'Heatmap'}>
+        <div className={v.heatGrid} style={style} role="grid" aria-label={view.title ?? t('components.views.heatmap.label')}>
           <span />
           {plan.xs.map((x, i) => (
             <span key={`x${i}`} className={tall ? v.heatXTall : v.heatX} title={x}>
@@ -54,6 +56,7 @@ export function HeatmapView({ view, data }: { view: View; data: ViewData }) {
 }
 
 function Row({ y, cells, xs, color, fmt, show, hide }: { y: string; cells: readonly (number | null)[]; xs: readonly string[]; color: (n: number | null) => string; fmt: (n: number) => string; show: (el: Element, body: React.ReactNode) => void; hide: () => void }) {
+  const t = useT();
   return (
     <>
       <span className={v.heatY} title={y}>
@@ -68,12 +71,12 @@ function Row({ y, cells, xs, color, fmt, show, hide }: { y: string; cells: reado
             </div>
             <div className={v.tipRow}>
               <span className={v.legendMark} style={{ background: color(n) }} />
-              <span className={v.tipName}>Value</span>
+              <span className={v.tipName}>{t('components.views.heatmap.value')}</span>
               <span className={v.tipValue}>{n === null ? '—' : fmt(n)}</span>
             </div>
           </>
         );
-        return <span key={xi} role="gridcell" className={v.heatCell} style={{ background: color(n) }} aria-label={`${x}, ${y}: ${n === null ? 'no value' : fmt(n)}`} onMouseEnter={(e) => show(e.currentTarget, body)} onMouseLeave={hide} />;
+        return <span key={xi} role="gridcell" className={v.heatCell} style={{ background: color(n) }} aria-label={`${x}, ${y}: ${n === null ? t('components.views.heatmap.noValue') : fmt(n)}`} onMouseEnter={(e) => show(e.currentTarget, body)} onMouseLeave={hide} />;
       })}
     </>
   );

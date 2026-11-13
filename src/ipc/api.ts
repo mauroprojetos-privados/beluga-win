@@ -14,6 +14,9 @@ import { STRIPE_API } from './stripe-api.js';
 import { REVENUECAT_API } from './revenuecat-api.js';
 import { TRIAGE_API } from './triage-api.js';
 import { SUPPORT_API } from './support-api.js';
+import { I18N_API } from './i18n-api.js';
+import { STACK_API } from './stack-api.js';
+import { LANGUAGE_CHOICES, LOCALES } from '../shared/i18n/locales.js';
 import { STATS_API } from './stats-api.js';
 import { WEB_API } from './web-api.js';
 import { DIAGNOSTICS_API } from './diagnostics-api.js';
@@ -41,6 +44,10 @@ import { CALLS_API } from './calls-api.js';
 import { TERMINAL_IMPORT_API } from './terminal-import-api.js';
 import { AGENT_TERM_API } from './agent-term-api.js';
 import { HANDOFF_MODES } from '../shared/agent-handoff.js';
+import { CategoryCombos, Combo, DifficultyCombos, MAX_COMBOS, RoleCombos } from '../core/routing/model.js';
+import { SAVINGS_BASELINES } from '../core/routing/outcomes.js';
+import { ROUTING_API } from './routing-api.js';
+import { BOTS_API } from './bots-api.js';
 
 /**
  * Everything a client can ask Beluga to do, in one list. The daemon validates every call
@@ -85,6 +92,9 @@ const EXPERIMENTS_MAX = 20;
 export const PrefsPatch = z
   .object({
     theme: z.enum(THEMES),
+    language: z.enum(LANGUAGE_CHOICES),
+    // Per project (by name), its commits' and PRs' language; null: back to English.
+    commitLanguages: z.record(z.string().min(1).max(80), z.enum(LOCALES)).nullable(),
     mouse: bool,
     tunnel: z.enum(['auto', 'p2p', 'cloudflared', 'ngrok', 'none']),
     keepAwake: z.enum(KEEP_AWAKE),
@@ -98,6 +108,16 @@ export const PrefsPatch = z
     // Who answers "@you" (null: back to Claude), and per-project ones by project name (BLG-444).
     defaultAgent: AgentRef.nullable().optional(),
     projectAgents: z.record(z.string().min(1).max(80), AgentRef),
+    // Your combos, the whole list each time (routing.setCombos checks them first); null: back to the defaults.
+    combos: z.array(Combo).max(MAX_COMBOS).nullable(),
+    // Which combo a task of each difficulty starts on; null: none (your agent).
+    difficultyCombos: DifficultyCombos.nullable(),
+    // Which combo each role runs on; null: none (as before).
+    roleCombos: RoleCombos.nullable(),
+    // Which combo (and effort) a task of each kind starts on; null: none (by difficulty, else your agent).
+    categoryCombos: CategoryCombos.nullable(),
+    // What Usage › Combos measures savings against ("everything on Opus"); null: the default.
+    savingsBaseline: z.enum(SAVINGS_BASELINES).nullable(),
     autoSetup: bool,
     branchPrefix: z.string().regex(BRANCH_PREFIX_RE, 'Use letters, digits and . _ - / only'),
     contextMeter: bool,
@@ -115,6 +135,8 @@ export const PrefsPatch = z
     settleIdleDays: z.number().int().min(0).max(SETTLE_IDLE_DAYS_MAX),
     pushToPr: bool,
     scratchFolder: bool,
+    stackRepair: bool,
+    stackBootstrap: bool,
     subagents: z.enum(['full', 'compact', 'hidden']),
     hiddenButtons: z.array(z.string().max(40)).max(40),
     friendWorktrees: z.enum(['ask', 'off']),
@@ -517,6 +539,10 @@ export const API = {
   ...REVENUECAT_API,
   // ---- supporting Beluga: the star and coffee asks merges bring (support-api.ts)
   ...SUPPORT_API,
+  // ---- the app's language, and each project's for its commits and PRs (i18n-api.ts, docs/i18n.md)
+  ...I18N_API,
+  // ---- your stack: the services and tools your agents lean on, and setting a project up for them (stack-api.ts, docs/stack.md)
+  ...STACK_API,
   // ---- your stats in the Usage tab: counted by the daemon, pastes and dictation from the Mac (stats-api.ts)
   ...STATS_API,
   // ---- problem reports: the daemon's black box in one redacted file (diagnostics-api.ts)
@@ -563,6 +589,10 @@ export const API = {
   ...AGENT_TERM_API,
   // ---- browsers on the web port: join links, the ones let in, revoking (web-api.ts)
   ...WEB_API,
+  // ---- combos: which agents and models a conversation's runs go to, in order (routing-api.ts)
+  ...ROUTING_API,
+  // ---- bots: Your Mac and the ones you make, each a folder of files; Bot Studio edits them (bots-api.ts)
+  ...BOTS_API,
 } as const;
 
 export type Api = typeof API;

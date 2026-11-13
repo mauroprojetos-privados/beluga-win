@@ -1,4 +1,5 @@
 import { MAX_PROJECT_CONTEXT } from '../core/board/model.js';
+import { inLanguage } from './side-language.js';
 import type { Complete } from './runtime/types.js';
 import { LOOK_TOOLS, lookVerdict } from './task-drafter.js';
 
@@ -47,7 +48,7 @@ export async function describeProject(dir: string, project: string, opts: { comp
       vetTool: (tool, input) => verdict(lookVerdict(dir, tool, input)),
       maxTurns: DESCRIBE_TURNS,
       signal: abortController.signal,
-      system: SYSTEM,
+      system: inLanguage(SYSTEM, 'the description'),
     });
     return parseDescription(said);
   } catch {

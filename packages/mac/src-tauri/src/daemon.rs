@@ -154,7 +154,7 @@ fn alive(pid: u32) -> bool {
 }
 
 /// Whether something answers on Beluga's port (a leftover pid could belong to anything).
-fn listening(port: u16) -> bool {
+pub(crate) fn listening(port: u16) -> bool {
     let addr = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
     TcpStream::connect_timeout(&addr, Duration::from_millis(200)).is_ok()
 }
@@ -625,6 +625,11 @@ pub async fn stop_for_update(app: &AppHandle) {
 pub async fn ensure(app: &AppHandle, args: &[String]) -> Result<Endpoint, String> {
     let state = app.state::<AppState>();
     let _one_at_a_time = state.lock.lock().await;
+    // Settings › Advanced › Engine › WSL: the engine in that distro instead of the bundled one.
+    #[cfg(windows)]
+    if let Some(distro) = crate::engine::wsl_distro(app) {
+        return crate::engine::ensure(&distro).await;
+    }
     if let Some(info) = running(app) {
         let bundled = bundled_version(app);
         let old = outdated(info.version.as_deref(), info.keep_alive, bundled.as_deref());
@@ -653,10 +658,49 @@ pub async fn ensure(app: &AppHandle, args: &[String]) -> Result<Endpoint, String
 /// Start Beluga again with these arguments (a link to a friend's room): the running one stops first.
 pub async fn restart(app: &AppHandle, args: &[String]) -> Result<Endpoint, String> {
     check_join(args)?;
+    if crate::engine::wsl_distro(app).is_some() {
+        return Err(JOIN_IN_WSL.into());
+    }
     let state = app.state::<AppState>();
     let _one_at_a_time = state.lock.lock().await;
     stop_running(app).await?;
     start(app, args).await
+}
+
+/// A link to a friend's room while the engine runs in WSL: the app doesn't restart that one.
+const JOIN_IN_WSL: &str = "Beluga's engine runs in WSL, so the app can't move it to a friend's \
+room. Run `beluga join <the link>` in your WSL terminal, or set Settings › Advanced › Engine back \
+to Windows.";
+
+/// Move the engine to Windows or a WSL distro (Settings › Advanced › Engine). WSL is tried first,
+/// and only kept if Beluga answers there; then the engine this app started on Windows stops (the
+/// window reconnects to the new one). Back to Windows, the distro is let go.
+#[cfg(windows)]
+pub async fn switch(app: &AppHandle, choice: crate::engine::Choice) -> Result<(), String> {
+    use crate::engine::{self, Place};
+    let state = app.state::<AppState>();
+    let _one_at_a_time = state.lock.lock().await;
+    match (choice.place, choice.distro.as_deref()) {
+        (Place::Wsl, Some(distro)) => {
+            engine::ensure(distro).await?;
+            engine::write_choice(app, &choice)?;
+            let child = locked(&state.child).take();
+            if let Some(child) = child {
+                terminate_child(child).await;
+            }
+        }
+        (Place::Wsl, None) => return Err("Pick a WSL distro first.".into()),
+        (Place::Windows, _) => {
+            engine::write_choice(app, &choice)?;
+            engine::let_go();
+        }
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+pub async fn switch(_app: &AppHandle, _choice: crate::engine::Choice) -> Result<(), String> {
+    Err("Beluga's engine runs in WSL only on Windows.".into())
 }
 
 /// Only joining a friend's room is allowed: `join <invite link>`.
@@ -686,6 +730,7 @@ fn check_join(args: &[String]) -> Result<(), String> {
 
 /// Stop the daemon this app started (one started elsewhere is left alone).
 pub fn stop(app: &AppHandle) {
+    crate::engine::let_go();
     let Some(state) = app.try_state::<AppState>() else {
         return;
     };

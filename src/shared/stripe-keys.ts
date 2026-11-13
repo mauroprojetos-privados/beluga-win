@@ -3,15 +3,17 @@
  * connect, the Mac app's sheet as you type). Browser-safe.
  */
 
+import { t } from './i18n/index.js';
+
 /** A restricted (rk_) or secret (sk_) key, live or test. */
 export const STRIPE_KEY = /^(rk|sk)_(live|test)_[A-Za-z0-9]{16,}$/;
 
 /** What's wrong with a pasted key, if anything. */
 export function stripeKeyProblem(key: string): string | undefined {
-  if (!key) return 'Paste a key from your Stripe dashboard';
-  if (/^pk_/.test(key)) return 'That’s a publishable key (pk_…). Beluga needs a restricted key (rk_…) that can read charges.';
-  if (/^whsec_/.test(key)) return 'That’s a webhook signing secret. Beluga needs a restricted key (rk_…) that can read charges.';
-  if (!STRIPE_KEY.test(key)) return 'That doesn’t look like a Stripe key. Restricted keys start with rk_live_ or rk_test_.';
+  if (!key) return t('shared.keys.stripeEmpty');
+  if (/^pk_/.test(key)) return t('shared.keys.stripePublishable');
+  if (/^whsec_/.test(key)) return t('shared.keys.stripeWebhook');
+  if (!STRIPE_KEY.test(key)) return t('shared.keys.stripeBad');
   return undefined;
 }
 

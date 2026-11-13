@@ -5,7 +5,9 @@
 //! the menu bar, the tray, notifications, `beluga://` (and the older `klaud://`) links, and
 //! keeping Beluga's daemon running. Everything Beluga does happens in the daemon.
 
+mod badge;
 mod daemon;
+mod engine;
 mod export;
 mod focus;
 mod menu;
@@ -58,6 +60,33 @@ async fn restart_daemon(
     args: Vec<String>,
 ) -> Result<daemon::Endpoint, String> {
     daemon::restart(&app, &args).await
+}
+
+/// Where Beluga's engine runs (Settings › Advanced › Engine): Windows or a WSL distro.
+#[tauri::command]
+fn engine_location(app: tauri::AppHandle) -> engine::Status {
+    engine::status(&app)
+}
+
+/// The WSL distros to pick from, or plain words on how to set WSL up.
+#[tauri::command]
+async fn wsl_distros() -> Result<Vec<String>, String> {
+    engine::distros().await
+}
+
+/// Move the engine to Windows or a WSL distro; the window reconnects after.
+#[tauri::command]
+async fn set_engine_location(
+    app: tauri::AppHandle,
+    place: engine::Place,
+    distro: Option<String>,
+) -> Result<engine::Status, String> {
+    let distro = distro.filter(|d| engine::valid_distro(d));
+    if place == engine::Place::Wsl && distro.is_none() {
+        return Err("Pick a WSL distro first.".into());
+    }
+    daemon::switch(&app, engine::Choice { place, distro }).await?;
+    Ok(engine::status(&app))
 }
 
 /// The beluga:// (and klaud://) links that opened the app before the window was ready to hear about them
@@ -151,6 +180,10 @@ fn set_tray_status(
         let _ = tray.set_tooltip(Some(tray_tip(waiting, working, unread)));
     }
     if let Some(window) = app.get_webview_window("main") {
+        // Windows has no badge count; the taskbar button carries it as an overlay icon.
+        #[cfg(windows)]
+        badge::show(&window, unread);
+        #[cfg(not(windows))]
         let _ = window.set_badge_count((unread > 0).then_some(i64::from(unread)));
     }
 }
@@ -296,6 +329,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             daemon_endpoint,
             restart_daemon,
+            engine_location,
+            wsl_distros,
+            set_engine_location,
             set_menu_state,
             set_vibrancy,
             set_menu_keys,

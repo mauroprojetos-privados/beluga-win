@@ -5,6 +5,7 @@ import { ScrollView, View } from 'react-native';
 import { useView } from '../lib/hooks';
 import { calls } from '../lib/link/calls';
 import type { ConvSummary, HomeView, Topic } from '../lib/link/protocol';
+import { t } from '../lib/language';
 import { store } from '../lib/store';
 import { color } from '../lib/theme';
 import { convHref, StepTicker, statusIcon } from './Conv';
@@ -43,8 +44,8 @@ export function DeleteMacChat({ topic, title, onClose, after }: { readonly topic
     <Options
       visible={Boolean(topic)}
       onClose={onClose}
-      title="This can’t be undone"
-      options={topic ? [{ Icon: Trash2, label: title ? `Delete “${title}”` : 'Delete this chat', sub: 'Its messages and files go for good, here and on your Mac', tone: 'rose', onPress: () => deleteMacChat(topic, after) }] : []}
+      title={t('phoneParts.cantUndo')}
+      options={topic ? [{ Icon: Trash2, label: title ? t('phoneParts.macChats.deleteNamed', { title }) : t('phoneParts.macChats.deleteThis'), sub: t('phoneParts.macChats.deleteSub'), tone: 'rose', onPress: () => deleteMacChat(topic, after) }] : []}
     />
   );
 }
@@ -80,9 +81,9 @@ export function MacChatsSheet({ visible, onClose, current, window = false }: { r
           <IconBadge Icon={Laptop} tone="sky" size={32} />
           <View style={{ flex: 1 }}>
             <T v="title" style={{ fontSize: 20 }}>
-              Your Mac’s chats
+              {t('phoneParts.macChats.title')}
             </T>
-            <T v="caption">The same chats as the tabs on your Mac</T>
+            <T v="caption">{t('phoneParts.macChats.sub')}</T>
           </View>
         </View>
       }
@@ -90,21 +91,21 @@ export function MacChatsSheet({ visible, onClose, current, window = false }: { r
       {deleting ? (
         <View style={{ paddingHorizontal: 12, paddingBottom: 20 }}>
           <T v="eyebrow" style={{ paddingHorizontal: 10, paddingBottom: 8 }}>
-            This can’t be undone
+            {t('phoneParts.cantUndo')}
           </T>
           <Press scaleTo={0.98} onPress={() => remove(deleting)} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 11, paddingHorizontal: 10, borderRadius: 16 }}>
             <IconBadge Icon={Trash2} tone="rose" size={38} />
             <View style={{ flex: 1 }}>
               <T v="body" numberOfLines={1} style={{ fontWeight: '500' }}>
-                Delete “{deleting.title}”
+                {t('phoneParts.macChats.deleteNamed', { title: deleting.title })}
               </T>
-              <T v="caption">Its messages and files go for good, here and on your Mac</T>
+              <T v="caption">{t('phoneParts.macChats.deleteSub')}</T>
             </View>
           </Press>
           <Press scaleTo={0.98} onPress={() => setDeleting(undefined)} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 11, paddingHorizontal: 10, borderRadius: 16 }}>
             <IconBadge Icon={X} tone="plain" size={38} />
             <T v="body" style={{ fontWeight: '500' }}>
-              Keep it
+              {t('phoneParts.macChats.keep')}
             </T>
           </Press>
         </View>
@@ -120,7 +121,7 @@ export function MacChatsSheet({ visible, onClose, current, window = false }: { r
           >
             <IconBadge Icon={Plus} tone="sky" size={38} />
             <T v="body" style={{ flex: 1, fontWeight: '600' }}>
-              New chat
+              {t('phoneParts.macChats.newChat')}
             </T>
           </Press>
           {chats.map((c) => (
@@ -128,7 +129,7 @@ export function MacChatsSheet({ visible, onClose, current, window = false }: { r
           ))}
           {chats.length ? (
             <T v="caption" style={{ paddingHorizontal: 10, paddingTop: 10 }}>
-              Long-press a chat to delete it.
+              {t('phoneParts.macChats.longPress')}
             </T>
           ) : null}
         </ScrollView>
@@ -137,7 +138,7 @@ export function MacChatsSheet({ visible, onClose, current, window = false }: { r
   );
 }
 
-function ChatRow({ c, current, onPress, onLongPress }: { readonly c: ConvSummary; readonly current: boolean; readonly onPress: () => void; readonly onLongPress: () => void }) {
+export function ChatRow({ c, current, onPress, onLongPress }: { readonly c: ConvSummary; readonly current: boolean; readonly onPress: () => void; readonly onLongPress: () => void }) {
   const st = statusIcon(c.needsYou ? 'waiting' : c.status);
   return (
     <Press scaleTo={0.98} onPress={onPress} onLongPress={onLongPress} delayLongPress={350} style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 10, paddingHorizontal: 10, borderRadius: 16, backgroundColor: current ? color.sunken : undefined }}>
@@ -147,10 +148,10 @@ function ChatRow({ c, current, onPress, onLongPress }: { readonly c: ConvSummary
           {c.title}
         </T>
         {c.status === 'working' ? (
-          <StepTicker step={c.last ?? 'Working'} size={12.5} />
+          <StepTicker step={c.last ?? t('phoneParts.working')} size={12.5} />
         ) : (
           <T v="caption" numberOfLines={1}>
-            {c.last ?? 'Nothing asked yet'}
+            {c.last ?? t('phoneParts.macChats.nothingAsked')}
           </T>
         )}
       </View>

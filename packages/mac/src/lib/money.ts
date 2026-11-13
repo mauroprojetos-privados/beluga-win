@@ -1,4 +1,6 @@
 import { type Converted, type FxRates, type MoneyTotal, convertParts } from '../../../../src/core/earnings-store.js';
+import { formatDateWith } from '../../../../src/shared/i18n/format.js';
+import { t } from '../../../../src/shared/i18n/index.js';
 
 /**
  * Money for people, without React: formatting amounts (a glance or exact), naming currencies,
@@ -83,16 +85,16 @@ export function currencyName(currency: string): string {
 
 /** How fresh the rates are: "today", "yesterday", "on Oct 12". */
 export function ratesWhen(at: number, now: number = Date.now()): string {
-  const day = (t: number): string => new Date(t).toDateString();
-  if (day(at) === day(now)) return 'today';
-  if (day(at) === day(now - 86_400_000)) return 'yesterday';
-  return `on ${new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+  const day = (ms: number): string => new Date(ms).toDateString();
+  if (day(at) === day(now)) return t('macLib.money.today');
+  if (day(at) === day(now - 86_400_000)) return t('helpers.ago.yesterday');
+  return t('macLib.money.on', { date: formatDateWith(at, { month: 'short', day: 'numeric' }) });
 }
 
 /** "₹269 not included (no rate yet)", for totals that couldn't be converted. */
 export function missingNote(missing: readonly MoneyTotal[]): string | undefined {
   if (!missing.length) return undefined;
-  return `${missing.map((t) => formatGlance(t.amount, t.currency)).join(', ')} not included (no rate yet)`;
+  return t('macLib.money.missing', { amounts: missing.map((m) => formatGlance(m.amount, m.currency)).join(', ') });
 }
 
 /** One project's earnings, in the currency you show them in. */

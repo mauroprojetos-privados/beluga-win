@@ -1,5 +1,7 @@
 import type { LogItem, View } from '../../../../src/core/store.js';
 import { isRunning } from '../../../../src/ui/format.js';
+import { formatDateWith, formatTime } from '../../../../src/shared/i18n/format.js';
+import { type Key, t } from '../../../../src/shared/i18n/index.js';
 
 /**
  * Beluga's own updates, as the window shows them: what the app shell (src-tauri/src/updater.rs)
@@ -63,9 +65,9 @@ export function shortVersion(version: string): string {
 /** Whether there's something to show in the sidebar: a downloaded update, or what just changed. */
 export function pillOf(state: UpdateState): { readonly label: string; readonly kind: 'ready' | 'news' } | undefined {
   if (state.available) {
-    return { label: state.phase === 'installing' ? 'Updating Beluga…' : `Beluga ${shortVersion(state.available.version)} is ready`, kind: 'ready' };
+    return { label: state.phase === 'installing' ? t('macLib.update.updating') : t('macLib.update.ready', { version: shortVersion(state.available.version) }), kind: 'ready' };
   }
-  if (state.news) return { label: `Updated to ${shortVersion(state.news.version)} · What’s new`, kind: 'news' };
+  if (state.news) return { label: t('macLib.update.news', { version: shortVersion(state.news.version) }), kind: 'news' };
   return undefined;
 }
 
@@ -74,50 +76,51 @@ const DAY = 24 * 60 * MINUTE;
 
 /** "Never", "Just now", "12 minutes ago", "Today at 9:41", "Yesterday at 18:02", "3 Oct". */
 export function lastCheckedLabel(lastCheck: number | null | undefined, now: number = Date.now(), locale?: string): string {
-  if (!lastCheck) return 'Never';
+  if (!lastCheck) return t('macLib.update.never');
   const ago = now - lastCheck;
-  if (ago < MINUTE) return 'Just now';
+  if (ago < MINUTE) return t('helpers.ago.justNowTitle');
   if (ago < 60 * MINUTE) {
     const m = Math.floor(ago / MINUTE);
-    return `${m} minute${m === 1 ? '' : 's'} ago`;
+    return t('helpers.ago.minutes', { count: m });
   }
   const at = new Date(lastCheck);
-  const time = at.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
+  // A locale given (the tests) says it that way; else the app's language.
+  const time = locale ? at.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' }) : formatTime(at);
   const startOfToday = new Date(now).setHours(0, 0, 0, 0);
-  if (lastCheck >= startOfToday) return `Today at ${time}`;
-  if (lastCheck >= startOfToday - DAY) return `Yesterday at ${time}`;
-  return at.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
+  if (lastCheck >= startOfToday) return t('helpers.ago.todayAt', { time });
+  if (lastCheck >= startOfToday - DAY) return t('helpers.ago.yesterdayAt', { time });
+  return locale ? at.toLocaleDateString(locale, { day: 'numeric', month: 'short' }) : formatDateWith(at, { day: 'numeric', month: 'short' });
 }
 
-const BLOCKER_WORDS: Record<UpdateBlocker, string> = {
-  claude: 'your agent to finish',
-  terminal: 'programs in your terminals to finish',
-  room: 'friends to leave your room (or you to leave theirs)',
-  you: 'you to step away for 10 minutes',
+const BLOCKER_WORDS: Record<UpdateBlocker, Key> = {
+  claude: 'macLib.update.waitClaude',
+  terminal: 'macLib.update.waitTerminal',
+  room: 'macLib.update.waitRoom',
+  you: 'macLib.update.waitYou',
 };
 
 /** "Installs when you step away", or what it still waits for. */
 export function idleLine(waitingOn: readonly UpdateBlocker[]): string {
-  if (!waitingOn.length) return 'Installs as soon as you step away. Beluga reopens in the background.';
-  const words = waitingOn.map((b) => BLOCKER_WORDS[b]);
-  const list = words.length > 1 ? `${words.slice(0, -1).join(', ')} and ${words.at(-1)}` : words[0];
-  return `Waiting for ${list}.`;
+  if (!waitingOn.length) return t('macLib.update.idleNow');
+  const words = waitingOn.map((b) => t(BLOCKER_WORDS[b]));
+  const list = words.length > 1 ? t('macLib.update.listAnd', { first: words.slice(0, -1).join(', '), last: words.at(-1) ?? '' }) : (words[0] ?? '');
+  return t('macLib.update.waiting', { list });
 }
 
 /** What the Settings row says about updates right now. */
 export function statusLine(state: UpdateState): string {
   switch (state.phase) {
     case 'checking':
-      return 'Checking…';
+      return t('macLib.update.checking');
     case 'downloading':
-      return `Downloading${state.progress ? ` · ${Math.round(state.progress * 100)}%` : '…'}`;
+      return state.progress ? t('macLib.update.downloadingPct', { percent: Math.round(state.progress * 100) }) : t('macLib.update.downloading');
     case 'installing':
-      return 'Installing…';
+      return t('macLib.update.installing');
     case 'error':
-      return state.error ?? 'Couldn’t check for updates.';
+      return state.error ?? t('macLib.update.couldntCheck');
     default:
-      if (state.available) return `Beluga ${shortVersion(state.available.version)} is ready${state.choice === 'idle' ? ' · installs when you’re idle' : ' · installs when you quit'}`;
-      return state.phase === 'current' ? 'Beluga is up to date.' : '';
+      if (state.available) return state.choice === 'idle' ? t('macLib.update.readyIdle', { version: shortVersion(state.available.version) }) : t('macLib.update.readyQuit', { version: shortVersion(state.available.version) });
+      return state.phase === 'current' ? t('macLib.update.upToDate') : '';
   }
 }
 

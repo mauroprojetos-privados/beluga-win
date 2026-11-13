@@ -7,6 +7,7 @@ import type { People } from './people.js';
 import type { TrustLevel } from './settings.js';
 import { type DomainState, type Store, peerName } from './store.js';
 import type { WorkspaceSharing } from './workspace-sharing.js';
+import { t } from '../shared/i18n/index.js';
 
 /** How the host's room lets guests in (implemented by the hub). */
 export interface GuestControl {
@@ -17,7 +18,7 @@ export interface GuestControl {
 }
 
 export { type LinkOptions, DAY_MS, DEFAULT_LINK, CAN_INFO, roleFor, trustFor, guestSummary, expiresIn } from '../shared/invites.js';
-import { type LinkOptions, CAN_INFO, roleFor, trustFor } from '../shared/invites.js';
+import { type LinkOptions, canWords, roleFor, trustFor } from '../shared/invites.js';
 
 /** Whether a new person may come in with this link right now. */
 export function linkUsable(link: Pick<ProjectLink, 'singleUse' | 'used' | 'expiresAt'>, now: number): boolean {
@@ -93,7 +94,7 @@ export class ProjectInvites {
   /** Make a link and copy it (opening remote access first if needed); `copy: false` only makes it (the demo). */
   async create(opts: LinkOptions, { copy = true } = {}): Promise<ProjectLink | undefined> {
     if (!this.deps.room) {
-      this.deps.toast('Project links work in rooms you host. Start Beluga yourself to invite people into a project', 'warn');
+      this.deps.toast(t('toasts.projectInvites.hostOnly'), 'warn');
       return undefined;
     }
     const secret = generateSecret();
@@ -128,10 +129,10 @@ export class ProjectInvites {
     if (!url) {
       this.pendingCopy = id;
       this.deps.startInvite?.();
-      this.deps.toast('Opening a secure link… it will be copied when ready');
+      this.deps.toast(t('toasts.projectInvites.opening'));
       return;
     }
-    await this.deps.copy(url, `Link for ${link.label} copied (${CAN_INFO[link.can].short}${link.knock ? ', knocks first' : ''})`);
+    await this.deps.copy(url, link.knock ? t('toasts.projectInvites.copiedKnock', { label: link.label, can: canWords(link.can).short }) : t('toasts.projectInvites.copied', { label: link.label, can: canWords(link.can).short }));
   }
 
   /** The link stops working; people already in keep their place until you remove them. */
@@ -142,7 +143,7 @@ export class ProjectInvites {
     this.secrets.delete(id);
     this.deps.store.dispatch({ type: 'link_remove', id });
     for (const k of this.state.knocks.filter((x) => x.linkId === id)) this.decline(k.peerId, true);
-    if (link) this.deps.toast(`The link for ${link.label} no longer works`, 'success');
+    if (link) this.deps.toast(t('toasts.projectInvites.revoked', { label: link.label }), 'success');
   }
 
   private liveKeys(): Array<{ id: string; keys: RoomKeys }> {
@@ -177,7 +178,7 @@ export class ProjectInvites {
       else {
         const knock: Knock = { peerId: p.peerId, linkId, ts: this.now() };
         this.deps.store.dispatch({ type: 'knock', knock, show: true });
-        this.deps.toast(`${p.name} is at the door of ${link.label}`);
+        this.deps.toast(t('toasts.projectInvites.atDoor', { name: p.name, label: link.label }));
       }
     }
   }
@@ -192,7 +193,7 @@ export class ProjectInvites {
     this.arrivals.delete(peerId);
     const guest: Guest = { peerId, name: peer.name, projects: link.scope === 'room' ? [] : [link.scope], room: link.scope === 'room', can: can ?? link.can };
     this.apply(guest);
-    this.deps.toast(`${peer.name} is in ${guest.room ? 'the room' : link.label} (${CAN_INFO[guest.can].short})`, 'success');
+    this.deps.toast(guest.room ? t('toasts.projectInvites.inRoom', { name: peer.name, can: canWords(guest.can).short }) : t('toasts.projectInvites.inLink', { name: peer.name, label: link.label, can: canWords(guest.can).short }), 'success');
   }
 
   decline(peerId: string, quiet = false): void {
@@ -200,7 +201,7 @@ export class ProjectInvites {
     this.arrivals.delete(peerId);
     this.deps.store.dispatch({ type: 'knock', knock: { peerId, linkId: '', ts: 0 }, show: false });
     this.deps.room?.turnAway(peerId);
-    if (!quiet) this.deps.toast(`You turned ${name} away`, 'success');
+    if (!quiet) this.deps.toast(t('toasts.projectInvites.turnedAway', { name }), 'success');
   }
 
   /** Give a guest more (another project, or everything) or change what they can do. */
@@ -214,7 +215,7 @@ export class ProjectInvites {
       can: patch.can ?? guest.can,
     };
     this.apply(next);
-    const what = patch.room ? 'everything: the room chat and what you share' : patch.addProject ? this.labelFor(patch.addProject) : CAN_INFO[next.can].short;
+    const what = patch.room ? t('toasts.projectInvites.everything') : patch.addProject ? this.labelFor(patch.addProject) : canWords(next.can).short;
     this.deps.toast(`${guest.name}: ${what}`, 'success');
   }
 
@@ -227,7 +228,7 @@ export class ProjectInvites {
     // The trust that came with the link goes too: coming back by another link starts from your default.
     this.deps.people.forget(peerId);
     this.deps.room?.turnAway(peerId);
-    this.deps.toast(`${guest.name} was removed`, 'success');
+    this.deps.toast(t('toasts.projectInvites.removed', { name: guest.name }), 'success');
   }
 
   /** Is this person a guest who only sees what they were invited to? */

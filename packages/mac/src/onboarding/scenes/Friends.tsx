@@ -1,6 +1,8 @@
 import { AnimatePresence, motion } from 'motion/react';
 import { type ReactNode, useState } from 'react';
 import { Icon, type IconName } from '../../components/Icon.js';
+import { t } from '@beluga/shared/i18n/index.js';
+import { useT } from '../../lib/i18n.js';
 import { SPRING } from '../fx.js';
 import { useBeats } from './use-beats.js';
 import s from './scenes.module.css';
@@ -26,39 +28,39 @@ interface Errand {
   readonly result: { icon: IconName; label: string; detail: string };
 }
 
-const ERRANDS: readonly Errand[] = [
+const ERRANDS = (): readonly Errand[] => [
   {
-    before: 'Drafting the Q3 investor update',
-    ask: 'Find the Q3 balance sheet on Ada’s computer and send me a summary',
+    before: t('components.onboarding.scene.friends.q3Before'),
+    ask: t('components.onboarding.scene.friends.q3Ask'),
     steps: [
-      { icon: 'search', text: 'Searched', code: '~/Desktop' },
-      { icon: 'file', text: 'Found', code: 'Balance-Sheet-Q3.xlsx' },
-      { icon: 'pencil', text: 'Summarised 3 sheets' },
+      { icon: 'search', text: t('components.onboarding.scene.friends.searched'), code: '~/Desktop' },
+      { icon: 'file', text: t('components.onboarding.scene.friends.found'), code: 'Balance-Sheet-Q3.xlsx' },
+      { icon: 'pencil', text: t('components.onboarding.scene.friends.summarised') },
     ],
-    result: { icon: 'file', label: 'q3-summary.md', detail: 'Revenue +18%, runway 22 months' },
-    after: 'Adding the numbers to the update',
+    result: { icon: 'file', label: 'q3-summary.md', detail: t('components.onboarding.scene.friends.q3Result') },
+    after: t('components.onboarding.scene.friends.q3After'),
   },
   {
-    before: 'Setting up CI for acme/web',
-    ask: 'Make me an admin on acme/web, I need to set branch rules',
+    before: t('components.onboarding.scene.friends.ciBefore'),
+    ask: t('components.onboarding.scene.friends.ciAsk'),
     steps: [
-      { icon: 'person', text: 'Ada is an owner of', code: 'acme' },
-      { icon: 'terminal', text: 'Ran', code: 'gh api …/memberships' },
-      { icon: 'check', text: 'Role changed to admin' },
+      { icon: 'person', text: t('components.onboarding.scene.friends.owner'), code: 'acme' },
+      { icon: 'terminal', text: t('components.onboarding.scene.friends.ran'), code: 'gh api …/memberships' },
+      { icon: 'check', text: t('components.onboarding.scene.friends.roleChanged') },
     ],
-    result: { icon: 'check', label: 'Admin on acme/web', detail: 'Granted by Ada’s agent' },
-    after: 'Turning on branch protection',
+    result: { icon: 'check', label: t('components.onboarding.scene.friends.ciResult'), detail: t('components.onboarding.scene.friends.ciGranted') },
+    after: t('components.onboarding.scene.friends.ciAfter'),
   },
   {
-    before: 'Debugging the revenue chart',
-    ask: 'Screenshot the staging dashboard while you’re signed in',
+    before: t('components.onboarding.scene.friends.chartBefore'),
+    ask: t('components.onboarding.scene.friends.chartAsk'),
     steps: [
-      { icon: 'globe', text: 'Opened', code: 'staging.acme.dev' },
-      { icon: 'eye', text: 'Waited for the charts to load' },
-      { icon: 'image', text: 'Took a screenshot' },
+      { icon: 'globe', text: t('components.onboarding.scene.friends.opened'), code: 'staging.acme.dev' },
+      { icon: 'eye', text: t('components.onboarding.scene.friends.waitedCharts') },
+      { icon: 'image', text: t('components.onboarding.scene.friends.tookShot') },
     ],
     result: { icon: 'image', label: 'staging-dashboard.png', detail: '1440 × 900' },
-    after: 'Comparing it with production',
+    after: t('components.onboarding.scene.friends.chartAfter'),
   },
 ];
 
@@ -73,6 +75,7 @@ const RETURNING = 7;
 const DONE = 8;
 
 function Window({ who, hue, you, children }: { readonly who: string; readonly hue: number; readonly you?: boolean; readonly children: ReactNode }) {
+  const t = useT();
   return (
     <div className={s.mac}>
       <div className={s.macHead}>
@@ -80,9 +83,9 @@ function Window({ who, hue, you, children }: { readonly who: string; readonly hu
           {who[0]}
         </span>
         <div>
-          <strong>{you ? upFirst(yourComputer()) : `${who}’s computer`}</strong>
+          <strong>{you ? upFirst(yourComputer()) : t('components.onboarding.scene.friends.theirComputer', { who })}</strong>
           <span className={s.macClaude}>
-            <Icon name="claude" size={10} /> {you ? 'your agent' : `${who}’s agent`}
+            <Icon name="claude" size={10} /> {you ? t('components.onboarding.scene.friends.yourAgent') : t('components.onboarding.scene.friends.theirAgent', { who })}
           </span>
         </div>
       </div>
@@ -100,25 +103,27 @@ const Line = ({ icon, text, code, live }: { readonly icon: IconName; readonly te
 );
 
 export function Friends() {
+  const t = useT();
   const [round, setRound] = useState(0);
   const beat = useBeats(BEATS, DONE, () => setRound((r) => r + 1));
-  const errand = ERRANDS[round % ERRANDS.length]!;
+  const errands = ERRANDS();
+  const errand = errands[round % errands.length]!;
   const shown = beat >= WORKING ? Math.min(errand.steps.length, beat - WORKING + 1) : 0;
   return (
     <div className={s.stage}>
       <div className={s.friends}>
-        <Window who="You" hue={40} you>
+        <Window who={t('components.onboarding.scene.friends.you')} hue={40} you>
           <AnimatePresence mode="popLayout">
             <motion.div key={`${round}-${beat >= DONE}`} className={s.task} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={SPRING}>
               <Icon name={beat >= ASKING && beat < DONE ? 'clock' : 'refresh'} size={12} className={beat >= ASKING && beat < DONE ? s.waitIcon : s.spin} />
-              {beat >= DONE ? errand.after : beat >= ASKING ? 'Waiting on Ada’s agent…' : errand.before}
+              {beat >= DONE ? errand.after : beat >= ASKING ? t('components.onboarding.scene.friends.waiting') : errand.before}
             </motion.div>
           </AnimatePresence>
           <AnimatePresence>
             {beat >= ASKING ? (
               <motion.div key={`ask-${round}`} className={s.errandAsk} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={SPRING}>
                 <span className={s.askTag}>
-                  <Icon name="share" size={10} /> To Ada’s agent
+                  <Icon name="share" size={10} /> {t('components.onboarding.scene.friends.toAda')}
                 </span>
                 {errand.ask}
               </motion.div>
@@ -175,20 +180,20 @@ export function Friends() {
             ) : null}
           </AnimatePresence>
           <span className={s.lock}>
-            <Icon name="lock" size={10} /> Computer to computer, encrypted
+            <Icon name="lock" size={10} /> {t('components.onboarding.scene.friends.encrypted')}
           </span>
         </div>
 
-        <Window who="Ada" hue={300}>
+        <Window who="Ada" hue={300}>{/* i18n-ignore */}
           <AnimatePresence mode="popLayout">
             {beat === WAITING || beat === ALLOWED ? (
               <motion.div key={`req-${round}`} className={s.request} initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -6, scale: 0.97 }} transition={SPRING}>
-                <span className={s.dim}>Your friend’s agent asks</span>
+                <span className={s.dim}>{t('components.onboarding.scene.friends.friendAsks')}</span>
                 <span className={s.requestText}>{errand.ask}</span>
                 <div className={s.requestButtons}>
-                  <span className={s.btn}>Decline</span>
+                  <span className={s.btn}>{t('components.onboarding.scene.friends.decline')}</span>
                   <motion.span className={s.btnPrimary} animate={beat === ALLOWED ? { scale: [1, 0.9, 1] } : {}} transition={{ duration: 0.3 }}>
-                    {beat === ALLOWED ? <Icon name="check" size={11} /> : null} Allow
+                    {beat === ALLOWED ? <Icon name="check" size={11} /> : null} {t('common.allow')}
                   </motion.span>
                 </div>
               </motion.div>
@@ -200,7 +205,7 @@ export function Friends() {
               </motion.div>
             ) : (
               <motion.div key="idle" className={s.idle} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <Icon name="claude" size={12} /> Ready to help
+                <Icon name="claude" size={12} /> {t('components.onboarding.scene.friends.readyToHelp')}
               </motion.div>
             )}
           </AnimatePresence>

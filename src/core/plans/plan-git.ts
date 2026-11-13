@@ -1,4 +1,5 @@
 import type { CombineResult, MergeResult } from '../../workspaces/git.js';
+import { tryGit } from '../../workspaces/git.js';
 import { createPr, explainMergeError, findPr, hasGh, mergePr, pushForPr } from '../../workspaces/pr.js';
 import type { PlanPr } from './model.js';
 import type { WorkspaceController } from '../workspace-controller.js';
@@ -28,6 +29,10 @@ export interface PlanGit {
   mergePr(projectId: string, number: number, opts?: { readonly auto?: boolean }): Promise<void>;
   /** Merge the branch into the project's main folder (on main). */
   mergeLocal(projectId: string, branch: string): Promise<MergeResult>;
+  /** A ref's commit (undefined: git couldn't tell). */
+  head?(projectId: string, ref: string): Promise<string | undefined>;
+  /** Files changed between two commits (empty when git couldn't tell). */
+  changedFiles?(projectId: string, from: string, to: string): Promise<string[]>;
 }
 
 export function planGitOf(controller: WorkspaceController): PlanGit {
@@ -56,5 +61,11 @@ export function planGitOf(controller: WorkspaceController): PlanGit {
       });
     },
     mergeLocal: (projectId, branch) => m.mergeBranchIntoMain(projectId, branch),
+    head: async (projectId, ref) => (await tryGit(root(projectId), ['rev-parse', '--verify', '--quiet', ref]))?.trim() || undefined,
+    changedFiles: async (projectId, from, to) =>
+      ((await tryGit(root(projectId), ['diff', '--name-only', from, to])) ?? '')
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean),
   };
 }

@@ -9,6 +9,7 @@ import { answer, NeedButtons, NeedFace, plainOf, sendOwn } from '../../component
 import { Sheet } from '../../components/Sheet';
 import { Card, Hairline, Press, Row, T } from '../../components/ui';
 import { useAllNeeds, useView } from '../../lib/hooks';
+import { useT } from '../../lib/language';
 import type { HomeView } from '../../lib/link/protocol';
 import { store } from '../../lib/store';
 import { color } from '../../lib/theme';
@@ -18,6 +19,7 @@ import { color } from '../../lib/theme';
  * advanced ones, one row each: Always, your own words, open what it holds up, open on the Mac.
  */
 export default function Need() {
+  const t = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const home = useView<HomeView>('home');
   // Your Mac's and every computer's (BLG-810): answering goes back where it came from.
@@ -46,32 +48,32 @@ export default function Need() {
         {n ? (
           <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 12, gap: 18 }} keyboardShouldPersistTaps="handled">
             <NeedFace item={n} full onAnswered={() => close()} />
-            <NeedButtons item={n} onAnswer={(t) => act(t)} />
+            <NeedButtons item={n} onAnswer={(tone) => act(tone)} />
             <Card style={{ marginHorizontal: -4 }}>
-              {always ? <Row first Icon={Always} tone="peach" label={always.label} sub="Don't ask again for this" onPress={() => act('plain')} chevron={false} /> : null}
+              {always ? <Row first Icon={Always} tone="peach" label={always.label} sub={t('phone.needs.dontAskAgain')} onPress={() => act('plain')} chevron={false} /> : null}
               {opens ? (
                 <Row
                   first={!always}
                   Icon={opens.startsWith('plan:') ? Workflow : opens.startsWith('sentinel:') ? Shield : MessageSquare}
                   tone="sky"
-                  label={opens.startsWith('plan:') ? 'Open the plan' : opens.startsWith('sentinel:') ? 'Open the sentinel' : 'Open the conversation'}
+                  label={t(opens.startsWith('plan:') ? 'phone.needs.openPlan' : opens.startsWith('sentinel:') ? 'phone.needs.openSentinel' : 'phone.needs.openConversation')}
                   onPress={() => {
-                    const t = opens;
-                    close(() => router.push(t.startsWith('plan:') ? `/plan/${t.slice(5)}` : t.startsWith('sentinel:') ? `/sentinel/${encodeURIComponent(t.slice(9))}` : t.startsWith('chat:') ? chatHref(t) : (convHref(t, on) as never)));
+                    const to = opens;
+                    close(() => router.push(to.startsWith('plan:') ? `/plan/${to.slice(5)}` : to.startsWith('sentinel:') ? `/sentinel/${encodeURIComponent(to.slice(9))}` : to.startsWith('chat:') ? chatHref(to) : (convHref(to, on) as never)));
                   }}
                 />
               ) : null}
-              {on ? null : <Row first={!always && !opens} Icon={Monitor} tone="plain" label="Open on your Mac" onPress={() => (void openOnMac(n.topic ? { topic: n.topic } : { need: n.id }), close())} chevron={false} />}
-              <Row Icon={EyeOff} tone="plain" label="Dismiss" sub="Off your lists, here and on your Mac, without answering" onPress={() => (store.dismiss(n), close())} chevron={false} />
+              {on ? null : <Row first={!always && !opens} Icon={Monitor} tone="plain" label={t('phone.needs.openOnMac')} onPress={() => (void openOnMac(n.topic ? { topic: n.topic } : { need: n.id }), close())} chevron={false} />}
+              <Row Icon={EyeOff} tone="plain" label={t('phone.needs.dismiss')} sub={t('phone.needs.dismissSub')} onPress={() => (store.dismiss(n), close())} chevron={false} />
             </Card>
             {n.answer?.text ? (
               <View style={{ gap: 8 }}>
-                <T v="eyebrow">{n.choices?.length ? 'Or in your words' : 'Your answer'}</T>
+                <T v="eyebrow">{t(n.choices?.length ? 'phone.needs.orInYourWords' : 'phone.needs.yourAnswer')}</T>
                 <Card style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 14, paddingRight: 6, paddingVertical: 6 }}>
-                  <TextInput value={words} onChangeText={setWords} placeholder="Type an answer" placeholderTextColor={color.text3} style={{ flex: 1, color: color.text, fontSize: 15.5, paddingVertical: 8, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : {}) }} />
+                  <TextInput value={words} onChangeText={setWords} placeholder={t('phone.needs.typeAnswer')} placeholderTextColor={color.text3} style={{ flex: 1, color: color.text, fontSize: 15.5, paddingVertical: 8, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : {}) }} />
                   <Press disabled={!words.trim()} onPress={() => sendOwn(n, words.trim()) && close()} style={{ height: 36, paddingHorizontal: 14, borderRadius: 18, justifyContent: 'center', backgroundColor: words.trim() ? color.primary : color.sunken }}>
                     <T v="callout" c={words.trim() ? color.onPrimary : color.text3} style={{ fontWeight: '600' }}>
-                      {n.answer.label ?? 'Send'}
+                      {n.answer.label ?? t('common.send')}
                     </T>
                   </Press>
                 </Card>
@@ -80,7 +82,7 @@ export default function Need() {
           </ScrollView>
         ) : (
           <View style={{ padding: 20 }}>
-            <T v="callout">Already answered.</T>
+            <T v="callout">{t('phone.needs.alreadyAnswered')}</T>
             <Hairline />
           </View>
         )}

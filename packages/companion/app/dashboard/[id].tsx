@@ -16,6 +16,7 @@ import type { DashboardView, Topic } from '../../lib/link/protocol';
 import { openOnMac } from '../../lib/mac';
 import { store } from '../../lib/store';
 import { color } from '../../lib/theme';
+import { useT } from '../../lib/language';
 
 /**
  * A dashboard (BLG-244, docs/sentinel.md §10): the tiles your Mac works out from what your
@@ -27,6 +28,7 @@ import { color } from '../../lib/theme';
 export default function DashboardPage() {
   const { scrolled, onScroll } = useScrolled();
   const insets = useSafeAreaInsets();
+  const say = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [current, setCurrent] = useState(decodeURIComponent(id ?? ''));
   useEffect(() => setCurrent(decodeURIComponent(id ?? '')), [id]);
@@ -62,13 +64,12 @@ export default function DashboardPage() {
 
   return (
     <Screen>
-      <Header scrolled={scrolled} back eyebrow="Dashboard" title={d?.name ?? 'Dashboard'} at={view?.at} right={d ? <More onPress={() => setMenu(true)} label="Dashboard options" /> : undefined} />
+      <Header scrolled={scrolled} back eyebrow={say('phoneApp.dashboard.dashboard')} title={d?.name ?? say('phoneApp.dashboard.dashboard')} at={view?.at} right={d ? <More onPress={() => setMenu(true)} label={say('phoneApp.dashboard.options')} /> : undefined} />
       {refreshing ? (
         <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingBottom: 6 }}>
           <ActivityIndicator size="small" color={color.text3} />
           <T v="caption" numberOfLines={1} style={{ flex: 1 }}>
-            Fetching… {Math.min(refreshing.done + 1, refreshing.total)} of {refreshing.total}
-            {refreshing.sentinel ? ` · ${refreshing.sentinel}` : ''}
+            {refreshing.sentinel ? say('phoneApp.dashboard.fetchingFrom', { done: Math.min(refreshing.done + 1, refreshing.total), total: refreshing.total, sentinel: refreshing.sentinel }) : say('phoneApp.dashboard.fetching', { done: Math.min(refreshing.done + 1, refreshing.total), total: refreshing.total })}
           </T>
         </Animated.View>
       ) : null}
@@ -80,11 +81,11 @@ export default function DashboardPage() {
       >
         {!on ? (
           <T v="callout" style={{ textAlign: 'center', marginTop: 40, paddingHorizontal: 24 }}>
-            Update Beluga on your Mac to see your dashboards here.
+            {say('phoneApp.dashboard.update')}
           </T>
         ) : !d ? (
           <T v="callout" style={{ textAlign: 'center', marginTop: 40, paddingHorizontal: 24 }}>
-            {view === undefined ? 'Opening the dashboard…' : 'This dashboard is gone.'}
+            {view === undefined ? say('phoneApp.dashboard.opening') : say('phoneApp.dashboard.gone')}
           </T>
         ) : (
           <Animated.View entering={FadeIn.duration(220)} style={{ gap: 14 }}>
@@ -102,11 +103,11 @@ export default function DashboardPage() {
               <Tiles tiles={d.tiles} compare={shown} />
             ) : (
               <T v="callout" style={{ textAlign: 'center', marginTop: 24, paddingHorizontal: 24 }}>
-                No tiles yet. Add them on the Dashboard page on your Mac.
+                {say('phoneApp.dashboard.noTiles')}
               </T>
             )}
             <T v="caption" c={color.text3} style={{ textAlign: 'center', paddingHorizontal: 24, marginTop: 6 }}>
-              Pull down to fetch every number again.
+              {say('phoneApp.dashboard.pull')}
             </T>
           </Animated.View>
         )}
@@ -116,22 +117,22 @@ export default function DashboardPage() {
         onClose={() => setMenu(false)}
         title={d?.name}
         options={[
-          { Icon: RefreshCw, label: 'Refresh', sub: 'Run every sentinel it draws from (or pull down)', tone: 'sky', hidden: Boolean(refreshing), onPress: () => void refresh() },
-          { Icon: Grid2x2Plus, label: 'Add to Home screen', sub: 'One of its tiles, as a widget', tone: 'mint', hidden: !canPin || !pinnable.length, onPress: () => setPinning(true) },
-          { Icon: Monitor, label: 'Open on your Mac', sub: 'Arrange its tiles, add numbers', tone: 'plain', onPress: () => void openOnMac({ topic }) },
+          { Icon: RefreshCw, label: say('phoneApp.dashboard.refresh'), sub: say('phoneApp.dashboard.refreshSub'), tone: 'sky', hidden: Boolean(refreshing), onPress: () => void refresh() },
+          { Icon: Grid2x2Plus, label: say('phoneApp.dashboard.addHome'), sub: say('phoneApp.dashboard.addHomeSub'), tone: 'mint', hidden: !canPin || !pinnable.length, onPress: () => setPinning(true) },
+          { Icon: Monitor, label: say('phone.needs.openOnMac'), sub: say('phoneApp.dashboard.openOnMacSub'), tone: 'plain', onPress: () => void openOnMac({ topic }) },
         ]}
       />
       <Options
         visible={pinning}
         onClose={() => setPinning(false)}
-        title="Which tile?"
+        title={say('phoneApp.dashboard.whichTile')}
         options={pinnable.map((t) => ({
           Icon: t.kind === 'number' ? Hash : t.kind === 'chart' || t.kind === 'series' ? ChartSpline : Text,
           label: t.title,
           ...(t.value ? { sub: t.value } : t.sentinel ? { sub: t.sentinel } : {}),
           tone: 'plain' as const,
           onPress: () => {
-            if (d && !homeWidgets.pin(`${d.id}/${t.id}`)) store.toast({ text: 'This phone’s Home screen can’t take it from here: long-press it › Widgets › Beluga.', tone: 'error' });
+            if (d && !homeWidgets.pin(`${d.id}/${t.id}`)) store.toast({ text: say('phoneApp.dashboard.cantPin'), tone: 'error' });
           },
         }))}
       />

@@ -12,6 +12,7 @@ import { useCheckerChat, useClock, usePlanActions } from './use-plans.js';
 import { useStartWith } from '../components/agent-options.js';
 import { useMyAgent } from '../lib/agent-words.js';
 import type { AgentRef } from '@beluga/protocol.js';
+import { useT } from '../lib/i18n.js';
 
 /** A change you make to a plan (as the API takes it). */
 type PlanOp = Parameters<ReturnType<typeof usePlanActions>['api']['edit']>[1][number];
@@ -24,6 +25,8 @@ import p from './plans.module.css';
  */
 export function PlanOutline({ view, keys, selected, onSelect, startable }: { view: PlanView; keys: ReadonlyMap<string, string>; selected?: string; onSelect: (id: string) => void; startable: ReadonlySet<string> }) {
   const marks = changeMarks(view.plan);
+  const tr = useT();
+  const and = (xs: readonly string[]): string => xs.join(` ${tr('common.and')} `);
   // Milestones that run side by side share a row; a row starts once what it waits on has passed.
   const rows = milestoneRows(view.body ?? view.plan.draft);
   return (
@@ -35,9 +38,9 @@ export function PlanOutline({ view, keys, selected, onSelect, startable }: { vie
         return (
           <Fragment key={row.join()}>
             {i > 0 ? (
-              <div className={p.oAfter} aria-label={`Then, once ${after.map((m) => m.milestone.title).join(' and ')} ${after.length === 1 ? 'passes' : 'pass'}`}>
+              <div className={p.oAfter} aria-label={tr('plans.o.thenOnce', { count: after.length, names: and(after.map((m) => m.milestone.title)) })}>
                 <Icon name="arrowRight" size={11} className={p.oAfterArrow} />
-                {after.length ? `Once ${after.map((m) => `“${m.milestone.title}”`).join(' and ')} ${after.length === 1 ? 'passes' : 'pass'}` : 'Then'}
+                {after.length ? tr('plans.o.once', { count: after.length, names: and(after.map((m) => `“${m.milestone.title}”`)) }) : tr('plans.o.then')}
               </div>
             ) : null}
             <div className={p.oRow} data-parallel={ms.length > 1 ? ms.length : undefined} style={{ '--cols': ms.length } as React.CSSProperties}>
@@ -57,25 +60,26 @@ function Milestone({ view, plan, m, keys, marks, selected, onSelect, startable }
   const edit = (ops: PlanOp[]): void => void act(() => api.edit(plan.id, ops));
   const info = MILESTONE_STATE[m.state];
   const checker = useCheckerChat(m);
+  const tr = useT();
   const menu: ActionItem[] = [
-    ...(checker ? [{ label: m.state === 'checking' ? 'Watch the Check' : 'Open the Check', onSelect: () => openWorktree(checker) }] : []),
-    { label: 'Runs', submenu: AUTONOMIES.map((a) => ({ label: AUTONOMY_INFO[a].label, hint: AUTONOMY_INFO[a].hint, checked: m.autonomy === a, onSelect: () => void act(() => api.setAutonomy(plan.id, a, m.milestone.id)) })), onSelect: () => undefined },
-    ...(m.state === 'gate' || m.state === 'failed' || m.state === 'checking' ? [{ label: 'Not Yet…', onSelect: () => openSheet({ kind: 'plan_send_back', planId: plan.id, milestone: m.milestone.id }) }] : []),
-    { label: 'Remove Milestone', danger: true, separate: true, onSelect: () => openSheet({ kind: 'confirm', title: `Remove “${m.milestone.title}”?`, message: plan.body ? 'Its tasks are taken out of the plan (unfinished ones are canceled on the board).' : 'Its tasks go with it.', confirm: 'Remove', destructive: true, run: () => edit([{ op: 'remove_milestone', id: m.milestone.id }]) }) },
+    ...(checker ? [{ label: m.state === 'checking' ? tr('plans.watchCheck') : tr('plans.d.openCheck'), onSelect: () => openWorktree(checker) }] : []),
+    { label: tr('plans.o.runs'), submenu: AUTONOMIES.map((a) => ({ label: AUTONOMY_INFO[a].label, hint: AUTONOMY_INFO[a].hint, checked: m.autonomy === a, onSelect: () => void act(() => api.setAutonomy(plan.id, a, m.milestone.id)) })), onSelect: () => undefined },
+    ...(m.state === 'gate' || m.state === 'failed' || m.state === 'checking' ? [{ label: tr('plans.notYet'), onSelect: () => openSheet({ kind: 'plan_send_back', planId: plan.id, milestone: m.milestone.id }) }] : []),
+    { label: tr('plans.o.removeMilestone'), danger: true, separate: true, onSelect: () => openSheet({ kind: 'confirm', title: tr('plans.o.removeTitle', { title: m.milestone.title }), message: plan.body ? tr('plans.o.removeApproved') : tr('plans.o.removeDraft'), confirm: tr('plans.o.remove'), destructive: true, run: () => edit([{ op: 'remove_milestone', id: m.milestone.id }]) }) },
   ];
   return (
     <section className={cx(p.oMilestone, p[`ms_${m.state}`])} aria-label={m.milestone.title}>
       <header className={p.oHead}>
         <span className={p.msIndex}>{m.state === 'passed' ? <Icon name="check" size={11} /> : m.index + 1}</span>
-        <Rename value={m.milestone.title} className={p.oTitle} label="Milestone name" onDone={(title) => edit([{ op: 'update_milestone', id: m.milestone.id, title }])} />
+        <Rename value={m.milestone.title} className={p.oTitle} label={tr('plans.o.milestoneName')} onDone={(title) => edit([{ op: 'update_milestone', id: m.milestone.id, title }])} />
         <span className={cx(p.msState, p[`tone_${info.tone}`])}>{milestoneLabel(view, m)}</span>
         {m.autonomy !== plan.autonomy ? <span className={p.msAuto}>{AUTONOMY_INFO[m.autonomy].label}</span> : null}
         <span className={p.grow} />
         <span className={p.msCount}>
-          {m.state === 'draft' ? `${m.milestone.tasks.length} tasks` : `${m.finished}/${m.total}`}
+          {m.state === 'draft' ? tr('plans.o.nTasks', { n: m.milestone.tasks.length }) : `${m.finished}/${m.total}`}
         </span>
         <ActionsDropdown items={menu}>
-          <IconButton icon="more" label={`${m.milestone.title} Options`} />
+          <IconButton icon="more" label={tr('plans.o.options', { title: m.milestone.title })} />
         </ActionsDropdown>
       </header>
       {m.milestone.goal ? <p className={p.oGoal}>{m.milestone.goal}</p> : null}
@@ -88,9 +92,9 @@ function Milestone({ view, plan, m, keys, marks, selected, onSelect, startable }
       {m.milestone.criteria.length ? (
         <button type="button" className={cx(p.oGate, selected === `gate:${m.milestone.id}` && p.oGateSelected)} onClick={() => onSelect(`gate:${m.milestone.id}`)}>
           <Icon name="flag" size={12} />
-          <span className={p.oGateLabel}>Passes when</span>
+          <span className={p.oGateLabel}>{tr('plans.d.passesWhen')}</span>
           <span className={p.oCriteria}>{m.milestone.criteria.join(' · ')}</span>
-          {m.run.check ? <span className={cx(p.gateCheck, m.run.check.verdict === 'pass' ? p.tone_ok : p.tone_error)}>{m.run.check.verdict === 'pass' ? 'Agent: passes' : 'Agent: not yet'}</span> : null}
+          {m.run.check ? <span className={cx(p.gateCheck, m.run.check.verdict === 'pass' ? p.tone_ok : p.tone_error)}>{m.run.check.verdict === 'pass' ? tr('plans.o.agentPasses') : tr('plans.o.agentNotYet')}</span> : null}
         </button>
       ) : null}
     </section>
@@ -106,33 +110,34 @@ function TaskRow({ plan, t, k, mark, selected, onSelect, canStart }: { plan: Pla
   const others = (body?.milestones ?? []).filter((m) => m.id !== t.milestoneId);
   const startWith = useStartWith();
   const mine = useMyAgent();
+  const tr = useT();
   // Its own agent, else the plan's: who Start uses. Start with ▸ (BLG-506): another, this start only.
   const own = t.issue?.agent ?? plan.agent;
   const startIt = (agent?: AgentRef): void => void act(() => api.startTask(plan.id, t.task.id, agent));
   const menu = (): ActionItem[] => [
     ...(canStart
       ? t.forYou
-        ? [{ label: 'Decide…', icon: 'hand' as const, onSelect: openDecision }]
+        ? [{ label: tr('plans.d.decide'), icon: 'hand' as const, onSelect: openDecision }]
         : [
-            { label: 'Start', icon: 'play' as const, onSelect: () => startIt() },
-            { label: 'Start with', icon: 'play' as const, submenu: startWith(own, (a) => startIt(a ?? (own ? mine : undefined)), ''), onSelect: () => undefined },
+            { label: tr('tasks.start'), icon: 'play' as const, onSelect: () => startIt() },
+            { label: tr('tasks.p.startWith'), icon: 'play' as const, submenu: startWith(own, (a) => startIt(a ?? (own ? mine : undefined)), ''), onSelect: () => undefined },
           ]
       : []),
-    ...(t.worktree ? [{ label: 'Open Worktree', onSelect: () => openWorktree(t.worktree!) }] : []),
-    ...(t.issue ? [{ label: 'Open Task', onSelect: () => openTask(t.issue!.id) }] : []),
-    ...(others.length ? [{ label: 'Move to', separate: true, submenu: others.map((m) => ({ label: m.title, onSelect: () => edit([{ op: 'move_task', id: t.task.id, milestone: m.id }]) })), onSelect: () => undefined }] : []),
-    { label: t.task.assignee === 'me' ? 'Give It to the Agent' : 'I’ll Do It Myself', onSelect: () => edit([{ op: 'update_task', id: t.task.id, patch: { assignee: t.task.assignee === 'me' ? 'claude' : 'me' } }]) },
-    { label: 'Take Out of the Plan', danger: true, separate: true, onSelect: () => edit([{ op: 'remove_task', id: t.task.id }]) },
+    ...(t.worktree ? [{ label: tr('tasks.openWorktree'), onSelect: () => openWorktree(t.worktree!) }] : []),
+    ...(t.issue ? [{ label: tr('plans.d.openTask'), onSelect: () => openTask(t.issue!.id) }] : []),
+    ...(others.length ? [{ label: tr('plans.o.moveTo'), separate: true, submenu: others.map((m) => ({ label: m.title, onSelect: () => edit([{ op: 'move_task', id: t.task.id, milestone: m.id }]) })), onSelect: () => undefined }] : []),
+    { label: t.task.assignee === 'me' ? tr('plans.o.giveToAgent') : tr('plans.o.doMyself'), onSelect: () => edit([{ op: 'update_task', id: t.task.id, patch: { assignee: t.task.assignee === 'me' ? 'claude' : 'me' } }]) },
+    { label: tr('plans.o.takeOut'), danger: true, separate: true, onSelect: () => edit([{ op: 'remove_task', id: t.task.id }]) },
   ];
   return (
     <ActionsContext items={menu}>
       <li className={cx(p.oTask, selected && p.oTaskSelected, p[`task_${t.state}`])}>
-        <div role="button" tabIndex={0} className={p.oTaskMain} onClick={onSelect} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onSelect())} aria-label={`${t.task.title}, ${info.label}`}>
+        <div role="button" tabIndex={0} className={p.oTaskMain} onClick={onSelect} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onSelect())} aria-label={tr('plans.o.taskAria', { title: t.task.title, state: info.label })}>
           <TaskStateIcon state={t.state} />
           {k ? <span className={p.taskKey}>{k}</span> : null}
-          <Rename value={t.task.title} className={p.oTaskTitle} label="Task name" onDone={(title) => edit([{ op: 'update_task', id: t.task.id, patch: { title } }])} />
-          {mark ? <span className={p.markChip}>{mark === 'added' ? 'New' : 'Changed'}</span> : null}
-          {t.task.parent ? <span className={p.muted}>sub-task</span> : null}
+          <Rename value={t.task.title} className={p.oTaskTitle} label={tr('plans.o.taskName')} onDone={(title) => edit([{ op: 'update_task', id: t.task.id, patch: { title } }])} />
+          {mark ? <span className={p.markChip}>{mark === 'added' ? tr('plans.o.new') : tr('plans.o.changed')}</span> : null}
+          {t.task.parent ? <span className={p.muted}>{tr('plans.o.subTask')}</span> : null}
           <TaskChatMark {...(t.worktree ? { worktree: t.worktree } : {})} />
         </div>
         <span className={p.oTaskMeta}>
@@ -142,7 +147,7 @@ function TaskRow({ plan, t, k, mark, selected, onSelect, canStart }: { plan: Pla
           {canStart ? (
             <button type="button" className={p.startButton} onClick={() => (t.forYou ? openDecision() : void act(() => api.startTask(plan.id, t.task.id)))}>
               <Icon name={t.forYou ? 'hand' : 'play'} size={9} />
-              {t.forYou ? 'Decide…' : 'Start'}
+              {t.forYou ? tr('plans.d.decide') : tr('tasks.start')}
             </button>
           ) : (
             <span className={cx(p.taskState, p[`tone_${info.tone}`])}>{info.label}</span>
@@ -157,6 +162,7 @@ function TaskRow({ plan, t, k, mark, selected, onSelect, canStart }: { plan: Pla
 function Rename({ value, onDone, className, label }: { value: string; onDone: (next: string) => void; className?: string; label: string }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(value);
+  const tr = useT();
   if (!editing) {
     return (
       <span
@@ -166,7 +172,7 @@ function Rename({ value, onDone, className, label }: { value: string; onDone: (n
           setText(value);
           setEditing(true);
         }}
-        title="Double-click to rename"
+        title={tr('plans.o.doubleClick')}
       >
         {value}
       </span>

@@ -13,13 +13,14 @@ import { LiveTranscript } from './LiveTranscript.js';
 import { AgentOutputs, useAgentOutputs } from './AgentOutputs.js';
 import { BackgroundTasks } from './BackgroundTasks.js';
 import { tasksForAgent } from './background-model.js';
-import { agentElapsed, agentLabel, agentTone, plural, tokens, typeLabel } from './cc-model.js';
+import { agentElapsed, agentLabel, agentTone, tokens, typeLabel } from './cc-model.js';
 import { type SubAgent, agentIdOfPath, agentOfWorktree, agentTitle, effortLabel, modelLabel, parentWorkspace, steerPrompt, steerable } from './subagents-model.js';
 import s from './claude-code.module.css';
 import m from './agent-monitor.module.css';
 import o from './agent-outputs.module.css';
 import { revealLabel } from '../lib/os-words.js';
 import { showWorktreeFolder, useRevealLabel } from '../lib/remote-open.js';
+import { useT } from '../lib/i18n.js';
 
 /**
  * One sub-agent, followed live: what it was asked, who started it (and a way back there), its
@@ -34,26 +35,27 @@ import { showWorktreeFolder, useRevealLabel } from '../lib/remote-open.js';
 function Steer({ sub, parent, leadName }: { sub: SubAgent; parent: Workspace | undefined; leadName?: string }) {
   const { client } = useBeluga();
   const prefs = usePrefs();
+  const t = useT();
   const [text, setText] = useState('');
   const [sent, setSent] = useState<string>();
   const can = steerable(sub) && parent !== undefined;
-  const lead = leadName ?? parent?.name ?? 'the conversation that started it';
+  const lead = leadName ?? parent?.name ?? t('github.mon.theConversation');
   const send = (): void => {
     const body = text.trim();
     if (!body || !can || !parent) return;
     void client.api.session.submit(steerPrompt(sub.agent, body), { channel: `ws:${parent.id}` }).then(
       () => {
         setText('');
-        setSent(`Sent to ${lead}’s agent: it passes it on.`);
+        setSent(t('github.mon.sentTo', { lead }));
       },
-      () => setSent('Couldn’t reach that conversation. Try again.'),
+      () => setSent(t('github.mon.cantReach')),
     );
   };
   if (!can) {
     return (
       <div className={m.steerOff}>
         <Icon name="info" size={12} />
-        {sub.session.own ? 'The conversation that started it is gone, so nobody can pass anything on.' : 'It was started outside Beluga: steer it from where its session runs.'}
+        {sub.session.own ? t('github.mon.gone') : t('github.mon.outside')}
       </div>
     );
   }
@@ -64,8 +66,8 @@ function Steer({ sub, parent, leadName }: { sub: SubAgent; parent: Workspace | u
           className={`${m.steerInput} selectable`}
           rows={1}
           value={text}
-          placeholder={`Tell ${lead}’s main agent something for this one…`}
-          aria-label={`Tell ${lead}’s main agent something for this one`}
+          placeholder={t('github.mon.tellPlaceholder', { lead })}
+          aria-label={t('github.mon.tellLabel', { lead })}
           onChange={(e) => {
             setText(e.target.value);
             setSent(undefined);
@@ -78,13 +80,13 @@ function Steer({ sub, parent, leadName }: { sub: SubAgent; parent: Workspace | u
             send();
           }}
         />
-        <Tip label={`The main agent in ${lead} gets it and passes it on with SendMessage`} keys={prefs.sendWith === 'enter' ? '↩' : chordLabel('Cmd+Enter')}>
+        <Tip label={t('github.mon.passesOn', { lead })} keys={prefs.sendWith === 'enter' ? '↩' : chordLabel('Cmd+Enter')}>
           <Button size="small" variant={text.trim() ? 'primary' : 'plain'} icon="send" disabled={!text.trim()} onClick={send}>
-            Send to Main Agent
+            {t('github.mon.sendToMain')}
           </Button>
         </Tip>
       </div>
-      <div className={m.steerHint}>{sent ?? `You steer it through ${lead}’s agent, which started it. Its answer shows in that chat.`}</div>
+      <div className={m.steerHint}>{sent ?? t('github.mon.steerHint', { lead })}</div>
     </div>
   );
 }
@@ -94,6 +96,7 @@ export function AgentMonitor({ sub, worktree }: { sub: SubAgent; worktree?: Work
   const { client } = useBeluga();
   const revealWords = useRevealLabel();
   const actions = useActions();
+  const t = useT();
   const a = sub.agent;
   // Only Beluga's own conversations are a chat to go back to (a session outside Beluga isn't).
   const parent = useApp((st) => (sub.session.own ? parentWorkspace(st, sub) : undefined));
@@ -107,7 +110,7 @@ export function AgentMonitor({ sub, worktree }: { sub: SubAgent; worktree?: Work
   const made = outputs?.outputs.length ?? 0;
   // Commands it runs in the background (a dev server, its tests): a third view, when it has any.
   const tasks = useMemo(() => tasksForAgent(sub.session, a.id), [sub.session, a.id]);
-  const runningTasks = tasks.filter((t) => t.task.status === 'running').length;
+  const runningTasks = tasks.filter((x) => x.task.status === 'running').length;
   const view = picked === 'background' && !tasks.length ? 'activity' : picked;
   const version = `${a.lastAt}:${a.steps}:${a.status}`;
   const facts = [
@@ -115,9 +118,9 @@ export function AgentMonitor({ sub, worktree }: { sub: SubAgent; worktree?: Work
     ...(modelLabel(a.model) ? [{ label: modelLabel(a.model)!, tip: a.model }] : []),
     ...(effortLabel(a.effort) ? [{ label: effortLabel(a.effort)! }] : []),
     { label: agentElapsed(a, now) },
-    { label: plural(a.steps, 'step') },
-    ...(a.tokens ? [{ label: `${tokens(a.tokens)} context` }] : []),
-    ...(a.background ? [{ label: 'Background' }] : []),
+    { label: t('github.cc.steps', { count: a.steps }) },
+    ...(a.tokens ? [{ label: t('github.mon.context', { tokens: tokens(a.tokens) }) }] : []),
+    ...(a.background ? [{ label: t('github.mon.background') }] : []),
   ];
   return (
     <div className={s.sessionPage} data-agent-monitor={a.id}>
@@ -127,23 +130,20 @@ export function AgentMonitor({ sub, worktree }: { sub: SubAgent; worktree?: Work
         </span>
         <div className={m.titles}>
           <div className={m.kicker}>
-            Sub-agent
+            {t('github.mon.subAgent')}
             {parent ? (
               <>
-                {' of '}
+                {t('github.mon.of')}
                 <button type="button" className={m.parentLink} onClick={() => actions.run({ type: 'open_ws', id: parent.id })}>
                   {parent.kind === 'main' ? (projectName ?? parent.name) : parent.name}
                 </button>
               </>
             ) : sub.session.own ? null : (
               <>
-                {' of “'}
-                {sub.session.title}
-                {'”, a Claude Code session outside Beluga'}
-                {projectName ? ` in ${projectName}` : ''}
+                {projectName ? t('github.mon.ofSessionIn', { title: sub.session.title, project: projectName }) : t('github.mon.ofSession', { title: sub.session.title })}
               </>
             )}
-            {parentAgent ? <> · started by its agent “{agentTitle(parentAgent)}”</> : null}
+            {parentAgent ? t('github.mon.startedBy', { title: agentTitle(parentAgent) }) : null}
           </div>
           <h1 className={s.focusTitle}>{agentTitle(a)}</h1>
           <div className={m.facts}>
@@ -158,7 +158,8 @@ export function AgentMonitor({ sub, worktree }: { sub: SubAgent; worktree?: Work
             ))}
             {a.worktree ? (
               <span className={m.fact} title={a.worktree.path}>
-                <Icon name="branch" size={10} /> Its own worktree{a.worktree.branch ? ` · ${a.worktree.branch}` : ''}
+                <Icon name="branch" size={10} /> {t('github.mon.ownWorktree')}
+                {a.worktree.branch ? ` · ${a.worktree.branch}` : ''}
               </span>
             ) : null}
           </div>
@@ -171,7 +172,7 @@ export function AgentMonitor({ sub, worktree }: { sub: SubAgent; worktree?: Work
         <div className={m.headActions}>
           {parent ? (
             <Button size="small" icon="chat" onClick={() => actions.run({ type: 'open_ws', id: parent.id })}>
-              Open Main Chat
+              {t('github.mon.openMainChat')}
             </Button>
           ) : null}
           {worktree ? (
@@ -181,27 +182,27 @@ export function AgentMonitor({ sub, worktree }: { sub: SubAgent; worktree?: Work
           ) : null}
           {worktree && !live ? (
             <Button size="small" variant="danger" icon="archive" onClick={() => setRemoving(true)}>
-              Remove Worktree…
+              {t('github.mon.removeWorktree')}
             </Button>
           ) : null}
         </div>
       </header>
       <div className={o.tabs}>
         <Segmented
-          label="Show"
+          label={t('github.mon.show')}
           value={view}
           onChange={setView}
           options={[
-            { value: 'activity', label: 'Activity', hint: 'What it does, as it does it' },
-            { value: 'outputs', label: made ? `Outputs · ${made}` : 'Outputs', hint: 'Screenshots, test output and logs it made or looked at' },
-            ...(tasks.length ? [{ value: 'background' as const, label: `Background · ${runningTasks ? `${runningTasks} running` : tasks.length}`, hint: 'Commands it runs in the background, with their output as it comes' }] : []),
+            { value: 'activity', label: t('github.cc.activity'), hint: t('github.mon.activityHint') },
+            { value: 'outputs', label: made ? t('github.mon.outputsCount', { count: made }) : t('github.mon.outputs'), hint: t('github.mon.outputsHint') },
+            ...(tasks.length ? [{ value: 'background' as const, label: t('github.mon.backgroundCount', { count: runningTasks ? t('github.cc.countRunning', { count: runningTasks }) : tasks.length }), hint: t('github.mon.backgroundHint') }] : []),
           ]}
         />
       </div>
       {view === 'activity' ? (
-        <LiveTranscript key={`${sub.session.id}/${a.id}`} sessionId={sub.session.id} agentId={a.id} version={version} live={live} label={`Sub-agent ${agentTitle(a)}`} />
+        <LiveTranscript key={`${sub.session.id}/${a.id}`} sessionId={sub.session.id} agentId={a.id} version={version} live={live} label={t('github.mon.subAgentLabel', { title: agentTitle(a) })} />
       ) : view === 'background' ? (
-        <BackgroundTasks items={tasks} layout="split" empty="Nothing it runs in the background." />
+        <BackgroundTasks items={tasks} layout="split" empty={t('github.mon.nothingBackground')} />
       ) : (
         <AgentOutputs key={`${sub.session.id}/${a.id}`} sessionId={sub.session.id} agentId={a.id} list={outputs} {...(sub.session.cwd ? { cwd: sub.session.cwd } : {})} />
       )}
@@ -221,6 +222,7 @@ export function AgentWorktreePage({ ws }: { ws: Workspace }) {
   const origin = useApp((st) => st.claudeCode.origins.find((o) => o.path === ws.path));
   const sub = useMemo(() => agentOfWorktree(sessions, ws), [sessions, ws]);
   const [looked, setLooked] = useState(false);
+  const t = useT();
   const id = agentIdOfPath(ws.path);
   // Not watched now (finished a while ago): ask Beluga to find it, so it can be followed again.
   useEffect(() => {
@@ -235,6 +237,7 @@ export function AgentWorktreePage({ ws }: { ws: Workspace }) {
     };
   }, [id, Boolean(sub)]);
   if (sub) return <AgentMonitor sub={sub} worktree={ws} />;
-  if (!looked) return <Empty icon="bot" title="Finding this sub-agent…" detail="Reading what Claude Code kept of it." />;
+  if (!looked) return <Empty icon="bot" title={t('github.mon.finding')} detail={t('github.mon.findingDetail')} />;
+
   return <WorktreeInfoPage ws={ws} agent {...(origin ? { origin } : {})} />;
 }

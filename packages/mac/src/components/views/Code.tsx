@@ -7,6 +7,7 @@ import type { TokenLines } from '../markdown/highlight.js';
 import { useCopied } from '../markdown/CodeBlock.js';
 import type { ViewData } from './use-view-data.js';
 import c from '../markdown/code.module.css';
+import { useT } from '../../lib/i18n.js';
 import v from './views.module.css';
 
 /**
@@ -18,6 +19,7 @@ import v from './views.module.css';
 const FOLD_AT = 28;
 
 export function CodeView({ view, data }: { view: View; data: ViewData }) {
+  const t = useT();
   const text = (data.text ?? '').replace(/\n$/, '');
   const lang = view.language ?? langOf(view.filename ?? (data.source && 'path' in data.source ? data.source.path : ''));
   const tokens = useTokens(text, lang);
@@ -41,14 +43,14 @@ export function CodeView({ view, data }: { view: View; data: ViewData }) {
         ) : null}
         {lang ? <span className={v.codeLang}>{lang}</span> : null}
         <span className={v.grow} />
-        <Tip label={wrap ? 'Don’t wrap long lines' : 'Wrap long lines'}>
-          <button type="button" className={cx(v.codeTool, wrap && v.codeToolOn)} aria-label="Wrap long lines" aria-pressed={wrap} onClick={() => setWrap(!wrap)}>
+        <Tip label={wrap ? t('components.views.code.noWrap') : t('components.views.code.wrap')}>
+          <button type="button" className={cx(v.codeTool, wrap && v.codeToolOn)} aria-label={t('components.views.code.wrap')} aria-pressed={wrap} onClick={() => setWrap(!wrap)}>
             <Icon name="wrap" size={12} />
           </button>
         </Tip>
-        <button type="button" className={v.codeTool} aria-label="Copy code" onClick={() => copy(text)}>
+        <button type="button" className={v.codeTool} aria-label={t('components.views.code.copyCode')} onClick={() => copy(text)}>
           <Icon name={copied ? 'check' : 'copy'} size={12} />
-          {copied ? 'Copied' : 'Copy'}
+          {copied ? t('components.views.copied') : t('components.views.copy')}
         </button>
       </div>
       <pre className={cx(c.pre, c.numbered, wrap && c.wrap, tokens && c.colored, v.codePre)} style={gutter} data-lang={lang || undefined}>
@@ -59,13 +61,13 @@ export function CodeView({ view, data }: { view: View; data: ViewData }) {
               <span key={i} className={cx(c.line, marked.has(n) && v.codeMarked)}>
                 <span className={c.ln} data-n={n} aria-hidden="true" />
                 <span className={c.src}>
-                  {line.map((t, j) =>
-                    t.style ? (
-                      <span key={j} style={t.style}>
-                        {t.content}
+                  {line.map((tok, j) =>
+                    tok.style ? (
+                      <span key={j} style={tok.style}>
+                        {tok.content}
                       </span>
                     ) : (
-                      t.content
+                      tok.content
                     ),
                   )}
                 </span>
@@ -76,7 +78,7 @@ export function CodeView({ view, data }: { view: View; data: ViewData }) {
       </pre>
       {long ? (
         <button type="button" className={v.codeMore} onClick={() => setAll(!all)}>
-          {all ? 'Show less' : `Show all ${lines.length} lines`}
+          {all ? t('components.views.code.showLess') : t('components.views.code.showAll', { n: lines.length })}
         </button>
       ) : null}
     </div>

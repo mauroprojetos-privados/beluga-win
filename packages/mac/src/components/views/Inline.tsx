@@ -7,6 +7,7 @@ import { parseColor, toHex, toHsl, toneOf } from './format.js';
 import { PlanChip, TaskChip, WorktreeChip } from '../../tasks/TaskRef.js';
 import { SentinelChip } from '../../sentinel/marks.js';
 import { CallNotesChip } from '../../call/NotesBox.js';
+import { useT } from '../../lib/i18n.js';
 import v from './inline.module.css';
 
 /**
@@ -20,15 +21,16 @@ export function InlineCode({ text, fallback }: { text: string; fallback: ReactNo
 }
 
 function InlineView({ el, raw }: { el: InlineElement; raw: string }) {
+  const t = useT();
   switch (el.kind) {
     case 'color':
       return <ColorChip value={el.value} />;
     case 'colors':
       return (
-        <span className={v.strip} aria-label={`Colors: ${el.values.join(', ')}`}>
+        <span className={v.strip} aria-label={t('components.views.inline.colors', { colors: el.values.join(', ') })}>
           {el.values.map((c, i) => (
             <Tip key={i} label={c}>
-              <button type="button" className={v.stripCell} style={{ background: c }} onClick={() => void copyText(c)} aria-label={`Copy ${c}`} />
+              <button type="button" className={v.stripCell} style={{ background: c }} onClick={() => void copyText(c)} aria-label={t('components.views.inline.copyValue', { value: c })} />
             </Tip>
           ))}
         </span>
@@ -82,11 +84,12 @@ function InlineView({ el, raw }: { el: InlineElement; raw: string }) {
 }
 
 function ColorChip({ value }: { value: string }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   const rgb = parseColor(value);
   const label = rgb ? `${toHex(rgb)} · ${toHsl(rgb)}` : value;
   return (
-    <Tip label={copied ? 'Copied' : `${label} · click to copy`}>
+    <Tip label={copied ? t('components.views.copied') : t('components.views.inline.clickToCopy', { value: label })}>
       <button
         type="button"
         className={v.color}

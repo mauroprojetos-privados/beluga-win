@@ -18,6 +18,7 @@ import { SharedPlanPage } from '../team/SharedPlans.js';
 import { CallRoom } from '../call/CallRoom.js';
 import { StartingThere } from '../machines/StartingThere.js';
 import { useStarting } from '../machines/start-there.js';
+import { useT } from '../lib/i18n.js';
 
 const OverviewView = lazyView('views/OverviewView', () => import('../views/OverviewView.js').then((m) => m.OverviewView));
 const SearchView = lazyView('views/SearchView', () => import('../views/SearchView.js').then((m) => m.SearchView));
@@ -50,17 +51,18 @@ const PhoneView = lazyView('phone/PhoneView', () => import('../phone/PhoneView.j
  * conversation when git is done.
  */
 function MakingWorktree() {
+  const t = useT();
   const ws = useApp((st) => (st.view.kind === 'workspace' ? findWorkspace(st.projects, st.view.id) : undefined));
   const asked = useApp((st) => (ws ? st.log.some((l) => l.channel === `ws:${ws.id}`) : false));
   if (!ws) return null;
-  const from = ws.base ?? 'the latest origin';
+  const from = ws.base ?? t('layout.wsrow.latestOrigin');
   if (!asked) {
     return (
       <Empty
         icon="branch"
         mark={<span className={side.making} style={{ width: 18, height: 18 }} aria-hidden="true" />}
-        title={`Making ${ws.name}…`}
-        detail={`A new worktree from ${from}. Its conversation opens here in a moment; anything you asked your agent starts then.`}
+        title={t('layout.main.making', { name: ws.name })}
+        detail={t('layout.main.makingDetail', { from })}
       />
     );
   }
@@ -69,7 +71,7 @@ function MakingWorktree() {
       <ChatLog key={ws.id} channel={`ws:${ws.id}`} />
       <div className={s.makingLine} role="status">
         <span className={side.making} aria-hidden="true" />
-        Making {ws.name} from {from}. Your agent starts as soon as its folder is ready.
+        {t('layout.main.makingLine', { name: ws.name, from })}
       </div>
     </div>
   );
@@ -105,6 +107,7 @@ function Route() {
     case 'room':
       return <RoomChat />;
     case 'assistant':
+    case 'bot':
     case 'draft':
     case 'draft_worktree':
       return <ChatView />;

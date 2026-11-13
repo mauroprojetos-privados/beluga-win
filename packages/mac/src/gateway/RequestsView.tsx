@@ -5,6 +5,8 @@ import { Avatar, Button, Dot, Empty, Segmented, cx } from '../components/ui.js';
 import { useApi, useApp, useBeluga } from '../lib/beluga.js';
 import { TaskCard } from './TaskCard.js';
 import s from './gateway.module.css';
+import { t as tr } from '@beluga/shared/i18n/index.js';
+import { useT } from '../lib/i18n.js';
 
 /**
  * Requests: tasks between Claudes in one place. Sent (what you and your Claude asked of others)
@@ -18,9 +20,9 @@ const message = (err: unknown): string => (err instanceof Error ? err.message : 
 
 function ago(ts: number, now: number): string {
   const s = Math.max(0, Math.round((now - ts) / 1000));
-  if (s < 60) return 'just now';
-  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
-  if (s < 86_400) return `${Math.floor(s / 3600)} h ago`;
+  if (s < 60) return tr('github.req.justNow');
+  if (s < 3600) return tr('github.req.minAgo', { count: Math.floor(s / 60) });
+  if (s < 86_400) return tr('github.req.hAgo', { count: Math.floor(s / 3600) });
   return new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
@@ -34,14 +36,15 @@ export const waitingForYou = (tasks: readonly TaskView[]): number => tasks.filte
 
 function Row({ task, open, onToggle }: { task: TaskView; open: boolean; onToggle: () => void }) {
   const tone = stateTone(task);
-  const who = task.direction === 'sent' ? targetLabel(task) : `${task.peerName}${task.by === 'agent' ? '’s agent' : ''}`;
+  const t = useT();
+  const who = task.direction === 'sent' ? targetLabel(task) : task.by === 'agent' ? t('github.req.theirAgent', { name: task.peerName }) : task.peerName;
   return (
     <>
       <div
         role="button"
         tabIndex={0}
         aria-expanded={open}
-        aria-label={`${task.direction === 'sent' ? 'To' : 'From'} ${who}: ${oneLine(task.ask, 80)}, ${stateLabel(task)}`}
+        aria-label={t(task.direction === 'sent' ? 'github.req.rowTo' : 'github.req.rowFrom', { who, ask: oneLine(task.ask, 80), state: stateLabel(task) })}
         className={cx(s.row, open && s.rowOn)}
         onClick={onToggle}
         onKeyDown={(e) => {
@@ -74,6 +77,7 @@ function Note() {
   const api = useApi();
   const { client } = useBeluga();
   const saved = useApp((st) => st.gateway.note);
+  const t = useT();
   const [text, setText] = useState<string | undefined>();
   const value = text ?? saved;
   const save = (): void => {
@@ -82,16 +86,16 @@ function Note() {
       .setNote(text)
       .then(() => {
         setText(undefined);
-        client.store.dispatch({ type: 'toast', text: 'Saved. Friends’ agents see it on your card', level: 'success' });
+        client.store.dispatch({ type: 'toast', text: t('github.req.noteSaved'), level: 'success' });
       })
-      .catch((err: unknown) => client.store.dispatch({ type: 'toast', text: `Couldn't save it: ${message(err)}`, level: 'error' }));
+      .catch((err: unknown) => client.store.dispatch({ type: 'toast', text: `${t('github.req.cantSave')}: ${message(err)}`, level: 'error' }));
   };
   return (
     <label className={s.note}>
-      <span>Ask me for</span>
+      <span>{t('github.req.askMeFor')}</span>
       <input
-        aria-label="Ask me for"
-        placeholder="what your agent is good for here (friends’ agents see this)"
+        aria-label={t('github.req.askMeFor')}
+        placeholder={t('github.req.askMeForPlaceholder')}
         value={value}
         maxLength={280}
         onChange={(e) => setText(e.target.value)}
@@ -113,6 +117,7 @@ function Compose({ onDone }: { onDone: () => void }) {
     return JSON.stringify([...friends, ...room]);
   });
   const list = useMemo(() => JSON.parse(people) as Array<{ id: string; name: string }>, [people]);
+  const t = useT();
   const [to, setTo] = useState(list[0]?.id ?? '');
   const [ask, setAsk] = useState('');
   const send = (): void => {
@@ -120,22 +125,22 @@ function Compose({ onDone }: { onDone: () => void }) {
     void api.gateway
       .ask(to, ask.trim())
       .then(onDone)
-      .catch((err: unknown) => client.store.dispatch({ type: 'toast', text: `Couldn't ask: ${message(err)}`, level: 'error' }));
+      .catch((err: unknown) => client.store.dispatch({ type: 'toast', text: `${t('github.req.cantAsk')}: ${message(err)}`, level: 'error' }));
   };
-  if (!list.length) return <div className={s.compose}>Nobody to ask yet: add a friend, or invite someone to your room.</div>;
+  if (!list.length) return <div className={s.compose}>{t('github.req.nobody')}</div>;
   return (
-    <div className={s.compose} role="group" aria-label="Ask someone's agent">
+    <div className={s.compose} role="group" aria-label={t('github.req.askSomeone')}>
       <div className={s.composeRow}>
-        <span>To</span>
-        <Select label="Whose agent" value={to} onChange={setTo} options={list.map((p) => ({ value: p.id, label: `${p.name}’s agent`, icon: <Avatar name={p.name} id={p.id} size={16} /> }))} />
+        <span>{t('github.req.to')}</span>
+        <Select label={t('github.req.whoseAgent')} value={to} onChange={setTo} options={list.map((p) => ({ value: p.id, label: t('github.req.theirAgent', { name: p.name }), icon: <Avatar name={p.name} id={p.id} size={16} /> }))} />
       </div>
-      <textarea className={s.edit} aria-label="What to ask" placeholder="What should their agent do? They see only this." value={ask} onChange={(e) => setAsk(e.target.value)} autoFocus />
+      <textarea className={s.edit} aria-label={t('github.req.whatToAsk')} placeholder={t('github.req.whatToAskPlaceholder')} value={ask} onChange={(e) => setAsk(e.target.value)} autoFocus />
       <div className={s.actions}>
         <Button variant="primary" disabled={!ask.trim()} onClick={send}>
-          Ask
+          {t('github.req.ask')}
         </Button>
         <Button variant="quiet" onClick={onDone}>
-          Cancel
+          {t('common.cancel')}
         </Button>
       </div>
     </div>
@@ -144,12 +149,13 @@ function Compose({ onDone }: { onDone: () => void }) {
 
 export function RequestsView() {
   const gateway = useApp((st) => st.gateway);
+  const tr = useT();
   const [tab, setTab] = useState<Tab>(() => (gateway.tasks.some((t) => t.direction === 'received' && t.state === 'awaiting_approval') ? 'received' : 'sent'));
   const [open, setOpen] = useState<string | undefined>();
   const [composing, setComposing] = useState(false);
   const [answered, setAnswered] = useState(false);
   if (!gateway.enabled) {
-    return <Empty icon="hand" title="Requests need the Beluga app" detail="Tasks between agents run in the Beluga app's daemon." />;
+    return <Empty icon="hand" title={tr('github.req.needsApp')} detail={tr('github.req.needsAppDetail')} />;
   }
   const mine = gateway.tasks.filter((t) => t.direction === tab);
   const done = mine.filter((t) => !pending(t)).length;
@@ -160,21 +166,21 @@ export function RequestsView() {
       <div className={s.inner}>
         <div className={s.bar}>
           <Segmented<Tab>
-            label="Requests"
+            label={tr('github.req.requests')}
             value={tab}
             onChange={(v) => {
               setTab(v);
               setOpen(undefined);
             }}
             options={[
-              { value: 'sent', label: `Sent${count('sent') ? ` · ${count('sent')}` : ''}` },
-              { value: 'received', label: `Received${count('received') ? ` · ${count('received')}` : ''}` },
+              { value: 'sent', label: `${tr('github.req.sent')}${count('sent') ? ` · ${count('sent')}` : ''}` },
+              { value: 'received', label: `${tr('github.req.received')}${count('received') ? ` · ${count('received')}` : ''}` },
             ]}
           />
           <span className={s.grow} />
           {composing ? null : (
             <Button icon="claude" onClick={() => setComposing(true)}>
-              Ask Someone’s Agent…
+              {tr('github.req.askSomeoneButton')}
             </Button>
           )}
         </div>
@@ -187,7 +193,7 @@ export function RequestsView() {
             }}
           />
         ) : null}
-        <div className={s.list} role="list" aria-label={tab === 'sent' ? 'Sent requests' : 'Received requests'}>
+        <div className={s.list} role="list" aria-label={tab === 'sent' ? tr('github.req.sentList') : tr('github.req.receivedList')}>
           {list.length ? (
             list.map((t) => (
               <div role="listitem" key={t.id}>
@@ -196,13 +202,14 @@ export function RequestsView() {
             ))
           ) : (
             <div className={s.empty}>
-              {done ? 'Nothing waiting. Everything here has been answered.' : tab === 'sent' ? 'Nothing sent yet. Ask your agent to get something from a friend’s agent (“ask bob to run the tests”).' : 'Nothing received yet. When a friend’s agent asks yours for something, it shows here.'}
+              {done ? tr('github.req.allAnswered') : tab === 'sent' ? tr('github.req.noneSent') : tr('github.req.noneReceived')}
             </div>
           )}
         </div>
         {done ? (
           <Button variant="quiet" onClick={() => setAnswered(!answered)}>
-            {answered ? 'Hide answered' : `Show answered · ${done}`}
+            {answered ? tr('github.req.hideAnswered') : tr('github.req.showAnswered', { count: done })}
+
           </Button>
         ) : null}
       </div>

@@ -1,7 +1,9 @@
 import { useReducedMotion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { Icon } from '../../components/Icon.js';
+import { t } from '@beluga/shared/i18n/index.js';
 import { usePrefs } from '../../lib/prefs.js';
+import { useT } from '../../lib/i18n.js';
 import { SLIDES } from '../../sentinel/Showcase.js';
 import show from '../../sentinel/showcase.module.css';
 import s from './scenes.module.css';
@@ -15,31 +17,33 @@ import s from './scenes.module.css';
  */
 
 /** A tab's name for each film. */
-const NAMES: Readonly<Record<string, string>> = {
-  sleep: 'Night shift',
-  board: 'Your numbers',
-  fix: 'Failing tests',
-  review: 'Pull requests',
-};
+const NAMES = (): Readonly<Record<string, string>> => ({
+  sleep: t('components.onboarding.scene.uses.sleep'),
+  board: t('components.onboarding.scene.uses.board'),
+  fix: t('components.onboarding.scene.uses.fix'),
+  review: t('components.onboarding.scene.uses.review'),
+});
 
 export function SentinelUses() {
+  const t = useT();
+  const names = NAMES();
   const still = (useReducedMotion() ?? false) || usePrefs().reduceMotion;
   const [at, setAt] = useState(0);
   const [held, setHeld] = useState(false);
   const slide = SLIDES[at]!;
   useEffect(() => {
     if (held || still) return;
-    const t = setTimeout(() => setAt((at + 1) % SLIDES.length), slide.ms + 1200);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setAt((at + 1) % SLIDES.length), slide.ms + 1200);
+    return () => clearTimeout(timer);
   }, [at, held, still]);
   return (
     <div className={s.stage}>
       <div className={s.uses} onPointerEnter={() => setHeld(true)} onPointerLeave={() => setHeld(false)}>
-        <div className={s.usesTabs} role="tablist" aria-label="What sentinels do">
+        <div className={s.usesTabs} role="tablist" aria-label={t('components.onboarding.scene.uses.tabs')}>
           {SLIDES.map((x, i) => (
             <button key={x.id} type="button" role="tab" aria-selected={i === at} className={s.usesTab} onClick={() => setAt(i)}>
               <Icon name={x.icon} size={12} />
-              {NAMES[x.id] ?? x.id}
+              {names[x.id] ?? x.id}
               {/* The one playing fills as it plays (it holds while you point at it). */}
               {i === at && !still ? <span key={`${x.id}-${at}`} className={s.usesFill} data-held={held || undefined} style={{ animationDuration: `${x.ms + 1200}ms` }} /> : null}
             </button>

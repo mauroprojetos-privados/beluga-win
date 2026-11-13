@@ -21,7 +21,7 @@ const BODY: BodyInput = {
   milestones: [{ id: 'm1', title: 'Fast', criteria: ['fast'], tasks: [{ id: 'a', title: 'Lexer' }] }],
 };
 
-function setup() {
+function setup(body: BodyInput = BODY) {
   const store = new Store(initialState('room'));
   store.dispatch({ type: 'projects', projects: [project([ws('main', 'bob-api')])] });
   const controller = { onWorktree: () => () => undefined } as unknown as WorkspaceController;
@@ -30,12 +30,21 @@ function setup() {
   const plans = new Plans({ store, dir: null });
   const plansWork = new PlansWork({ store, plans, board: work, git: null, askClaude: () => 'ask', intend: () => undefined, delayMs: 0 });
   const plan = plans.create({ projectId: 'api', home: 'ws:main', autonomy: 'step' }, work.myClaude());
-  plansWork.forRun('ws:main', 'p-me')!.tools!.write(BODY);
+  plansWork.forRun('ws:main', 'p-me')!.tools!.write(body);
   plansWork.approve(plan.id);
   return { store, plans, plan };
 }
 
 const milestone = (store: Store, planId: string) => PlanView.parse(planPageView(store.getState(), planId)).milestones[0]!;
+
+describe('a task’s stop conditions on the phone (plan 002)', () => {
+  it('goes as stopIf and a count of checks; the commands never leave the Mac', () => {
+    const t = setup({ ...BODY, milestones: [{ id: 'm1', title: 'Fast', criteria: ['fast'], tasks: [{ id: 'a', title: 'Lexer', verify: [{ run: 'npm run secret-command', expect: 'ok' }, { run: 'npx vitest run', expect: 'passes' }], stopIf: ['the lexer is not in src/lex'] }] }] });
+    const view = planPageView(t.store.getState(), t.plan.id);
+    expect(PlanView.parse(view).milestones[0]!.tasks[0]).toMatchObject({ checks: 2, stopIf: ['the lexer is not in src/lex'] });
+    expect(JSON.stringify(view)).not.toContain('secret-command');
+  });
+});
 
 describe('a milestone’s checker on the phone (BLG-634)', () => {
   it('none until a checker is made', () => {

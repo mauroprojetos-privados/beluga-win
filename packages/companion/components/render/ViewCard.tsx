@@ -5,7 +5,9 @@ import { useMemo, useState } from 'react';
 import { ActivityIndicator, Linking, Platform, ScrollView, Switch, Text, TextInput, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { type Column, type Control, type Row, type Stat, type View as ViewSpec, alignOf, columnChoices, contrast, formatCell, headingOf, inkOn, parseColor, toHex, toMarkdownTable } from '../../lib/render';
+import { t } from '../../lib/language';
 import { store } from '../../lib/store';
+import { formatDateWith, formatNumber } from '../../../../src/shared/i18n/format';
 import { openFull } from '../../lib/fullscreen';
 import { color, elevation, ink, radius, tint, type } from '../../lib/theme';
 import { haptic, Pill, Press, T, toneBg, toneInk } from '../ui';
@@ -34,21 +36,21 @@ export function ViewCard({ view, at, warnings = 0, full }: { readonly view: View
       <View style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 8, gap: 2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <T v="heading" numberOfLines={2} style={{ flex: 1, fontSize: 15.5 }}>
-            {view.title ?? (view.type === 'code' ? (view.filename ?? 'Code') : view.type === 'colors' ? 'Colors' : view.type === 'stats' ? 'Numbers' : view.type === 'gantt' ? 'Timeline' : view.type === 'calendar' ? 'Activity' : 'Data')}
+            {view.title ?? (view.type === 'code' ? (view.filename ?? t('phoneParts.view.code')) : view.type === 'colors' ? t('phoneParts.view.colors') : view.type === 'stats' ? t('phoneParts.view.numbers') : view.type === 'gantt' ? t('phoneParts.view.timeline') : view.type === 'calendar' ? t('phoneParts.view.activity') : t('phoneParts.view.data'))}
           </T>
-          {d.live && view.source?.refresh ? <Pill label="Live" tone="mint" /> : null}
+          {d.live && view.source?.refresh ? <Pill label={t('phoneParts.view.live')} tone="mint" /> : null}
           {chartable ? (
-            <Press onPress={() => setAsChart((v) => !v)} accessibilityLabel={asChart ? 'Show as a table' : 'Show as a chart'} hitSlop={6} style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: color.sunken }}>
+            <Press onPress={() => setAsChart((v) => !v)} accessibilityLabel={asChart ? t('phoneParts.view.asTable') : t('phoneParts.view.asChart')} hitSlop={6} style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: color.sunken }}>
               {asChart ? <Table2 color={color.text2} size={15} /> : <BarChart3 color={color.text2} size={15} />}
             </Press>
           ) : null}
           {full ? null : (
-            <Press onPress={() => openFull({ kind: 'view', view, ...(at ? { at } : {}) })} accessibilityLabel="Full screen" hitSlop={6} style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: color.sunken }}>
+            <Press onPress={() => openFull({ kind: 'view', view, ...(at ? { at } : {}) })} accessibilityLabel={t('phoneParts.view.fullScreen')} hitSlop={6} style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: color.sunken }}>
               <Maximize2 color={color.text2} size={14} />
             </Press>
           )}
           {d.live ? (
-            <Press onPress={d.refresh} accessibilityLabel="Fetch again on your Mac" hitSlop={6} style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: color.sunken }}>
+            <Press onPress={d.refresh} accessibilityLabel={t('phoneParts.view.fetchAgain')} hitSlop={6} style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: color.sunken }}>
               {d.loading ? <ActivityIndicator size="small" color={color.text3} /> : <RefreshCw color={color.text2} size={14} />}
             </Press>
           ) : null}
@@ -60,12 +62,12 @@ export function ViewCard({ view, at, warnings = 0, full }: { readonly view: View
       {d.needsApproval ? (
         <View style={{ margin: 12, padding: 12, borderRadius: 12, backgroundColor: tint.butter, gap: 8 }}>
           <T v="callout" c={ink.butter}>
-            This runs on your Mac: {d.needsApproval}
+            {t('phoneParts.view.runsOnMac', { what: d.needsApproval })}
           </T>
           <Press onPress={() => (haptic.commit(), d.approve())} style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, paddingHorizontal: 14, borderRadius: 17, backgroundColor: color.primary }}>
             <Play color={color.onPrimary} size={13} />
             <T v="callout" c={color.onPrimary} style={{ fontWeight: '700' }}>
-              Run on your Mac
+              {t('phoneParts.view.runOnMac')}
             </T>
           </Press>
         </View>
@@ -101,12 +103,12 @@ export function ViewCard({ view, at, warnings = 0, full }: { readonly view: View
       </View>
       {warnings ? (
         <T v="caption" style={{ paddingHorizontal: 14, paddingBottom: 10 }}>
-          {warnings} small {warnings === 1 ? 'mistake was' : 'mistakes were'} left out
+          {t('phoneParts.view.mistakes', { count: warnings })}
         </T>
       ) : null}
       {d.live && d.at ? (
         <T v="caption" style={{ paddingHorizontal: 14, paddingBottom: 10 }}>
-          From your Mac · {new Date(d.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          {t('phoneParts.view.fromMac', { time: formatDateWith(new Date(d.at), { hour: '2-digit', minute: '2-digit' }) })}
         </T>
       ) : null}
     </View>
@@ -189,7 +191,7 @@ function TableView({ view, d }: { readonly view: ViewSpec; readonly d: ViewData 
   // The whole table as Markdown (it reads as a table in chat, notes and GitHub), not just this page.
   const copyTable = () => {
     const all = d.allRows();
-    copy(toMarkdownTable(all, cols), `Copied ${all.length} ${all.length === 1 ? 'row' : 'rows'}`);
+    copy(toMarkdownTable(all, cols), t('phoneParts.view.copiedRows', { count: all.length }));
   };
   const sortBy = (key: string) => {
     haptic.tap();
@@ -202,7 +204,7 @@ function TableView({ view, d }: { readonly view: ViewSpec; readonly d: ViewData 
       {searchable ? (
         <View style={{ marginHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8, height: 36, paddingHorizontal: 10, borderRadius: 18, backgroundColor: color.sunken }}>
           <Search color={color.text3} size={15} />
-          <TextInput value={d.search} onChangeText={d.setSearch} placeholder="Search" placeholderTextColor={color.text3} style={{ flex: 1, color: color.text, fontSize: 14, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : {}) }} />
+          <TextInput value={d.search} onChangeText={d.setSearch} placeholder={t('common.search')} placeholderTextColor={color.text3} style={{ flex: 1, color: color.text, fontSize: 14, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : {}) }} />
         </View>
       ) : null}
       {wide && cards ? (
@@ -244,7 +246,7 @@ function TableView({ view, d }: { readonly view: ViewSpec; readonly d: ViewData 
           ))}
           {!d.rows.length ? (
             <T v="callout" style={{ padding: 14 }}>
-              {d.loading ? 'Asking your Mac…' : d.needsApproval ? '' : 'Nothing here'}
+              {d.loading ? t('phoneParts.view.asking') : d.needsApproval ? '' : t('phoneParts.view.nothing')}
             </T>
           ) : null}
         </View>
@@ -263,12 +265,12 @@ function TableView({ view, d }: { readonly view: ViewSpec; readonly d: ViewData 
         </View>
         {d.rows.length ? (
           <View style={{ marginRight: wide ? 0 : 12 }}>
-            <SmallChip label="Copy" Icon={Copy} accessibilityLabel="Copy the table" onPress={copyTable} />
+            <SmallChip label={t('phoneParts.copy')} Icon={Copy} accessibilityLabel={t('phoneParts.view.copyTable')} onPress={copyTable} />
           </View>
         ) : null}
         {wide ? (
           <View style={{ flexDirection: 'row', marginRight: 12, padding: 2, gap: 2, borderRadius: 15, backgroundColor: color.sunken }}>
-            {([['Scroll sideways', MoveHorizontal, false], ['As cards', Rows3, true]] as const).map(([label, Icon, on]) => (
+            {([[t('phoneParts.view.scrollSideways'), MoveHorizontal, false], [t('phoneParts.view.asCards'), Rows3, true]] as const).map(([label, Icon, on]) => (
               <Press key={label} haptics={false} onPress={() => (haptic.tap(), setCards(on))} accessibilityLabel={label} accessibilityState={{ selected: cards === on }} style={{ width: 34, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: cards === on ? color.card : 'transparent' }}>
                 <Icon color={cards === on ? color.text : color.text3} size={15} />
               </Press>
@@ -285,7 +287,7 @@ function Pager({ d, from }: { readonly d: ViewData; readonly from: number }) {
   if (!shown || (d.page === 0 && !d.hasMore)) {
     return shown ? (
       <T v="caption" style={{ paddingHorizontal: 14 }}>
-        {shown} {shown === 1 ? 'row' : 'rows'}
+        {t('phoneParts.view.rows', { count: shown })}
       </T>
     ) : null;
   }
@@ -297,11 +299,10 @@ function Pager({ d, from }: { readonly d: ViewData; readonly from: number }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12 }}>
       <T v="caption" style={{ flex: 1, fontVariant: ['tabular-nums'] }}>
-        {from + 1}–{from + shown}
-        {d.total !== undefined ? ` of ${d.total.toLocaleString()}` : ''}
+        {d.total !== undefined ? t('phoneParts.view.rangeOf', { from: from + 1, to: from + shown, total: formatNumber(d.total) }) : `${from + 1}–${from + shown}`}
       </T>
-      {btn(d.page > 0, ChevronLeft, () => d.setPage(d.page - 1), 'Previous page')}
-      {btn(d.hasMore, ChevronRight, () => d.setPage(d.page + 1), 'Next page')}
+      {btn(d.page > 0, ChevronLeft, () => d.setPage(d.page - 1), t('phoneParts.view.previousPage'))}
+      {btn(d.hasMore, ChevronRight, () => d.setPage(d.page + 1), t('phoneParts.view.nextPage'))}
     </View>
   );
 }
@@ -332,7 +333,7 @@ function ControlView({ c, view, d }: { readonly c: Control; readonly view: ViewS
     return (
       <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
         {c.label ? <T v="caption">{c.label}</T> : null}
-        {c.type === 'select' ? <Chip label="All" on={v === undefined} onPress={() => d.setControl(c.id, undefined)} /> : null}
+        {c.type === 'select' ? <Chip label={t('phoneParts.all')} on={v === undefined} onPress={() => d.setControl(c.id, undefined)} /> : null}
         {c.options.map((o, i) => (
           <Chip key={i} label={o.label} on={v === i} onPress={() => d.setControl(c.id, c.type === 'select' && v === i ? undefined : i)} />
         ))}
@@ -344,7 +345,7 @@ function ControlView({ c, view, d }: { readonly c: Control; readonly view: ViewS
     return (
       <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
         <T v="caption">{c.label ?? headingOf({ key: c.column })}</T>
-        <Chip label="All" on={v === undefined} onPress={() => d.setControl(c.id, undefined)} />
+        <Chip label={t('phoneParts.all')} on={v === undefined} onPress={() => d.setControl(c.id, undefined)} />
         {choices.map((x, i) => (
           <Chip key={i} label={String(x)} on={v === x} onPress={() => d.setControl(c.id, v === x ? undefined : x)} />
         ))}
@@ -378,7 +379,7 @@ function ControlView({ c, view, d }: { readonly c: Control; readonly view: ViewS
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 32, width: 170, paddingHorizontal: 10, borderRadius: 16, backgroundColor: color.sunken }}>
       <Search color={color.text3} size={13} />
-      <TextInput value={typeof v === 'string' ? v : ''} onChangeText={(t) => d.setControl(c.id, t)} placeholder={c.placeholder ?? c.label ?? 'Filter'} placeholderTextColor={color.text3} style={{ flex: 1, color: color.text, fontSize: 13, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : {}) }} />
+      <TextInput value={typeof v === 'string' ? v : ''} onChangeText={(t) => d.setControl(c.id, t)} placeholder={c.placeholder ?? c.label ?? t('phoneParts.view.filter')} placeholderTextColor={color.text3} style={{ flex: 1, color: color.text, fontSize: 13, ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : {}) }} />
     </View>
   );
 }
@@ -393,7 +394,7 @@ function Actions({ view, d }: { readonly view: ViewSpec; readonly d: ViewData })
         ) : a.href && /^https?:\/\//.test(a.href) ? (
           <Chip key={i} label={a.label} on={false} onPress={() => void Linking.openURL(a.href!)} />
         ) : a.copy ? (
-          <Chip key={i} label={a.label} on={false} onPress={() => (void Clipboard.setStringAsync(a.copy!), store.toast({ text: 'Copied', tone: 'ok' }))} />
+          <Chip key={i} label={a.label} on={false} onPress={() => (void Clipboard.setStringAsync(a.copy!), store.toast({ text: t('phoneParts.copied'), tone: 'ok' }))} />
         ) : null,
       )}
     </ScrollView>
@@ -475,8 +476,8 @@ function CodeView({ view, text }: { readonly view: ViewSpec; readonly text: stri
         </View>
       </ScrollView>
       <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 12 }}>
-        {lines.length > FOLD ? <Chip label={all ? 'Fold' : `All ${lines.length} lines`} on={false} onPress={() => setAll((a) => !a)} /> : null}
-        <Chip label="Copy" on={false} onPress={() => (void Clipboard.setStringAsync(text), store.toast({ text: 'Copied', tone: 'ok' }))} />
+        {lines.length > FOLD ? <Chip label={all ? t('phoneParts.view.fold') : t('phoneParts.view.allLines', { count: lines.length })} on={false} onPress={() => setAll((a) => !a)} /> : null}
+        <Chip label={t('phoneParts.copy')} on={false} onPress={() => (void Clipboard.setStringAsync(text), store.toast({ text: t('phoneParts.copied'), tone: 'ok' }))} />
         {view.language ? <Pill label={view.language} /> : null}
       </View>
     </View>
@@ -492,9 +493,9 @@ function ColorsView({ view }: { readonly view: ViewSpec }) {
         const rgb = parseColor(s.value);
         const white = rgb ? contrast(rgb, { r: 255, g: 255, b: 255 }) : 0;
         return (
-          <Press key={i} haptics={false} onPress={() => (haptic.tap(), void Clipboard.setStringAsync(s.value), store.toast({ text: `Copied ${s.value}`, tone: 'ok' }))} style={{ width: '31%', flexGrow: 1, borderRadius: 14, overflow: 'hidden', backgroundColor: color.sunken }}>
+          <Press key={i} haptics={false} onPress={() => (haptic.tap(), void Clipboard.setStringAsync(s.value), store.toast({ text: t('phoneParts.copiedWhat', { what: s.value }), tone: 'ok' }))} style={{ width: '31%', flexGrow: 1, borderRadius: 14, overflow: 'hidden', backgroundColor: color.sunken }}>
             <View style={{ height: 64, backgroundColor: rgb ? s.value : color.sunken, justifyContent: 'flex-end', padding: 8 }}>
-              {rgb ? <Text style={{ ...type.caption, color: inkOn(rgb), fontWeight: '700' }}>Aa {white.toFixed(1)}</Text> : null}
+              {rgb ? <Text style={{ ...type.caption, color: inkOn(rgb), fontWeight: '700' }}>{/* i18n-ignore */}Aa {white.toFixed(1)}</Text> : null}
             </View>
             <View style={{ padding: 8, gap: 1 }}>
               {s.name ? (

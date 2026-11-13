@@ -2,6 +2,7 @@ import type { AppState } from '@beluga/core/store.js';
 import { RUNTIME_NAMES } from '@beluga/shared/agent-label.js';
 import { type StatRange, type StatsSnapshot, type TotalKey, type Totals, dayStart, previousRange, rangeStart, shiftDay, statDay, totalsBy, totalsOf } from '@beluga/shared/stats.js';
 import type { IconName } from '../../components/Icon.js';
+import { t as tt } from '@beluga/shared/i18n/index.js';
 import { compact, formatCost, slotOf } from './usage-model.js';
 
 /** The numbers on the stats strip: each picks what the calendar and the ranking show. */
@@ -28,7 +29,8 @@ export interface MetricDef {
   readonly daily: TotalKey;
 }
 
-const plural = (n: number, one: string, many = `${one}s`): string => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+/** "3 runs", "1 chat": the number as the app's language writes it. */
+const runs = (n: number): string => tt('usage.metric.runs', { count: n, n: n.toLocaleString() });
 
 /** "45 min", "3 h 20 min", "112 h". */
 export function duration(ms: number): string {
@@ -56,93 +58,112 @@ const WORKDAY_MS = 8 * 3_600_000;
 export const METRICS: readonly MetricDef[] = [
   {
     id: 'agentMs',
-    label: 'Agent time',
+    get label() {
+      return tt('usage.metric.agentMs');
+    },
     icon: 'clock',
     color: 'var(--m-time)',
     value: (t) => t.agentMs,
     format: duration,
     axis: hours,
-    aside: (t) => (t.agentMs >= WORKDAY_MS / 2 ? `≈ ${about(t.agentMs / WORKDAY_MS)} workdays · ${plural(t.runs, 'run')}` : plural(t.runs, 'run')),
-    empty: () => 'No runs in this stretch',
+    aside: (t) => (t.agentMs >= WORKDAY_MS / 2 ? tt('usage.metric.workdays', { n: about(t.agentMs / WORKDAY_MS), runs: runs(t.runs) }) : runs(t.runs)),
+    empty: () => tt('usage.metric.noRuns'),
     daily: 'agentMs',
   },
   {
     id: 'prompts',
-    label: 'Prompts',
+    get label() {
+      return tt('usage.metric.prompts');
+    },
     icon: 'send',
     color: 'var(--m-prompts)',
     value: (t) => t.prompts,
     format: (n) => n.toLocaleString(),
-    aside: (t) => `${compact(t.chars)} characters${t.prompts ? ` · ${Math.round(t.chars / t.prompts)} a prompt` : ''}`,
-    empty: () => 'None sent in this stretch',
+    aside: (t) => (t.prompts ? tt('usage.metric.charactersPer', { chars: compact(t.chars), per: Math.round(t.chars / t.prompts) }) : tt('usage.metric.characters', { chars: compact(t.chars) })),
+    empty: () => tt('usage.metric.noneSent'),
     daily: 'prompts',
   },
   {
     id: 'pasted',
-    label: 'Pasted',
+    get label() {
+      return tt('usage.metric.pasted');
+    },
     icon: 'clip',
     color: 'var(--m-pasted)',
     value: (t) => t.pasted,
     format: compact,
-    aside: (t) => (t.pasted >= NOVEL / 2 ? `≈ ${about(t.pasted / NOVEL)} novels` : `≈ ${plural(Math.max(1, Math.round(t.pasted / PAGE)), 'page')} of text`),
-    empty: () => 'Nothing pasted in this stretch',
+    aside: (t) => {
+      const pages = Math.max(1, Math.round(t.pasted / PAGE));
+      return t.pasted >= NOVEL / 2 ? tt('usage.metric.novels', { n: about(t.pasted / NOVEL) }) : tt('usage.metric.pages', { count: pages, n: pages.toLocaleString() });
+    },
+    empty: () => tt('usage.metric.nothingPasted'),
     daily: 'pasted',
   },
   {
     id: 'dictationMs',
-    label: 'Dictated',
+    get label() {
+      return tt('usage.metric.dictated');
+    },
     icon: 'mic',
     color: 'var(--m-voice)',
     value: (t) => t.dictationMs,
     format: duration,
     axis: hours,
-    aside: (t) => `≈ ${compact(Math.round((t.dictationMs / 60_000) * WORDS_PER_MIN))} words spoken`,
-    empty: () => 'Not used yet: the mic',
+    aside: (t) => tt('usage.metric.wordsSpoken', { n: compact(Math.round((t.dictationMs / 60_000) * WORDS_PER_MIN)) }),
+    empty: () => tt('usage.metric.micUnused'),
     daily: 'dictationMs',
   },
   {
     id: 'worktrees',
-    label: 'Worktrees',
+    get label() {
+      return tt('usage.metric.worktrees');
+    },
     icon: 'branch',
     color: 'var(--m-worktrees)',
     value: (t) => t.worktrees,
     format: (n) => n.toLocaleString(),
-    aside: (t) => `${t.archived.toLocaleString()} archived · ${plural(t.chats, 'chat')}`,
+    aside: (t) => tt('usage.metric.archivedChats', { archived: t.archived.toLocaleString(), chats: tt('usage.metric.chats', { count: t.chats, n: t.chats.toLocaleString() }) }),
     daily: 'worktrees',
   },
   {
     id: 'prsMerged',
-    label: 'PRs merged',
+    get label() {
+      return tt('usage.metric.prsMerged');
+    },
     icon: 'merge',
     color: 'var(--m-prs)',
     value: (t) => t.prsMerged,
     format: (n) => n.toLocaleString(),
-    aside: (t) => `${t.prsOpened.toLocaleString()} opened`,
-    empty: (t) => (t.prsOpened ? undefined : 'None from Beluga’s worktrees yet'),
+    aside: (t) => tt('usage.metric.opened', { n: t.prsOpened.toLocaleString() }),
+    empty: (t) => (t.prsOpened ? undefined : tt('usage.metric.noPrs')),
     github: true,
     daily: 'prsMerged',
   },
   {
     id: 'lines',
-    label: 'Lines shipped',
+    get label() {
+      return tt('usage.metric.lines');
+    },
     icon: 'diff',
     color: 'var(--m-lines)',
     value: (t) => t.linesAdded + t.linesRemoved,
     format: compact,
-    aside: (t) => `+${compact(t.linesAdded)} −${compact(t.linesRemoved)} in merged PRs`,
-    empty: () => 'Counted from merged PRs',
+    aside: (t) => tt('usage.metric.linesAside', { added: compact(t.linesAdded), removed: compact(t.linesRemoved) }),
+    empty: () => tt('usage.metric.fromMergedPrs'),
     github: true,
     daily: 'linesAdded',
   },
   {
     id: 'tokens',
-    label: 'Tokens',
+    get label() {
+      return tt('usage.metric.tokens');
+    },
     icon: 'spark',
     color: 'var(--m-tokens)',
     value: (t) => t.tokens,
     format: compact,
-    aside: (t) => (t.cost ? `${formatCost(t.cost)} estimated` : 'No cost counted'),
-    empty: () => 'None in this stretch',
+    aside: (t) => (t.cost ? tt('usage.metric.estimated', { cost: formatCost(t.cost) }) : tt('usage.metric.noCost')),
+    empty: () => tt('usage.metric.noneInStretch'),
     daily: 'tokens',
   },
 ];
@@ -150,7 +171,7 @@ export const METRICS: readonly MetricDef[] = [
 /** The small line under a number: what it amounts to, or (nothing yet) why, and how to get some. */
 export function asideOf(m: MetricDef, t: Totals, noGitHub: boolean): string {
   if (m.value(t) > 0) return m.aside(t);
-  if (m.github && noGitHub) return 'Needs the GitHub CLI (gh)';
+  if (m.github && noGitHub) return tt('usage.metric.needsGh');
   return m.empty?.(t) ?? m.aside(t);
 }
 
@@ -186,9 +207,9 @@ const AGENT_COLOR: Readonly<Record<string, string>> = { claude: 'var(--claude)',
 
 /** A project's (or agent's) name, colour and icon, from its key (a root, or a runtime). */
 export function groupOf(key: string, by: GroupBy, projects: AppState['projects']): { name: string; color: string; projectId?: string } {
-  if (by === 'agent') return { name: key ? (RUNTIME_NAMES[key] ?? key) : 'Not in a run', color: AGENT_COLOR[key] ?? 'var(--series-other)' };
+  if (by === 'agent') return { name: key ? (RUNTIME_NAMES[key] ?? key) : tt('usage.metric.notInRun'), color: AGENT_COLOR[key] ?? 'var(--series-other)' };
   const p = key ? projects.find((x) => x.root === key) : undefined;
-  const name = p?.name ?? (key ? (key.split('/').filter(Boolean).at(-1) ?? key) : 'Chats and elsewhere');
+  const name = p?.name ?? (key ? (key.split('/').filter(Boolean).at(-1) ?? key) : tt('usage.metric.chatsElsewhere'));
   return { name, color: `var(--series-${p ? slotOf(projects, p) : key ? 'other' : 'chats'})`, ...(p ? { projectId: p.id } : {}) };
 }
 
@@ -242,5 +263,5 @@ export function favouriteHour(hours: readonly number[]): { day: string; time: st
     if (n > best) [best, at] = [n, i];
   });
   if (best <= 0) return undefined;
-  return { day: `${new Date(2026, 0, 4 + Math.floor(at / 24)).toLocaleDateString([], { weekday: 'long' })}s`, time: new Date(2026, 0, 4, at % 24).toLocaleTimeString([], { hour: 'numeric' }) };
+  return { day: tt('usage.metric.weekdays', { day: new Date(2026, 0, 4 + Math.floor(at / 24)).toLocaleDateString([], { weekday: 'long' }) }), time: new Date(2026, 0, 4, at % 24).toLocaleTimeString([], { hour: 'numeric' }) };
 }

@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import type { ChatFile } from '@beluga/net/mesh/views.js';
 import type { SocketClient } from '@beluga/ipc/socket-client.js';
+import { t } from '@beluga/shared/i18n/index.js';
 
 /**
  * Files waiting in a conversation's message box before you send them: each is taken into
@@ -88,7 +89,7 @@ export async function addBlobs(client: SocketClient, id: string, files: readonly
   const thumbs = files.map((f) => (f.type.startsWith('image/') ? URL.createObjectURL(f) : undefined));
   const keys = start(
     id,
-    files.map((f) => f.name || (f.type.startsWith('image/') ? `Pasted image.${f.type.split('/')[1] ?? 'png'}` : 'Pasted file')),
+    files.map((f) => f.name || (f.type.startsWith('image/') ? t('network.attach.pastedImage', { ext: f.type.split('/')[1] ?? 'png' }) : t('network.attach.pastedFile'))),
     thumbs,
   );
   await Promise.all(
@@ -103,7 +104,7 @@ export async function addBlobs(client: SocketClient, id: string, files: readonly
           const last = at + PART_BYTES >= f.size;
           file = await client.api.network['files.addData'](name, await base64(f.slice(at, at + PART_BYTES)), { id: upload, last });
         }
-        if (!file) throw new Error('It didn’t arrive whole');
+        if (!file) throw new Error(t('network.attach.notWhole'));
         update(id, key, { state: 'ready', file, name: file.name });
       } catch (err) {
         update(id, key, { state: 'failed', error: message(err) });

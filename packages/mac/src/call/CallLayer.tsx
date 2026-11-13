@@ -10,10 +10,12 @@ import { callLength } from '@beluga/shared/calls.js';
 import { openCall, useCallEngine, useCallLive, useCallPlace, useMyCall, useRinging, useSecond, useShowing } from './use-call.js';
 import { syncFloat } from './float.js';
 import { startOverlay } from './overlay.js';
+import { useT } from '../lib/i18n.js';
 import c from './call.module.css';
 
 /** Someone rings you: a card at the top of the window, wherever you are in Beluga. */
 function Incoming({ call }: { call: CallView }) {
+  const t = useT();
   const { client } = useBeluga();
   const engine = useCallEngine();
   const place = useCallPlace(call.conversation);
@@ -25,7 +27,7 @@ function Incoming({ call }: { call: CallView }) {
     void engine.join(call.conversation).catch(() => undefined);
   };
   return (
-    <div className={c.incoming} role="alertdialog" aria-label={`${by?.name ?? 'Someone'} is calling`}>
+    <div className={c.incoming} role="alertdialog" aria-label={t('network.call.isCalling', { name: by?.name ?? t('network.call.someone') })}>
       <button type="button" className={c.incomingWho} onClick={() => openCall(client, call.conversation)}>
         <span className={c.ripples} aria-hidden="true">
           <span />
@@ -33,15 +35,15 @@ function Incoming({ call }: { call: CallView }) {
         </span>
         {by ? <CallAvatar peerId={by.peerId} name={by.name} size={36} speaking={false} /> : null}
         <span className={c.incomingText}>
-          <strong>{by?.name ?? 'Someone'} is calling</strong>
-          <span>{group ? `${place}${others.length ? ` · with ${namesOf(others)}` : ''}` : 'Voice call'}</span>
+          <strong>{t('network.call.isCalling', { name: by?.name ?? t('network.call.someone') })}</strong>
+          <span>{group ? `${place}${others.length ? t('network.layer.withNames', { names: namesOf(others) }) : ''}` : t('network.float.voiceCall')}</span>
         </span>
       </button>
       <span className={c.incomingActions}>
-        <button type="button" className={c.roundDecline} aria-label="Decline" onClick={() => void client.api.calls.decline(call.conversation)}>
+        <button type="button" className={c.roundDecline} aria-label={t('network.group.decline')} onClick={() => void client.api.calls.decline(call.conversation)}>
           <Icon name="callEnd" size={17} />
         </button>
-        <button type="button" className={c.roundJoin} aria-label="Join" onClick={join}>
+        <button type="button" className={c.roundJoin} aria-label={t('network.call.join')} onClick={join}>
           <Icon name="call" size={16} />
         </button>
       </span>
@@ -51,6 +53,7 @@ function Incoming({ call }: { call: CallView }) {
 
 /** The call you're in, in the sidebar while you look at something else: back to it in one click. */
 export function CallPill() {
+  const t = useT();
   const { client } = useBeluga();
   const call = useMyCall();
   const live = useCallLive();
@@ -62,7 +65,7 @@ export function CallPill() {
   const talking = others.find((p) => live.speaking.has(p.peerId));
   const sharing = call.people.some((p) => p.me && p.sharing);
   return (
-    <div className={cx(c.pill, sharing && c.pillSharing)} role="region" aria-label={`Call in ${place}`}>
+    <div className={cx(c.pill, sharing && c.pillSharing)} role="region" aria-label={t('network.layer.callIn', { place })}>
       <button type="button" className={c.pillMain} onClick={() => openCall(client, call.conversation)}>
         <span className={c.pillFaces}>
           {others.slice(0, 3).map((p) => (
@@ -71,7 +74,7 @@ export function CallPill() {
         </span>
         <span className={c.pillText}>
           <strong>{place}</strong>
-          <span>{sharing ? 'You’re sharing your screen' : talking ? `${talking.name} is talking` : others.length ? callLength(now - call.startedAt) : 'Ringing…'}</span>
+          <span>{sharing ? t('network.call.youShare') : talking ? t('network.call.isTalking', { name: talking.name }) : others.length ? callLength(now - call.startedAt) : t('network.call.ringing')}</span>
         </span>
       </button>
       <CallControls call={call} compact />

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { BodyInput, BodyOf, ClaudeAnswer, ClaudeQuestion } from '../protocol.js';
 import { type Store, clean } from './store.js';
+import { t } from '../shared/i18n/index.js';
 
 export interface QuestionDeps {
   readonly store: Store;
@@ -75,7 +76,7 @@ export class QuestionBroker {
       const timer = setTimeout(() => {
         if (!this.waiting.delete(qid)) return;
         this.deps.store.dispatch({ type: 'question_remove', qid, unanswered: true });
-        this.deps.toast(`Your agent's ${question.kind === 'plan' ? 'plan' : 'question'} went unanswered, so it carried on without it`, 'warn');
+        this.deps.toast(question.kind === 'plan' ? t('toasts.questions.planUnanswered') : t('toasts.questions.questionUnanswered'), 'warn');
         resolve(SKIP);
       }, this.deps.timeoutMs());
       timer.unref();

@@ -1,4 +1,5 @@
 import type { LogItem } from '../core/store.js';
+import { type Key, t } from './i18n/index.js';
 
 /**
  * Words about a Claude card that aren't Claude's answer: Claude Code's own notice that a plan
@@ -17,6 +18,16 @@ export const STEERED_IN = 'Your agent read this while it worked; the answer abov
 
 /** What a steered message's card says once you took it back before Claude read it (Cancel: see AgentHost.cancelSteer). */
 export const TAKEN_BACK = 'Taken back before your agent read it';
+
+const NOTICE_KEYS: Readonly<Record<string, Key>> = {
+  [READS_AFTER_STEP]: 'shared.notices.readsAfterStep',
+  [STOPPING_FOR]: 'shared.notices.stoppingFor',
+  [STEERED_IN]: 'shared.notices.steeredIn',
+  [TAKEN_BACK]: 'shared.notices.takenBack',
+};
+
+/** A card's words on a screen: one of Beluga's notes above (they stay English: cards are compared by them) in the app's language, else as they are. */
+export const noticeLine = (text: string): string => (Object.hasOwn(NOTICE_KEYS, text) ? t(NOTICE_KEYS[text]!) : text);
 
 /**
  * A steered message Claude hasn't read yet (BLG-54): its card is only a note, waiting in the
@@ -143,6 +154,6 @@ export function backgroundWait(items: readonly LogItem[]): string | undefined {
   if (!card || ['done', 'error', 'denied'].includes(card.status) || !card.text) return undefined;
   const live = card.subagents.filter((x) => x.status === 'running');
   if (!live.length) return undefined;
-  const noun = live.every((x) => x.kind !== 'background') ? 'background agent' : live.every((x) => x.kind === 'background') ? 'background task' : 'background job';
-  return `Waiting on ${live.length} ${noun}${live.length === 1 ? '' : 's'} · ${live.map((x) => x.title).join(', ')}`;
+  const key = live.every((x) => x.kind !== 'background') ? 'shared.notices.waitAgents' : live.every((x) => x.kind === 'background') ? 'shared.notices.waitTasks' : 'shared.notices.waitJobs';
+  return t(key, { count: live.length, titles: live.map((x) => x.title).join(', ') });
 }

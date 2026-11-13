@@ -65,6 +65,13 @@ export const AgentRef = z.object({
   runtime: z.string().regex(/^[a-z][\w-]{0,31}$/) as z.ZodType<AgentRuntime>,
   model: z.string().min(1).max(64).optional(),
   label: z.string().min(1).max(64),
+  /**
+   * A combo (core/routing, docs/routing.md). Picked: the combo by id, whose runs go to its first
+   * target that can run. On a run's card: the combo it went through, the rest of the ref being the
+   * target it ran on. `comboName` says it ("Economy · Codex"). An older Mac drops both and runs `runtime`.
+   */
+  combo: z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/).optional(),
+  comboName: z.string().min(1).max(64).optional(),
 });
 export type AgentRef = z.infer<typeof AgentRef>;
 

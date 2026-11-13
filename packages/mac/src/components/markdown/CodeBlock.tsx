@@ -4,6 +4,7 @@ import { Tip, cx } from '../ui.js';
 import { copyText } from '../../lib/copy.js';
 import { CodeLines } from './CodeLines.js';
 import c from './code.module.css';
+import { useT } from '../../lib/i18n.js';
 
 /** "Copied" for a moment after a copy button is pressed (text, or a copy of its own, like a table's). */
 export function useCopied(): [boolean, (what: string | (() => Promise<unknown>)) => void] {
@@ -22,20 +23,21 @@ export function useCopied(): [boolean, (what: string | (() => Promise<unknown>))
 
 /** A fenced code block in a document: colored, with its language, soft wrap and Copy on hover. */
 export function CodeBlock({ code, lang }: { code: string; lang?: string | undefined }) {
+  const t = useT();
   const [wrap, setWrap] = useState(false);
   const [copied, copy] = useCopied();
   return (
     <div className={c.block}>
       <div className={c.tools}>
         {lang ? <span className={c.lang}>{lang}</span> : null}
-        <Tip label={wrap ? 'Don’t wrap long lines' : 'Wrap long lines'}>
-          <button type="button" className={cx(c.tool, wrap && c.toolOn)} aria-label="Wrap long lines" aria-pressed={wrap} onClick={() => setWrap(!wrap)}>
+        <Tip label={wrap ? t('components.markdown.noWrap') : t('components.markdown.wrap')}>
+          <button type="button" className={cx(c.tool, wrap && c.toolOn)} aria-label={t('components.markdown.wrap')} aria-pressed={wrap} onClick={() => setWrap(!wrap)}>
             <Icon name="wrap" size={12} />
           </button>
         </Tip>
-        <button type="button" className={c.tool} aria-label="Copy code" onClick={() => copy(code)}>
+        <button type="button" className={c.tool} aria-label={t('components.markdown.copyCode')} onClick={() => copy(code)}>
           <Icon name={copied ? 'check' : 'copy'} size={12} />
-          {copied ? 'Copied' : 'Copy'}
+          {copied ? t('components.copied') : t('components.copy')}
         </button>
       </div>
       <CodeLines text={code} lang={lang} wrap={wrap} />

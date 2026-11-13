@@ -12,6 +12,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Toasts } from '../components/Screen';
 import { useScheme } from '../lib/appearance';
+import { useLocale } from '../lib/language';
 import { startSaved } from '../lib/saved';
 import { store } from '../lib/store';
 import { startUpdates } from '../lib/update';
@@ -24,6 +25,8 @@ import { color, stroke } from '../lib/theme';
 /** The app: one store (lib/store.ts), a stack of screens over the tabs, toasts on top. */
 export default function Root() {
   const scheme = useScheme();
+  // Settings › Advanced › Language, or the Mac's (docs/i18n.md): every screen says it afresh.
+  const locale = useLocale();
   useEffect(() => {
     // The cache holds nothing a new launch uses; saved files are checked when the link opens.
     startSaved();
@@ -62,7 +65,7 @@ export default function Root() {
     if (Platform.OS === 'android') NavigationBar.setStyle(scheme === 'dark' ? 'dark' : 'light');
   }, [scheme]);
   return (
-    <GestureHandlerRootView key={scheme} style={{ flex: 1, backgroundColor: color.bg }}>
+    <GestureHandlerRootView key={`${scheme}-${locale}`} style={{ flex: 1, backgroundColor: color.bg }}>
       <SafeAreaProvider>
         {/* Every icon one line weight (lib/theme.ts `stroke`) unless it says otherwise. */}
         <LucideProvider strokeWidth={stroke}>

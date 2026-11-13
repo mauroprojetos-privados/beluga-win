@@ -21,6 +21,8 @@ import type { AgentRef } from '@beluga/protocol.js';
 import { WaitingLine } from './WaitingLine.js';
 import p from './plans.module.css';
 import { revealLabel } from '../lib/os-words.js';
+import { useT } from '../lib/i18n.js';
+import { t as tx } from '@beluga/shared/i18n/index.js';
 
 /** The details pane shows what the plan did when this is picked. */
 export const FEED = 'feed';
@@ -40,6 +42,7 @@ export function PlanDetails({ view, picked, canStart, onPick, onClose }: { view:
   const gate = picked.startsWith('gate:') ? view.milestones.find((m) => `gate:${m.milestone.id}` === picked) : undefined;
   const task = gate || feed || branch || decided ? undefined : view.milestones.flatMap((m) => m.tasks).find((t) => t.task.id === picked);
   const [scrolled, setScrolled] = useState(false);
+  const t = useT();
   const shown = Boolean(feed || branch || decided || gate || task);
   // Another pick starts at its top (the body is keyed by it).
   useEffect(() => setScrolled(false), [picked]);
@@ -57,10 +60,10 @@ export function PlanDetails({ view, picked, canStart, onPick, onClose }: { view:
   }, [shown, onClose]);
   if (!shown) return null;
   return (
-    <aside className={p.details} aria-label={feed ? 'What happened' : branch ? 'Where the work goes' : decided ? 'Decisions' : 'Details'}>
+    <aside className={p.details} aria-label={feed ? t('plans.d.whatHappened') : branch ? t('plans.d.whereWorkGoes') : decided ? t('plans.decisions') : t('plans.details')}>
       <header className={p.detailsHead} data-scrolled={scrolled ? 'true' : 'false'}>
         <div className={p.detailsHeadText}>{feed ? <FeedHead /> : branch ? <BranchHead view={view} /> : decided ? <DecisionsHead /> : gate ? <GateHead m={gate} /> : <TaskHead t={task!} />}</div>
-        <IconButton icon="x" label="Close" className={p.detailsClose} onClick={onClose} />
+        <IconButton icon="x" label={t('common.close')} className={p.detailsClose} onClick={onClose} />
       </header>
       <div key={picked} className={p.detailsBody} onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 0)}>
         {feed ? <PlanFeed plan={view.plan} /> : branch ? <BranchFlow view={view} /> : decided ? <PlanDecisions plan={view.plan} onPick={onPick} /> : gate ? <GateDetails plan={view.plan} m={gate} onPick={onPick} /> : <TaskDetails view={view} t={task!} canStart={canStart} />}
@@ -70,29 +73,32 @@ export function PlanDetails({ view, picked, canStart, onPick, onClose }: { view:
 }
 
 function FeedHead() {
+  const t = useT();
   return (
     <>
-      <div className={p.detailsKind}>Plan</div>
-      <h3 className={p.detailsTitle}>What happened</h3>
+      <div className={p.detailsKind}>{t('plans.d.plan')}</div>
+      <h3 className={p.detailsTitle}>{t('plans.d.whatHappened')}</h3>
     </>
   );
 }
 
 function DecisionsHead() {
+  const t = useT();
   return (
     <>
-      <div className={p.detailsKind}>Plan</div>
-      <h3 className={p.detailsTitle}>Decisions</h3>
-      <p className={p.muted}>What the plan has decided along the way. A decision that replaced another is kept, crossed out.</p>
+      <div className={p.detailsKind}>{t('plans.d.plan')}</div>
+      <h3 className={p.detailsTitle}>{t('plans.decisions')}</h3>
+      <p className={p.muted}>{t('plans.d.decisionsIntro')}</p>
     </>
   );
 }
 
 /** The plan's decisions, newest first: each one in force, or replaced (and by which), with the tasks still written the old way. */
 function PlanDecisions({ plan, onPick }: { plan: Plan; onPick: (id: string) => void }) {
+  const t = useT();
   const body = shownBody(plan);
   const list = [...(body?.decisions ?? [])].reverse();
-  if (!list.length) return <p className={p.muted}>No decisions recorded yet. Your agent records them here as you settle things in the conversation.</p>;
+  if (!list.length) return <p className={p.muted}>{t('plans.d.noDecisions')}</p>;
   return (
     <ol className={p.decisions}>
       {list.map((d) => {
@@ -100,10 +106,10 @@ function PlanDecisions({ plan, onPick }: { plan: Plan; onPick: (id: string) => v
         return (
           <li key={d.id} className={cx(p.decision, d.supersededBy && p.decisionOld)}>
             <span className={cx(p.decisionText, 'selectable')}>{d.text}</span>
-            {d.supersededBy ? <span className={p.muted}>Replaced by “{body?.decisions?.find((x) => x.id === d.supersededBy)?.text ?? d.supersededBy}”</span> : null}
+            {d.supersededBy ? <span className={p.muted}>{t('plans.d.replacedBy', { text: body?.decisions?.find((x) => x.id === d.supersededBy)?.text ?? d.supersededBy })}</span> : null}
             {stale.length ? (
               <span className={p.decisionStale}>
-                Still written the old way:{' '}
+                {t('plans.d.stillOldWay')}{' '}
                 {stale.map((id, i) => (
                   <button key={id} type="button" className={p.linkButton} onClick={() => onPick(id)}>
                     {i ? ', ' : ''}
@@ -120,26 +126,29 @@ function PlanDecisions({ plan, onPick }: { plan: Plan; onPick: (id: string) => v
 }
 
 function BranchHead({ view }: { view: PlanView }) {
+  const t = useT();
   return (
     <>
       <div className={p.detailsKind}>
         <Icon name="branch" size={12} />
-        Plan
+        {t('plans.d.plan')}
       </div>
-      <h3 className={p.detailsTitle}>Where the work goes</h3>
-      <p className={p.muted}>{view.plan.branch ? `Each milestone merges into ${view.plan.branch} when it passes; at the end, one pull request takes it into main.` : 'Without a branch of its own, each task’s work goes to main on its own.'}</p>
+      <h3 className={p.detailsTitle}>{t('plans.d.whereWorkGoes')}</h3>
+      <p className={p.muted}>{view.plan.branch ? t('plans.d.branchIntro', { branch: view.plan.branch }) : t('plans.d.noBranchIntro')}</p>
     </>
   );
 }
 
 const FLOW_ICON: Record<FlowStep['kind'], IconName> = { main: 'diamond', pr: 'pr', branch: 'branch', milestone: 'flag' };
-const FLOW_STATE: Record<FlowStep['state'], string> = { done: 'Done', active: 'Now', waiting: 'Not yet', problem: 'Needs you', later: 'Later' };
+const FLOW_STATE = (): Record<FlowStep['state'], string> => ({ done: tx('plans.d.flowDone'), active: tx('plans.d.flowNow'), waiting: tx('plans.d.flowNotYet'), problem: tx('plans.m.needsYou'), later: tx('plans.m.later') });
 
 /** main ← the pull request ← the plan's branch ← each milestone, with where each stands. */
 function BranchFlow({ view }: { view: PlanView }) {
+  const t = useT();
   const steps = branchFlow(view);
+  const flowState = FLOW_STATE();
   return (
-    <ol className={p.flow} aria-label="Where the work goes">
+    <ol className={p.flow} aria-label={t('plans.d.whereWorkGoes')}>
       {steps.map((s) => (
         <li key={s.id} className={p.flowStep} data-state={s.state} data-kind={s.kind}>
           <span className={p.flowMark} aria-hidden="true">
@@ -148,7 +157,7 @@ function BranchFlow({ view }: { view: PlanView }) {
           <span className={p.flowText}>
             <span className={p.flowLabel}>
               {s.kind === 'branch' || s.kind === 'main' ? <code>{s.label}</code> : s.label}
-              <span className={p.flowState}>{FLOW_STATE[s.state]}</span>
+              <span className={p.flowState}>{flowState[s.state]}</span>
             </span>
             <span className={p.flowDetail}>{s.detail}</span>
           </span>
@@ -161,12 +170,13 @@ function BranchFlow({ view }: { view: PlanView }) {
 function TaskHead({ t }: { t: TaskView }) {
   // Its state in words, with what it's doing now (the step and its time, a stall, a usage limit).
   const now = useClock(t.pulse?.kind === 'working' || t.pulse?.kind === 'command');
+  const tr = useT();
   const info = taskWords(t, now);
   return (
     <>
       <div className={p.detailsKind}>
         <TaskStateIcon state={t.state} size={13} />
-        {t.issue?.key ?? 'Task'}
+        {t.issue?.key ?? tr('plans.d.task')}
         {t.task.estimate ? <span className={p.points}>{t.task.estimate}</span> : null}
       </div>
       <h3 className={p.detailsTitle}>{t.task.title}</h3>
@@ -174,9 +184,9 @@ function TaskHead({ t }: { t: TaskView }) {
         <TonePill tone={info.tone} live={t.state === 'running'}>
           {info.label}
         </TonePill>
-        {t.forYou ? <span className={p.muted}>For you</span> : null}
+        {t.forYou ? <span className={p.muted}>{tr('plans.d.forYou')}</span> : null}
       </div>
-      {info.sub && t.pulse ? <p className={p.detailsStep}>{t.pulse.kind === 'working' || t.pulse.kind === 'command' ? `Now: ${info.sub}` : info.sub}</p> : t.step && t.state === 'running' ? <p className={p.detailsStep}>Now: {t.step}</p> : null}
+      {info.sub && t.pulse ? <p className={p.detailsStep}>{t.pulse.kind === 'working' || t.pulse.kind === 'command' ? tr('plans.d.now', { what: info.sub }) : info.sub}</p> : t.step && t.state === 'running' ? <p className={p.detailsStep}>{tr('plans.d.now', { what: t.step })}</p> : null}
       {t.waiting?.length ? (
         <p className={p.detailsWaiting}>
           <WaitingLine waiting={t.waiting} each />
@@ -196,6 +206,7 @@ function TaskDetails({ view, t, canStart }: { view: PlanView; t: TaskView; canSt
   const checks: readonly Criterion[] = onBoard.length ? onBoard : t.task.acceptance.map((text) => ({ text, state: 'open' as const }));
   const startWith = useStartWith();
   const mine = useMyAgent();
+  const tr = useT();
   // Its own agent, else the plan's: who Start uses. The ▾ (BLG-506): another, this start only.
   const own = t.issue?.agent ?? view.plan.agent;
   const startIt = (agent?: AgentRef): void => void act(() => api.startTask(view.plan.id, t.task.id, agent));
@@ -205,42 +216,42 @@ function TaskDetails({ view, t, canStart }: { view: PlanView; t: TaskView; canSt
       <div className={p.detailsActions}>
         {canStart && t.forYou ? (
           <Button size="small" variant="primary" icon="hand" onClick={() => openDecision()}>
-            Decide…
+            {tr('plans.d.decide')}
           </Button>
         ) : canStart ? (
-          <SplitButton label="Start with another agent" items={startWith(own, (a) => startIt(a ?? (own ? mine : undefined)))}>
+          <SplitButton label={tr('plans.startWithAnother')} items={startWith(own, (a) => startIt(a ?? (own ? mine : undefined)))}>
             <Button size="small" variant="primary" icon="play" onClick={() => startIt()}>
-              Start
+              {tr('tasks.start')}
             </Button>
           </SplitButton>
         ) : null}
         {canResume ? (
           <Button size="small" variant="primary" icon="play" onClick={() => void act(() => api.resumeTask(view.plan.id, t.task.id))}>
-            Resume
+            {tr('plans.resume')}
           </Button>
         ) : null}
         {t.worktree ? (
           // Its chat, one click away (with its news); its Claude asking you: answering is this click.
           <Button size="small" icon={t.state === 'asking' ? 'chat' : 'branch'} variant={t.state === 'asking' ? 'primary' : 'plain'} onClick={() => openWorktree(t.worktree!)}>
-            {t.state === 'asking' ? 'Answer' : canResume ? 'Open Chat' : 'Open Worktree'}
+            {t.state === 'asking' ? tr('plans.d.answer') : canResume ? tr('plans.d.openChat') : tr('tasks.openWorktree')}
             <TaskChatMark worktree={t.worktree} />
           </Button>
         ) : null}
         {t.issue ? (
           <Button size="small" variant="quiet" onClick={() => openTask(t.issue!.id)}>
-            Open Task
+            {tr('plans.d.openTask')}
           </Button>
         ) : null}
       </div>
       {t.task.goal ? (
         <section className={p.detailsSection}>
-          <h4>Goal</h4>
+          <h4>{tr('plans.d.goal')}</h4>
           <Markdown text={t.task.goal} />
         </section>
       ) : null}
       {checks.length ? (
-        <section className={p.detailsSection} aria-label="Done when">
-          <h4>Done when</h4>
+        <section className={p.detailsSection} aria-label={tr('plans.d.doneWhen')}>
+          <h4>{tr('plans.d.doneWhen')}</h4>
           <ul className={p.checks}>
             {checks.map((c, i) => {
               const explained = c.state === 'deferred' || c.state === 'not_done';
@@ -253,7 +264,7 @@ function TaskDetails({ view, t, canStart }: { view: PlanView; t: TaskView; canSt
                     {c.text}
                     {explained ? (
                       <span className={p.checkReason}>
-                        {c.state === 'deferred' ? 'Deferred' : 'Not done'} · {c.reason}
+                        {c.state === 'deferred' ? tr('plans.d.deferred') : tr('plans.d.notDone')} · {c.reason}
                       </span>
                     ) : null}
                   </span>
@@ -265,7 +276,7 @@ function TaskDetails({ view, t, canStart }: { view: PlanView; t: TaskView; canSt
       ) : null}
       {t.task.blockedBy.length ? (
         <section className={p.detailsSection}>
-          <h4>Waits on</h4>
+          <h4>{tr('plans.d.waitsOn')}</h4>
           <ul className={p.plainList}>
             {t.task.blockedBy.map((b) => {
               const other = all.find((x) => x.task.id === b);
@@ -281,7 +292,7 @@ function TaskDetails({ view, t, canStart }: { view: PlanView; t: TaskView; canSt
       ) : null}
       {t.task.touches?.length ? (
         <section className={p.detailsSection}>
-          <h4>Changes</h4>
+          <h4>{tr('plans.d.changes')}</h4>
           <div className={p.touches}>
             {t.task.touches.map((f) => (
               <code key={f}>{f}</code>
@@ -290,14 +301,14 @@ function TaskDetails({ view, t, canStart }: { view: PlanView; t: TaskView; canSt
         </section>
       ) : null}
       {t.issue && taskProof(t.issue).length ? (
-        <section className={p.detailsSection} aria-label="Proof">
-          <h4>Proof</h4>
+        <section className={p.detailsSection} aria-label={tr('plans.d.proof')}>
+          <h4>{tr('plans.d.proof')}</h4>
           <ProofItems issue={t.issue} readOnly />
         </section>
       ) : null}
       {t.task.context ? (
         <section className={p.detailsSection}>
-          <h4>Context</h4>
+          <h4>{tr('plans.d.context')}</h4>
           <Markdown text={t.task.context} />
         </section>
       ) : null}
@@ -306,18 +317,17 @@ function TaskDetails({ view, t, canStart }: { view: PlanView; t: TaskView; canSt
 }
 
 function GateHead({ m }: { m: MilestoneView }) {
+  const t = useT();
   const info = MILESTONE_STATE[m.state];
   return (
     <>
-      <div className={p.detailsKind}>Milestone {m.index + 1}</div>
+      <div className={p.detailsKind}>{t('plans.d.milestoneN', { n: m.index + 1 })}</div>
       <h3 className={p.detailsTitle}>{m.milestone.title}</h3>
       <div className={p.detailsRow}>
         <TonePill tone={info.tone} live={m.state === 'checking' || m.state === 'running'}>
           {info.label}
         </TonePill>
-        <span className={p.muted}>
-          {m.finished}/{m.total} tasks finished
-        </span>
+        <span className={p.muted}>{t('plans.d.tasksFinished', { finished: m.finished, total: m.total })}</span>
       </div>
     </>
   );
@@ -325,13 +335,14 @@ function GateHead({ m }: { m: MilestoneView }) {
 
 function GateDetails({ plan, m, onPick }: { plan: Plan; m: MilestoneView; onPick: (id: string) => void }) {
   const { api, act, openWorktree } = usePlanActions();
+  const t = useT();
   const check = m.run.check;
   const yours = plan.body && !plan.draft && (m.state === 'gate' || m.state === 'checking' || m.state === 'failed');
   // Its checker's conversation (folded into the plan, off the sidebar): watched live, or read once it said.
   const checker = useCheckerChat(m);
   const openChecker = checker ? (
     <Button size="small" icon="eye" variant={m.state === 'checking' ? 'plain' : 'quiet'} onClick={() => openWorktree(checker)}>
-      {m.state === 'checking' ? 'Watch the Check' : 'Open the Check'}
+      {m.state === 'checking' ? t('plans.watchCheck') : t('plans.d.openCheck')}
       <TaskChatMark worktree={checker} />
     </Button>
   ) : null;
@@ -340,14 +351,14 @@ function GateDetails({ plan, m, onPick }: { plan: Plan; m: MilestoneView; onPick
   return (
     <>
       {m.state === 'merging' ? (
-        <section className={p.detailsSection} aria-label="Merging">
-          <h4>{conflict ? (conflict.stuck ? 'Merge conflict: needs you' : 'Merge conflict: your agent is fixing it') : `Merging into ${plan.branch ?? 'the plan’s branch'}`}</h4>
+        <section className={p.detailsSection} aria-label={t('plans.m.merging')}>
+          <h4>{conflict ? (conflict.stuck ? t('plans.d.conflictStuck') : t('plans.d.conflictFixing')) : t('plans.d.mergingInto', { branch: plan.branch ?? t('plans.thePlansBranch') })}</h4>
           {conflict ? (
             <>
               <p className={p.muted}>
-                Merging {conflict.key ?? conflict.merging} into {plan.branch}. {conflict.stuck ? 'Your agent couldn’t fix it: ask it again, or fix the files yourself in their folder (Beluga commits the merge once no conflict markers are left).' : 'The milestone passes once it’s fixed.'}
+                {t('plans.d.mergingWhatInto', { what: conflict.key ?? conflict.merging, branch: plan.branch ?? '' })} {conflict.stuck ? t('plans.d.conflictStuckBody') : t('plans.d.conflictFixingBody')}
               </p>
-              <ul className={p.plainList} aria-label="Conflicted files">
+              <ul className={p.plainList} aria-label={t('plans.d.conflictedFiles')}>
                 {conflict.files.map((f) => (
                   <li key={f}>
                     <code>{f}</code>
@@ -356,8 +367,8 @@ function GateDetails({ plan, m, onPick }: { plan: Plan; m: MilestoneView; onPick
               </ul>
               <div className={p.detailsActions}>
                 {conflict.stuck ? (
-                  <Button size="small" variant="primary" icon="claude" onClick={() => void act(() => api.retryConflicts(plan.id), 'Your agent is on the conflict again')}>
-                    Ask Claude Again
+                  <Button size="small" variant="primary" icon="claude" onClick={() => void act(() => api.retryConflicts(plan.id), t('plans.d.onConflictAgain'))}>
+                    {t('plans.d.askClaudeAgain')}
                   </Button>
                 ) : null}
                 <Button size="small" icon="folder" onClick={() => void act(() => api.showConflict(plan.id))}>
@@ -366,28 +377,28 @@ function GateDetails({ plan, m, onPick }: { plan: Plan; m: MilestoneView; onPick
               </div>
             </>
           ) : (
-            <p className={p.muted}>Its tasks’ work is going into the plan’s branch now; it passes once that’s in.</p>
+            <p className={p.muted}>{t('plans.d.goingIn')}</p>
           )}
         </section>
       ) : null}
       {failed && !m.run.passedAt && m.state !== 'merging' ? (
-        <section className={p.detailsSection} aria-label="Couldn’t merge">
-          <h4>Couldn’t merge into {plan.branch ?? 'the plan’s branch'}</h4>
+        <section className={p.detailsSection} aria-label={t('plans.d.couldntMerge')}>
+          <h4>{t('plans.d.couldntMergeInto', { branch: plan.branch ?? t('plans.thePlansBranch') })}</h4>
           <p className={p.muted}>{failed.reason}</p>
-          <p className={p.muted}>Fix that, then pass it again: nothing was merged.</p>
+          <p className={p.muted}>{t('plans.d.fixThenPass')}</p>
         </section>
       ) : null}
       {yours ? (
         <div className={p.detailsActions}>
           <Button size="small" variant="primary" icon="check" onClick={() => void act(() => api.pass(plan.id, m.milestone.id))}>
-            {m.state === 'failed' || m.state === 'checking' ? 'Pass Anyway' : failed ? 'Pass Again' : 'Pass Milestone'}
+            {m.state === 'failed' || m.state === 'checking' ? t('plans.passAnyway') : failed ? t('plans.passAgain') : t('plans.passMilestone')}
           </Button>
           <Button size="small" onClick={() => openSheet({ kind: 'plan_send_back', planId: plan.id, milestone: m.milestone.id })}>
-            Not Yet…
+            {t('plans.notYet')}
           </Button>
           {m.state === 'checking' || m.state === 'failed' ? (
             <Button size="small" variant="quiet" onClick={() => void act(() => api.recheck(plan.id, m.milestone.id))}>
-              Check Again
+              {t('plans.checkAgain')}
             </Button>
           ) : null}
           {openChecker}
@@ -399,12 +410,12 @@ function GateDetails({ plan, m, onPick }: { plan: Plan; m: MilestoneView; onPick
       <MilestoneTasks m={m} onPick={onPick} />
       {m.milestone.goal ? (
         <section className={p.detailsSection}>
-          <h4>Goal</h4>
+          <h4>{t('plans.d.goal')}</h4>
           <Markdown text={m.milestone.goal} />
         </section>
       ) : null}
       <section className={p.detailsSection}>
-        <h4>Passes when</h4>
+        <h4>{t('plans.d.passesWhen')}</h4>
         {m.milestone.criteria.length ? (
           <ul className={p.checks}>
             {m.milestone.criteria.map((c) => (
@@ -415,12 +426,12 @@ function GateDetails({ plan, m, onPick }: { plan: Plan; m: MilestoneView; onPick
             ))}
           </ul>
         ) : (
-          <p className={p.muted}>No criteria: you pass it when its tasks are done.</p>
+          <p className={p.muted}>{t('plans.d.noCriteria')}</p>
         )}
       </section>
       {check ? (
         <section className={p.detailsSection}>
-          <h4>{check.verdict === 'pass' ? 'The agent’s check: passes' : 'The agent’s check: not yet'}</h4>
+          <h4>{check.verdict === 'pass' ? t('plans.d.checkPasses') : t('plans.d.checkNotYet')}</h4>
           <Markdown text={check.notes} />
         </section>
       ) : null}
@@ -431,23 +442,24 @@ function GateDetails({ plan, m, onPick }: { plan: Plan; m: MilestoneView; onPick
 /** Its one Claude: what it's doing right now (even between tasks), and its chat a click away. */
 function MilestoneAgentSection({ m }: { m: MilestoneView }) {
   const { openWorktree } = usePlanActions();
+  const tr = useT();
   const now = useClock(m.agentNow?.kind === 'working' || m.agentNow?.kind === 'command');
   const words = milestoneNowWords(m, now);
   if (!m.agent) return null;
   const left = m.tasks.some((t) => t.worktree === m.agent!.worktree && !FINISHED.has(t.state));
   return (
-    <section className={p.detailsSection} aria-label="Its agent">
-      <h4>Its agent</h4>
+    <section className={p.detailsSection} aria-label={tr('plans.d.itsAgent')}>
+      <h4>{tr('plans.d.itsAgent')}</h4>
       <p className={cx(p.agentNowLine, words && p[`tone_${words.tone}`])} data-agent-now={words ? 'live' : 'quiet'}>
         {words ? words.tone === 'claude' ? <LiveDot /> : <Icon name="chat" size={12} /> : null}
         <span>
-          {words ? words.label : left ? 'Not at work right now' : 'Done with its tasks'}
+          {words ? words.label : left ? tr('plans.d.notAtWork') : tr('plans.d.doneWithTasks')}
           {words?.sub ? <span className={p.muted}> · {words.sub}</span> : null}
         </span>
       </p>
       <div className={p.detailsActions}>
         <Button size="small" icon="chat" variant={words?.tone === 'warn' ? 'primary' : 'plain'} onClick={() => openWorktree(m.agent!.worktree)}>
-          {words?.tone === 'warn' ? 'Answer' : 'Open Agent’s Chat'}
+          {words?.tone === 'warn' ? tr('plans.d.answer') : tr('plans.d.openAgentChat')}
           <TaskChatMark worktree={m.agent.worktree} />
         </Button>
       </div>
@@ -457,11 +469,12 @@ function MilestoneAgentSection({ m }: { m: MilestoneView }) {
 
 /** Its tasks in the order its agent does them, each where it stands: click one for its details. */
 function MilestoneTasks({ m, onPick }: { m: MilestoneView; onPick: (id: string) => void }) {
+  const tr = useT();
   const tasks = taskOrder(m);
   if (!tasks.length) return null;
   return (
-    <section className={p.detailsSection} aria-label="Its tasks">
-      <h4>Tasks, in order</h4>
+    <section className={p.detailsSection} aria-label={tr('plans.d.itsTasks')}>
+      <h4>{tr('plans.d.tasksInOrder')}</h4>
       <ul className={p.msTaskList}>
         {tasks.map((t) => (
           <li key={t.task.id}>
@@ -469,7 +482,7 @@ function MilestoneTasks({ m, onPick }: { m: MilestoneView; onPick: (id: string) 
               <TaskStateIcon state={t.state} size={12} />
               {t.issue?.key ? <span className={p.taskKey}>{t.issue.key}</span> : null}
               <span className={p.msTaskTitle}>{t.task.title}</span>
-              <span className={p.msTaskState}>{t.queued ? 'Next up' : taskWords(t, 0).label}</span>
+              <span className={p.msTaskState}>{t.queued ? tr('plans.d.nextUp') : taskWords(t, 0).label}</span>
             </button>
           </li>
         ))}

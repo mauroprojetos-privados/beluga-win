@@ -29,6 +29,7 @@ import k from "./plan-ask.module.css";
 import p from "./plans.module.css";
 import { shortcutKeys } from "../lib/shortcuts.js";
 import { chordLabel } from "../lib/shortcuts-model.js";
+import { useT } from "../lib/i18n.js";
 
 const FOLD = { fold: true };
 const FOLD_QUIET = { fold: true, quietWorking: true };
@@ -67,6 +68,7 @@ export function PlanChat({
   onClose: () => void;
 }) {
   const api = useApi();
+  const t = useT();
   const { client } = useBeluga();
   const actions = useActions();
   // Unsent words and a message that didn't go, per plan chat on its computer (BLG-784).
@@ -211,7 +213,7 @@ export function PlanChat({
       (err: unknown) =>
         client.store.dispatch({
           type: "toast",
-          text: `Couldn't stop the agent: ${errorText(err)}`,
+          text: t("plans.chat.couldntStop", { error: errorText(err) }),
           level: "error",
         }),
     );
@@ -224,7 +226,7 @@ export function PlanChat({
   };
 
   return (
-    <aside className={p.chat} aria-label="Conversation" data-drop-zone>
+    <aside className={p.chat} aria-label={t("plans.chat.conversation")} data-drop-zone>
       {att.dropTarget}
       <header className={p.chatHead}>
         <span className={p.chatTitle}>
@@ -235,20 +237,20 @@ export function PlanChat({
         {busy && !drafting ? (
           <span className={p.chatBusy}>
             <LiveDot />
-            working
+            {t("tasks.m.working")}
           </span>
         ) : null}
         <span className={p.grow} />
         {wsId ? (
           <IconButton
             icon="expand"
-            label="Open the Whole Conversation"
+            label={t("plans.chat.openWhole")}
             onClick={() =>
               actions.run({ type: "open_ws", id: wsId, tab: "chat" })
             }
           />
         ) : null}
-        <IconButton icon="x" label="Hide the Conversation" onClick={onClose} />
+        <IconButton icon="x" label={t("plans.chat.hide")} onClick={onClose} />
       </header>
       <div className={p.chatLog}>
         {/* A narrow pane: what you asked first folds to a few lines, so the conversation reads from the top; while the plan is being written, the line under it is Claude's one status. */}
@@ -261,16 +263,16 @@ export function PlanChat({
                 <Empty
                   icon="chat"
                   mark={<Working />}
-                  title="Loading the conversation…"
+                  title={t("plans.chat.loading")}
                 />
               ) : (
                 <Empty
                   icon="flag"
-                  title="Plan it together"
+                  title={t("plans.chat.together")}
                   detail={
                     draft
-                      ? "Your agent is reading the code and writing the plan. Tell it what to change: the plan on the left updates as it goes."
-                      : "Ask your agent about the plan, or tell it what to change."
+                      ? t("plans.chat.togetherDraft")
+                      : t("plans.chat.togetherAsk")
                   }
                 />
               )
@@ -288,7 +290,7 @@ export function PlanChat({
           }
         >
           <Icon name="alert" size={12} />
-          Your agent asked you something. Answer it in the conversation
+          {t("plans.chat.askedAnswer")}
         </button>
       ) : null}
       <div className={p.chatQueue}>
@@ -303,14 +305,14 @@ export function PlanChat({
         <div className={p.chatFailed} role="alert">
           <Icon name="alert" size={12} />
           <span className={p.chatFailedText}>
-            Your message wasn’t sent: {failed.error}
+            {t("plans.chat.notSent", { error: failed.error })}
           </span>
           <button
             type="button"
             className={p.chatRetry}
             onClick={() => deliver(failed.message)}
           >
-            Retry
+            {t("plans.chat.retry")}
           </button>
         </div>
       ) : null}
@@ -351,12 +353,12 @@ export function PlanChat({
               value={text}
               placeholder={
                 busy
-                  ? "Your agent is working: tell it now, or stop it…"
+                  ? t("plans.chat.phBusy")
                   : draft
-                    ? "Tell your agent what to change…"
-                    : "Ask about the plan, or change it…"
+                    ? t("plans.chat.phDraft")
+                    : t("plans.chat.phAsk")
               }
-              aria-label="Message your agent about the plan"
+              aria-label={t("plans.chat.boxAria")}
               onChange={(e) => setText(e.target.value)}
               onPaste={att.onPaste}
               onKeyDown={(e) => {
@@ -376,13 +378,13 @@ export function PlanChat({
           </div>
           {busy ? (
             <Tip
-              label="Stop the agent here · your queued messages come back to the box"
+              label={t("plans.chat.stopTip")}
               keys={shortcutKeys('conv-stop')}
             >
               <button
                 type="button"
                 className={k.stop}
-                aria-label="Stop the agent"
+                aria-label={t("plans.chat.stop")}
                 onClick={stop}
               >
                 <span className={k.stopMark} />
@@ -392,15 +394,15 @@ export function PlanChat({
           <Tip
             label={
               busy
-                ? `Send now: your agent reads it at its next step, without stopping · ${chordLabel("Alt+Enter")} queues it instead`
-                : "Send"
+                ? t("plans.chat.sendNowTip", { keys: chordLabel("Alt+Enter") })
+                : t("common.send")
             }
             keys="↩"
           >
             <button
               type="button"
               className={p.chatSend}
-              aria-label={busy ? "Send Now" : "Send"}
+              aria-label={busy ? t("plans.chat.sendNow") : t("common.send")}
               disabled={!text.trim() && !att.images.length && !att.files.length}
               onClick={() => send()}
             >
