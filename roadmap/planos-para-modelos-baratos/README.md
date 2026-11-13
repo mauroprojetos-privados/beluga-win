@@ -12,11 +12,11 @@ passos na ordem, respeite "Quando parar" e atualize a sua linha aqui ao terminar
 
 | Plano | O que fica verdade | Fase do roadmap | Prioridade | Esforço | Risco | Depende de | Modelo | Situação |
 |---|---|---|---|---|---|---|---|---|
-| [001](001-preset-por-papel-padrao.md) | "Opus planeja, Sonnet constrói" vale em toda máquina com o Claude | 1 | P1 | S | LOW | — | Sonnet 5.5 | DONE (não commitado; o plano corrigido para esperar `state: 'ready'`) |
-| [002](002-tarefas-para-o-executor.md) | cada tarefa diz como se prova, o que não tocar e quando parar | 2 | P1 | M | LOW | — | Sonnet 5.5 | DONE (não commitado) |
-| [004](004-limite-de-rodadas-de-correcao.md) | uma etapa que reprova várias vezes volta para o planejador | 4 (parte) | P2 | M | MED | 002 | Sonnet 5.5, `high` | DONE (não commitado) |
-| [005](005-parar-com-motivo.md) | o agente da etapa para uma tarefa com motivo, e o planejador a reescreve | 4 (parte) | P2 | L | HIGH | 002 | Sonnet 5.5 `high`, Opus 5.5 se reprovar | DONE (não commitado; `task_stop` classificada `chat_only` para agentes externos, e uma tarefa em andamento volta para To Do ao parar) |
-| [003](003-conferir-mudancas-antes-da-etapa.md) | antes de começar uma etapa, o agente sabe o que mudou desde o plano | 3 | P3 | M | MED | — | Sonnet 5.5, `high` | DONE (não commitado; o git vem de `planGitOf` em produção, não de `deps.git`) |
+| [001](001-preset-por-papel-padrao.md) | "Opus planeja, Sonnet constrói" vale em toda máquina com o Claude | 1 | P1 | S | LOW | — | Sonnet 5.5 | DONE `c392bd4a`; visto num plano real (o plano corrigido para esperar `state: 'ready'`) |
+| [002](002-tarefas-para-o-executor.md) | cada tarefa diz como se prova, o que não tocar e quando parar | 2 | P1 | M | LOW | — | Sonnet 5.5 | DONE `772762ff`; visto num plano real |
+| [004](004-limite-de-rodadas-de-correcao.md) | uma etapa que reprova várias vezes volta para o planejador | 4 (parte) | P2 | M | MED | 002 | Sonnet 5.5, `high` | DONE `772762ff`; só nos testes, ainda não visto num plano real |
+| [005](005-parar-com-motivo.md) | o agente da etapa para uma tarefa com motivo, e o planejador a reescreve | 4 (parte) | P2 | L | HIGH | 002 | Sonnet 5.5 `high`, Opus 5.5 se reprovar | DONE `772762ff`, visto num plano real (`task_stop` classificada `chat_only` para agentes externos, e uma tarefa em andamento volta para To Do ao parar) |
+| [003](003-conferir-mudancas-antes-da-etapa.md) | antes de começar uma etapa, o agente sabe o que mudou desde o plano | 3 | P3 | M | MED | — | Sonnet 5.5, `high` | DONE `772762ff`, visto num plano real (o git vem de `planGitOf` em produção, não de `deps.git`) |
 
 Situações: TODO · IN PROGRESS · DONE · BLOCKED (com o motivo em uma linha) · REJECTED (com o porquê).
 

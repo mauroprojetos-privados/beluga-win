@@ -5,9 +5,9 @@
 > da skill [shadcn/improve](https://github.com/shadcn/improve) (MIT): *o plano é o produto*, escrito
 > para o executor mais fraco possível, com verificação em cada passo e condições de parada.
 
-Status: proposto · escrito contra o commit `bdb82aa2` · atualizado em 2026-11-13
+Status: fases 1 a 4 feitas e vistas num plano real · fase 5 proposta · atualizado em 2026-11-13
 
-As fases 1 a 4 estão detalhadas, prontas para um modelo mais barato executar, em
+As fases 1 a 4 estão detalhadas, e foram executadas por um modelo mais barato, em
 [planos-para-modelos-baratos/](planos-para-modelos-baratos/README.md) (a fase 4 virou dois planos,
 004 e 005).
 
@@ -227,7 +227,31 @@ tabela de achados chega como texto da conversa (sem código, por `stripCode`).
 Dá para executar este próprio roadmap como um plano do Beluga: New Plan com o objetivo "fases 1 a 4
 de `roadmap/planos-para-modelos-baratos.md`", com o Plan head no Opus e os milestones no Sonnet.
 
-## 6. Decisões (registro)
+## 6. O teste real (2026-11-13)
+
+Um plano de verdade no `beluga-win`, com o daemon deste checkout e uma pasta de dados à parte:
+
+| O quê | Resultado |
+|---|---|
+| Fase 1 | Num daemon novo, os papéis vieram sozinhos: o planejador rodou no Opus ("Claude: Opus first", $0,77), o agente da etapa no Sonnet ("Claude: Sonnet first") |
+| Fase 2 | O Opus escreveu a tarefa de 2 pontos com 2 `verify`, 3 `outOfScope`, 2 `stopIf` e um `exemplar`, sem ninguém pedir campo a campo |
+| Fase 3 | Ao lançar a etapa, o aviso "2 file(s) changed outside the plan" disparou com razão (o branch do plano saiu do `main`, sem os commits do dia) |
+| Fase 4 (parar) | Em 37 s o Sonnet chamou `task_stop` com o motivo exato e não mudou nada ($0,30); o Opus achou a causa e propôs reescrever o plano com uma decisão para você ($0,21) |
+| Fase 4 (rodadas) | Não exercitada: nenhuma etapa chegou a ser verificada |
+
+O que ele ensinou:
+
+- **Um plano sempre sai do `main`.** Enquanto a `feat/windows-port` não estiver no `main`, um plano
+  nesta pasta trabalha sobre código mais antigo.
+- **`ready` não garantia o login.** `claude auth status --json` diz `loggedIn: true` mesmo com o
+  login vencido; o primeiro plano falhou com "OAuth session expired and could not be refreshed".
+  Corrigido: `loginExpiresAt` no passado conta como sem login, e uma execução que termina sem login
+  faz o Beluga verificar o Claude de novo (`src/agent/runtime/claude/status.ts`,
+  `src/core/workbench.ts`).
+- **O planejador conferiu antes de planejar**, e corrigiu uma premissa errada do pedido (esvaziar os
+  campos de uma tarefa já funcionava).
+
+## 7. Decisões (registro)
 
 - **O plano é o produto.** O planejador não implementa; quem executa nunca viu a conversa do plano.
 - **Os comandos de verificação não vão para o celular**; ele vê os `stopIf` e quantas verificações há.
