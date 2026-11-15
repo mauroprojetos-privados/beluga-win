@@ -1,7 +1,7 @@
 import { ToolHost } from '../../tool-host.js';
 import { CompletionError, type CompletionRequest } from '../types.js';
 import { type CodexConnect, spawnAppServer } from './app-server.js';
-import type { Model, ThreadItem, ThreadStartResponse, Turn } from './protocol.js';
+import type { Model, ThreadItem, ThreadStartResponse, ThreadTokenUsage, Turn } from './protocol.js';
 import { RUN_FEATURES_OFF, mcpConfig, pickCodexModel } from './runner.js';
 import { sideCallConfinement } from './sandbox.js';
 
@@ -23,7 +23,14 @@ export async function codexComplete(req: CompletionRequest, deps: { readonly con
         return verdict && !verdict.allow ? verdict.reason : undefined;
       })
     : undefined;
-  const conn = await (deps.connect ?? spawnAppServer)({ cwd: req.cwd, ...(deps.bin ? { bin: deps.bin } : {}) });
+  let conn: Awaited<ReturnType<CodexConnect>>;
+  try {
+    conn = await (deps.connect ?? spawnAppServer)({ cwd: req.cwd, ...(deps.bin ? { bin: deps.bin } : {}), ...(req.env ? { env: { ...process.env, ...req.env } } : {}) });
+  } catch (err) {
+    mounted?.close();
+    // Not installed, or it wouldn't start: said, so a delegation can go to the combo's next target.
+    throw new CompletionError('failed', err instanceof Error ? err.message : String(err));
+  }
   const stop = (): void => void conn.proc.kill();
   req.signal?.addEventListener('abort', stop, { once: true });
   try {
@@ -33,6 +40,13 @@ export async function codexComplete(req: CompletionRequest, deps: { readonly con
       rpc.onNotification((method, params) => {
         const item = params.item as ThreadItem | undefined;
         if (method === 'item/completed' && item?.type === 'agentMessage') answer = (item as Extract<ThreadItem, { type: 'agentMessage' }>).text.trim() || answer;
+        // The thread's tokens so far (a delegation's cap and Usage).
+        if (method === 'thread/tokenUsage/updated' && req.onTokens) {
+          const total = (params.tokenUsage as ThreadTokenUsage | undefined)?.total;
+          // Cache reads aside, as Claude's are counted (input + output + cache writes).
+          const n = total ? (total.inputTokens !== undefined || total.outputTokens !== undefined ? Math.max(0, (total.inputTokens ?? 0) - (total.cachedInputTokens ?? 0)) + (total.outputTokens ?? 0) : (total.totalTokens ?? 0)) : 0;
+          if (n > 0) req.onTokens(n);
+        }
         if (method === 'turn/completed') resolve(params.turn as Turn);
       }),
     );
@@ -55,15 +69,22 @@ export async function codexComplete(req: CompletionRequest, deps: { readonly con
     });
     const turn = await Promise.race([done, gone]);
     if (req.signal?.aborted) throw new Error('aborted');
-    if (!turn || turn.status !== 'completed') throw new CompletionError('failed');
+    if (!turn || turn.status !== 'completed') throw new CompletionError('failed', failedWords(turn, conn.stderr()));
     if (!answer) throw new CompletionError('no_answer');
     return answer;
   } catch (err) {
     if (req.signal?.aborted) throw new Error('aborted');
-    throw err instanceof CompletionError ? err : new CompletionError('failed');
+    throw err instanceof CompletionError ? err : new CompletionError('failed', [err instanceof Error ? err.message : String(err), ...conn.stderr().slice(-12)].join('\n').slice(0, 4000));
   } finally {
     req.signal?.removeEventListener('abort', stop);
     mounted?.close();
     await conn.proc.kill();
   }
+}
+
+/** What a failed turn said (its error, Codex's error kind, the last stderr lines): why it couldn't run. */
+function failedWords(turn: Turn | undefined, stderr: readonly string[]): string {
+  const info = turn?.error?.codexErrorInfo;
+  const said = [turn?.error?.message, typeof info === 'string' ? info : undefined, turn ? undefined : 'Codex exited before the turn ended'];
+  return [...said.filter((v): v is string => Boolean(v)), ...stderr.slice(-12)].join('\n').slice(0, 4000);
 }

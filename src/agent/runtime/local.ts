@@ -85,7 +85,12 @@ export function localRuntime(resolve: (value: string | undefined) => LocalTarget
         },
       });
     },
-    complete: (req) => claudeRuntime.complete(req),
+    // A call that names one of your endpoints' models ("ollama/qwen3:8b": a delegation to a local
+    // executor) goes to that endpoint, never to Anthropic; any other is Claude's, as before.
+    complete: (req) => {
+      const target = req.model ? resolve(req.model) : undefined;
+      return claudeRuntime.complete(target ? { ...req, model: target.model, env: { ...req.env, ...endpointEnv(target) } } : req);
+    },
   };
 }
 

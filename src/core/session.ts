@@ -16,7 +16,7 @@ import { canStartFresh, lastSummary } from './context-log.js';
 import os from 'node:os';
 import path from 'node:path';
 import type { AgentBackend, RoomBridge } from '../agent/types.js';
-import type { AgentRuntime, CompletionRequest, RuntimeCapabilities, RuntimeId, RuntimeOptions } from '../agent/runtime/types.js';
+import type { AgentRuntime, Complete, CompletionRequest, RuntimeCapabilities, RuntimeId, RuntimeOptions } from '../agent/runtime/types.js';
 import { guardedBackend } from '../agent/runtime/guard.js';
 import { type SideRoute, routeSideCall, routedBackend } from '../agent/runtime/router.js';
 import { comboForRole, routeOf } from './routing/model.js';
@@ -334,6 +334,18 @@ export class Session {
     const backend = guardedBackend(rt.create({ ...this.opts.runtime.options, bridge: this.bridge }), rt.capabilities);
     this.otherBackends.set(runtime, backend);
     return backend;
+  }
+
+  /**
+   * A runtime's one-shot call, for orchestrator mode's delegations (core/routing/delegate.ts): one
+   * process per call, closed when it answers. A local endpoint's is Claude Code pointed there
+   * (agent/runtime/local.ts). Undefined: not run here (the demo has no runtimes).
+   */
+  completeFor(runtime: string): Complete | undefined {
+    const rt = this.opts.runtime;
+    if (!rt) return undefined;
+    if (runtime === LOCAL_RUNTIME) return rt.runtimes('claude') ? localRuntime((v) => this.local.resolve(v)).complete : undefined;
+    return rt.runtimes(runtime)?.complete;
   }
 
   /** Whether a runtime takes a message into a running turn (undefined: your default agent's). A local model is Claude Code pointed elsewhere. */

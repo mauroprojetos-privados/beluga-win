@@ -31,8 +31,8 @@ export function runToolSuites(input: AgentRunInput, bridge: RoomBridge, shelf: V
     ...(input.dashboardTools ? { beluga_dashboard: createDashboardTools(input.dashboardTools) } : {}),
     // A plan's home conversation gets the plan's tools (core/plans).
     ...(input.planTools ? { beluga_plan: createPlanTools(input.planTools) } : {}),
-    // "Your Mac" gets its own tools (core/assistant).
-    ...(input.macTools ? { beluga_mac: createMacTools(input.macTools) } : {}),
+    // "Your Mac" gets its own tools (core/assistant); orchestrator mode's delegate tool sits beside them (phase 3).
+    ...(input.macTools || input.delegateTools ? { beluga_mac: createMacTools(input.macTools, input.delegateTools) } : {}),
     // Your own runs can drive your phone (core/phone, BLG-150).
     ...(input.phoneTools ? { beluga_phone: createPhoneTools(input.phoneTools) } : {}),
     // Your own runs can look up what was said in calls you were in (core/calls, BLG-715).

@@ -132,7 +132,7 @@ export type OrchestratorState = Pick<RoutingState, 'runtimes' | 'prefs'> & { rea
 const isCategory = (name: string): name is WorkCategory => (WORK_CATEGORIES as readonly string[]).includes(name);
 
 /** "Claude · Haiku": a resolved target in words. */
-const labelOf = (agent: AgentRef, model?: string): string => (model && agent.runtime !== 'local' ? `${agent.label} · ${modelName(model)}` : agent.label);
+export const labelOf = (agent: AgentRef, model?: string): string => (model && agent.runtime !== 'local' ? `${agent.label} · ${modelName(model)}` : agent.label);
 
 /**
  * The orchestrator for a run: the places merged (Settings' block read from `st.prefs.orchestrator`
@@ -179,6 +179,13 @@ export function resolveOrchestrator(st: OrchestratorState, world: RouteWorld, la
 
 /** The executors a Claude run hands to the SDK: Claude ones that can run now. */
 export const claudeExecutors = (o: Pick<ResolvedOrchestrator, 'executors'>): ResolvedExecutor[] => o.executors.filter((e) => e.runtime === 'claude' && !e.why);
+
+/**
+ * The executors on another runtime (phase 3): their combo's target now is Codex, a local endpoint,
+ * OpenCode… The lead hands them a task through the delegate tool (core/routing/delegate.ts), which
+ * goes through the combo again at the time. One whose combo can't run now is left out, as in phase 2.
+ */
+export const delegateExecutors = (o: Pick<ResolvedOrchestrator, 'executors'>): Array<ResolvedExecutor & { readonly combo: string }> => o.executors.filter((e): e is ResolvedExecutor & { readonly combo: string } => e.runtime !== 'claude' && !e.why && e.combo !== undefined);
 
 /** "Opus pensa · 3 executores": the conversation header's words (English; screens translate). */
 export function orchestratorWords(o: ResolvedOrchestrator): string | undefined {

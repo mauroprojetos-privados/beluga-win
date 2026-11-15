@@ -1,5 +1,8 @@
 import type { RunExecutor, RunOrchestrator } from './types.js';
 
+/** The tool the lead hands a task to an executor on another runtime with (phase 3; core/routing/delegate.ts). */
+export const DELEGATE_TOOL_NAME = 'mcp__beluga_mac__delegate';
+
 /**
  * Orchestrator mode in a Claude run (roadmap/modo-orquestrador.md, phase 2; docs/routing.md): the
  * executors become the SDK's own sub-agents (`agents`), each on its own model, so the lead hands a
@@ -102,12 +105,19 @@ export function orchestratorEnv(o: RunOrchestrator | undefined): Record<string, 
  */
 export function buildOrchestratorAppend(o: RunOrchestrator | undefined, taken: ReadonlySet<string> = new Set()): string {
   const kept = (o?.executors ?? []).filter((e) => !taken.has(e.name));
-  if (!o || !kept.length) return '';
-  const list = kept.map((e) => `\`${e.name}\` (${e.can === 'read' ? 'reads' : e.can === 'run' ? 'reads and runs checks' : 'reads, runs and edits'})`).join(', ');
+  const others = (o?.delegates ?? []).filter((e) => !taken.has(e.name));
+  if (!o || (!kept.length && !others.length)) return '';
+  const does = (can: RunExecutor['can']): string => (can === 'read' ? 'reads' : can === 'run' ? 'reads and runs checks' : 'reads, runs and edits');
+  const list = kept.map((e) => `\`${e.name}\` (${does(e.can)})`).join(', ');
   const always = o.delegate === 'always' ? ' Broad searches (Grep/Glob across the project) and test or typecheck runs are refused to you here: send them to an executor.' : '';
+  const via = kept.length ? `your executors: ${list}. Use the Agent tool with one of these names.` : 'your executors, below.';
+  // Phase 3: executors on other models, reached through Beluga's delegate tool (one call, one answer).
+  const delegated = others.length
+    ? `\n- Executors on other models: ${others.map((e) => `\`${e.name}\` (${e.label}, ${does(e.can)})`).join(', ')}. Hand one a task with ${DELEGATE_TOOL_NAME} (executor, task, paths); it works in this folder, sees only your task, and you get its summary back in the same turn.`
+    : '';
   return (
     '\n\nYou are the orchestrator of this conversation. You think, decide and make the edits; the legwork goes to cheap sub-agents, ' +
-    `your executors: ${list}. Use the Agent tool with one of these names.\n` +
+    `${via}${delegated}\n` +
     '- Delegate searches that sweep many files ("where is X used", "which screens show Y"), long reads you only need summarized, and typecheck or test runs with their diagnosis.\n' +
     '- Do yourself what takes one or two calls, and every edit: delegating those costs more.\n' +
     '- Write the request in full: the executor does not see this conversation. Say the goal, the files or areas, and the shape of the answer.\n' +
@@ -135,13 +145,16 @@ function broad(tool: string, input: Record<string, unknown>): boolean {
 export function delegateRefusal(o: RunOrchestrator | undefined, tool: string, input: Record<string, unknown>, taken: ReadonlySet<string> = new Set()): string | undefined {
   if (o?.delegate !== 'always') return undefined;
   const kept = o.executors.filter((e) => !taken.has(e.name));
+  // Phase 3: with no Claude executor for it, one on another model (through the delegate tool).
+  const others = (o.delegates ?? []).filter((e) => !taken.has(e.name));
+  const how = (e: RunExecutor): string => (others.includes(e as (typeof others)[number]) ? `with ${DELEGATE_TOOL_NAME}` : 'with the Agent tool');
   if ((tool === 'Grep' || tool === 'Glob') && broad(tool, input)) {
-    const to = kept.find((e) => e.name === 'explore') ?? kept.find((e) => e.can === 'read');
-    if (to) return `Orchestrator mode: broad searches go to an executor. Hand this to \`${to.name}\` with the Agent tool (say what you are looking for and the answer you need), or search one folder or file yourself.`;
+    const to = kept.find((e) => e.name === 'explore') ?? kept.find((e) => e.can === 'read') ?? others.find((e) => e.can === 'read') ?? others[0];
+    if (to) return `Orchestrator mode: broad searches go to an executor. Hand this to \`${to.name}\` ${how(to)} (say what you are looking for and the answer you need), or search one folder or file yourself.`;
   }
   if (tool === 'Bash' && typeof input.command === 'string' && CHECK_RUN.test(input.command)) {
-    const to = kept.find((e) => e.name === 'test') ?? kept.find((e) => e.can === 'run' || e.can === 'edit');
-    if (to) return `Orchestrator mode: tests and typechecks go to an executor. Hand this to \`${to.name}\` with the Agent tool (the command, and that you want the failures diagnosed with file:line).`;
+    const to = kept.find((e) => e.name === 'test') ?? kept.find((e) => e.can === 'run' || e.can === 'edit') ?? others.find((e) => e.can === 'run' || e.can === 'edit');
+    if (to) return `Orchestrator mode: tests and typechecks go to an executor. Hand this to \`${to.name}\` ${how(to)} (the command, and that you want the failures diagnosed with file:line).`;
   }
   return undefined;
 }

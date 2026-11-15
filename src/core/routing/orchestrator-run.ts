@@ -4,7 +4,7 @@ import type { RunOrchestrator } from '../../agent/types.js';
 import { readProjectFile } from '../../workspaces/scripts.js';
 import { parseBotFile } from '../bots/schema.js';
 import type { RouteWorld } from './model.js';
-import { type OrchestratorBlock, type OrchestratorState, type ResolvedOrchestrator, claudeExecutors, resolveOrchestrator } from './orchestrator.js';
+import { type OrchestratorBlock, type OrchestratorState, type ResolvedOrchestrator, claudeExecutors, delegateExecutors, resolveOrchestrator } from './orchestrator.js';
 
 /**
  * Orchestrator mode for one run, from the places it can be set (Settings, the project's beluga.json,
@@ -68,11 +68,19 @@ export function orchestratorAt(st: OrchestratorState, world: RouteWorld, where: 
   });
 }
 
-/** What a Claude run gets: its Claude executors that can run now, less the names the bot's own agents take. Undefined: off, or none left. */
+/**
+ * What a Claude run gets: its Claude executors that can run now (the SDK's sub-agents) and those on
+ * other runtimes (the delegate tool, phase 3), less the names the bot's own agents take. Undefined:
+ * off, or none left.
+ */
 export function runOrchestrator(o: ResolvedOrchestrator, taken: ReadonlySet<string> = new Set()): RunOrchestrator | undefined {
   if (!o.on) return undefined;
   const executors = claudeExecutors(o)
     .filter((e) => !taken.has(e.name))
     .map((e) => ({ name: e.name, can: e.can, ...(e.model ? { model: e.model } : {}), ...(e.description ? { description: e.description } : {}) }));
-  return executors.length ? { executors, delegate: o.delegate } : undefined;
+  const delegates = delegateExecutors(o)
+    .filter((e) => !taken.has(e.name))
+    .map((e) => ({ name: e.name, can: e.can, combo: e.combo, runtime: e.runtime, label: e.label, ...(e.model ? { model: e.model } : {}), ...(e.description ? { description: e.description } : {}) }));
+  if (!executors.length && !delegates.length) return undefined;
+  return { executors, delegate: o.delegate, ...(delegates.length ? { delegates } : {}) };
 }

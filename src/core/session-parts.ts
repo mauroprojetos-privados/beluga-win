@@ -210,6 +210,7 @@ export function createSessionParts(session: Session, opts: SessionOptions): Sess
       agents: () => opts.client.currentProfile.agents ?? [],
       runsAgent: (agent) => session.runsAgent(agent),
       backendFor: (runtime) => session.backendFor(runtime),
+      completeFor: (runtime) => session.completeFor(runtime),
       shares: opts.shares,
       sharing,
       people,

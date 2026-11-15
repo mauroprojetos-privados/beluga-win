@@ -1,6 +1,7 @@
 import { tool, toolSuite } from './tool-kit.js';
 import { z } from 'zod';
-import type { MacTools } from './types.js';
+import type { DelegateTools, MacTools } from './types.js';
+import { delegateToolDef } from './delegate-tool.js';
 
 /**
  * "Your Mac" (BLG-47, core/assistant): the tools of the assistant conversation you talk to from
@@ -143,6 +144,7 @@ function dispatchTool(dispatch: NonNullable<MacTools['dispatchPlan']>) {
   );
 }
 
-export function createMacTools(mac: MacTools) {
-  return toolSuite({ name: 'beluga_mac', version: '0.1.0', tools: createMacToolDefs(mac) });
+/** The `beluga_mac` server: Your Mac's tools when the run is Your Mac's (or a bot's), and orchestrator mode's `delegate` when it has executors on other models. */
+export function createMacTools(mac: MacTools | undefined, delegate?: DelegateTools) {
+  return toolSuite({ name: 'beluga_mac', version: '0.1.0', tools: [...(mac ? createMacToolDefs(mac) : []), ...(delegate?.executors.length ? [delegateToolDef(delegate)] : [])] });
 }
