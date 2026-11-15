@@ -227,6 +227,9 @@ export const PhoneCalls = {
   'bots.deleteChat': entry('bots.deleteChat', done),
   // Your stack (docs/stack.md): its Needs You card's Check Again (the view comes back in Home's needs).
   'stack.check': entry('stack.check', done),
+  // Auto-compact (docs/compaction.md): Needs You's one-time question, and Start Fresh From the Summary.
+  'session.chooseAutoCompact': entry('session.chooseAutoCompact', done),
+  'session.freshFromSummary': entry('session.freshFromSummary', done),
 } as const;
 
 export type PhoneMethod = keyof typeof PhoneCalls;

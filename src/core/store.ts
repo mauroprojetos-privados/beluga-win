@@ -31,7 +31,7 @@ import { type PlansAction, type PlansSlice, initialPlans, isPlanHome, reducePlan
 import { type DialoguesAction, type DialoguesSlice, initialDialogues, reduceDialogues } from './dialogues/model.js';
 import { type TeamAction, type TeamSlice, initialTeam, reduceTeam } from './team/model.js';
 import { type CompactMark, type ContextInfo, applyContextEvent, parseContextEvent } from './context-log.js';
-import { AUTO_COMPACT_DEFAULT } from '../shared/context-usage.js';
+import { AUTO_COMPACT_DEFAULT, type AutoCompactAt } from '../shared/context-usage.js';
 import { PARALLEL_RUNS_DEFAULT, type SlotWait } from '../shared/run-slots.js';
 import { CHAT_LIMIT_DEFAULT } from '../shared/chat-limit.js';
 import { THREAD_LIMITS_DEFAULT, type ThreadLimits } from '../shared/threads.js';
@@ -355,7 +355,10 @@ export interface Prefs {
   readonly contextMeter: boolean;
   /** Compact a conversation on its own when its context passes `autoCompactAt` percent. */
   readonly autoCompact: boolean;
-  readonly autoCompactAt: number;
+  /** Percent of the window, or `{ tokens, pct? }`: whichever comes first (shared/context-usage.ts). */
+  readonly autoCompactAt: AutoCompactAt;
+  /** You chose auto-compact yourself (Settings, or the Needs You card that asks once). */
+  readonly autoCompactChosen?: boolean;
   /** After your usage limit resets, the agent that stopped on it continues: off everywhere, in some chats, or this session (shared/auto-continue.ts). */
   readonly autoContinue: boolean;
   readonly autoContinueOff: readonly string[];
@@ -836,7 +839,7 @@ export const DEFAULT_PREFS: Prefs = {
 
 /** The preference fields out of saved settings. */
 export function prefsFrom(settings: Partial<Settings>): Prefs {
-  const picked = Object.fromEntries(Object.keys(DEFAULT_PREFS).concat(['model', 'effort', 'defaultAgent', 'projectAgents', 'combos', 'difficultyCombos', 'roleCombos', 'categoryCombos', 'savingsBaseline', 'shell', 'earningsCurrency', 'commitLanguages']).filter((k) => settings[k as keyof Settings] !== undefined).map((k) => [k, settings[k as keyof Settings]]));
+  const picked = Object.fromEntries(Object.keys(DEFAULT_PREFS).concat(['model', 'effort', 'defaultAgent', 'projectAgents', 'combos', 'difficultyCombos', 'roleCombos', 'categoryCombos', 'savingsBaseline', 'shell', 'earningsCurrency', 'commitLanguages', 'autoCompactChosen']).filter((k) => settings[k as keyof Settings] !== undefined).map((k) => [k, settings[k as keyof Settings]]));
   return { ...DEFAULT_PREFS, ...picked };
 }
 

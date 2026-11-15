@@ -1,16 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
   AUTO_COMPACT_DEFAULT,
+  AUTO_COMPACT_TOKENS_DEFAULT,
   COMPACT_INSTRUCTIONS,
   autoCompactDue,
   breakdownFrom,
   clampThreshold,
   compactEnv,
+  compactLimit,
   contextPct,
   contextTokens,
   contextTone,
   contextWindowFor,
   formatTokenCount,
+  thresholdPct,
+  thresholdTokens,
   windowOfRun,
 } from '../src/shared/context-usage.js';
 import { Settings } from '../src/shared/settings-schema.js';
@@ -85,10 +89,34 @@ describe('auto-compact threshold', () => {
     expect(autoCompactDue({ on: true, at: 10, info: info(71) })).toBe(true);
   });
 
-  it('tells Claude Code’s own auto-compact the same threshold (nothing when off)', () => {
-    expect(compactEnv(true, 80)).toEqual({ CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '80' });
-    expect(compactEnv(true, 120)).toEqual({ CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '95' });
+  it('tells Claude Code’s own auto-compact the same threshold: the window in tokens and the percent of it (nothing when off)', () => {
+    // 200k window: the percent alone (the window is the model's).
+    expect(compactEnv(true, 80)).toEqual({ CLAUDE_CODE_AUTO_COMPACT_WINDOW: '200000', CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '80' });
+    expect(compactEnv(true, 120)).toEqual({ CLAUDE_CODE_AUTO_COMPACT_WINDOW: '200000', CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '95' });
     expect(compactEnv(false, 80)).toEqual({});
+    // 1M window: 160k by default, so 85% of a 188,236-token window (Claude Code caps it at the model's).
+    const env = compactEnv(true, 85, 1_000_000);
+    expect(env.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE).toBe('85');
+    expect(Number(env.CLAUDE_CODE_AUTO_COMPACT_WINDOW)).toBe(188_236);
+    expect(Math.floor((Number(env.CLAUDE_CODE_AUTO_COMPACT_WINDOW) * 85) / 100)).toBe(160_000);
+    // Tokens you set, on a 200k window: whichever comes first (100k before 85% of 200k).
+    expect(compactEnv(true, { tokens: 100_000 }, 200_000)).toEqual({ CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(Math.ceil(100_000 / 0.85)), CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: '85' });
+  });
+
+  it('compacts at the percent or the tokens, whichever comes first (docs/compaction.md)', () => {
+    // A 1M window: 160k by default, not 85% (850k).
+    expect(compactLimit(85, 1_000_000)).toBe(AUTO_COMPACT_TOKENS_DEFAULT);
+    expect(autoCompactDue({ on: true, at: 85, info: { used: 170_000, window: 1_000_000 } })).toBe(true);
+    expect(autoCompactDue({ on: true, at: 85, info: { used: 150_000, window: 1_000_000 } })).toBe(false);
+    // 200k: the percent (85% = 170k), as before.
+    expect(compactLimit(85, 200_000)).toBe(170_000);
+    expect(thresholdTokens(85, 200_000)).toBeUndefined();
+    // Tokens you set apply to every window, with the percent kept (or the default).
+    expect(compactLimit({ tokens: 300_000 }, 1_000_000)).toBe(300_000);
+    expect(compactLimit({ tokens: 180_000, pct: 75 }, 200_000)).toBe(150_000);
+    expect(thresholdPct({ tokens: 180_000 })).toBe(85);
+    // Out of range tokens are kept inside it.
+    expect(compactLimit({ tokens: 5 }, 1_000_000)).toBe(20_000);
   });
 
   it('is a saved setting: off by default (85% once on), a bad saved value falls back to 85', () => {
@@ -129,5 +157,14 @@ describe('context breakdown', () => {
     expect(breakdownFrom(undefined, 1000)).toBeUndefined();
     expect(breakdownFrom({ categories: [{ name: 'Free space', tokens: 10, kind: 'free' }] }, 1000)).toBeUndefined();
     expect(breakdownFrom({ categories: [{ name: 'Messages', tokens: 900 }], messageBreakdown: { toolResultTokens: 5_000 } }, 0)).toEqual({ conversation: 0, tools: 900, system: 0 });
+  });
+});
+
+describe('the threshold in tokens, as saved', () => {
+  it('accepts `{ tokens, pct? }` beside the percent, and a bad one falls back to 85', () => {
+    expect(Settings.parse({ autoCompactAt: { tokens: 160_000 } }).autoCompactAt).toEqual({ tokens: 160_000 });
+    expect(Settings.parse({ autoCompactAt: { tokens: 120_000, pct: 80 } }).autoCompactAt).toEqual({ tokens: 120_000, pct: 80 });
+    expect(Settings.parse({ autoCompactAt: { tokens: 10 } }).autoCompactAt).toBe(85);
+    expect(prefsFrom(Settings.parse({ autoCompactAt: { tokens: 200_000 }, autoCompactChosen: true }))).toMatchObject({ autoCompactAt: { tokens: 200_000 }, autoCompactChosen: true });
   });
 });

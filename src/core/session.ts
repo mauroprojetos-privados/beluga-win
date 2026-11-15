@@ -12,6 +12,7 @@ import { ASSISTANT_TITLE, isAssistant } from '../shared/assistant.js';
 import { assistantOf } from './assistant/registry.js';
 import { botsOf } from './bots/registry.js';
 import { isBotChannel } from './bots/schema.js';
+import { canStartFresh, lastSummary } from './context-log.js';
 import os from 'node:os';
 import path from 'node:path';
 import type { AgentBackend, RoomBridge } from '../agent/types.js';
@@ -1132,6 +1133,19 @@ export class Session {
     this.toast(channel.startsWith('ws:') || isAssistant(channel) ? t('toasts.session.clearedRemembers') : t('toasts.session.clearedScreen'), 'success');
   }
 
+  /**
+   * A conversation whose summary is still past the compaction threshold (docs/compaction.md): start
+   * a fresh conversation there and hand Claude that summary as its first message. Only where a
+   * conversation can start fresh (a worktree, Your Mac, a bot's chat).
+   */
+  freshFromSummary(channel: string): void {
+    if (!canStartFresh(channel)) return this.toast(t('toasts.session.noFreshHere'), 'warn');
+    const summary = lastSummary(this.store.getState().log, channel);
+    if (!summary) return this.toast(t('toasts.session.noSummary'), 'warn');
+    this.clearChat(channel, { fresh: true });
+    this.submit(`${t('chat.compact.freshPrompt')}\n\n${summary}`, { channel });
+  }
+
   findPeer(name: string): PeerInfo | undefined {
     const lower = name.toLowerCase().replace(/^@/, '');
     return this.store.getState().peers.find((p) => p.name.toLowerCase() === lower);
@@ -1427,7 +1441,9 @@ export class Session {
 
   /** Update a display preference and remember it. */
   /** Change preferences; a null (or undefined) one goes back to its default. */
-  setPrefs(prefs: { readonly [K in keyof Prefs]?: Prefs[K] | null }): void {
+  setPrefs(patch: { readonly [K in keyof Prefs]?: Prefs[K] | null }): void {
+    // Turning auto-compact on or off is your choice: the screens learn it too, so its Needs You card leaves.
+    const prefs = typeof patch.autoCompact === 'boolean' ? { ...patch, autoCompactChosen: true } : patch;
     // Unset travels as null, so every screen clears it too (JSON drops undefined).
     const forScreens = Object.fromEntries(Object.entries(prefs).map(([k, v]) => [k, v === undefined ? null : v]));
     this.store.dispatch({ type: 'prefs', prefs: forScreens });

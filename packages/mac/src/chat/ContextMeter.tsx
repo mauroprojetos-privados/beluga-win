@@ -1,7 +1,7 @@
 import * as Popover from '@radix-ui/react-popover';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { modelLabel, modelOf } from '@beluga/ui/menus.js';
-import { clampThreshold, contextWindowFor, formatTokenCount } from '@beluga/shared/context-usage.js';
+import { compactLimit, contextWindowFor, formatTokenCount } from '@beluga/shared/context-usage.js';
 import { LOCAL_RUNTIME, speedWords } from '@beluga/shared/local-endpoints.js';
 import { cx } from '../components/ui.js';
 import { toast, useApi, useApp, useBeluga } from '../lib/beluga.js';
@@ -116,7 +116,11 @@ function MeterDetails({ channel, model }: { channel: string; model: MeterModel }
   const local = useLocalRun(channel);
   const info = model.info;
   const rows = info ? breakdownRows(info) : [];
-  const at = clampThreshold(prefs.autoCompactAt);
+  // Where it compacts, in tokens (the percent or the tokens, whichever comes first: docs/compaction.md), and where that sits on the bar.
+  const size = info?.window ?? contextWindowFor(picked);
+  const limit = compactLimit(prefs.autoCompactAt, size);
+  const at = Math.round((limit / size) * 100);
+  const limitText = formatTokenCount(limit);
   const t = useT();
   const compact = (): void => {
     api.session.compact(channel).then(
@@ -134,7 +138,7 @@ function MeterDetails({ channel, model }: { channel: string; model: MeterModel }
         <>
           <div className={s.bar} role="img" aria-label={usageLine(info)}>
             {rows.length ? rows.map((r) => <span key={r.key} className={s[`seg_${r.key}`]} style={{ width: `${r.share * 100}%` }} />) : <span className={s.seg_used} style={{ width: `${model.pct}%` }} />}
-            {prefs.autoCompact ? <i className={s.mark} style={{ left: `${at}%` }} title={t('chat.context.autoAt', { at })} /> : null}
+            {prefs.autoCompact ? <i className={s.mark} style={{ left: `${at}%` }} title={t('chat.context.autoAtTokens', { tokens: limitText })} /> : null}
           </div>
           <div className={s.sub} data-context-usage="">
             {usageLine(info)}
@@ -170,7 +174,7 @@ function MeterDetails({ channel, model }: { channel: string; model: MeterModel }
         <dt>{t('chat.context.lastCompacted')}</dt>
         <dd>{model.last ? `${whenText(model.last.ts)} · ${formatTokenCount(model.last.compact.pre ?? 0)} → ${formatTokenCount(model.last.compact.post ?? 0)}` : t('chat.context.notYet')}</dd>
         <dt>{t('chat.context.autoCompact')}</dt>
-        <dd>{prefs.autoCompact ? t('chat.context.at', { at }) : t('common.off')}</dd>
+        <dd data-compact-at={limit}>{prefs.autoCompact ? t('chat.context.atTokens', { tokens: limitText, pct: at }) : t('common.off')}</dd>
       </dl>
       {theirs ? (
         <div className={s.actions}>

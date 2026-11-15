@@ -89,6 +89,13 @@ export const en = {
   // combos
   'daemon.needs.comboOut': 'Nothing in {name} can run now',
   'daemon.needs.tryAgain': 'Try Again',
+  'daemon.needs.autoCompactAsk': 'Beluga compacts long conversations so they don’t use up your plan. Turn it on?',
+  'daemon.needs.autoCompactDetail': 'Past {limit} on a 1M-window model (85% on a 200k one), your agent summarizes its working memory between turns and goes on from the summary. The chat stays on screen. Change it any time in Settings › Context.',
+  'daemon.needs.turnOn': 'Turn On',
+  'daemon.needs.keepOff': 'Keep Off',
+  'daemon.needs.compactStillBig': 'The summary is still big: start a new conversation from it?',
+  'daemon.needs.compactStillBigDetail': 'After compacting, this conversation still holds {used}, past the {limit} threshold. A new conversation that starts from the summary costs less each turn.',
+  'daemon.needs.freshFromSummary': 'Start Fresh',
 } as const satisfies Record<string, Message>;
 
 export const ptBR: { readonly [K in keyof typeof en]?: Message } = {
@@ -165,4 +172,11 @@ export const ptBR: { readonly [K in keyof typeof en]?: Message } = {
 
   'daemon.needs.comboOut': 'Nada em {name} pode rodar agora',
   'daemon.needs.tryAgain': 'Tentar de novo',
+  'daemon.needs.autoCompactAsk': 'O Beluga compacta conversas longas para não gastar o seu plano. Ligar?',
+  'daemon.needs.autoCompactDetail': 'Passando de {limit} num modelo com janela de 1M (85% num de 200k), o seu agente resume a memória de trabalho entre um turno e outro e segue a partir do resumo. O chat continua na tela. Dá para mudar quando quiser em Ajustes › Contexto.',
+  'daemon.needs.turnOn': 'Ligar',
+  'daemon.needs.keepOff': 'Deixar desligado',
+  'daemon.needs.compactStillBig': 'O resumo continua grande: começar uma conversa nova a partir dele?',
+  'daemon.needs.compactStillBigDetail': 'Depois de compactar, esta conversa ainda tem {used}, acima do limiar de {limit}. Uma conversa nova que começa do resumo custa menos a cada turno.',
+  'daemon.needs.freshFromSummary': 'Começar do resumo',
 };

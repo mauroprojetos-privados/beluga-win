@@ -1,4 +1,6 @@
 import { type ContextBreakdown, DEFAULT_CONTEXT_WINDOW, MAX_SUMMARY_CHARS, formatTokenCount } from '../shared/context-usage.js';
+import { isAssistant } from '../shared/assistant.js';
+import { isBotChannel } from './bots/schema.js';
 
 // Context meter updates and compactions, applied to the conversation: the meter's numbers, and a
 // divider in the chat where Claude's working memory was compacted (the messages all stay).
@@ -185,3 +187,12 @@ export function applyContextEvent<L extends { readonly id: string; readonly type
   if (data.key && lastIndex(state.log, channel, (m) => m.key === data.key) >= 0) return { ...state, context, compactions };
   return { ...state, context, compactions, log: append(state.log, item(`${e.id}:compact${data.key ? `:${data.key}` : ''}`, e.ts, mark)) };
 }
+
+/** What the newest finished compaction in the conversation kept (its summary), if it kept one. */
+export function lastSummary<L extends { readonly type: string; readonly channel: string; readonly compact?: CompactMark }>(log: readonly L[], channel: string): string | undefined {
+  const i = lastIndex(log, channel, (m) => m.state === 'done' && Boolean(m.summary));
+  return i < 0 ? undefined : log[i]!.compact!.summary;
+}
+
+/** Conversations that can start over fresh in place (Clear › fresh): a worktree, Your Mac, a bot's chat. */
+export const canStartFresh = (channel: string): boolean => channel.startsWith('ws:') || isAssistant(channel) || isBotChannel(channel);

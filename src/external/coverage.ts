@@ -41,6 +41,8 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'session.copyLastAnswer': 'ui_only',
   'session.copyText': 'ui_only',
   'session.setPrefs': 'gated',
+  // Your own choice, asked once on your Mac's bell and phone: an external agent doesn't make it for you.
+  'session.chooseAutoCompact': { refused: 'Turning auto-compact on or off is your choice, answered on your Mac or your phone.' },
   'session.setPlanMode': 'covered',
   'session.setClaudeSharing': 'gated',
   'session.rename': 'gated',
@@ -58,6 +60,7 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'session.runOnPeerByHand': 'gated',
   'session.stopAgent': { refused: OTHERS_RUNS },
   'session.compact': 'covered',
+  'session.freshFromSummary': 'covered',
   'session.btw': 'covered',
   'session.btwDismiss': 'covered',
   'session.quit': 'gated',

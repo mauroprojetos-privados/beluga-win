@@ -90,6 +90,7 @@ import { ASSISTANT_CHANNEL, ASSISTANT_TITLE, activeAssistantChannel, assistantCh
 import { STEERED_IN, TAKEN_BACK, type SteeredMessage, asSent, steeredMessages, steerWaiting } from '../shared/claude-notices.js';
 import { slotWaitLine } from '../shared/run-slots.js';
 import type { DocKey } from './files.js';
+import { compactLimit } from '../shared/context-usage.js';
 
 /** Words for a turn: code taken out (strip.ts), math typeset (math-svg.ts). */
 const proseOf = (markdown: string) => withMath(stripCode(markdown));
@@ -806,7 +807,16 @@ export function convView(state: DomainState, ctx: ViewContext, topic: Topic): Co
     ...tagsOf(state, channel),
     ...terminalOf(state, channel),
     ...(reactableChannel(channel) ? { quick: quickRow(state) } : {}),
+    ...contextOf(state, channel),
   };
+}
+
+/** How full the conversation's context is, and where it compacts in tokens (docs/compaction.md); none before it was measured. */
+function contextOf(state: DomainState, channel: string): Pick<ConvView, 'context'> {
+  const c = state.context[channel];
+  if (!c || !(c.window > 0)) return {};
+  const used = Math.max(0, Math.round(c.used));
+  return { context: { used, window: Math.round(c.window), ...(state.prefs.autoCompact ? { compactAt: compactLimit(state.prefs.autoCompactAt, c.window) } : {}), ...(c.compacting ? { compacting: true } : {}) } };
 }
 
 /** The Mac's terminal view drives this conversation (BLG-534): who, so the phone can say so and take it back. */

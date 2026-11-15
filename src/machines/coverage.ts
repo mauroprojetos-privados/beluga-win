@@ -65,6 +65,7 @@ export const MACHINE: Record<Method, MachineSide> = {
   'session.copyLastAnswer': 'drive',
   'session.copyText': 'drive',
   'session.setPrefs': 'drive',
+  'session.chooseAutoCompact': 'drive',
   'session.setPlanMode': 'drive',
   'session.setClaudeSharing': 'drive',
   'session.rename': 'drive',
@@ -83,6 +84,7 @@ export const MACHINE: Record<Method, MachineSide> = {
   'session.runOnPeerByHand': 'drive',
   'session.stopAgent': 'drive',
   'session.compact': 'drive',
+  'session.freshFromSummary': 'drive',
   'session.btw': 'drive',
   'session.btwDismiss': 'drive',
   // Refused: quitting it would cut every screen off, yours included.
