@@ -5,6 +5,7 @@ import { SCRATCH_DIR } from '../shared/scratch-dir.js';
 import { dialogueHeader } from '../core/dialogues/view.js';
 import { agentPicker, pickedAgent } from '../shared/agent-picker.js';
 import { runRouteOf } from '../core/routing/model.js';
+import { type BudgetView as CoreBudget, budgetView, dayBudgets } from '../core/budget/model.js';
 import { taskKindLine } from '../core/routing/outcomes.js';
 import { roomAgentTags } from '../shared/agent-tags.js';
 import { type Approval, type DomainState, type LogItem, type SubAgent, isRunning } from '../core/store.js';
@@ -43,6 +44,8 @@ import { threadNesting } from '../ui/thread-tree.js';
 import { providerCards } from '../ui/usage-cards.js';
 import {
   type BotSummary,
+  type BudgetBand,
+  type BudgetLineView,
   type BranchView,
   type ChatMessageView,
   type ChatsView,
@@ -690,6 +693,8 @@ export function homeView(state: DomainState, ctx: ViewContext): HomeView {
     ...(bots.length > 1 || bots[0]?.line || bots[0]?.nextRun !== undefined ? { bots } : {}),
     me: { name: clip(myName(state), 64), peerId: myId(state) },
     usage: usageViews(state.peers.find((p) => p.peerId === state.self?.peerId) ?? state.self, state.prefs.defaultAgent),
+    // 1.57: the day's token budgets (docs/budget.md).
+    ...dayBand(state),
     needsYou: items,
     running: running.slice(0, 20),
     // Outputs live with their conversation now (ConvView `outputs`); Home only hints (`fresh`).
@@ -806,7 +811,30 @@ export function convView(state: DomainState, ctx: ViewContext, topic: Topic): Co
     ...tagsOf(state, channel),
     ...terminalOf(state, channel),
     ...(reactableChannel(channel) ? { quick: quickRow(state) } : {}),
+    // 1.57: its token budgets (docs/budget.md), only for your own conversations.
+    ...(conv?.mine ? convBand(state, channel) : {}),
   };
+}
+
+/** A budget line for the phone (BudgetLineView). */
+const lineView = (l: CoreBudget['lines'][number]): BudgetLineView => ({ scope: l.scope, used: Math.round(l.used), limit: Math.round(l.limit), pct: Math.max(0, Math.round(l.pct)), level: l.level, ...(l.name ? { name: clip(l.name, 100) } : {}) });
+
+const bandPlan = (plan: { readonly pct: number; readonly resetsAt?: number } | undefined): Pick<BudgetBand, 'plan'> => (plan ? { plan: { pct: Math.max(0, Math.min(100, plan.pct)), ...(plan.resetsAt !== undefined ? { resetsAt: Math.round(plan.resetsAt) } : {}) } } : {});
+
+/** A conversation's budgets (docs/budget.md, core/budget/model.ts): none set and the plan's window far off, nothing. */
+function convBand(state: DomainState, channel: string): Pick<ConvView, 'budget'> {
+  const v = budgetView(state, channel, Date.now());
+  if (!v) return {};
+  return { budget: { lines: v.lines.slice(0, 40).map(lineView), near: v.near, level: v.level, ...(v.cheaper ? { cheaper: true } : {}), ...bandPlan(v.plan) } };
+}
+
+/** The day's budgets for Home: yours, each project's and bot's that has one; none and the plan's window far off, nothing. */
+function dayBand(state: DomainState): Pick<HomeView, 'budget'> {
+  const d = dayBudgets(state, Date.now());
+  const plan = d.plan && d.plan.level !== 'ok' ? d.plan : undefined;
+  if (!d.lines.length && !plan) return {};
+  const level = d.lines.some((l) => l.level === 'over') ? 'over' : d.lines.some((l) => l.level === 'near') ? 'near' : 'ok';
+  return { budget: { lines: d.lines.slice(0, 40).map(lineView), ...(d.yours ? { near: d.yours.near } : {}), level, spent: Math.round(d.spent), ...bandPlan(plan) } };
 }
 
 /** The Mac's terminal view drives this conversation (BLG-534): who, so the phone can say so and take it back. */

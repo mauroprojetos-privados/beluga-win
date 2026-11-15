@@ -120,6 +120,12 @@ conversation waits in **Needs You** (`needs-you.ts`, kind `combo`) with the reas
 **Try Again** (`routing.retry`, on the phone too). The card goes away by itself when a target can run
 again; at the reset auto-continue sends the conversation on, as for any limit.
 
+A token budget set to `downgrade` ([budget.md](budget.md)) goes through the same failover: the run
+it stopped is told to continue, and its next run passes the budget's gate on the combo's next target
+that can run (or a cheaper Claude model off a combo). That hand-on goes whatever Continue after the
+limit says; a usage limit's hand-on, and auto-continue, skip a conversation past a budget. At 95% of
+your plan's 5-hour window a combo's run skips that plan's targets before the limit, not after.
+
 ## By how hard a task is, and by kind of work (Phase 3)
 
 The task drafter (`agent/task-drafter.ts`) also says how hard a task looks: `simple`, `normal` or

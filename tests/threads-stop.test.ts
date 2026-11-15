@@ -215,6 +215,8 @@ const session = (t: { session: unknown }): never => t.session as never;
 /** The real host and the real wiring, down to the handler the Mac and the phone call. */
 function real() {
   const store = freshStore();
+  // A family of five runs at once: room for all of them (the default, 4, would queue the fifth).
+  store.dispatch({ type: 'prefs', prefs: { parallelRuns: 10 } });
   const toasts: string[] = [];
   const dir = mkdtempSync(path.join(os.tmpdir(), 'beluga-threads-stop-'));
   const chats = new Map<string, Workspace>();

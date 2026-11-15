@@ -5,6 +5,7 @@ import { Activity, Bot, Camera, ChevronRight, Map as MapIcon, CircleCheck, Circl
 import { AgentList, Breathe, LivePanel, StepList, StepsFold, ToolBadge, TypingDots } from '../../components/Live';
 import { ThreadsSheet, threadsSummary } from '../../components/ThreadsSheet';
 import { BranchBand, MergeBand, MergeSheet } from '../../components/Merge';
+import { BudgetRow } from '../../components/Budget';
 import { ProjectMark } from '../../components/ProjectMark';
 import { openOnMac } from '../../lib/mac';
 import { useRef, useState } from 'react';
@@ -189,6 +190,12 @@ function Conversation() {
             // Where its branch stands (the Mac toolbar's state), unless a merge from here is under way.
             <View style={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 10 }}>
               <BranchBand topic={topic} branch={c.branch} canMerge={can.branchMerge} onMerge={() => setMergeOpen(true)} />
+            </View>
+          ) : null}
+          {/* Its token budget (1.57, docs/budget.md): only once it's near one, or your plan's 5-hour window is. */}
+          {c?.budget && (c.budget.level !== 'ok' || c.budget.plan) ? (
+            <View style={{ paddingHorizontal: 14, paddingBottom: 10, paddingTop: c.merge || c.branch ? 0 : 10 }}>
+              <BudgetRow budget={c.budget} />
             </View>
           ) : null}
           {/* The plan this chat writes and runs (1.15): its milestones and map are a tap away. */}

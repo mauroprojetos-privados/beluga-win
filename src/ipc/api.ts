@@ -6,6 +6,7 @@ import { AUTO_COMPACT_MAX, AUTO_COMPACT_MIN } from '../shared/context-usage.js';
 import { PARALLEL_RUNS_MAX, PARALLEL_RUNS_MIN } from '../shared/run-slots.js';
 import { CHAT_LIMIT_MAX } from '../shared/chat-limit.js';
 import { AUTO_CONTINUE_OFF_MAX } from '../shared/auto-continue.js';
+import { BUDGET_CHOICES_MAX, BudgetConfig } from '../shared/budget.js';
 import { ENV_KEY, MAX_ENV_VALUE, MAX_ENV_VARS } from '../shared/env-vars.js';
 import { MAX_RANGE } from '../shared/text-range.js';
 import { type ArgsRuntime, MAX_AGENT_ARGS, MAX_AGENT_ARG_LENGTH, agentArgsProblem } from '../shared/agent-args.js';
@@ -47,6 +48,7 @@ import { HANDOFF_MODES } from '../shared/agent-handoff.js';
 import { CategoryCombos, Combo, DifficultyCombos, MAX_COMBOS, RoleCombos } from '../core/routing/model.js';
 import { SAVINGS_BASELINES } from '../core/routing/outcomes.js';
 import { ROUTING_API } from './routing-api.js';
+import { BUDGET_API } from './budget-api.js';
 import { BOTS_API } from './bots-api.js';
 
 /**
@@ -127,6 +129,10 @@ export const PrefsPatch = z
     autoContinueOff: z.array(z.string().max(200)).max(AUTO_CONTINUE_OFF_MAX),
     autoContinueSkip: z.number().int().min(0),
     parallelRuns: z.number().int().min(PARALLEL_RUNS_MIN).max(PARALLEL_RUNS_MAX),
+    // Token budgets (shared/budget.ts); null: none.
+    budget: BudgetConfig.nullable(),
+    budgetAllow: z.record(z.string().max(240), z.number().int().min(0)),
+    budgetCheaper: z.array(z.string().max(200)).max(BUDGET_CHOICES_MAX),
     chatLimit: z.number().int().min(0).max(CHAT_LIMIT_MAX),
     agentThreads: bool,
     threadLimits: ThreadLimitsSchema,
@@ -591,6 +597,8 @@ export const API = {
   ...WEB_API,
   // ---- combos: which agents and models a conversation's runs go to, in order (routing-api.ts)
   ...ROUTING_API,
+  // ---- token budgets: per conversation, per day, and answering one's Needs You (budget-api.ts)
+  ...BUDGET_API,
   // ---- bots: Your Mac and the ones you make, each a folder of files; Bot Studio edits them (bots-api.ts)
   ...BOTS_API,
 } as const;

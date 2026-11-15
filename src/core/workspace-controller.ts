@@ -742,6 +742,16 @@ export class WorkspaceController {
   }
 
   /**
+   * A token budget moved this conversation's next run to another runtime (core/budget/guard.ts):
+   * it carries the recent conversation, once. Nothing to carry: nothing.
+   */
+  carryForBudget(channel: string, from: string): void {
+    const ws = this.inChannel(channel);
+    if (!ws || (!ws.sessionId && !ws.forkFromSession)) return;
+    this.deps.manager.setCarry(ws.id, from);
+  }
+
+  /**
    * A message as its run starts: after a quiet switch (BLG-592) the first run carries the recent
    * conversation the new agent can't read, once (without the message itself, `requestId`'s).
    */

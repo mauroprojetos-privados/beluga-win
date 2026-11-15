@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { COMBO_ID, DIFFICULTIES, type Difficulty, DifficultyCombos } from '../routing/model.js';
 import { ASSISTANT_CHANNEL, CHAT_ID } from '../../shared/assistant.js';
 import { TriggerSchema } from '../sentinel/schema.js';
+import { BudgetConfig } from '../../shared/budget.js';
 import type { Trigger } from '../sentinel/model.js';
 
 /**
@@ -140,6 +141,8 @@ export const BotFile = z.object({
   projects: z.array(z.string().min(1).max(200)).max(50).optional(),
   /** What it does on its own: on a schedule or an event (Sentinels' triggers), each with its message. */
   triggers: z.array(BotTrigger).max(MAX_BOT_TRIGGERS).optional(),
+  /** Its token budgets (shared/budget.ts): per conversation, its day, and what happens at one. Yours where unset. */
+  budget: BudgetConfig.optional(),
 });
 export type BotFile = z.infer<typeof BotFile>;
 
@@ -201,7 +204,7 @@ export function parseBotFile(text: string | undefined): ParsedBot {
 
 /** bot.json as Beluga writes it: stable key order, two-space indent, a newline at the end. */
 export function botFileText(bot: BotFile): string {
-  const order: Array<keyof BotFile> = ['version', 'name', 'icon', 'color', 'description', 'combo', 'categories', 'difficulty', 'autonomy', 'projects', 'triggers'];
+  const order: Array<keyof BotFile> = ['version', 'name', 'icon', 'color', 'description', 'combo', 'categories', 'difficulty', 'autonomy', 'projects', 'triggers', 'budget'];
   const out: Record<string, unknown> = {};
   for (const k of order) if (bot[k] !== undefined && !(Array.isArray(bot[k]) && !(bot[k] as unknown[]).length) && !(k === 'categories' && !Object.keys(bot.categories ?? {}).length)) out[k] = bot[k];
   out.version = BOT_FILE_VERSION;
@@ -304,6 +307,8 @@ export interface BotInfo {
   readonly rev: number;
   /** The conversations of work it dispatched (its plans' own and their tasks' worktrees): a Needs You there names it. */
   readonly behind: readonly string[];
+  /** Its token budgets (bot.json "budget"). */
+  readonly budget?: BudgetConfig;
 }
 
 /** The bot behind a conversation: its own chat, or work it dispatched there. */

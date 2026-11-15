@@ -4,12 +4,12 @@ import { clampParallelRuns, slotWaitDetail } from '../src/shared/run-slots.js';
 import { Settings } from '../src/shared/settings-schema.js';
 
 describe('conversations at once', () => {
-  it('defaults to 10, roomy enough that few people meet it', () => {
-    expect(DEFAULT_PREFS.parallelRuns).toBe(10);
-    expect(Settings.parse({}).parallelRuns).toBe(10);
-    expect(Settings.parse({ parallelRuns: 900 }).parallelRuns).toBe(10);
+  it('defaults to 4: ten long conversations at once used a whole plan in hours', () => {
+    expect(DEFAULT_PREFS.parallelRuns).toBe(4);
+    expect(Settings.parse({}).parallelRuns).toBe(4);
+    expect(Settings.parse({ parallelRuns: 900 }).parallelRuns).toBe(4);
     expect(prefsFrom(Settings.parse({ parallelRuns: 3 })).parallelRuns).toBe(3);
-    expect(clampParallelRuns(undefined)).toBe(10);
+    expect(clampParallelRuns(undefined)).toBe(4);
     expect(clampParallelRuns(0)).toBe(1);
   });
 

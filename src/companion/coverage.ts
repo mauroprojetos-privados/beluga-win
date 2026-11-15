@@ -735,6 +735,11 @@ export const PHONE: Record<Method, Side> = {
   // A preset for Settings › Agents › Combos: settings stay the Mac's.
   'routing.useClaudeByKind': 'mac',
 
+  // ---- token budgets (docs/budget.md): how far each has got is the phone's to read, and a budget's
+  // Needs You (Continue, Cheaper, Stop) is an answer; setting budgets is Settings on the Mac (session.setPrefs)
+  'budget.status': 'phone',
+  'budget.answer': 'phone',
+
   // ---- bots (docs/bots.md): seeing them and what they do is the phone's (chatting is session.submit in
   // their conversation); making, editing, knowledge, tools, versions, export and import are Bot Studio's, on the Mac
   'bots.list': 'phone',

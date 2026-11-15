@@ -587,6 +587,14 @@ What notifies (each can be turned off on the phone): **Needs you** (approvals, y
 friends' requests, plan decisions: with Approve / Decline or a reply right on the notification),
 **Done** (a conversation you asked from the phone finished), **Mentions** (friends' chats).
 
+## Token budgets (1.57)
+
+The phone shows your day's token budgets on Home under Usage (`HomeView.budget`), a conversation's
+band under its header once it nears one or your plan's 5-hour window does (`ConvView.budget`), and a
+budget set to ask as a Needs You card (`kind: 'budget'`: Continue, Go On Cheaper, Stop through
+`budget.answer`, both `budget.*` methods `phone`). It never sets a budget: that's Settings on the
+Mac, `beluga.json` and `bot.json` ([budget.md](budget.md)).
+
 ## Using it: the screens
 
 Small screen, thumbs, one hand. Friendly and calm: soft pastels (sky, mint, peach, lavender,

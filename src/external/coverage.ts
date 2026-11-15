@@ -223,6 +223,9 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'routing.retry': { refused: NO_TOOL },
   'routing.usage': { refused: STATS },
   'routing.useClaudeByKind': { refused: NO_TOOL },
+  // Token budgets (docs/budget.md): the person's spending across every project, and their answer at one.
+  'budget.status': { refused: STATS },
+  'budget.answer': { refused: APPROVALS },
   // Bots (docs/bots.md): the person's own orchestrators and their files (secrets among them), set up in Bot Studio.
   'bots.list': { refused: BOTS },
   'bots.status': { refused: BOTS },

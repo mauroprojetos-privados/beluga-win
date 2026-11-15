@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 import { belugaEnvBoth } from '../core/beluga-env.js';
+import { BudgetConfig } from '../shared/budget.js';
 
 /** Commands a project runs in its workspaces: `setup` once per new worktree, `run` on demand. */
 export interface ProjectScripts {
@@ -26,6 +27,8 @@ export interface ResolvedScripts {
   readonly run?: { readonly command: string; readonly source: ScriptSource };
   /** Extra pull request instructions for this project (beluga.json "prPrompt"). */
   readonly prPrompt?: string;
+  /** Token budgets for this project (beluga.json "budget", shared/budget.ts). */
+  readonly budget?: BudgetConfig;
 }
 
 const Command = z.string().trim().min(1).max(2000);
@@ -34,6 +37,8 @@ const Command = z.string().trim().min(1).max(2000);
 export const ProjectFile = z.object({
   scripts: z.object({ setup: Command.optional(), run: Command.optional() }).partial().default({}),
   prPrompt: z.string().max(8000).optional(),
+  /** Token budgets for this project (shared/budget.ts): it can only tighten yours (it comes with the repository). A bad one is left out. */
+  budget: BudgetConfig.optional().catch(undefined),
 });
 export type ProjectFile = z.infer<typeof ProjectFile>;
 
@@ -208,7 +213,7 @@ export function resolveScripts(root: string, yours: ProjectScripts = {}): Resolv
   };
   const setup = yours.skipSetup && !yours.setup ? undefined : pick('setup', detectSetup);
   const run = pick('run', detectRun);
-  return { ...(setup ? { setup } : {}), ...(run ? { run } : {}), ...(file?.prPrompt ? { prPrompt: file.prPrompt } : {}) };
+  return { ...(setup ? { setup } : {}), ...(run ? { run } : {}), ...(file?.prPrompt ? { prPrompt: file.prPrompt } : {}), ...(file?.budget ? { budget: file.budget } : {}) };
 }
 
 /** Write the scripts into the project's beluga.json (or its older klaud.json) so teammates get them too (keeps other fields). */

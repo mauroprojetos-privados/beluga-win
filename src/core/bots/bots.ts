@@ -339,6 +339,7 @@ export class Bots {
         ...(nextRun !== undefined ? { nextRun } : {}),
         ...(status ? { status } : {}),
         behind: this.behindOf(info.id, st),
+        ...(file?.budget ? { budget: file.budget } : {}),
       };
     });
   }

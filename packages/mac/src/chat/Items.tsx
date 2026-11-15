@@ -583,6 +583,9 @@ function TurnCard({
                 {t('chat.items.continue')}
               </Button>
             </div>
+          ) : limited && failure?.kind === 'budget' ? (
+            // A token budget stopped it (docs/budget.md): go on (half the budget again), or go on cheaper.
+            <BudgetActions channel={item.channel} />
           ) : limited && failure?.kind === 'usage_limit' ? (
             <LimitResume channel={item.channel} failure={failure} stoppedAt={item.endTs ?? item.lastAt ?? item.ts} agent={item.agent} onContinue={resume} />
           ) : limited ? (
@@ -666,6 +669,23 @@ function LimitResume({ channel, failure, stoppedAt, agent, onContinue }: { chann
           {t('chat.limit.sendAt', { when })}
         </Button>
       ) : null}
+    </div>
+  );
+}
+
+/** Under a run a token budget stopped (docs/budget.md): Continue (half the budget again) and Go On Cheaper, as its Needs You offers. */
+function BudgetActions({ channel }: { channel: string }) {
+  const { client } = useBeluga();
+  const t = useT();
+  const answer = (choice: 'continue' | 'cheaper'): void => void client.api.budget.answer(channel, choice).catch((err: unknown) => toast(client, err instanceof Error ? err.message : String(err), 'error'));
+  return (
+    <div className={s.limitActions}>
+      <Button size="small" icon="play" onClick={() => answer('continue')} title={t('budget.card.continueTip')}>
+        {t('budget.needs.continue')}
+      </Button>
+      <Button size="small" variant="quiet" onClick={() => answer('cheaper')} title={t('budget.card.cheaperTip')}>
+        {t('budget.needs.cheaper')}
+      </Button>
     </div>
   );
 }

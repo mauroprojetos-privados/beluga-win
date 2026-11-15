@@ -1,0 +1,27 @@
+/* A conversation's token budget, beside its context meter (BudgetMeter.tsx). */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 11px;
+  color: var(--text-3);
+  font-size: 0.84rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: default;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.chip:hover {
+  background: var(--bg-hover);
+  color: var(--text-2);
+}
+.near,
+.near:hover {
+  color: var(--warn);
+}
+.over,
+.over:hover {
+  color: var(--error);
+}

@@ -26,6 +26,7 @@ import { chordLabel } from '../lib/shortcuts-model.js';
 import { cmdReturn, returnName, thisComputer, upFirst, yourComputer } from '../lib/os-words.js';
 import { ModelPicker, myRuntime } from './ModelPicker.js';
 import { ContextMeter } from './ContextMeter.js';
+import { BudgetMeter } from './BudgetMeter.js';
 import { McpChip } from './McpChip.js';
 import { RunsOnLabel, RunsOnPicker } from './RunsOn.js';
 import { sendToComputer, useStartDeps } from '../machines/start-there.js';
@@ -739,6 +740,8 @@ export function Composer({ autoFocus = true }: { autoFocus?: boolean }) {
           <span className={s.flex} />
           {/* Your MCP servers, on the box's right beside how full the context is (BLG-252). */}
           {!shared ? <McpChip /> : null}
+          {/* Its token budget, when one is set (docs/budget.md). */}
+          {channel !== 'draft' && !shared ? <BudgetMeter channel={channel} /> : null}
           {channel !== 'draft' ? <ContextMeter channel={channel} /> : null}
           {/* While you talk, only your voice's control shows: two square buttons side by side stopped Claude by mistake. */}
           {compose.busy && !talking ? (

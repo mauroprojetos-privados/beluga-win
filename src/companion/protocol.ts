@@ -9,7 +9,7 @@ import { z } from 'zod';
  * ignores what it doesn't know. A breaking change bumps the major, and the Mac keeps answering the
  * previous major for a release.
  */
-export const COMPANION_PROTO = { major: 1, minor: 56 } as const;
+export const COMPANION_PROTO = { major: 1, minor: 57 } as const;
 
 /**
  * What came in which minor, for a phone talking to an older Mac: it subscribes to a topic (and
@@ -150,8 +150,11 @@ export const COMPANION_PROTO = { major: 1, minor: 56 } as const;
  * triggers, SINCE.botTriggers). An older Mac sends neither (one chat per bot, no next run); an older phone ignores them.
  * 1.56 (docs/tasks-and-plans.md): a plan task's stop conditions and how many checks prove it (`PlanTaskView.stopIf`,
  * `checks`); an older phone ignores them.
+ * 1.57 (docs/budget.md): token budgets against what they counted: a conversation's (`ConvView.budget`) and
+ * the day's (`HomeView.budget`), and a budget's Needs You (`kind: 'budget'`, Continue / Cheaper / Stop
+ * through `budget.answer`, SINCE.budget). An older Mac sends none; an older phone ignores them and shows the card plainly.
  */
-export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, routing: 52, bots: 53, language: 54, botChats: 55, botTriggers: 55 } as const;
+export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, routing: 52, bots: 53, language: 54, botChats: 55, botTriggers: 55, budget: 57 } as const;
 
 /** One frame's biggest payload, and a file piece. */
 export const MAX_COMPANION_FRAME = 1024 * 1024;
@@ -267,6 +270,31 @@ export const UsageView = z.object({
   signedIn: z.boolean().optional(),
 });
 export type UsageView = z.infer<typeof UsageView>;
+
+/** 1.57: one token budget against what it counted (docs/budget.md): a conversation's, your day's, a project's or a bot's day. */
+export const BudgetLineView = z.object({
+  scope: z.enum(['conversation', 'day', 'project', 'bot']),
+  used: z.number().int().min(0),
+  limit: z.number().int().min(0),
+  pct: z.number().int().min(0),
+  level: z.enum(['ok', 'near', 'over']),
+  /** The project's or the bot's name. */
+  name: z.string().max(100).optional(),
+});
+export type BudgetLineView = z.infer<typeof BudgetLineView>;
+
+/** 1.57: the budgets on a conversation (or on your day), what happens at one, and your plan's 5-hour window when it's near. */
+export const BudgetBand = z.object({
+  lines: z.array(BudgetLineView).max(40),
+  near: z.enum(['downgrade', 'ask', 'stop']).optional(),
+  level: z.enum(['ok', 'near', 'over']),
+  /** Past a budget, it goes on cheaper. */
+  cheaper: z.boolean().optional(),
+  /** What today spent (HomeView's). */
+  spent: z.number().int().min(0).optional(),
+  plan: z.object({ pct: z.number().min(0).max(100), resetsAt: ts.optional() }).optional(),
+});
+export type BudgetBand = z.infer<typeof BudgetBand>;
 
 /**
  * 1.54 (docs/i18n.md): what a text says as a catalog key (src/shared/i18n) and what fills it, beside
@@ -590,6 +618,8 @@ export const HomeView = z.object({
   macChats: z.array(ConvSummary).max(40).optional(),
   /** 1.53: your bots, Your Mac first (docs/bots.md). */
   bots: z.array(BotSummary).max(40).optional(),
+  /** 1.57: your day's token budgets (docs/budget.md); unset: none set and the plan's window isn't near. */
+  budget: BudgetBand.optional(),
   /** 1.3: tasks waiting for your review (Home links to them). */
   review: z.object({ count: z.number().int().min(0), first: z.object({ topic: Topic, key: z.string().max(40), title: z.string().max(300) }).optional() }).optional(),
 });
@@ -756,6 +786,8 @@ export const ConvView = z.object({
   terminal: z.object({ label: z.string().max(80) }).optional(),
   /** 1.41 (BLG-702): your quick reactions, for a reactable turn's long-press (the room's or a workspace's chat). */
   quick: z.array(z.string().min(1).max(32)).max(8).optional(),
+  /** 1.57: its token budgets (docs/budget.md); unset: none set and the plan's window isn't near. */
+  budget: BudgetBand.optional(),
 });
 export type ConvView = z.infer<typeof ConvView>;
 

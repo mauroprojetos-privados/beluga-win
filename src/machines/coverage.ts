@@ -26,6 +26,9 @@ export const MACHINE: Record<Method, MachineSide> = {
   'routing.retry': 'drive',
   'routing.usage': 'drive',
   'routing.useClaudeByKind': 'drive',
+  // ---- token budgets (docs/budget.md): reading them and answering one, as on that computer
+  'budget.status': 'drive',
+  'budget.answer': 'drive',
   // ---- bots (docs/bots.md): that computer's bots, as if you sat at it
   'bots.list': 'drive',
   'bots.status': 'drive',

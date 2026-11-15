@@ -41,6 +41,8 @@ export const SYNCED_SETTINGS = [
   'roleCombos',
   'categoryCombos',
   'savingsBaseline',
+  // Token budgets (docs/budget.md): yours, on every computer.
+  'budget',
   'autoSetup',
   'branchPrefix',
   'contextMeter',
@@ -85,6 +87,9 @@ export const LOCAL_SETTINGS = [
   'threadLimits',
   'autoContinueOff',
   'autoContinueSkip',
+  // What you let go past a budget is per conversation (and day) here, like autoContinueOff.
+  'budgetAllow',
+  'budgetCheaper',
   'autoCompactChosen',
   'policy',
   'people',
@@ -120,6 +125,7 @@ export const SETTING_LABELS: Readonly<Record<SyncedSetting, string>> = {
   roleCombos: 'Combos by role',
   categoryCombos: 'Combos by kind of work',
   savingsBaseline: 'What savings are measured against',
+  budget: 'Token budget',
   autoSetup: 'Run setup in new worktrees',
   branchPrefix: 'Branch prefix',
   contextMeter: 'Context meter',

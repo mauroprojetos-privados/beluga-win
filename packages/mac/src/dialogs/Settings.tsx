@@ -24,6 +24,7 @@ import { EnvironmentSettings } from './EnvironmentSettings.js';
 import { ReportProblemRow } from './ReportProblemRow.js';
 import { ContextSettings } from './ContextSettings.js';
 import { UsageLimitSettings } from './UsageLimitSettings.js';
+import { BudgetSettings } from './BudgetSettings.js';
 import { ParallelSettings } from './ParallelSettings.js';
 import { AgentThreadsSettings, ThreadLimitsSettings } from './AgentThreadsSettings.js';
 import { StackSettings } from './StackSettings.js';
@@ -497,6 +498,7 @@ function AgentPane() {
       </Group>
       <ContextSettings />
       <UsageLimitSettings />
+      <BudgetSettings />
       <ParallelSettings />
       <ChatLimitSettings />
       {p.agentThreads ? <ThreadLimitsSettings /> : null}

@@ -1803,7 +1803,8 @@ export class Workbench {
   /** A run's usage report, added to its workspace. → what it added (tokens and cost), for the run's card; undefined: not a workspace's, or not usage. */
   onUsage(channel: string, json: string): { readonly tokens: number; readonly cost: number } | undefined {
     const id = channel.startsWith('ws:') ? channel.slice(3) : undefined;
-    if (!id) return undefined;
+    // Outside a workspace (a bot's chat, Your Mac's): only the growth, for the run's card and the budgets' ledger (core/budget/store.ts).
+    if (!id) return channel === 'room' ? undefined : this.growthOutside(channel, json);
     try {
       const u = JSON.parse(json) as { input?: number; output?: number; cacheRead?: number; cacheWrite?: number; cost?: number; session?: string; free?: boolean; tps?: number };
       const num = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : 0);
@@ -1816,6 +1817,25 @@ export class Workbench {
       return { tokens: Math.max(0, total(after) - total(before)), cost: Math.max(0, after.cost - (before?.cost ?? 0)) };
     } catch {
       // Not usage we understand.
+      return undefined;
+    }
+  }
+
+  /** The last running totals of each conversation outside a workspace (the reports are per session). */
+  private readonly outsideTotals = new Map<string, { readonly session?: string; readonly tokens: number; readonly cost: number }>();
+
+  /** A usage report outside a workspace → what it added (as WorkspaceManager.addUsage works it out), nothing kept on disk. */
+  private growthOutside(channel: string, json: string): { readonly tokens: number; readonly cost: number } | undefined {
+    try {
+      const u = JSON.parse(json) as { input?: number; output?: number; cacheWrite?: number; cost?: number; session?: string };
+      const num = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : 0);
+      const now = { ...(typeof u.session === 'string' ? { session: u.session } : {}), tokens: num(u.input) + num(u.output) + num(u.cacheWrite), cost: num(u.cost) };
+      const last = this.outsideTotals.get(channel);
+      const continues = now.session !== undefined && last?.session === now.session && now.tokens >= last.tokens && now.cost >= last.cost;
+      this.outsideTotals.set(channel, now);
+      if (this.outsideTotals.size > 400) this.outsideTotals.delete(this.outsideTotals.keys().next().value!);
+      return continues && last ? { tokens: now.tokens - last.tokens, cost: now.cost - last.cost } : { tokens: now.tokens, cost: now.cost };
+    } catch {
       return undefined;
     }
   }

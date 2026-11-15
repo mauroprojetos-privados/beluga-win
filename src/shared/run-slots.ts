@@ -4,7 +4,8 @@ import { t } from './i18n/index.js';
  * How many conversations your Claude works in at once (Settings › Claude › Working at once). A
  * message past the limit waits for one of them to finish, and its card says so (see slotWait).
  */
-export const PARALLEL_RUNS_DEFAULT = 10;
+/** Four (it was ten): ten long conversations at once used a whole plan in hours (roadmap "modo orquestrador", phase 4). */
+export const PARALLEL_RUNS_DEFAULT = 4;
 export const PARALLEL_RUNS_MIN = 1;
 export const PARALLEL_RUNS_MAX = 30;
 
