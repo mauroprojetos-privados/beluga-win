@@ -10,6 +10,8 @@ import { ENV_KEY, MAX_ENV_VALUE, MAX_ENV_VARS } from '../shared/env-vars.js';
 import { MAX_RANGE } from '../shared/text-range.js';
 import { type ArgsRuntime, MAX_AGENT_ARGS, MAX_AGENT_ARG_LENGTH, agentArgsProblem } from '../shared/agent-args.js';
 import { NETWORK_API } from './network-api.js';
+import { SkillList } from '../shared/run-skills.js';
+import { STACK_RULES_MODES } from '../core/stack-store.js';
 import { STRIPE_API } from './stripe-api.js';
 import { REVENUECAT_API } from './revenuecat-api.js';
 import { TRIAGE_API } from './triage-api.js';
@@ -120,6 +122,8 @@ export const PrefsPatch = z
     categoryCombos: CategoryCombos.nullable(),
     // Orchestrator mode's block (core/routing/orchestrator.ts); null: off, back to unset.
     orchestrator: OrchestratorBlock.nullable(),
+    // The skills your runs get (shared/run-skills.ts): exact names, or "all"; null: back to unset (every skill).
+    skills: SkillList.nullable(),
     // What Usage › Combos measures savings against ("everything on Opus"); null: the default.
     savingsBaseline: z.enum(SAVINGS_BASELINES).nullable(),
     autoSetup: bool,
@@ -145,6 +149,8 @@ export const PrefsPatch = z
     scratchFolder: bool,
     stackRepair: bool,
     stackBootstrap: bool,
+    // Where the stack's rules live (core/stack-store.ts); null: back to unset (your global CLAUDE.md).
+    stackRules: z.enum(STACK_RULES_MODES).nullable(),
     subagents: z.enum(['full', 'compact', 'hidden']),
     hiddenButtons: z.array(z.string().max(40)).max(40),
     friendWorktrees: z.enum(['ask', 'off']),

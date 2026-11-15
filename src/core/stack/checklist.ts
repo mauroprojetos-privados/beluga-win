@@ -7,6 +7,7 @@ import {
   type ChecklistPlace,
   type ChecklistWhy,
   type StackCheck,
+  type StackRulesMode,
 } from '../stack-store.js';
 import { type AgentDeps, type AgentFile, STACK_TOOL_FIX, cliOnly, mentionsStack, readAgents, readsOnly, stackless, withModel, withTool } from './agents.js';
 import { STACK_EXCLUDES, vikingParent } from './bootstrap.js';
@@ -41,6 +42,8 @@ export interface ChecklistContext {
   readonly rebuild?: (dir: string, id: ChecklistItemId) => { readonly running?: boolean; readonly failed?: string } | undefined;
   /** A look Beluga takes by itself: nothing that starts Claude Code (`claude mcp list` starts every MCP and plugin). */
   readonly quick?: boolean;
+  /** Where the stack's rules live (Settings › Stack › Stack rules); unset: your global CLAUDE.md. */
+  readonly stackRules?: StackRulesMode;
 }
 
 /** A place to check: a project's main checkout or one of its worktrees. */
@@ -225,7 +228,18 @@ Read less, find more:
 4. **RTK** shrinks shell output by itself (its hook); run commands normally.
 `;
 
-export function claudeMdItem(deps: StackDeps): ChecklistItem {
+/** `text` without the stack's block: its `## Stack` heading up to the next `## ` heading, or the end. */
+export function withoutStackBlock(text: string): string {
+  const start = /^## Stack\b.*$/m.exec(text);
+  if (!start) return text;
+  const after = text.slice(start.index + start[0].length);
+  const next = /^## /m.exec(after);
+  const before = text.slice(0, start.index).replace(/\s+$/, '');
+  const rest = next ? after.slice(next.index) : '';
+  return [before, rest].filter(Boolean).join('\n\n').replace(/\s*$/, '\n');
+}
+
+export function claudeMdItem(deps: StackDeps, rules: StackRulesMode = 'global'): ChecklistItem {
   const dir = claudeDir(deps);
   const text = deps.readFile(P(deps).join(dir, 'CLAUDE.md')) ?? '';
   const broken = [...text.matchAll(/^@(\S+)\s*$/gm)].map((m) => m[1]!).filter((f) => !deps.exists(P(deps).isAbsolute(f) ? f : P(deps).join(dir, expandHome(f, deps))));
@@ -234,6 +248,8 @@ export function claudeMdItem(deps: StackDeps): ChecklistItem {
     const { fix: _none, ...item } = bad('claudeMd', 'fail', 'brokenImport', broken.map((b) => `@${b}`).join(', '));
     return item;
   }
+  // The rules only in the executors' prompts (agent/orchestrator-agents.ts): a block left in yours is paid on every turn.
+  if (rules === 'executors') return /^## Stack\b/m.test(text) ? bad('claudeMd', 'warn', 'inGlobal', '## Stack') : ok('claudeMd');
   const missing = [...(/^## Stack\b/m.test(text) ? [] : ['## Stack']), ...(has(deps, 'token-goat') && !text.includes('token-goat') ? ['token-goat'] : [])];
   return missing.length ? bad('claudeMd', 'warn', 'noBlock', missing.join(', ')) : ok('claudeMd');
 }
@@ -484,7 +500,7 @@ export async function machineChecklist(ctx: ChecklistContext, deps: ChecklistDep
     rtk,
     gitnexus,
     mcps,
-    claudeMdItem(deps),
+    claudeMdItem(deps, ctx.stackRules),
     agentToolsItem(agents),
     agentModelsItem(agents, deps),
     subagentHooksItem(rtk, gitnexus),
@@ -562,6 +578,13 @@ export async function askFix(id: ChecklistItemId, ctx: ChecklistContext, deps: C
     case 'claudeMd': {
       const file = p.join(claudeDir(deps), 'CLAUDE.md');
       const text = deps.readFile(file) ?? '';
+      if (ctx.stackRules === 'executors') {
+        // The rules go to the executors only: the block comes out of yours, kept in the backup.
+        if (!/^## Stack\b/m.test(text)) return { ok: true, changed: [] };
+        backup(file, deps);
+        deps.writeFile(file, withoutStackBlock(text));
+        return { ok: true, changed: [file] };
+      }
       if (/^## Stack\b/m.test(text)) return { ok: false, changed: [], why: 'token-goat: its own setup writes its block' };
       backup(file, deps);
       deps.writeFile(file, `${text}${text && !text.endsWith('\n') ? '\n' : ''}${STACK_RULES_BLOCK}`);

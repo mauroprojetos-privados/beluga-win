@@ -8,6 +8,8 @@ import type { Effort } from '../shared/settings-schema.js';
 import type { StepRecord } from '../shared/steps.js';
 import type { AutoCompactAt } from '../shared/context-usage.js';
 import type { ArgsRuntime } from '../shared/agent-args.js';
+import type { SkillList } from '../shared/run-skills.js';
+import type { StackTool } from '../core/stack-store.js';
 
 /** One executor a run's lead may hand work to (orchestrator mode): its name, what it may do and its model. */
 export interface RunExecutor {
@@ -21,6 +23,16 @@ export interface RunExecutor {
 export interface RunOrchestrator {
   readonly executors: readonly RunExecutor[];
   readonly delegate: 'suggest' | 'always';
+  /** The stack the executors work with (docs/stack.md, phase 2b). Unset: none said, as before. */
+  readonly stack?: RunStack;
+}
+
+/** The stack as the executors get it: the reading tools installed here, and whether its rules go in their prompts. */
+export interface RunStack {
+  /** The stack's tools installed on this computer (Settings › Stack). */
+  readonly tools: readonly StackTool[];
+  /** Settings › Stack › Stack rules is "only the executors": each executor's prompt carries its role's rules, without your CLAUDE.md. */
+  readonly rulesInPrompt: boolean;
 }
 
 /** How far a request may reach on the owner's computer. */
@@ -70,6 +82,8 @@ export interface AgentRunInput {
   readonly contextWindow?: number;
   /** Orchestrator mode (core/routing/orchestrator.ts): the executors this run's lead hands work to. Unset: off, and nothing about the run changes. */
   readonly orchestrator?: RunOrchestrator;
+  /** The skills this run gets (shared/run-skills.ts: Settings, the project's beluga.json, the bot's bot.json). Unset: every skill. Your own runs only. */
+  readonly skills?: SkillList;
   /** A folder (relative to the run's folder, git-ignored) for screenshots and scratch output; the owner watches it live. */
   readonly scratchDir?: string;
   /** Where to run: a workspace folder with its own Claude conversation. Defaults to the room's folder. */

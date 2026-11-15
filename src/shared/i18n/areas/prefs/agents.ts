@@ -234,6 +234,18 @@ export const en = {
   'prefs.launchFlags.codexDetail': 'Before app-server. Beluga still sets each turn’s sandbox.',
   'prefs.launchFlags.ownRuns': '{detail} Your own runs only.',
   'prefs.launchFlags.aria': '{label} launch flags',
+
+  // Skills (dialogs/SkillsSettings.tsx)
+  'prefs.skills.title': 'Skills',
+  'prefs.skills.which': 'Skills your runs get',
+  'prefs.skills.whichDetail': 'Each skill listed costs context on every turn. A project’s beluga.json and a bot’s bot.json can set their own "skills".',
+  'prefs.skills.all': 'Every skill',
+  'prefs.skills.allDetail': 'All your Claude Code has, as before',
+  'prefs.skills.only': 'Only these',
+  'prefs.skills.onlyDetail': 'Their exact names: the folder’s name, or plugin:skill',
+  'prefs.skills.names': 'Names',
+  'prefs.skills.namesDetail': 'Separated by commas or spaces. Empty: no skills. Your own runs only.',
+  'prefs.skills.bad': 'Not a skill’s exact name: {names}',
 } as const satisfies Record<string, Message>;
 
 export const ptBR: { readonly [K in keyof typeof en]?: Message } = {
@@ -466,4 +478,16 @@ export const ptBR: { readonly [K in keyof typeof en]?: Message } = {
   'prefs.launchFlags.codexDetail': 'Antes de app-server. O Beluga ainda define o sandbox de cada turno.',
   'prefs.launchFlags.ownRuns': '{detail} Só nas suas execuções.',
   'prefs.launchFlags.aria': 'Flags de inicialização do {label}',
+
+  // Skills
+  'prefs.skills.title': 'Skills',
+  'prefs.skills.which': 'Skills das suas execuções',
+  'prefs.skills.whichDetail': 'Cada skill listada custa contexto em todo turno. O beluga.json de um projeto e o bot.json de um bot podem definir as suas em "skills".',
+  'prefs.skills.all': 'Todas as skills',
+  'prefs.skills.allDetail': 'Todas as do seu Claude Code, como antes',
+  'prefs.skills.only': 'Só estas',
+  'prefs.skills.onlyDetail': 'Os nomes exatos: o nome da pasta, ou plugin:skill',
+  'prefs.skills.names': 'Nomes',
+  'prefs.skills.namesDetail': 'Separados por vírgula ou espaço. Vazio: nenhuma skill. Só nas suas execuções.',
+  'prefs.skills.bad': 'Não é o nome exato de uma skill: {names}',
 };

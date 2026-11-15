@@ -282,6 +282,50 @@ Settings › Agent › Combos › Orchestrator mode says lead × executors so fa
 (phone: what applies, `words` for a header), `routing.setOrchestrator` and
 `routing.setConversationOrchestrator` (Mac).
 
+**Lean executors (phase 2b).** Each executor gets only what its role needs
+(`agent/orchestrator-agents.ts`):
+
+| Executor | MCP servers (`mcpServers`, by name, shared with the run) | Bash | Your CLAUDE.md |
+|---|---|---|---|
+| `explore` | `gitnexus`, when the run has a server of that name (its tools as `mcp__gitnexus__*`) | only `token-goat symbol …` and `gls symbol …`, when installed (one command, no pipes or redirects) | loaded, unless Stack rules are "only in the executors" |
+| `test` | none | yes (`can: run`) | the same |
+| `docs` | none | no | the same |
+
+With a `tools` list, a sub-agent sees no tool it doesn't name, so the rest of your MCP servers (Figma,
+Linear…) and every skill stay out of the executors' context; none gets `Skill` or preloaded skills.
+The token-goat gate: when token-goat or gls is installed, an executor's `Read` of a file over 1,000
+lines with no `offset` or `limit` is refused with how to read just the symbol. Only executors (their
+hook carries `agent_id` and `agent_type`), never the lead or another sub-agent. Where the stack's
+rules go is in [stack.md › The stack in orchestrator mode](stack.md#the-stack-in-orchestrator-mode).
+
+## Skills per project
+
+Claude Code lists every skill it finds in every turn's context, so a project that uses three of them
+pays for thirty. A run of yours gets the list resolved from, the most specific winning whole (never
+merged):
+
+1. Settings › Agent › Skills (`skills` in settings.json; `session.setPrefs`);
+2. the project's `beluga.json` → `skills` (a worktree's own copy included);
+3. a bot's `bot.json` → `skills` ([bots.md](bots.md)): its own folder's runs, and work handed to it.
+
+```json
+{ "skills": ["frontend-design", "anthropic-skills:docx", "deploy"] }
+```
+
+- A list of **exact names**: the skill's folder name, or `plugin:skill`. The SDK takes nothing else
+  (a wildcard like `docs:*` fails the run), so a list with one is refused where it's read: from a
+  file, the list reads as unset; in Settings, the field says which names aren't one. `[]` is no
+  skills; `"all"` is every skill.
+- A bare name also means the project's own skill of that name, which Beluga brings in as its plugin
+  (`project:deploy`, or `bot:deploy` in a bot's folder; see `agent/runtime/claude/skill-plugins.ts`).
+- Unset everywhere: every skill, as before (`skills: 'all'`).
+- Only your own runs: a friend's or a guest's loads none of your skills either way.
+
+It's a context filter, not a sandbox: an unlisted skill is hidden from the listing and refused by the
+Skill tool, but its files stay readable. `shared/run-skills.ts` (browser-safe) parses and resolves;
+`core/skills-at.ts` reads the files; the run passes the SDK `skills: string[]` (`ownerSettings` and
+`skillOptions` in the runner). Test: `tests/lean-runs.test.ts`.
+
 ## Bots (Phases 6, 6b and 6c)
 
 A bot plans and dispatches with all of the above: its own combo for its conversation, and a map of

@@ -31,6 +31,7 @@ import { StackSettings } from './StackSettings.js';
 import { EngineLocationSettings } from './EngineLocationSettings.js';
 import { ChatLimitSettings } from './ChatLimitSettings.js';
 import { McpSettings } from './McpSettings.js';
+import { SkillsSettings } from './SkillsSettings.js';
 import { ExternalAgentsSettings } from './ExternalAgentsSettings.js';
 import { LaunchFlagsSettings } from './LaunchFlagsSettings.js';
 import { CombosSettings } from './CombosSettings.js';
@@ -479,6 +480,7 @@ function AgentPane() {
       <CombosSettings />
       <LaunchFlagsSettings />
       <McpSettings />
+      <SkillsSettings />
       <div id={LOCAL_MODELS_ID}>
         <LocalModelsSettings />
       </div>

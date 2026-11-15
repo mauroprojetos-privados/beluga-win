@@ -239,6 +239,7 @@ export class StackMonitor {
 
   private context(quick = false): ChecklistContext {
     const cl = this.deps.checklist;
+    const stackRules = this.deps.store.getState().prefs.stackRules;
     return {
       ...(quick ? { quick: true } : {}),
       checks: this.view().checks,
@@ -246,6 +247,7 @@ export class StackMonitor {
       botDirs: cl?.botDirs?.() ?? [],
       docsSentAt: (dir) => this.docs()[dir],
       rebuild: (dir, id) => this.rebuilds.get(rebuildKey(dir, id)),
+      ...(stackRules ? { stackRules } : {}),
     };
   }
 

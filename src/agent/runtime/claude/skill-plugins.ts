@@ -3,6 +3,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameS
 import path from 'node:path';
 import type { Options, SdkPluginConfig } from '@anthropic-ai/claude-agent-sdk';
 import { fillArguments, findSkill } from '../../../core/claude-code/skills.js';
+import { type SkillList, skillsForRun } from '../../../shared/run-skills.js';
 
 /**
  * A project's skills and custom commands on your own runs (BLG-505). Your own runs load your user
@@ -99,17 +100,27 @@ export async function skillPlugins(cwd: string, home: string, root: string): Pro
   // Your own folder as the project (a run in ~): it already loads as your user settings.
   if (path.resolve(home) === project) return [];
   // A bot's folder (docs/bots.md, ~/.beluga only: nobody else writes there) brings its sub-agents too.
-  const beluga = path.dirname(path.resolve(root));
-  const bot = existsSync(path.resolve(cwd, 'bot.json')) && path.resolve(cwd).startsWith(beluga + path.sep);
-  const dir = shadowPlugin(project, bot ? 'bot' : 'project', (entry) => FROM_CLAUDE_DIR.has(entry) || (bot && entry === 'agents'), root);
+  const name = skillPluginName(cwd, root);
+  const bot = name === 'bot';
+  const dir = shadowPlugin(project, name, (entry) => FROM_CLAUDE_DIR.has(entry) || (bot && entry === 'agents'), root);
   return dir ? [{ type: 'local' as const, path: dir, skipMcpDiscovery: true }] : [];
 }
 
-/** What a run's options add for skills: on your own runs every skill found; a friend's or a guest's get none. */
-export async function skillOptions(own: boolean, cwd: string, home: string, root: string): Promise<Pick<Options, 'plugins' | 'skills'>> {
+/** The name Beluga's plugin of a folder's skills goes by: `bot` in a bot's folder, else `project` (its skills are `project:<name>`). */
+export function skillPluginName(cwd: string, root: string): 'bot' | 'project' {
+  const beluga = path.dirname(path.resolve(root));
+  return existsSync(path.resolve(cwd, 'bot.json')) && path.resolve(cwd).startsWith(beluga + path.sep) ? 'bot' : 'project';
+}
+
+/**
+ * What a run's options add for skills: on your own runs the skills `chosen` (shared/run-skills.ts:
+ * Settings, the project, the bot; unset: every skill found), a bare name also meaning the project's
+ * own; a friend's or a guest's get none.
+ */
+export async function skillOptions(own: boolean, cwd: string, home: string, root: string, chosen: SkillList = 'all'): Promise<Pick<Options, 'plugins' | 'skills'>> {
   if (!own) return {};
   const found = await skillPlugins(cwd, home, root);
-  return found.length ? { plugins: found, skills: 'all' } : {};
+  return found.length ? { plugins: found, skills: skillsForRun(chosen, [skillPluginName(cwd, root)]) } : {};
 }
 
 /** A prompt that might name a skill or command: `/name args` (or the / menu's `//name`). */

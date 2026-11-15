@@ -6,7 +6,7 @@ import { Button, Dot } from '../components/ui.js';
 import { useApi, useApp, useBeluga } from '../lib/beluga.js';
 import { openSheet } from '../lib/sheets.js';
 import { say, useT } from '../lib/i18n.js';
-import { Group, Row, Switch } from './settings-controls.js';
+import { Group, Row, Select, Switch } from './settings-controls.js';
 
 /**
  * Settings › Stack (docs/stack.md): the services and tools your agents lean on as the daemon last
@@ -18,6 +18,7 @@ export function StackSettings() {
   const stack = useApp((st) => st.stack);
   const repair = useApp((st) => st.prefs.stackRepair ?? true);
   const bootstrap = useApp((st) => st.prefs.stackBootstrap ?? true);
+  const rules = useApp((st) => st.prefs.stackRules ?? 'global');
   const [error, setError] = useState<string>();
   const checking = stack.checking;
   const check = (): void => {
@@ -57,6 +58,17 @@ export function StackSettings() {
         </Row>
         <Row label={say('Set up new projects')} detail={t('stack.settings.bootstrapDetail')}>
           <Switch label={t('stack.settings.bootstrap')} on={bootstrap} onChange={(v) => void api.session.setPrefs({ stackBootstrap: v })} />
+        </Row>
+        <Row label={t('stack.settings.rules')} detail={rules === 'executors' ? t('stack.settings.rulesExecutorsDetail') : t('stack.settings.rulesGlobalDetail')}>
+          <Select
+            label={t('stack.settings.rules')}
+            value={rules}
+            onChange={(v) => void api.session.setPrefs({ stackRules: v === 'executors' ? 'executors' : null })}
+            options={[
+              { value: 'global', label: t('stack.settings.rulesGlobal') },
+              { value: 'executors', label: t('stack.settings.rulesExecutors') },
+            ]}
+          />
         </Row>
       </Group>
       <ChecklistSection />
