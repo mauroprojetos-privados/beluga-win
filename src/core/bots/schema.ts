@@ -4,6 +4,7 @@ import { OrchestratorBlock } from '../routing/orchestrator.js';
 import { ASSISTANT_CHANNEL, CHAT_ID } from '../../shared/assistant.js';
 import { TriggerSchema } from '../sentinel/schema.js';
 import { BudgetConfig } from '../../shared/budget.js';
+import { SkillList } from '../../shared/run-skills.js';
 import type { Trigger } from '../sentinel/model.js';
 
 /**
@@ -144,6 +145,8 @@ export const BotFile = z.object({
   triggers: z.array(BotTrigger).max(MAX_BOT_TRIGGERS).optional(),
   /** Orchestrator mode in its conversations (core/routing/orchestrator.ts): over Settings' and the project's. Its own .claude/agents/<name>.md wins over an executor of that name. */
   orchestrator: OrchestratorBlock.optional(),
+  /** The skills its runs get (shared/run-skills.ts): over Settings' and the project's. Unset: theirs. */
+  skills: SkillList.optional(),
   /** Its token budgets (shared/budget.ts): per conversation, its day, and what happens at one. Yours where unset. */
   budget: BudgetConfig.optional(),
 });

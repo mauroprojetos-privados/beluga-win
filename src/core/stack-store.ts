@@ -41,6 +41,15 @@ export interface StackSlice {
   readonly stack: StackView;
 }
 
+/**
+ * Where the stack's rules (GitNexus first, token-goat for one symbol, RTK) live: `global`, your
+ * ~/.claude/CLAUDE.md, which every turn of every run loads; `executors`, only the orchestrator's
+ * executors' own prompts (agent/orchestrator-agents.ts), and the checklist offers to take the block
+ * out of your CLAUDE.md (with a backup, on your yes). Settings › Stack › Stack rules.
+ */
+export const STACK_RULES_MODES = ['global', 'executors'] as const;
+export type StackRulesMode = (typeof STACK_RULES_MODES)[number];
+
 export const initialStack: StackSlice = { stack: { checks: [], checking: false } };
 
 export type StackAction = { type: 'stack'; stack: StackView };
@@ -106,6 +115,7 @@ export const CHECKLIST_WHYS = [
   'notRegistered',
   'notAnswering',
   'noBlock',
+  'inGlobal',
   'brokenImport',
   'stale',
   'notBuilt',

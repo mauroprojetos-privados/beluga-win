@@ -276,5 +276,17 @@ modelos diferentes", e vem depois porque precisa do gate de leitura testado.
   texto (com os `@imports`, dentro da pasta, nunca arquivo secreto) às instruções da execução; bots
   ficam de fora porque a persona já vai no brief. Isso responde à dúvida do item 18: as regras do
   projeto não chegavam nem ao principal.
+- **2026-11-15, F2b (parte) e skills por projeto**: medido antes, um "oi" numa conversa nova do ERP
+  custava 41,2k de contexto (sistema ~31,4k), já com o Claude Code do usuário enxugado à mão. Feito:
+  `skills` (lista de nomes exatos ou `"all"`) em Settings › Agente › Skills, `beluga.json` e
+  `bot.json`, o mais específico vence inteiro, sem nada definido fica `'all'` como antes
+  (`shared/run-skills.ts`, `core/skills-at.ts`); executores só com o MCP do papel (`explore` →
+  `gitnexus`, `test`/`docs` nenhum) e, com o token-goat ou o gls instalados, o `explore` roda só
+  `token-goat symbol`/`gls symbol` e nenhum executor lê inteiro um arquivo de mais de 1.000 linhas
+  (gate `PreToolUse`); Settings › Stack › Regras do Stack "só nos executores" põe as regras no
+  `prompt` de cada um, com `omitClaudeMd`, e o item 7 do checklist oferece tirar o bloco do CLAUDE.md
+  global (com backup). Ficou de fora: OpenViking (desligado na máquina), `gls gate` no `test`, a
+  economia por ferramenta em Settings › Stack e o detalhamento do `breakdown` no Usage. Falta medir ao
+  vivo o "oi" com `skills` definido.
 - **Aberto**: ligar o modo por padrão no onboarding ou só por escolha; valor de `compactAt` (160k é
   um palpite, medir na fase 5); se `delegate: "always"` deve recusar ferramentas no principal ou só avisar.

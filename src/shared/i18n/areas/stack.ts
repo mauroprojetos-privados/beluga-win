@@ -75,6 +75,11 @@ export const en = {
   'stack.settings.bootstrapDetail': 'As a project is added or made: git if it has none, GitNexus and graphify index it, OpenViking gets its docs, and a beluga.json and CLAUDE.md where it has none (not committed)',
   'stack.settings.services': 'Services',
   'stack.settings.tools': 'Tools',
+  'stack.settings.rules': 'Stack rules',
+  'stack.settings.rulesGlobal': 'In your global CLAUDE.md',
+  'stack.settings.rulesGlobalDetail': 'Every turn of every run loads them',
+  'stack.settings.rulesExecutors': 'Only in the executors',
+  'stack.settings.rulesExecutorsDetail': 'Orchestrator mode’s executors get their role’s rules; the checklist offers to take the block out of your CLAUDE.md (with a backup)',
 
   // A project's ••• menu
   'stack.menu.setUp': 'Set Up Stack',
@@ -110,6 +115,7 @@ export const en = {
   'stack.why.notRegistered': 'not registered for Claude Code',
   'stack.why.notAnswering': 'registered, but it doesn’t answer',
   'stack.why.noBlock': 'its block is missing from ~/.claude/CLAUDE.md',
+  'stack.why.inGlobal': 'set to go only to the executors, but the block is still in ~/.claude/CLAUDE.md, paid on every turn',
   'stack.why.brokenImport': 'an @import doesn’t resolve',
   'stack.why.stale': 'out of date: agents read whole files again',
   'stack.why.notBuilt': 'never built',
@@ -225,6 +231,11 @@ export const ptBR: { readonly [K in keyof typeof en]?: Message } = {
   'stack.settings.bootstrapDetail': 'Quando um projeto é adicionado ou criado: git se não tiver, GitNexus e graphify indexam, o OpenViking recebe a documentação, e um beluga.json e um CLAUDE.md onde não houver (sem commit)',
   'stack.settings.services': 'Serviços',
   'stack.settings.tools': 'Ferramentas',
+  'stack.settings.rules': 'Regras do Stack',
+  'stack.settings.rulesGlobal': 'No seu CLAUDE.md global',
+  'stack.settings.rulesGlobalDetail': 'Todo turno de toda execução as carrega',
+  'stack.settings.rulesExecutors': 'Só nos executores',
+  'stack.settings.rulesExecutorsDetail': 'Os executores do modo orquestrador recebem as regras do seu papel; o checklist oferece tirar o bloco do seu CLAUDE.md (com cópia de segurança)',
 
   'stack.menu.setUp': 'Preparar a stack',
 
@@ -257,6 +268,7 @@ export const ptBR: { readonly [K in keyof typeof en]?: Message } = {
   'stack.why.notRegistered': 'não registrado no Claude Code',
   'stack.why.notAnswering': 'registrado, mas não responde',
   'stack.why.noBlock': 'falta o bloco dele no ~/.claude/CLAUDE.md',
+  'stack.why.inGlobal': 'configuradas para ir só aos executores, mas o bloco ainda está no ~/.claude/CLAUDE.md, pago em todo turno',
   'stack.why.brokenImport': 'um @import não resolve',
   'stack.why.stale': 'desatualizado: os agentes voltam a ler arquivos inteiros',
   'stack.why.notBuilt': 'nunca construído',

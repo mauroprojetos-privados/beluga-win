@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { belugaEnvBoth } from '../core/beluga-env.js';
 import { SavedOrchestrator } from '../core/routing/orchestrator.js';
 import { BudgetConfig } from '../shared/budget.js';
+import { SavedSkills } from '../shared/run-skills.js';
 
 /** Commands a project runs in its workspaces: `setup` once per new worktree, `run` on demand. */
 export interface ProjectScripts {
@@ -40,6 +41,8 @@ export const ProjectFile = z.object({
   prPrompt: z.string().max(8000).optional(),
   /** Orchestrator mode for this project (core/routing/orchestrator.ts): over Settings', under a bot's and the conversation's. A block that doesn't fit is ignored alone. */
   orchestrator: SavedOrchestrator,
+  /** The skills runs in this project get (shared/run-skills.ts): over Settings', under a bot's. A list that doesn't fit is ignored alone. */
+  skills: SavedSkills,
   /** Token budgets for this project (shared/budget.ts): it can only tighten yours (it comes with the repository). A bad one is left out. */
   budget: BudgetConfig.optional().catch(undefined),
 });

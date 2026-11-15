@@ -4,7 +4,7 @@ import type { Locale } from '../shared/i18n/locales.js';
 import { randomUUID } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import path from 'node:path';
-import type { AgentBackend, AgentPlace, AgentRunInput, RunOrchestrator, BoardTools, FollowUp, LiveStatus, MacTools, RunProcess, Steer, TerminalLaunch, TerminalSink } from '../agent/types.js';
+import type { AgentBackend, AgentPlace, AgentRunInput, RunOrchestrator, RunStack, BoardTools, FollowUp, LiveStatus, MacTools, RunProcess, Steer, TerminalLaunch, TerminalSink } from '../agent/types.js';
 import { ALWAYS_ASK_YOU, writesCode } from '../agent/policy.js';
 import { type AgentRef, type BodyInput, type BodyOf, CLAUDE_AGENT, MAX_TEXT, type MessageVia } from '../protocol.js';
 import type { People } from './people.js';
@@ -28,6 +28,7 @@ import { READS_AFTER_STEP, STEERED_IN, STOPPING_FOR, TAKEN_BACK } from '../share
 import { hhmm, span } from '../shared/clock.js';
 import { routeOf, worldOf } from './routing/model.js';
 import { botAgentNames, orchestratorAt, runOrchestrator } from './routing/orchestrator-run.js';
+import { skillsAt } from './skills-at.js';
 import { TERM_BUSY } from '../shared/terminal-keys.js';
 import { RunFailedError, decodeFailure } from '../shared/run-failure.js';
 import { e2eLockedIn, keepsRunning, mayLeaveProcesses } from '../workspaces/test-procs.js';
@@ -1597,6 +1598,8 @@ export class AgentHost {
         // The lead's model, when the conversation picked none of its own.
         ...(orchestrated.leadModel ? { model: orchestrated.leadModel } : {}),
         ...(orchestrated.run ? { orchestrator: orchestrated.run } : {}),
+        // The skills your run gets (Settings, the project's beluga.json, the bot's bot.json); none set: every skill.
+        ...(yours ? this.skillsFor(place?.cwd, botWork?.dir) : {}),
         // Your MCP servers (your logins: Figma, Linear…) are for runs you asked for, never a friend's.
         ...(yours ? { ownerMcp: true } : {}),
         // Your own flags for `claude` and `codex` (Settings › Agents), never on a friend's run or an agent's below full.
@@ -1763,9 +1766,27 @@ export class AgentHost {
     const ws = this.deps.workspaces?.inChannel?.(channel);
     const o = orchestratorAt(st, worldOf(st, Date.now(), hhmm), { ...(place?.cwd ? { cwd: place.cwd } : {}), ...(botDir ? { botDir } : {}), ...(ws?.orchestrator !== undefined ? { conversation: ws.orchestrator } : {}) });
     if (!o.on || runtime !== CLAUDE_AGENT.runtime) return {};
-    const run = runOrchestrator(o, botAgentNames(botDir ?? place?.cwd));
+    const found = runOrchestrator(o, botAgentNames(botDir ?? place?.cwd));
+    const run = found ? { ...found, stack: this.runStack() } : undefined;
     const leadModel = o.lead && !o.lead.why && o.lead.agent.runtime === runtime && !ws?.model && !ws?.agent ? o.lead.model : undefined;
     return { ...(run ? { run } : {}), ...(leadModel ? { leadModel } : {}) };
+  }
+
+  /** The stack as the executors get it (phase 2b): its tools installed here, and where its rules live (Settings › Stack). */
+  private runStack(): RunStack {
+    const st = this.store.getState();
+    return { tools: st.stack.checks.flatMap((c) => (c.kind === 'tool' && c.state === 'up' ? [c.id as RunStack['tools'][number]] : [])), rulesInPrompt: st.prefs.stackRules === 'executors' };
+  }
+
+  /** The skills a run of yours gets, when a place set them (shared/run-skills.ts); nothing: every skill, as before. */
+  private skillsFor(cwd: string | undefined, botDir: string | undefined): Pick<AgentRunInput, 'skills'> {
+    try {
+      const r = skillsAt(this.store.getState().prefs.skills, { ...(cwd ? { cwd } : {}), ...(botDir ? { botDir } : {}) });
+      return r.from ? { skills: r.skills } : {};
+    } catch {
+      // A file that can't be read: every skill, as without a list.
+      return {};
+    }
   }
 
   /** Your launch flags per runtime (Settings › Agents › Launch flags), when you set any. */

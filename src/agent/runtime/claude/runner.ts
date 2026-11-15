@@ -37,7 +37,8 @@ import { claudeHome } from '../../../core/claude-code/launch.js';
 import { belugaHome } from '../../../core/home.js';
 import { expandCommand, mayBeCommand, skillOptions } from './skill-plugins.js';
 import { BACKGROUND_LIMIT_MS, INTERRUPT_TIMEOUT_MS } from '../types.js';
-import { delegateRefusal, orchestratorAgents, orchestratorEnv } from '../../orchestrator-agents.js';
+import { bigReadRefusal, delegateRefusal, executorBashRefusal, orchestratorAgents, orchestratorEnv } from '../../orchestrator-agents.js';
+import type { SkillList } from '../../../shared/run-skills.js';
 
 const USAGE_TIMEOUT_MS = 20_000;
 /**
@@ -63,8 +64,21 @@ const STDERR_KEEP = 40;
  * skills and commands come in alone, see skill-plugins.ts; its CLAUDE.md as text, see
  * project-instructions.ts). A friend's or a guest's run loads nothing of yours.
  */
-export function ownerSettings(input: Pick<AgentRunInput, 'ownerMcp' | 'guest'>): { settingSources: Array<'user'>; skills?: 'all' } {
-  return input.ownerMcp && !input.guest ? { settingSources: ['user'], skills: 'all' } : { settingSources: [] };
+export function ownerSettings(input: Pick<AgentRunInput, 'ownerMcp' | 'guest' | 'skills'>): { settingSources: Array<'user'>; skills?: SkillList } {
+  // The skills: the list Settings, the project or the bot set (shared/run-skills.ts), else every one.
+  return input.ownerMcp && !input.guest ? { settingSources: ['user'], skills: input.skills ?? 'all' } : { settingSources: [] };
+}
+
+/** A file's lines, for the executors' big-Read gate; undefined when it can't be read (the Read then says why). */
+function lineCount(file: string): number | undefined {
+  try {
+    const text = readFileSync(file, 'utf8');
+    let n = 1;
+    for (let i = text.indexOf('\n'); i >= 0; i = text.indexOf('\n', i + 1)) n++;
+    return n;
+  } catch {
+    return undefined;
+  }
 }
 
 export interface ClaudeBackendOptions {
@@ -220,7 +234,7 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
       // Your own runs get your skills and custom commands (never a friend's or a guest's: see skill-plugins.ts).
       const own = Boolean(input.ownerMcp && !input.guest);
       const home = claudeHome();
-      const skills = await skillOptions(own, cwd, home, path.join(belugaHome(), 'claude-plugins'));
+      const skills = await skillOptions(own, cwd, home, path.join(belugaHome(), 'claude-plugins'), input.skills);
       /** A message as Claude gets it: a custom command (`/fruit apples`) filled in first, on your own runs. */
       const content = (msg: Pick<FollowUp, 'prompt' | 'requesterName' | 'viaAgent' | 'context'>): PromptContent | Promise<PromptContent> => {
         const build = (prompt: string): PromptContent => imageContent(buildPrompt({ ...msg, prompt }), linkedImages(msg.prompt));
@@ -229,7 +243,11 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
       // Your `claude` flags (Settings › Agents): how it asks, in the SDK's words; the rest as they are.
       const launch = claudeLaunch(input.launchArgs?.claude ?? [], { plan: Boolean(input.plan), autoEdit });
       // Orchestrator mode (unset: off, and the options are as before): its sub-agents and their model.
-      const executors = orchestratorAgents(input.orchestrator);
+      // Your own MCP servers first, so a name of Beluga's always means Beluga's.
+      // A bot's run (docs/bots.md): only its own servers, strictly (--strict-mcp-config), so yours and other bots' never reach it.
+      const mcpServers: Record<string, McpServerConfig> = { ...(place?.mcp ? (place.mcp.servers as Record<string, McpServerConfig>) : input.ownerMcp && !input.guest ? ownerMcpServers(cwd, { ...process.env, ...input.env }) : {}), ...sdkServers(runToolSuites(input, bridge, shelf, cwd)) };
+      // Each executor gets only the servers its role needs, of the run's (orchestrator-agents.ts ROLE_MCP).
+      const executors = orchestratorAgents(input.orchestrator, undefined, new Set(Object.keys(mcpServers)));
       const subEnv = executors ? orchestratorEnv(input.orchestrator) : {};
       const executorEnv = Object.keys(subEnv).length ? subEnv : undefined;
       const options: Options = {
@@ -242,9 +260,7 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
         permissionMode: launch.permissionMode,
         ...(launch.allowDangerouslySkipPermissions ? { allowDangerouslySkipPermissions: true } : {}),
         ...(Object.keys(launch.extraArgs).length ? { extraArgs: launch.extraArgs } : {}),
-        // Your own MCP servers first, so a name of Beluga's always means Beluga's.
-        // A bot's run (docs/bots.md): only its own servers, strictly (--strict-mcp-config), so yours and other bots' never reach it.
-        mcpServers: { ...(place?.mcp ? (place.mcp.servers as Record<string, McpServerConfig>) : input.ownerMcp && !input.guest ? ownerMcpServers(cwd, { ...process.env, ...input.env }) : {}), ...sdkServers(runToolSuites(input, bridge, shelf, cwd)) },
+        mcpServers,
         ...(place?.mcp ? { strictMcpConfig: true } : {}),
         // The hook runs before Claude Code's own permission logic, even for commands it would
         // auto-approve, so the machine owner stays in control of every risky action.
@@ -259,6 +275,10 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
                   // Orchestrator mode, delegating always: a broad search or a test run is the executors', not the lead's.
                   const delegated = hookInput.agent_id ? undefined : delegateRefusal(input.orchestrator, hookInput.tool_name, toolInput);
                   if (delegated) return verdict('deny', delegated);
+                  // An executor (phase 2b): a read-only one runs only the stack's reading commands, and none reads a long file whole.
+                  const executor = hookInput.agent_id ? hookInput.agent_type : undefined;
+                  const leaner = executor ? (hookInput.tool_name === 'Bash' ? executorBashRefusal(input.orchestrator, executor, String(toolInput.command ?? '')) : bigReadRefusal(input.orchestrator, executor, hookInput.tool_name, toolInput, (f) => lineCount(path.resolve(cwd, f)))) : undefined;
+                  if (leaner) return verdict('deny', leaner);
                   const veto = input.vetTool?.(hookInput.tool_name, toolInput);
                   if (veto) return verdict('deny', veto);
                   const decision = decideTool(hookInput.tool_name, toolInput, policy);

@@ -12,6 +12,8 @@ import type { BudgetConfig } from '../shared/budget.js';
 import { type SpendAction, type SpendSlice, addSpend, initialSpend, ledgerCounts } from './budget/store.js';
 import type { SavingsBaseline } from './routing/outcomes.js';
 import type { OrchestratorBlock } from './routing/orchestrator.js';
+import type { SkillList } from '../shared/run-skills.js';
+import type { StackRulesMode } from './stack-store.js';
 import type { LanguageChoice, Locale } from '../shared/i18n/locales.js';
 import type { Project, ProjectGroup } from '../workspaces/types.js';
 import type { EnvChange } from '../workspaces/env.js';
@@ -356,6 +358,8 @@ export interface Prefs {
   readonly categoryCombos?: CategoryCombos;
   /** Orchestrator mode's block from Settings (core/routing/orchestrator.ts); unset: off. */
   readonly orchestrator?: OrchestratorBlock;
+  /** The skills your runs get (shared/run-skills.ts); unset: every skill. A project's beluga.json and a bot's bot.json can set their own. */
+  readonly skills?: SkillList;
   /** What routing's savings are measured against (core/routing/outcomes.ts); unset: everything on Opus. */
   readonly savingsBaseline?: SavingsBaseline;
   readonly autoSetup: boolean;
@@ -400,6 +404,8 @@ export interface Prefs {
   readonly stackRepair: boolean;
   /** Your stack: set a project up for it (indexes, beluga.json, CLAUDE.md) as it's added or made. */
   readonly stackBootstrap: boolean;
+  /** Your stack: where its rules live (core/stack-store.ts); unset: your global CLAUDE.md. */
+  readonly stackRules?: StackRulesMode;
   /** Experimental features that are on (shared/experiments.ts), off until you turn each on. */
   readonly experiments: readonly string[];
   readonly subagents: Settings['subagents'];
@@ -857,7 +863,7 @@ export const DEFAULT_PREFS: Prefs = {
 
 /** The preference fields out of saved settings. */
 export function prefsFrom(settings: Partial<Settings>): Prefs {
-  const picked = Object.fromEntries(Object.keys(DEFAULT_PREFS).concat(['model', 'effort', 'defaultAgent', 'projectAgents', 'combos', 'difficultyCombos', 'roleCombos', 'categoryCombos', 'orchestrator', 'savingsBaseline', 'budget', 'shell', 'earningsCurrency', 'commitLanguages', 'autoCompactChosen']).filter((k) => settings[k as keyof Settings] !== undefined).map((k) => [k, settings[k as keyof Settings]]));
+  const picked = Object.fromEntries(Object.keys(DEFAULT_PREFS).concat(['model', 'effort', 'defaultAgent', 'projectAgents', 'combos', 'difficultyCombos', 'roleCombos', 'categoryCombos', 'orchestrator', 'skills', 'stackRules', 'savingsBaseline', 'budget', 'shell', 'earningsCurrency', 'commitLanguages', 'autoCompactChosen']).filter((k) => settings[k as keyof Settings] !== undefined).map((k) => [k, settings[k as keyof Settings]]));
   return { ...DEFAULT_PREFS, ...picked };
 }
 

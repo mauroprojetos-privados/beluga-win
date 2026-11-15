@@ -18,7 +18,17 @@ It looks when the daemon starts, every 5 minutes, and on Check Now (Settings ›
 
 It's cleared as soon as a look finds everything up. **Settings › Stack › Start services that are down** (`stackRepair`, on by default) turns the starting off; the looking and telling stay.
 
-The rules for using these tools (GitNexus before reading code, the reading order through token-goat and graphify, RTK's habits) live in your global `~/.claude/CLAUDE.md`, which every run of yours loads. Beluga writes none of them into projects.
+The rules for using these tools (GitNexus before reading code, the reading order through token-goat and graphify, RTK's habits) live in your global `~/.claude/CLAUDE.md`, which every run of yours loads, unless you move them to the executors ([below](#the-stack-in-orchestrator-mode)). Beluga writes none of them into projects.
+
+## The stack in orchestrator mode
+
+In orchestrator mode ([routing.md › Orchestrator mode](routing.md#orchestrator-mode)) the reading is the executors' job, so they get the stack's reading tools and the lead only what it needs to decide (`roadmap/modo-orquestrador.md`, phase 2b):
+
+- **Each executor its own servers.** `explore` gets the GitNexus MCP (when you registered it as `gitnexus`), `test` and `docs` none; none sees your other MCP servers or your skills. A read-only `explore` also runs `token-goat symbol` and `gls symbol` when they're installed, and no other command.
+- **The token-goat gate.** With token-goat or gls installed, an executor that `Read`s a file over 1,000 lines whole is refused with how to read just the symbol (`token-goat symbol`, `gls symbol`, or Grep and Read with offset and limit). A `PreToolUse` hook, only on executors.
+- **Stack rules** (Settings › Stack, `stackRules`): **In your global CLAUDE.md** (the default) leaves them where every turn of every run loads them. **Only in the executors** puts each role's rules in its executor's prompt (GitNexus first for `explore`, RTK for `test`, nothing for `docs`) and runs the executors without your CLAUDE.md (the SDK's `omitClaudeMd`). The checklist's CLAUDE.md item (7) then warns while the `## Stack` block is still in yours, and its Fix, on your yes, takes that section out (a backup next to it, `CLAUDE.md.bak-<time>`); nothing else in the file changes.
+
+Nothing here runs by itself: no index is rebuilt and no Claude Code is started for it. Not done yet (phase 2b's other items): OpenViking as the compaction's memory and `docs` with OpenViking (it's off on the computer this was measured on), `gls gate` for `test`, and Settings › Stack showing each tool's savings.
 
 ## Setting a project up
 
@@ -47,7 +57,7 @@ Installed and answering isn't the same as working. The checklist (`core/stack/ch
 | 4 | RTK's hook | `~/.claude/settings.json` has `PreToolUse` Bash → `rtk …` | on your yes: `rtk init -g` |
 | 5 | GitNexus's hooks | `PreToolUse` Grep, Glob, Bash and `PostToolUse` Bash run a `gitnexus-hook.cjs` that exists | on your yes: `gitnexus setup --coding-agent claude` |
 | 6 | The stack's MCPs | `gitnexus` and `openviking` in `~/.claude.json`'s `mcpServers`; `claude mcp list` says they connect | on your yes: `claude mcp add -s user gitnexus -- gitnexus mcp` (OpenViking's: says how) |
-| 7 | Stack rules in your CLAUDE.md | `~/.claude/CLAUDE.md` has `## Stack` (and token-goat's block when it's installed); each `@import` resolves | on your yes: appends the `## Stack` block; never rewrites yours |
+| 7 | Stack rules in your CLAUDE.md | `~/.claude/CLAUDE.md` has `## Stack` (and token-goat's block when it's installed); each `@import` resolves | on your yes: appends the `## Stack` block; never rewrites yours. With Stack rules only in the executors it's the other way round: ⚠ while the block is there, and the Fix takes that section out |
 
 **Each project and worktree** (each worktree has indexes of its own):
 
@@ -100,4 +110,5 @@ The chain is what fails over when a model hits its usage limit. It's set **once 
 - `src/core/stack/launch.ts`: started with the daemon (not in the demo); when the checklist runs.
 - `src/companion/needs-you.ts` `stackItems`; the phone's `stack` card in `components/Needs.tsx`.
 - `packages/mac/src/dialogs/StackSettings.tsx`: Settings › Stack, with the Checklist.
-- Tests: `tests/stack.test.ts`, `tests/stack-checklist.test.ts`.
+- `src/agent/orchestrator-agents.ts`: each executor's servers, tools, rules and gates (phase 2b).
+- Tests: `tests/stack.test.ts`, `tests/stack-checklist.test.ts`, `tests/lean-runs.test.ts`.

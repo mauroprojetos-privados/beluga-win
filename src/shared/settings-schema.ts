@@ -3,6 +3,8 @@ import { AgentRef } from '../protocol.js';
 import { CategoryCombos, DifficultyCombos, RoleCombos, SavedCombos } from '../core/routing/model.js';
 import { SAVINGS_BASELINES } from '../core/routing/outcomes.js';
 import { SavedOrchestrator } from '../core/routing/orchestrator.js';
+import { STACK_RULES_MODES } from '../core/stack-store.js';
+import { SavedSkills } from './run-skills.js';
 import { AUTO_COMPACT_DEFAULT, AUTO_COMPACT_MAX, AUTO_COMPACT_MIN, AUTO_COMPACT_TOKENS_MAX, AUTO_COMPACT_TOKENS_MIN } from './context-usage.js';
 import { PARALLEL_RUNS_DEFAULT, PARALLEL_RUNS_MAX, PARALLEL_RUNS_MIN } from './run-slots.js';
 import { CHAT_LIMIT_DEFAULT, CHAT_LIMIT_MAX } from './chat-limit.js';
@@ -152,6 +154,8 @@ export const Settings = z.object({
   categoryCombos: CategoryCombos.optional().catch(undefined),
   /** Orchestrator mode (core/routing/orchestrator.ts, docs/routing.md): a lead that thinks and edits, cheap executors for the legwork. Unset: off. */
   orchestrator: SavedOrchestrator,
+  /** The skills your runs get (shared/run-skills.ts, docs/routing.md): a list of exact names, or "all". Unset: every skill. A project's beluga.json and a bot's bot.json can set their own. */
+  skills: SavedSkills,
   /** What routing's savings are measured against (docs/routing.md); unset: everything on Opus. */
   savingsBaseline: z.enum(SAVINGS_BASELINES).optional().catch(undefined),
   /** What new worktrees' branches start with (`beluga/<name>`); empty: no prefix. */
@@ -200,6 +204,8 @@ export const Settings = z.object({
   stackRepair: z.boolean().catch(true),
   /** Your stack: set a project up for it as it's added or made. */
   stackBootstrap: z.boolean().catch(true),
+  /** Your stack: where its rules live (core/stack-store.ts STACK_RULES_MODES). Unset: your global CLAUDE.md, as before. */
+  stackRules: z.enum(STACK_RULES_MODES).optional().catch(undefined),
   /** How much of Claude's sub-agent work the chat shows. */
   subagents: z.enum(['full', 'compact', 'hidden']).default('full'),
   /** Workspace buttons you chose to hide from the top bar. */
