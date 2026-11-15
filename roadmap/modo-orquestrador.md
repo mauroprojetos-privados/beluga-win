@@ -299,5 +299,12 @@ modelos diferentes", e vem depois porque precisa do gate de leitura testado.
   por projeto (primeiro `used` e o primeiro breakdown do cartão, média das últimas 20 execuções). Tudo
   dos eventos `usage` e `context` que já chegam; nenhuma sonda nova. Medido hoje: 41,2k num "oi"
   (sistema ~31,4k, conversa ~9,7k), 53,8k de manhã. Fica para depois: o relatório semanal em Needs You.
+- **2026-11-15, F3 implementada** (`mcp__beluga_mac__delegate`): um executor cujo combo roda fora do
+  Claude vira "delegado". Cada chamada é o `complete` do runtime (um processo, fechado ao responder),
+  5 min, 400k tokens, 30 turnos; cai para o próximo alvo do combo quando um não pode rodar (sem login,
+  limite, endpoint fora, ou falhou sem gastar token) e diz quem respondeu. Portão = `can` da F2, nunca
+  acima do lugar do principal; o Codex roda no sandbox só-leitura. Aparece como "delegate · Codex ·
+  explore" e o uso conta como executor (relatório `delegated`, somado como está). Só com principal
+  Claude por enquanto. Falta testar ao vivo com Codex e Ollama de verdade.
 - **Aberto**: ligar o modo por padrão no onboarding ou só por escolha; valor de `compactAt` (160k é
   um palpite, medir na fase 5); se `delegate: "always"` deve recusar ferramentas no principal ou só avisar.

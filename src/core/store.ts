@@ -1173,7 +1173,8 @@ function applySub(list: readonly SubAgent[], json: string, ts: number): readonly
   return list.map((s) => {
     if (s.id !== e.id) return s;
     if (e.phase === 'step' && e.step) return { ...s, steps: [...s.steps, e.step].slice(-MAX_STEPS) };
-    if (e.phase === 'done') return { ...s, status: e.failed ? 'failed' : 'done', steps: e.step ? [...s.steps, e.step].slice(-MAX_STEPS) : s.steps };
+    // A delegation (orchestrator mode, phase 3) ends saying which target answered: its title then says so.
+    if (e.phase === 'done') return { ...s, status: e.failed ? 'failed' : 'done', steps: e.step ? [...s.steps, e.step].slice(-MAX_STEPS) : s.steps, ...(typeof e.title === 'string' && e.title ? { title: e.title.slice(0, 300) } : {}) };
     return s;
   });
 }

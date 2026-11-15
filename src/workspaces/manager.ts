@@ -1344,12 +1344,14 @@ export class WorkspaceManager {
    * Add one run's usage. The SDK reports running totals per conversation, so only the part
    * beyond the last total we saw for the same conversation is new.
    */
-  addUsage(id: string, run: { input: number; output: number; cacheRead: number; cacheWrite: number; cost: number; session?: string; free?: boolean; tps?: number }, now = Date.now()): WorkspaceUsage | undefined {
+  addUsage(id: string, run: { input: number; output: number; cacheRead: number; cacheWrite: number; cost: number; session?: string; free?: boolean; tps?: number }, now = Date.now(), opts: { readonly added?: boolean } = {}): WorkspaceUsage | undefined {
     const ws = this.find(id);
     if (!ws) return undefined;
     const prev = ws.usage ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, runs: 0 };
     const last = prev.last;
     // Same conversation and nothing went down: these are running totals, so only the growth is new.
+    // `added`: a report that is only an addition (a delegation's, core/routing/delegate.ts), not a running total: counted as it is, and the conversation's totals stay.
+    if (opts.added) return this.addOnly(id, ws.usage, run, now);
     const continues = run.session !== undefined && run.session === prev.lastSession && last !== undefined && run.input >= last.input && run.output >= last.output && run.cacheRead >= last.cacheRead && run.cacheWrite >= last.cacheWrite && run.cost >= last.cost;
     const delta = (k: 'input' | 'output' | 'cacheRead' | 'cacheWrite' | 'cost'): number => (continues && last ? run[k] - last[k] : run[k]);
     const next: WorkspaceUsage = {
@@ -1364,6 +1366,22 @@ export class WorkspaceManager {
       ...(run.session ? { lastSession: run.session, last: { input: run.input, output: run.output, cacheRead: run.cacheRead, cacheWrite: run.cacheWrite, cost: run.cost } } : {}),
       // Per day too, for the Usage screen's chart and "this week".
       days: addDay(prev.days, dayKey(now), { tokens: delta('input') + delta('output') + delta('cacheWrite'), cost: delta('cost') }),
+      lastAt: now,
+    };
+    this.patchRecord(id, { usage: next });
+    return next;
+  }
+
+  private addOnly(id: string, prev: WorkspaceUsage | undefined, run: { input: number; output: number; cacheRead: number; cacheWrite: number; cost: number }, now: number): WorkspaceUsage {
+    const base = prev ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, runs: 0 };
+    const next: WorkspaceUsage = {
+      ...base,
+      input: base.input + run.input,
+      output: base.output + run.output,
+      cacheRead: base.cacheRead + run.cacheRead,
+      cacheWrite: base.cacheWrite + run.cacheWrite,
+      cost: base.cost + run.cost,
+      days: addDay(base.days, dayKey(now), { tokens: run.input + run.output + run.cacheWrite, cost: run.cost }),
       lastAt: now,
     };
     this.patchRecord(id, { usage: next });

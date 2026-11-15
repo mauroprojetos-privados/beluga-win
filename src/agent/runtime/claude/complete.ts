@@ -53,12 +53,28 @@ export async function claudeComplete(req: CompletionRequest, claudePath?: string
             }
           : {}),
         ...claudeExecutable(claudePath),
+        // A local endpoint's variables (agent/runtime/local.ts): this call goes there, never to Anthropic.
+        ...(req.env ? { env: { ...process.env, ...req.env } } : {}),
       },
     });
+    // The tokens spent so far, once per model message (its content blocks come as several messages).
+    const spent = new Map<string, number>();
     for await (const msg of q) {
+      if (req.onTokens && msg.type === 'assistant') {
+        const u = msg.message.usage as { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number | null } | undefined;
+        const id = msg.message.id ?? msg.uuid;
+        if (u) {
+          spent.set(id, (u.input_tokens ?? 0) + (u.output_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0));
+          req.onTokens([...spent.values()].reduce((a, b) => a + b, 0));
+        }
+      }
       if (msg.type !== 'result') continue;
+      if (req.onTokens) {
+        const all = Object.values(msg.modelUsage ?? {}).reduce((a, m) => a + m.inputTokens + m.outputTokens + m.cacheCreationInputTokens, 0);
+        if (all) req.onTokens(all);
+      }
       if (msg.subtype === 'success') return msg.result;
-      throw new CompletionError(msg.subtype === 'error_max_turns' ? 'max_turns' : 'failed');
+      throw new CompletionError(msg.subtype === 'error_max_turns' ? 'max_turns' : 'failed', 'errors' in msg && Array.isArray(msg.errors) ? msg.errors.join('\n').slice(0, 2000) : undefined);
     }
     throw new CompletionError('no_answer');
   } finally {

@@ -19,12 +19,23 @@ export interface RunExecutor {
   readonly description?: string;
 }
 
+/** An executor on another runtime (orchestrator mode, phase 3): the lead hands it a task through `mcp__beluga_mac__delegate`. */
+export interface RunDelegate extends RunExecutor {
+  /** Its combo: the targets a delegation tries in order. */
+  readonly combo: string;
+  /** The runtime it would run on now ("codex", "local") and its words ("Codex", "Ollama"). */
+  readonly runtime: string;
+  readonly label: string;
+}
+
 /** Orchestrator mode for one run (resolved by core/routing/orchestrator.ts): only executors this runtime can run in-process. */
 export interface RunOrchestrator {
   readonly executors: readonly RunExecutor[];
   readonly delegate: 'suggest' | 'always';
   /** The stack the executors work with (docs/stack.md, phase 2b). Unset: none said, as before. */
   readonly stack?: RunStack;
+  /** Executors on other runtimes (Codex, a local endpoint, OpenCode), reached through the delegate tool; unset: none. */
+  readonly delegates?: readonly RunDelegate[];
 }
 
 /** The stack as the executors get it: the reading tools installed here, and whether its rules go in their prompts. */
@@ -33,6 +44,13 @@ export interface RunStack {
   readonly tools: readonly StackTool[];
   /** Settings › Stack › Stack rules is "only the executors": each executor's prompt carries its role's rules, without your CLAUDE.md. */
   readonly rulesInPrompt: boolean;
+}
+
+/** The delegate tool for a run whose orchestrator has executors on other runtimes (core/routing/delegate.ts). */
+export interface DelegateTools {
+  readonly executors: readonly RunDelegate[];
+  /** Hand `task` to the executor named, wait for it, and get back what it answered (or why it didn't), in words. */
+  delegate(input: { readonly executor: string; readonly task: string; readonly paths?: readonly string[] }): Promise<string>;
 }
 
 /** How far a request may reach on the owner's computer. */
@@ -167,6 +185,8 @@ export interface AgentRunInput {
   /** "Your Mac" (core/assistant): its tools (the screen, device info, starting work) and what Claude is told it is. */
   readonly macTools?: MacTools;
   readonly macBrief?: string;
+  /** Orchestrator mode, phase 3: executors on other runtimes, through `mcp__beluga_mac__delegate` (your own runs only). */
+  readonly delegateTools?: DelegateTools;
   /** Your phone (core/phone): tools to act on your own paired phone, and what Claude is told about it. */
   readonly phoneTools?: PhoneTools;
   readonly phoneBrief?: string;

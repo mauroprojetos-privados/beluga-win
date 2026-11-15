@@ -1019,4 +1019,6 @@ export const NOT_EXPOSED: Readonly<Record<string, 'chat_only' | 'checker_only'>>
   // A bot's own (docs/bots.md): its map of categories and its knowledge are its chat's, set up in Bot Studio.
   plan_dispatch: 'chat_only',
   knowledge_search: 'chat_only',
+  // Orchestrator mode (phase 3): the lead of one of your own runs hands a task to its executor on another model; an external agent runs no orchestrator.
+  delegate: 'chat_only',
 };

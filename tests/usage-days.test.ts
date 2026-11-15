@@ -61,4 +61,19 @@ describe('WorkspaceManager.addUsage', () => {
     expect(u?.lastAt).toBe(today);
     expect(u).toMatchObject({ input: 1500, output: 300, runs: 2 });
   });
+
+  it('adds a delegation’s report as it is, and the conversation’s running total goes on where it was (orchestrator mode, phase 3)', async () => {
+    const base = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'klaud-usage-delegate-')));
+    const store = new WorkspaceStore(path.join(base, 'home'));
+    store.saveConfig({ roots: [], projects: [], hidden: [] });
+    const mgr = new WorkspaceManager(store);
+    await mgr.refresh();
+    const chat = await mgr.createChat('chats', 'ideas');
+    const today = at(2026, 10, 18);
+    mgr.addUsage(chat.id, { input: 1000, output: 200, cacheRead: 0, cacheWrite: 0, cost: 0.05, session: 's1' }, today);
+    mgr.addUsage(chat.id, { input: 700, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 }, today, { added: true });
+    const u = mgr.addUsage(chat.id, { input: 1100, output: 250, cacheRead: 0, cacheWrite: 0, cost: 0.06, session: 's1' }, today);
+    expect(u).toMatchObject({ input: 1800, output: 250, runs: 2 });
+    expect(u?.days?.['2026-10-18']?.tokens).toBe(2050);
+  });
 });

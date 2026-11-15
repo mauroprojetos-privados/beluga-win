@@ -150,11 +150,19 @@ export interface CompletionRequest {
   /** At most this many turns (default 1). */
   readonly maxTurns?: number;
   readonly signal?: AbortSignal;
+  /** Variables over Beluga's own for this call (a local endpoint's: agent/runtime/local.ts endpointEnv). */
+  readonly env?: Readonly<Record<string, string>>;
+  /** The tokens this call has spent so far (input, output, cache writes), each time it grows: a delegation's cap and Usage (core/routing/delegate.ts). */
+  readonly onTokens?: (total: number) => void;
 }
 
 /** Why a side call has no answer: it ran out of turns, failed, or ended saying nothing. */
 export class CompletionError extends Error {
-  constructor(readonly kind: 'max_turns' | 'failed' | 'no_answer') {
+  constructor(
+    readonly kind: 'max_turns' | 'failed' | 'no_answer',
+    /** What the runtime said when it failed (its error, its last stderr lines), when known: why it couldn't run. */
+    readonly detail?: string,
+  ) {
     super(kind === 'max_turns' ? 'ran out of turns' : kind === 'failed' ? 'could not answer' : 'stopped without an answer');
   }
 }

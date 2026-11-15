@@ -1825,10 +1825,12 @@ export class Workbench {
     // Outside a workspace (a bot's chat, Your Mac's): only the growth, for the run's card and the budgets' ledger (core/budget/store.ts).
     if (!id) return channel === 'room' ? undefined : this.growthOutside(channel, json);
     try {
-      const u = JSON.parse(json) as { input?: number; output?: number; cacheRead?: number; cacheWrite?: number; cost?: number; session?: string; free?: boolean; tps?: number; executorTokens?: number; executorModel?: unknown };
+      const u = JSON.parse(json) as { input?: number; output?: number; cacheRead?: number; cacheWrite?: number; cost?: number; session?: string; free?: boolean; tps?: number; executorTokens?: number; executorModel?: unknown; delegated?: boolean };
       const num = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : 0);
       const before = this.manager.find(id)?.usage;
-      const after = this.manager.addUsage(id, { input: num(u.input), output: num(u.output), cacheRead: num(u.cacheRead), cacheWrite: num(u.cacheWrite), cost: num(u.cost), session: typeof u.session === 'string' ? u.session : undefined, ...(u.free === true ? { free: true, ...(num(u.tps) ? { tps: num(u.tps) } : {}) } : {}) });
+      // A delegation's report (orchestrator mode, phase 3) is only an addition, not a running total.
+      const added = u.delegated === true;
+      const after = this.manager.addUsage(id, { input: num(u.input), output: num(u.output), cacheRead: num(u.cacheRead), cacheWrite: num(u.cacheWrite), cost: num(u.cost), session: typeof u.session === 'string' ? u.session : undefined, ...(u.free === true ? { free: true, ...(num(u.tps) ? { tps: num(u.tps) } : {}) } : {}) }, Date.now(), { added });
       void this.deps.controller.refresh();
       if (!after) return undefined;
       // The growth: the reports are running totals per conversation (manager.addUsage works it out).
@@ -1847,8 +1849,13 @@ export class Workbench {
   /** A usage report outside a workspace → what it added (as WorkspaceManager.addUsage works it out), nothing kept on disk. */
   private growthOutside(channel: string, json: string): RunGrowth | undefined {
     try {
-      const u = JSON.parse(json) as { input?: number; output?: number; cacheWrite?: number; cost?: number; session?: string; executorTokens?: unknown; executorModel?: unknown };
+      const u = JSON.parse(json) as { input?: number; output?: number; cacheWrite?: number; cost?: number; session?: string; executorTokens?: unknown; executorModel?: unknown; delegated?: boolean };
       const num = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : 0);
+      // A delegation's report (orchestrator mode, phase 3): all of it is new, all of it the executors', and the conversation's totals stay.
+      if (u.delegated === true) {
+        const tokens = num(u.input) + num(u.output) + num(u.cacheWrite);
+        return { tokens, cost: num(u.cost), ...(tokens ? { executorTokens: tokens } : {}) };
+      }
       const now = { ...(typeof u.session === 'string' ? { session: u.session } : {}), tokens: num(u.input) + num(u.output) + num(u.cacheWrite), cost: num(u.cost) };
       const last = this.outsideTotals.get(channel);
       const continues = now.session !== undefined && last?.session === now.session && now.tokens >= last.tokens && now.cost >= last.cost;

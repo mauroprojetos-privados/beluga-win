@@ -60,6 +60,9 @@ const ALWAYS_OK = new Set([
   // or archive a worktree you asked to (lossless; one with Claude still working waits for your yes).
   // A bot's (docs/bots.md): plan_dispatch writes a plan the way plan tools do (its Approve follows the bot's autonomy); knowledge_search reads only its own sources.
   ...['screenshot', 'device_info', 'list_work', 'start_worktree', 'start_task', 'start_plan', 'archive_worktree', 'plan_dispatch', 'knowledge_search'].map((n) => `mcp__beluga_mac__${n}`),
+  // Orchestrator mode (phase 3): only your own runs with an executor on another model have it, and
+  // the executor runs under its own gate (agent/delegate-gate.ts: read, run or edit), never above the lead's place.
+  'mcp__beluga_mac__delegate',
   // Your phone (BLG-150): looking at it never asks (like the Mac's screenshot). Acting on it falls
   // to 'ask', then the owner-approval gate honours the phone's own setting (Off · Ask · Use · Full).
   ...['phone_status', 'phone_screenshot', 'phone_screen', 'phone_apps', 'phone_info', 'phone_pull', 'phone_notifications', 'phone_macro_list'].map((n) => `mcp__beluga_phone__${n}`),

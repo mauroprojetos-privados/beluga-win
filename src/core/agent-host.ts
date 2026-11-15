@@ -4,7 +4,7 @@ import type { Locale } from '../shared/i18n/locales.js';
 import { randomUUID } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import path from 'node:path';
-import type { AgentBackend, AgentPlace, AgentRunInput, RunOrchestrator, RunStack, BoardTools, FollowUp, LiveStatus, MacTools, RunProcess, Steer, TerminalLaunch, TerminalSink } from '../agent/types.js';
+import type { AgentBackend, AgentPlace, AgentRunInput, DelegateTools, RunOrchestrator, RunStack, BoardTools, FollowUp, LiveStatus, MacTools, RunProcess, Steer, TerminalLaunch, TerminalSink } from '../agent/types.js';
 import { ALWAYS_ASK_YOU, writesCode } from '../agent/policy.js';
 import { type AgentRef, type BodyInput, type BodyOf, CLAUDE_AGENT, MAX_TEXT, type MessageVia } from '../protocol.js';
 import type { People } from './people.js';
@@ -26,7 +26,9 @@ import { PHONE_LOOK_TOOLS } from '../agent/phone-tools.js';
 import type { StepPage, StepRecord } from '../shared/steps.js';
 import { READS_AFTER_STEP, STEERED_IN, STOPPING_FOR, TAKEN_BACK } from '../shared/claude-notices.js';
 import { hhmm, span } from '../shared/clock.js';
-import { routeOf, worldOf } from './routing/model.js';
+import { combosIn, routeOf, worldOf } from './routing/model.js';
+import { delegate as runDelegation, outcomeText } from './routing/delegate.js';
+import type { Complete } from '../agent/runtime/types.js';
 import { botAgentNames, orchestratorAt, runOrchestrator } from './routing/orchestrator-run.js';
 import { skillsAt } from './skills-at.js';
 import { TERM_BUSY } from '../shared/terminal-keys.js';
@@ -109,6 +111,8 @@ export interface AgentHostDeps {
    * cheaper target), or why it doesn't start (the failed card's words, shared/run-failure.ts).
    */
   readonly budget?: (channel: string, place: AgentPlace, requestId: string) => { readonly place: AgentPlace } | { readonly refuse: string };
+  /** A runtime's one-shot call (agent/runtime/types.ts Complete), for orchestrator mode's delegations (phase 3); undefined: not run here. */
+  readonly completeFor?: (runtime: string) => Complete | undefined;
   /** A worktree doing a task a bot's plan handed to another bot (core/bots): that bot's MCPs, folder and persona, for your own runs. */
   readonly botWork?: (channel: string) => { readonly mcp?: AgentPlace['mcp']; readonly dir: string; readonly brief: string } | undefined;
   /** Your phone (core/phone, BLG-150), your own runs: tools to act on it, saving screenshots in `scratchDir`. `env` lets Bash use adb/scrcpy (BLG-174). */
@@ -1600,6 +1604,8 @@ export class AgentHost {
         ...(orchestrated.run ? { orchestrator: orchestrated.run } : {}),
         // The skills your run gets (Settings, the project's beluga.json, the bot's bot.json); none set: every skill.
         ...(yours ? this.skillsFor(place?.cwd, botWork?.dir) : {}),
+        // Phase 3: its executors on other models, through mcp__beluga_mac__delegate (their own gate, never above this place).
+        ...this.delegateToolsFor(orchestrated.run, runPlace, body.requestId, from, body.channel, controller.signal),
         // Your MCP servers (your logins: Figma, Linear…) are for runs you asked for, never a friend's.
         ...(yours ? { ownerMcp: true } : {}),
         // Your own flags for `claude` and `codex` (Settings › Agents), never on a friend's run or an agent's below full.
@@ -1787,6 +1793,51 @@ export class AgentHost {
       // A file that can't be read: every skill, as without a list.
       return {};
     }
+  }
+
+  /**
+   * Orchestrator mode, phase 3: the delegate tool for a run whose executors include some on other
+   * runtimes (core/routing/delegate.ts). Each call is one process on the executor's combo, closed when
+   * it answers; it shows as a sub-agent ("delegate · Codex · explore") and its tokens count as the
+   * executors' on the run's card, the conversation's usage and the budgets. Only your own runs get an
+   * orchestrator at all (runAgent), so never a friend's or an external agent's.
+   */
+  private delegateToolsFor(run: RunOrchestrator | undefined, place: AgentPlace | undefined, requestId: string, from: string, channel: string, signal: AbortSignal): { delegateTools?: DelegateTools } {
+    const executors = run?.delegates;
+    const completeFor = this.deps.completeFor;
+    if (!executors?.length || !place || !completeFor) return {};
+    let n = 0;
+    const sub = (e: Record<string, unknown>): void => this.emitAgent(requestId, from, 'sub', JSON.stringify(e), channel);
+    const tools: DelegateTools = {
+      executors,
+      delegate: async ({ executor, task, paths }) => {
+        const e = executors.find((x) => x.name === executor);
+        if (!e) return `No executor named ${executor} takes tasks here. These do: ${executors.map((x) => x.name).join(', ')}.`;
+        const id = `delegate:${requestId}:${++n}`;
+        let started = false;
+        const outcome = await runDelegation(
+          {
+            combos: () => combosIn(this.store.getState()),
+            world: () => worldOf(this.store.getState(), Date.now(), hhmm),
+            complete: completeFor,
+            onTarget: (t, passed) => {
+              const last = passed.at(-1);
+              if (started) return sub({ id, phase: 'step', step: `${last ? `${last.label}: ${last.why}. ` : ''}${t.label} takes it` });
+              started = true;
+              sub({ id, phase: 'start', kind: 'agent', title: `delegate · ${t.label} · ${e.name}`, runtime: t.runtime, ...(t.model ? { model: t.model } : {}) });
+              if (last) sub({ id, phase: 'step', step: passed.map((p) => `${p.label}: ${p.why}`).join('; ') });
+            },
+          },
+          { executor: e, task, ...(paths ? { paths } : {}), place: { cwd: place.cwd, roots: [place.cwd, ...place.additionalDirectories], ...(place.askOnly ? { readOnly: true } : {}) }, signal },
+        );
+        if (!started) sub({ id, phase: 'start', kind: 'agent', title: `delegate · ${e.label} · ${e.name}`, runtime: e.runtime });
+        sub({ id, phase: 'done', ...(outcome.ok ? { title: `delegate · ${outcome.target} · ${e.name}` } : { failed: true }), step: outcome.ok ? `${outcome.target} answered` : outcome.why.slice(0, 300) });
+        // What it spent: the executors' share of this run (one report, added as it is: not a running total).
+        if (outcome.tokens > 0) this.emitAgent(requestId, from, 'usage', JSON.stringify({ input: outcome.tokens, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, delegated: true, executorTokens: outcome.tokens }), channel);
+        return outcomeText(e.name, outcome);
+      },
+    };
+    return { delegateTools: tools };
   }
 
   /** Your launch flags per runtime (Settings › Agents › Launch flags), when you set any. */

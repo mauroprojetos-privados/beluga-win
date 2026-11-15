@@ -263,8 +263,8 @@ SDK's `agents` (`description`, a short fixed `prompt` per role, `tools` from `ca
 built-in sub-agents (Explore, general-purpose) don't inherit the lead's, and the run's instructions
 gain the lead's paragraph (delegate wide searches, long reads and test runs; do yourself what takes a
 call or two, and every edit; write the request in full; check the critical lines before editing; send
-independent pieces in parallel). Executors of other runtimes (Codex, a local model) come with phase 3.
-Only your own runs get it, never a friend's or an external agent's.
+independent pieces in parallel). Executors of other runtimes (Codex, a local model) are reached
+through the delegate tool (below). Only your own runs get it, never a friend's or an external agent's.
 
 **Names.** An executor is the sub-agent of its name in Beluga's runs. The SDK's `agents` rank above
 your own `~/.claude/agents/*.md`, which Beluga's runs load (`settingSources: ['user']`): an executor
@@ -333,6 +333,56 @@ answers `routing.leadUsage` with it, `phone`):
 
 All of it is worked out from events Beluga already gets (the runs' `usage` and `context`): nothing is
 probed or run for it.
+
+### Executors on other models (phase 3)
+
+An executor whose combo's target now is not Claude (Codex, a local endpoint, OpenCode) can't be one
+of the SDK's sub-agents. It is configured the same way, in the same block:
+
+```json
+"executors": {
+  "explore": { "combo": "claude-haiku", "can": "read" },
+  "codex":   { "combo": "codex-first",  "can": "run" },
+  "local":   { "combo": "local-first",  "can": "read" }
+}
+```
+
+The lead hands it a task with **`mcp__beluga_mac__delegate`** (`executor`, `task`, `paths?`), waits,
+and reads back a short summary in the same turn. The run's instructions name these executors beside
+the Claude ones, and with `delegate: "always"` a refused search or test run names one when no Claude
+executor fits.
+
+- **One process per delegation.** Each call is the runtime's one-shot call (`complete`: Codex's
+  ephemeral thread on its own app-server, Claude Code pointed at the endpoint for a local model),
+  closed when it answers. Nothing is started ahead of time, nothing kept running. It has a time
+  limit (5 minutes), a token cap (400k: input, output and cache writes) and 30 turns. A stopped lead
+  stops it.
+- **Fallback along the combo**, as a run on a combo does (`failover.ts`): a target that can't run
+  now (not signed in, at its usage limit, its endpoint down, not installed) is passed over, before
+  the call or when the call fails that way (or fails before spending a token), and the next one is
+  asked. A target that ran and then failed, ran out of time or of tokens ends the delegation: the
+  next one would pay for the same work again. The answer starts "explore answered on Claude · Haiku
+  (Codex: isn't signed in)".
+- **The gate** is phase 2's `can`, never above the lead's own place (a project's main folder only
+  reads): `read` gets Read, Grep and Glob inside the run's folders, never a secret; `run` also
+  Bash for checks, refusing commands that change files (writes and redirects, deletes and moves,
+  `sed -i`, installs, git writes); `edit` also Edit and Write inside the folders, only when the block
+  says so. Every call is checked before it runs (`vetTool`, `agent/delegate-gate.ts`). Codex can't
+  be asked before each of its own commands, so its call runs in its read-only sandbox
+  (`sideCallConfinement`): it reads and runs and writes nothing, whatever `can` says.
+- **Screens.** It shows as a sub-agent of the run, "delegate · Codex · explore", with its `runtime`
+  and `model` on the `sub` event; the row ends with the title of the target that answered and the
+  passed-over ones as steps, on the Mac and the phone (`SubAgentView`).
+- **Usage.** Its tokens are one `usage` report marked `delegated` (added as it is, not a running
+  total, so the conversation's totals go on where they were), all of it the executors' share
+  (`executorTokens`): on the run's card, the conversation's Usage, the budgets' ledger
+  ([budget.md](budget.md)) and Settings › Agent › Combos › Orchestrator mode.
+
+Code: `core/routing/delegate.ts` (the loop over the combo, limits, the words), `agent/delegate-gate.ts`
+(tools and checks per `can`), `agent/delegate-tool.ts` (the tool, on the `beluga_mac` server
+beside Your Mac's), `core/agent-host.ts` (`delegateToolsFor`: your own runs only). Tested with fake
+runtimes in `tests/orchestrator-delegate.test.ts`. It is not an API method: `coverage.ts` doesn't change.
+Only a Claude lead gets it for now (as phase 2's sub-agents).
 
 ## Skills per project
 
