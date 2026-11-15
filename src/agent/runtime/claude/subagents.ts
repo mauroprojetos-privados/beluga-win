@@ -33,6 +33,19 @@ interface Block {
   readonly tool_use_id?: string;
 }
 
+/** A sub-agent's API response as the SDK streams it (Messages API names): its id, model and token counts. */
+export interface SubAgentMessage {
+  readonly id?: string;
+  readonly model?: string;
+  readonly usage?: { readonly input_tokens?: number | null; readonly output_tokens?: number | null; readonly cache_creation_input_tokens?: number | null } | null;
+}
+
+/** What the sub-agents spent since the last look: tokens (input, output, cache writes) and the model most of them ran on. */
+export interface SubAgentSpend {
+  readonly tokens: number;
+  readonly model?: string;
+}
+
 /**
  * Follows sub-agents through the SDK message stream: a top-level Task/Agent tool
  * call starts one, messages tagged with its id are its steps, and the matching
@@ -48,6 +61,20 @@ export class SubAgentTracker {
 
   /** Orchestrator mode's executors by name: their sub-agents start with the model they run on. */
   private readonly executors: ReadonlyMap<string, string | undefined>;
+
+  /**
+   * What the sub-agents spend (Usage's executor tokens): every call the lead started, and the ones
+   * they started in turn, each → the lead's call it belongs to and the model it was started on.
+   * Only these count: Claude Code's own side calls (titles, summaries) never come as sub-agent
+   * messages, so they stay the lead's even on the executors' model.
+   */
+  private readonly spenders = new Map<string, { readonly root: string; readonly model?: string }>();
+  /** Tokens counted so far per API message (it streams in pieces, each with its usage so far). */
+  private readonly perMessage = new Map<string, number>();
+  /** Lead's calls whose tokens came in their own messages: a background one's final report adds nothing then. */
+  private readonly streamed = new Set<string>();
+  /** Not taken yet, by model ('' unknown). */
+  private pending = new Map<string, number>();
 
   constructor(
     private readonly cwd?: string,
@@ -74,9 +101,14 @@ export class SubAgentTracker {
         const model = type && this.executors.has(type) ? this.executors.get(type) : undefined;
         const title = [type, model ? modelName(model) : undefined, input.description].filter((v): v is string => typeof v === 'string' && v.length > 0).join(' · ');
         events.push({ id: block.id, phase: 'start', title: title || 'sub-agent', ...(model ? { runtime: 'claude', model } : {}) });
+        const asked = model ?? (typeof input.model === 'string' ? input.model : undefined);
+        this.spenders.set(block.id, { root: block.id, ...(asked ? { model: asked } : {}) });
       } else if (parentToolUseId && this.open.has(parentToolUseId)) {
         events.push({ id: parentToolUseId, phase: 'step', step: summarizeTool(block.name ?? 'tool', input, this.cwd) });
       }
+      // A sub-agent starting one of its own: what that one spends is the executors' too.
+      const parent = parentToolUseId ? this.spenders.get(parentToolUseId) : undefined;
+      if (parent && block.id && this.isLaunch(block)) this.spenders.set(block.id, parent);
     }
     return events;
   }
@@ -85,13 +117,19 @@ export class SubAgentTracker {
    * Background work Claude Code reports as tasks (background shells, background agents).
    * Tasks that belong to a sub-agent we already show are skipped.
    */
-  task(msg: { subtype?: string; task_id?: string; tool_use_id?: string; description?: string; patch?: { status?: string; description?: string }; status?: string; summary?: string }): SubAgentEvent[] {
+  task(msg: { subtype?: string; task_id?: string; tool_use_id?: string; description?: string; patch?: { status?: string; description?: string }; status?: string; summary?: string; usage?: { total_tokens?: number } }): SubAgentEvent[] {
     const id = msg.task_id;
     if (!id) return [];
     // A background sub-agent's task: it ends that sub-agent's row.
     const call = msg.tool_use_id && this.background.has(msg.tool_use_id) ? msg.tool_use_id : this.taskCall.get(id);
     if (call) {
       this.taskCall.set(id, call);
+      // Its messages never came (Claude Code ran it out of the stream): its own total stands in for them.
+      const total = msg.subtype === 'task_notification' ? (msg.usage?.total_tokens ?? 0) : 0;
+      if (total > 0 && !this.streamed.has(call)) {
+        this.streamed.add(call);
+        this.add(this.spenders.get(call)?.model, total);
+      }
       const status = msg.subtype === 'task_updated' ? msg.patch?.status : msg.subtype === 'task_notification' ? msg.status : undefined;
       if (!status || !['completed', 'failed', 'killed', 'stopped'].includes(status)) return [];
       this.taskCall.delete(id);
@@ -112,6 +150,39 @@ export class SubAgentTracker {
       return [{ id, phase: 'done', failed: status !== 'completed', ...(msg.summary ? { step: msg.summary } : {}) }];
     }
     return [];
+  }
+
+  /**
+   * A sub-agent's response (an assistant message with `parentToolUseId`): its tokens count as the
+   * executors'. Pieces of one response carry its usage so far, so only the growth is added.
+   */
+  spent(parentToolUseId: string | null, message: SubAgentMessage): void {
+    const who = parentToolUseId ? this.spenders.get(parentToolUseId) : undefined;
+    const u = message.usage;
+    if (!who || !u) return;
+    const n = (u.input_tokens ?? 0) + (u.output_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0);
+    const before = message.id ? (this.perMessage.get(message.id) ?? 0) : 0;
+    if (!(n > before)) return;
+    if (message.id) this.perMessage.set(message.id, n);
+    this.streamed.add(who.root);
+    this.add(message.model ?? who.model, n - before);
+  }
+
+  /** What the sub-agents spent since the last call (a turn's result reports it), and the model most of it ran on. */
+  takeSpend(): SubAgentSpend {
+    let tokens = 0;
+    let top: [string, number] | undefined;
+    for (const [model, n] of this.pending) {
+      tokens += n;
+      if (model && (!top || n > top[1])) top = [model, n];
+    }
+    this.pending = new Map();
+    return { tokens, ...(top ? { model: top[0] } : {}) };
+  }
+
+  private add(model: string | undefined, n: number): void {
+    const key = model ?? '';
+    this.pending.set(key, (this.pending.get(key) ?? 0) + n);
   }
 
   user(blocks: readonly Block[] | string): SubAgentEvent[] {

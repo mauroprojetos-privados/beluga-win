@@ -25,6 +25,7 @@ export const MACHINE: Record<Method, MachineSide> = {
   'routing.resetCombos': 'drive',
   'routing.retry': 'drive',
   'routing.usage': 'drive',
+  'routing.leadUsage': 'drive',
   'routing.useClaudeByKind': 'drive',
   'routing.orchestrator': 'drive',
   'routing.setOrchestrator': 'drive',

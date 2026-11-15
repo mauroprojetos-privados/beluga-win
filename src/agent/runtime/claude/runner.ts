@@ -116,19 +116,6 @@ export function usageOf(modelUsage: Record<string, { inputTokens: number; output
   return { input: sum((u) => u.inputTokens), output: sum((u) => u.outputTokens), cacheRead: sum((u) => u.cacheReadInputTokens), cacheWrite: sum((u) => u.cacheCreationInputTokens), cost, session };
 }
 
-/**
- * Orchestrator mode: the tokens (input, output, cache writes) of the models only executors ran on, as
- * running totals like modelUsage's. A model the lead runs on too counts as the lead's: it can't be told apart.
- */
-export function executorTokensOf(modelUsage: Record<string, { inputTokens: number; outputTokens: number; cacheCreationInputTokens: number }>, executorModels: readonly string[], leadModel: string | undefined): number {
-  const lead = (leadModel ?? '').toLowerCase();
-  const isExecutor = (id: string): boolean => {
-    const key = id.toLowerCase();
-    return executorModels.some((m) => key.includes(m.toLowerCase())) && !(lead && key.includes(lead));
-  };
-  return Object.entries(modelUsage).reduce((n, [id, u]) => (isExecutor(id) ? n + (u.inputTokens || 0) + (u.outputTokens || 0) + (u.cacheCreationInputTokens || 0) : n), 0);
-}
-
 /** Claude Code's name for a model, without its "(recommended)": the picker says "Default", not "Default (recommended)". */
 const plainModelName = (name: string): string => name.replace(/\s*\(recommended\)\s*$/i, '') || name;
 
@@ -385,8 +372,6 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
       };
       /** The model the session runs on, so a message picked for another one switches it first. */
       let model = input.model ?? opts.model;
-      /** Orchestrator mode: the executors' running total last reported (see executorTokensOf). */
-      let execSeen = 0;
       /** A message into the live session. `steer`: Claude works on a turn, and takes it in at its next step. */
       const deliver = (followUp: FollowUp, steer: boolean): string | false => {
         if (prompts.closed) return false;
@@ -529,6 +514,7 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
           if (msg.type === 'assistant' && msg.error) apiError = msg.error;
           if (msg.type === 'assistant') {
             for (const e of subagents.assistant(msg.parent_tool_use_id, msg.message.content)) input.onEvent('sub', JSON.stringify(e));
+            subagents.spent(msg.parent_tool_use_id, msg.message);
           }
           report.observe(msg as ContextMessage);
           if (msg.type === 'system' && 'task_id' in msg) {
@@ -583,11 +569,10 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
             remember(msg.session_id);
             await report.result(msg.modelUsage, breakdownReader(q));
             const turn = turns.current();
-            // Orchestrator mode: what its executors spent this turn, for Usage to set apart from the lead's.
-            const execTotal = input.orchestrator ? executorTokensOf(msg.modelUsage ?? {}, input.orchestrator.executors.flatMap((e) => (e.model ? [e.model] : [])), model) : 0;
-            const execAdded = execTotal >= execSeen ? execTotal - execSeen : execTotal;
-            execSeen = execTotal;
-            turn.onEvent('usage', JSON.stringify({ ...usageOf(msg.modelUsage ?? {}, msg.total_cost_usd ?? 0, msg.session_id), ...(execAdded ? { executorTokens: execAdded } : {}) }));
+            // What its sub-agents (executors) spent this turn, for Usage to set apart from the lead's.
+            // From their own messages, never modelUsage: Claude Code's side calls on the same model aren't theirs.
+            const exec = subagents.takeSpend();
+            turn.onEvent('usage', JSON.stringify({ ...usageOf(msg.modelUsage ?? {}, msg.total_cost_usd ?? 0, msg.session_id), ...(exec.tokens ? { executorTokens: exec.tokens, ...(exec.model ? { executorModel: exec.model } : {}) } : {}) }));
             // A turn that ended on an API error (a usage limit, an outage) is a failure, whatever its subtype.
             const ok = msg.subtype === 'success' && !msg.is_error;
             if (!ok) failedResult = msg.subtype === 'success' ? msg.result : [`Agent stopped: ${msg.subtype.replace(/_/g, ' ')}`, ...(msg.errors ?? [])].join('\n');

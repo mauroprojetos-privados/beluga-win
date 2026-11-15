@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { API, type Method } from '../ipc/api.js';
-import { ChatMessageView, ComboReportView, DataListView, DocumentView, FilePageView, FolderView, FoundView, MergeCheckView, MergeView, SignedLinkView, SubAgentDetailView, TerminalView, TerminalsView, TranscriptView, TurnView, VoiceMacView } from './protocol.js';
+import { ChatMessageView, ComboReportView, DataListView, LeadReportView, DocumentView, FilePageView, FolderView, FoundView, MergeCheckView, MergeView, SignedLinkView, SubAgentDetailView, TerminalView, TerminalsView, TranscriptView, TurnView, VoiceMacView } from './protocol.js';
 
 /**
  * Every call the phone may make, typed: each `phone` method of coverage.ts with its arguments
@@ -229,6 +229,8 @@ export const PhoneCalls = {
   'routing.retry': entry('routing.retry', z.string()),
   // Runs through combos, by combo and target; 1.52: with how tasks went, savings and suggestions.
   'routing.usage': entry('routing.usage', z.array(ComboReportView)),
+  // 1.58: the lead against its executors, by conversation and day, and each project's opening context.
+  'routing.leadUsage': entry('routing.leadUsage', LeadReportView),
   // 1.53 (docs/bots.md): your bots and what each is doing; editing them is the Mac's.
   'bots.list': entry('bots.list', z.array(BotResult)),
   'bots.status': entry('bots.status', z.object({ status: BotResult.shape.status, line: z.string().optional() })),

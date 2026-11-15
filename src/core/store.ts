@@ -36,7 +36,7 @@ import { type PlansAction, type PlansSlice, initialPlans, isPlanHome, reducePlan
 import { type DialoguesAction, type DialoguesSlice, initialDialogues, reduceDialogues } from './dialogues/model.js';
 import { type TeamAction, type TeamSlice, initialTeam, reduceTeam } from './team/model.js';
 import { type CompactMark, type ContextInfo, applyContextEvent, parseContextEvent } from './context-log.js';
-import { AUTO_COMPACT_DEFAULT, type AutoCompactAt } from '../shared/context-usage.js';
+import { AUTO_COMPACT_DEFAULT, type AutoCompactAt, type ContextBreakdown } from '../shared/context-usage.js';
 import { PARALLEL_RUNS_DEFAULT, type SlotWait } from '../shared/run-slots.js';
 import { CHAT_LIMIT_DEFAULT } from '../shared/chat-limit.js';
 import { THREAD_LIMITS_DEFAULT, type ThreadLimits } from '../shared/threads.js';
@@ -151,8 +151,18 @@ export type LogItem =
 export interface RunUsage {
   readonly tokens: number;
   readonly cost: number;
-  /** Orchestrator mode: the part of 	okens its executors spent (the rest is the lead's). */
+  /** The part of `tokens` its sub-agents (executors) spent; the rest is the lead's. */
   readonly executorTokens?: number;
+  /** The model most of the executors' tokens ran on (prices what they saved the lead, docs/routing.md). */
+  readonly executorModel?: string;
+  /** Its context when it started: the first context number and where it comes from (the fixed cost of a turn). */
+  readonly opening?: RunOpening;
+}
+
+/** A run's first context number, and the first breakdown it had (system, tools, conversation). */
+export interface RunOpening {
+  readonly used: number;
+  readonly breakdown?: ContextBreakdown;
 }
 
 /** Words Claude said between its steps, and when (a step came after them, so they aren't its answer). */
@@ -1036,9 +1046,9 @@ export function orderQueued(log: readonly LogItem[], owner: string, ids: readonl
  * Workbench.onUsage works out the growth from running totals). No card for it: nothing.
  */
 function reduceRunUsage(state: DomainState, a: Extract<Action, { type: 'agent_event' }>): DomainState {
-  let add: { tokens?: unknown; cost?: unknown; executorTokens?: unknown };
+  let add: { tokens?: unknown; cost?: unknown; executorTokens?: unknown; executorModel?: unknown };
   try {
-    add = JSON.parse(a.text) as { tokens?: unknown; cost?: unknown; executorTokens?: unknown };
+    add = JSON.parse(a.text) as typeof add;
   } catch {
     return state;
   }
@@ -1050,7 +1060,8 @@ function reduceRunUsage(state: DomainState, a: Extract<Action, { type: 'agent_ev
   if (idx < 0) return spent;
   const card = spent.log[idx] as Extract<LogItem, { type: 'agent' }>;
   const executorTokens = (card.usage?.executorTokens ?? 0) + Math.min(num(add.executorTokens), num(add.tokens));
-  const usage = { tokens: (card.usage?.tokens ?? 0) + num(add.tokens), cost: (card.usage?.cost ?? 0) + num(add.cost), ...(executorTokens ? { executorTokens } : {}) };
+  const executorModel = typeof add.executorModel === 'string' && add.executorModel ? add.executorModel.slice(0, 80) : card.usage?.executorModel;
+  const usage: RunUsage = { tokens: (card.usage?.tokens ?? 0) + num(add.tokens), cost: (card.usage?.cost ?? 0) + num(add.cost), ...(executorTokens ? { executorTokens, ...(executorModel ? { executorModel } : {}) } : {}), ...(card.usage?.opening ? { opening: card.usage.opening } : {}) };
   return { ...spent, log: spent.log.map((l, i) => (i === idx ? { ...card, usage } : l)) };
 }
 
@@ -1127,7 +1138,23 @@ function reduceAgent(state: DomainState, raw: Extract<Action, { type: 'agent_eve
 function reduceContext(state: DomainState, a: Extract<Action, { type: 'agent_event' }>): DomainState {
   const data = parseContextEvent(a.text);
   if (!data || (a.event !== 'context' && a.event !== 'compact')) return state;
-  return applyContextEvent(state, { event: a.event, channel: a.channel ?? 'room', id: a.itemId ?? a.requestId, ts: a.ts, data }, appendLog);
+  const next = applyContextEvent(state, { event: a.event, channel: a.channel ?? 'room', id: a.itemId ?? a.requestId, ts: a.ts, data }, appendLog);
+  return a.event === 'context' && !data.compacting ? withOpening(next, a, data.used, data.breakdown) : next;
+}
+
+/**
+ * The run's opening context on its card (Usage's fixed cost of a turn, docs/routing.md): its first
+ * number, then the first breakdown (it comes when the run ends). Kept once: later numbers grow with the work.
+ */
+function withOpening(state: DomainState, a: Extract<Action, { type: 'agent_event' }>, used: number | undefined, breakdown: ContextBreakdown | undefined): DomainState {
+  const idx = state.log.findIndex((l) => l.type === 'agent' && l.requestId === a.requestId && l.owner === a.owner);
+  if (idx < 0) return state;
+  const card = state.log[idx] as Extract<LogItem, { type: 'agent' }>;
+  const was = card.usage?.opening;
+  const opening: RunOpening | undefined = !was ? (used && used > 0 ? { used, ...(breakdown ? { breakdown } : {}) } : undefined) : !was.breakdown && breakdown ? { ...was, breakdown } : undefined;
+  if (!opening) return state;
+  const usage: RunUsage = { ...(card.usage ?? { tokens: 0, cost: 0 }), opening };
+  return { ...state, log: state.log.map((l, i) => (i === idx ? { ...card, usage } : l)) };
 }
 
 export const formatTokens = (n: number): string => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n));

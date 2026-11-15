@@ -276,8 +276,7 @@ built-in `Explore` is another agent from `explore`.
 
 **Screens.** A sub-agent that is one of the run's executors starts as "explore · Haiku · <what it was
 asked>", with `runtime` and `model` on its `sub` event, on the Mac and the phone (`SubAgentView.model`).
-A run's card keeps the executors' share of its tokens (`RunUsage.executorTokens`, from the models only
-executors ran on: a model the lead runs on too can't be told apart and counts as the lead's), and
+A run's card keeps the executors' share of its tokens (`RunUsage.executorTokens`, see below), and
 Settings › Agent › Combos › Orchestrator mode says lead × executors so far. API: `routing.orchestrator`
 (phone: what applies, `words` for a header), `routing.setOrchestrator` and
 `routing.setConversationOrchestrator` (Mac).
@@ -297,6 +296,43 @@ The token-goat gate: when token-goat or gls is installed, an executor's `Read` o
 lines with no `offset` or `limit` is refused with how to read just the symbol. Only executors (their
 hook carries `agent_id` and `agent_type`), never the lead or another sub-agent. Where the stack's
 rules go is in [stack.md › The stack in orchestrator mode](stack.md#the-stack-in-orchestrator-mode).
+
+### Lead and executors (orchestrator mode, phase 5)
+
+**What counts as an executor's.** Only what the sub-agents the lead started spent: an `Agent`/`Task`
+call of the lead (one of the run's executors, Claude Code's `Explore`, any other), and the ones they
+start in turn; the same calls the `sub` event follows. The runner (`agent/runtime/claude/subagents.ts`,
+`SubAgentTracker.spent`) adds up the token counts on their own responses (assistant messages with a
+`parent_tool_use_id`: input, output and cache writes, once per response though it streams in pieces).
+A background sub-agent whose messages never come is counted by its final `task_notification`'s
+`usage.total_tokens`. Each turn's `usage` event carries the turn's `executorTokens` and
+`executorModel` (the model most of them ran on), and the card adds them up (never more than the turn's
+whole growth).
+
+Never from the result's `modelUsage`: it lists tokens by model, and Claude Code's own side calls
+(a conversation's title, summaries) run on Haiku too. Measured: a plain "ok" with no sub-agent came to
+`{"tokens":1261,…,"executorTokens":1255}` when the Haiku row was taken for the executors
+(`tests/executor-tokens.test.ts`). Those side calls stay in the lead's share.
+
+**Usage › Combos › Lead and executors** (`packages/mac/src/views/usage/LeadCard.tsx`) and the phone's
+Settings › Routing, from `core/routing/measure.ts` (`leadReport`, pure and browser-safe; the daemon
+answers `routing.leadUsage` with it, `phone`):
+
+- the lead's tokens against the executors', in all, for the 10 conversations that spent the most, and
+  for each of the last 14 days (local time);
+- **what the executors saved**: their tokens at the lead's price less at their own
+  (`executorSaving`), with the price table above (`MODEL_PRICES`). A Claude lead with no model named
+  is priced at the baseline Settings › Agent › Combos › Savings against picks; executors on an unknown
+  model are priced as the lead (no saving claimed). Negative: they cost more;
+- **the context a run starts with**, per project: a run's card keeps its first context number and the
+  first breakdown it gets (`RunUsage.opening`: system, tools, conversation; the breakdown comes when
+  the run ends), and each project shows the average of its latest 20 runs and the latest run's number.
+  `system` is the fixed part (Claude Code's prompt, CLAUDE.md, skills, MCP servers): trim those and
+  it drops, which is how a change is measured. Measured on 2026-11-15 in erp-rewrite: 41.2k for a
+  "oi" (system ~31.4k, conversation ~9.7k), 53.8k that morning.
+
+All of it is worked out from events Beluga already gets (the runs' `usage` and `context`): nothing is
+probed or run for it.
 
 ## Skills per project
 

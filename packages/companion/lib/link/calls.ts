@@ -84,6 +84,8 @@ export const calls = {
   externalAgents: (): Call => make('external.agents', [], t('shared.outbox.externalAgents')),
   // 1.52 (docs/routing.md): your runs through combos, how tasks went, savings and suggestions (read-only).
   routingUsage: (): Call => make('routing.usage', [], t('shared.outbox.routingUsage')),
+  // 1.58 (docs/routing.md "Lead and executors"): the lead against its executors, by day, and each project's opening context.
+  leadUsage: (): Call => make('routing.leadUsage', [], t('shared.outbox.leadUsage')),
   externalActivity: (kind?: 'allowed' | 'asked' | 'refused'): Call => make('external.activity', [kind ? { kind } : {}], t('shared.outbox.externalActivity')),
   externalStop: (agent: string, name: string): Call => make('external.stopAgent', [agent], t('shared.outbox.stopName', { name: short(name) })),
   externalStopAll: (): Call => make('external.stopAll', [], t('shared.outbox.externalStopAll')),

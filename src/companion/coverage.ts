@@ -740,6 +740,7 @@ export const PHONE: Record<Method, Side> = {
   // Needs You's Try Again for a used-up combo: like Continue, phone-sized.
   'routing.retry': 'phone',
   'routing.usage': 'phone',
+  'routing.leadUsage': 'phone',
   // A preset for Settings › Agents › Combos: settings stay the Mac's.
   'routing.useClaudeByKind': 'mac',
   // Orchestrator mode (core/routing/orchestrator.ts): the phone shows it (the conversation's header, the

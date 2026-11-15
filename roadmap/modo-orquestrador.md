@@ -288,5 +288,16 @@ modelos diferentes", e vem depois porque precisa do gate de leitura testado.
   global (com backup). Ficou de fora: OpenViking (desligado na máquina), `gls gate` no `test`, a
   economia por ferramenta em Settings › Stack e o detalhamento do `breakdown` no Usage. Falta medir ao
   vivo o "oi" com `skills` definido.
+- **2026-11-15, F5 (medir)**: bug medido ao vivo: num "oi, responda só: ok" sem sub-agente o `usage` dizia
+  `{"tokens":1261,…,"executorTokens":1255}`. Causa confirmada: a F2 tirava os tokens do executor do
+  `modelUsage` por modelo, e as chamadas internas do Claude Code (título etc.) também rodam no Haiku.
+  Agora contam só as respostas dos sub-agentes que o principal começou (mensagens com
+  `parent_tool_use_id`, `SubAgentTracker.spent`; em segundo plano sem mensagens, o `usage.total_tokens`
+  do `task_notification`). Usage › Combos › Principal e executores (Mac) e Ajustes › Roteamento (celular,
+  `routing.leadUsage`, 1.58): principal × executores no total, por conversa e por dia, a economia pelo
+  preço do principal (`MODEL_PRICES`; principal sem modelo: o `savingsBaseline`) e o contexto de abertura
+  por projeto (primeiro `used` e o primeiro breakdown do cartão, média das últimas 20 execuções). Tudo
+  dos eventos `usage` e `context` que já chegam; nenhuma sonda nova. Medido hoje: 41,2k num "oi"
+  (sistema ~31,4k, conversa ~9,7k), 53,8k de manhã. Fica para depois: o relatório semanal em Needs You.
 - **Aberto**: ligar o modo por padrão no onboarding ou só por escolha; valor de `compactAt` (160k é
   um palpite, medir na fase 5); se `delegate: "always"` deve recusar ferramentas no principal ou só avisar.
