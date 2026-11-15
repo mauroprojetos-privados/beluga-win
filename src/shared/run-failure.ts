@@ -1,6 +1,7 @@
 import { hhmm } from './clock.js';
 import { isLimitNotice } from './claude-notices.js';
 import { formatDateWith } from './i18n/format.js';
+import { formatTokenCount } from './context-usage.js';
 import { t } from './i18n/index.js';
 
 /**
@@ -11,7 +12,18 @@ import { t } from './i18n/index.js';
  * marker), and screens and plans read it back. Browser-safe.
  */
 
-type RunFailureKind = 'usage_limit' | 'signed_out' | 'crash' | 'network' | 'api' | 'stopped';
+type RunFailureKind = 'usage_limit' | 'signed_out' | 'crash' | 'network' | 'api' | 'stopped' | 'budget';
+
+/** A run Beluga stopped at a token budget (shared/budget.ts): which one, what it counted, and what it was set to do. */
+export interface BudgetStop {
+  readonly scope: 'conversation' | 'day' | 'project' | 'bot';
+  readonly used: number;
+  readonly limit: number;
+  /** What the budget does when reached: `ask` waits in Needs You, `stop` stops, `downgrade` goes on cheaper. */
+  readonly near: 'downgrade' | 'ask' | 'stop';
+  /** The project's or the bot's name. */
+  readonly name?: string;
+}
 
 export interface RunFailure {
   readonly kind: RunFailureKind;
@@ -23,6 +35,8 @@ export interface RunFailure {
   readonly detail: string;
   /** The runtime that failed ('codex'); unset: Claude Code. */
   readonly runtime?: string;
+  /** Budget: the one it reached. */
+  readonly budget?: BudgetStop;
 }
 
 /** Who a failure's words name: the agent, its app, and whose API it calls. */
@@ -77,6 +91,8 @@ export function failureHeadline(f: RunFailure, now = Date.now()): string {
       return t('shared.runFailure.api', { vendor, error: firstLine(f.detail).slice(0, 120) || t('shared.runFailure.unknownError') });
     case 'stopped':
       return t('shared.runFailure.stopped');
+    case 'budget':
+      return t(`budget.failure.${f.budget?.scope ?? 'conversation'}`, { used: formatTokenCount(f.budget?.used ?? 0), limit: formatTokenCount(f.budget?.limit ?? 0), name: f.budget?.name ?? '' });
   }
 }
 
@@ -96,6 +112,11 @@ export function failureTitle(f: RunFailure, now = Date.now()): string {
       return `${who.vendor}'s API failed: ${firstLine(f.detail).slice(0, 120) || 'unknown error'}`;
     case 'stopped':
       return 'Stopped by you';
+    case 'budget': {
+      const b = f.budget;
+      const which = b?.scope === 'day' ? 'your daily token budget' : b?.scope === 'project' || b?.scope === 'bot' ? `${b.name ?? `the ${b.scope}`}’s daily token budget` : 'this conversation’s token budget';
+      return `Stopped at ${which}${b ? ` · ${formatTokenCount(b.used)} of ${formatTokenCount(b.limit)}` : ''}`;
+    }
   }
 }
 

@@ -26,6 +26,8 @@ import { launchSentinel } from '../core/sentinel/launch.js';
 import { launchTriage, sendAutomatic } from '../core/triage/launch.js';
 import { AutoContinue } from '../core/auto-continue.js';
 import { ComboFailover } from '../core/routing/failover.js';
+import { BudgetGuard } from '../core/budget/guard.js';
+import { attachBudget, detachBudget } from '../core/budget/registry.js';
 import { launchAssistant } from '../core/assistant/launch.js';
 import { launchStack, watchClaudeByKind } from '../core/stack/launch.js';
 import { launchThreads, threadsOf } from '../core/threads/launch.js';
@@ -451,9 +453,21 @@ export async function buildCore(input: Config, hooks: CoreHooks, opts: { readonl
         skip: (channel) => threadsOf(session)?.skipsContinue(channel) ?? false,
         warn: (text) => console.warn(text),
       });
+      // Token budgets (docs/budget.md): every run of yours passes their gate; usage is checked as it comes.
+      const budget = new BudgetGuard({
+        store,
+        cancel: (requestId, note) => session.host.cancelRun(requestId, note),
+        carry: (channel, from) => session.workspaces?.carryForBudget(channel, from),
+        notify: (e) => session.notifier.notify(e),
+        file: path.join(belugaHome(), 'spend.json'),
+        warn: (text) => console.warn(text),
+      });
+      attachBudget(session, budget);
       stopAutoContinue = () => {
         auto.stop();
         failover.stop();
+        budget.stop();
+        detachBudget(session);
       };
     }
     // "Your Mac": one conversation with your Claude for the whole Mac, from the phone and the sidebar (core/assistant).

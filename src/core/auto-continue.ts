@@ -1,6 +1,8 @@
 import { hhmm } from '../shared/clock.js';
 import { autoContinueFor, autoContinues, limitResumeAt } from '../shared/auto-continue.js';
 import { CONTINUE_PROMPT, decodeFailure } from '../shared/run-failure.js';
+import { budgetName, budgetUse } from '../shared/budget.js';
+import { budgetReached } from './budget/model.js';
 import { planOfChannel } from './notify.js';
 import { isSentinelChat, sentinelOfChannel } from './sentinel/model.js';
 import { type DomainState, type LogItem, type Store, isRunning } from './store.js';
@@ -53,7 +55,7 @@ export const sentinelRunChat = (state: Pick<DomainState, 'sentinel'>, channel: s
 /** When the stopped run in `channel` is told to continue on its own, if it is (what the screens say on its card). */
 export function resumeOf(state: DomainState, channel: string, now: number): { readonly id: string; readonly at: number } | undefined {
   const stop = limitStops(state.log.filter((l) => l.channel === channel), state.selfId)[0];
-  return stop && now < stop.at && !sentinelRunChat(state, channel) && autoContinueFor(state.prefs, channel, stop.at, now).kind === 'scheduled' ? { id: stop.id, at: stop.at } : undefined;
+  return stop && now < stop.at && !sentinelRunChat(state, channel) && autoContinueFor(state.prefs, channel, stop.at, now).kind === 'scheduled' && !budgetReached(state, channel, now) ? { id: stop.id, at: stop.at } : undefined;
 }
 
 /** Whether the conversation is still there: a worktree or project chat not archived, one of Your Mac's chats, or of the Sentinel chat's. */
@@ -121,6 +123,13 @@ export class AutoContinue {
       if (this.sent.has(stop.requestId) || now < stop.at) continue;
       if (autoContinueFor(state.prefs, stop.channel, stop.at, now).kind !== 'scheduled') continue;
       if (!stillThere(state, stop.channel) || sentinelRunChat(state, stop.channel) || this.deps.skip?.(stop.channel)) continue;
+      // Past a token budget (docs/budget.md), nothing restarts on its own: Continue is yours (once, it says so).
+      const over = budgetReached(state, stop.channel, now);
+      if (over) {
+        this.sent.add(stop.requestId);
+        this.deps.store.dispatch({ type: 'system', channel: stop.channel, text: `Your usage limit reset, but ${budgetName(over)} is reached (${budgetUse(over)}): Beluga didn’t continue on its own.`, level: 'info' });
+        continue;
+      }
       const plan = planOfChannel(state, stop.channel)?.plan;
       if (plan?.status === 'active') continue;
       const last = this.sentAt.get(stop.channel);

@@ -7,6 +7,7 @@ import { AUTO_COMPACT_DEFAULT, AUTO_COMPACT_MAX, AUTO_COMPACT_MIN, AUTO_COMPACT_
 import { PARALLEL_RUNS_DEFAULT, PARALLEL_RUNS_MAX, PARALLEL_RUNS_MIN } from './run-slots.js';
 import { CHAT_LIMIT_DEFAULT, CHAT_LIMIT_MAX } from './chat-limit.js';
 import { AUTO_CONTINUE_OFF_MAX } from './auto-continue.js';
+import { BUDGET_CHOICES_MAX, BudgetConfig } from './budget.js';
 import { MAX_AGENT_ARGS, MAX_AGENT_ARG_LENGTH } from './agent-args.js';
 import { THREAD_LIMITS_DEFAULT, THREAD_LIMITS_MAX } from './threads.js';
 import { LANGUAGE_CHOICES, LOCALES } from './i18n/locales.js';
@@ -173,6 +174,12 @@ export const Settings = z.object({
   autoContinueSkip: z.number().int().min(0).catch(0).default(0),
   /** How many conversations your Claude works in at once; a message past it waits for one to finish (and says so). */
   parallelRuns: z.number().int().min(PARALLEL_RUNS_MIN).max(PARALLEL_RUNS_MAX).catch(PARALLEL_RUNS_DEFAULT),
+  /** Token budgets (shared/budget.ts): per conversation, per day, and what happens at one. Unset: none (80% of your 5-hour window is still said). */
+  budget: BudgetConfig.optional().catch(undefined),
+  /** What Continue on a budget's Needs You allowed past it, by its key (a conversation, or a day's). */
+  budgetAllow: z.record(z.string().max(240), z.number().int().min(0)).catch({}).default({}),
+  /** Conversations told to go on cheaper past their budget. */
+  budgetCheaper: z.array(z.string().max(200)).max(BUDGET_CHOICES_MAX).catch([]).default([]),
   /** How many chats Your Mac and Sentinel each keep open (shared/chat-limit.ts); 0: no limit. */
   chatLimit: z.number().int().min(0).max(CHAT_LIMIT_MAX).catch(CHAT_LIMIT_DEFAULT),
   /** Your agents may start child threads (core/threads). Off until you turn it on. */

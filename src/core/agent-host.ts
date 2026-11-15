@@ -103,6 +103,11 @@ export interface AgentHostDeps {
   readonly threads?: (channel: string) => import('../agent/types.js').ThreadTools | undefined;
   /** "Your Mac" (core/assistant), your own runs in its conversation: where it runs, its tools, what Claude is told. */
   readonly assistant?: (channel: string, from: string) => { readonly place: AgentPlace; readonly tools: MacTools; readonly brief: string } | undefined;
+  /**
+   * Token budgets (core/budget/guard.ts), your own runs: the place as it runs past a budget (on a
+   * cheaper target), or why it doesn't start (the failed card's words, shared/run-failure.ts).
+   */
+  readonly budget?: (channel: string, place: AgentPlace, requestId: string) => { readonly place: AgentPlace } | { readonly refuse: string };
   /** A worktree doing a task a bot's plan handed to another bot (core/bots): that bot's MCPs, folder and persona, for your own runs. */
   readonly botWork?: (channel: string) => { readonly mcp?: AgentPlace['mcp']; readonly dir: string; readonly brief: string } | undefined;
   /** Your phone (core/phone, BLG-150), your own runs: tools to act on it, saving screenshots in `scratchDir`. `env` lets Bash use adb/scrcpy (BLG-174). */
@@ -1400,7 +1405,10 @@ export class AgentHost {
     const routedPlace = picked && this.routePlace(picked);
     // A task handed to a bot (docs/bots.md): its worktree's run carries the bot's tools and folder.
     const botWork = routedPlace && from === this.selfId && body.channel.startsWith('ws:') ? this.deps.botWork?.(body.channel) : undefined;
-    const place = routedPlace && botWork ? { ...routedPlace, additionalDirectories: [...routedPlace.additionalDirectories, botWork.dir], ...(botWork.mcp ? { mcp: botWork.mcp } : {}) } : routedPlace;
+    const botPlace = routedPlace && botWork ? { ...routedPlace, additionalDirectories: [...routedPlace.additionalDirectories, botWork.dir], ...(botWork.mcp ? { mcp: botWork.mcp } : {}) } : routedPlace;
+    // Token budgets (docs/budget.md): past one, your run goes on cheaper, or doesn't start (Needs You asks, or it stops).
+    const gated = botPlace && from === this.selfId && !botPlace.route?.problem ? this.deps.budget?.(body.channel, botPlace, body.requestId) : undefined;
+    const place = gated && 'place' in gated ? gated.place : botPlace;
     let markFinished: () => void = () => undefined;
     /** Claude Code's process for this run (see gone), and whether the run is over. */
     let proc: RunProcess | undefined;
@@ -1428,6 +1436,14 @@ export class AgentHost {
     // A combo none of whose targets can run now: why, instead of a run (docs/routing.md).
     if (place?.route?.problem) {
       this.emitAgent(body.requestId, from, 'error', place.route.problem, body.channel);
+      if (lane.current === controller) {
+        lane.current = undefined;
+        lane.runAgent = undefined;
+      }
+      return;
+    }
+    if (gated && 'refuse' in gated) {
+      this.emitAgent(body.requestId, from, 'error', gated.refuse, body.channel);
       if (lane.current === controller) {
         lane.current = undefined;
         lane.runAgent = undefined;

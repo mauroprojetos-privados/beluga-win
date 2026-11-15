@@ -8,6 +8,8 @@ import type { Effort, NotifySettings, Settings, ThemeName, TrustLevel } from './
 import { BRANCH_PREFIX_DEFAULT, NotifySettings as NotifySchema, SETTLE_IDLE_DAYS_DEFAULT } from '../shared/settings-schema.js';
 import type { Review } from '../workspaces/git.js';
 import type { CategoryCombos, Combo, DifficultyCombos, RoleCombos } from './routing/model.js';
+import type { BudgetConfig } from '../shared/budget.js';
+import { type SpendAction, type SpendSlice, addSpend, initialSpend, ledgerCounts } from './budget/store.js';
 import type { SavingsBaseline } from './routing/outcomes.js';
 import type { OrchestratorBlock } from './routing/orchestrator.js';
 import type { LanguageChoice, Locale } from '../shared/i18n/locales.js';
@@ -372,6 +374,12 @@ export interface Prefs {
   readonly autoContinueSkip: number;
   /** How many conversations your Claude works in at once (see shared/run-slots.ts). */
   readonly parallelRuns: number;
+  /** Token budgets (shared/budget.ts, Settings › Agent › Budget): per conversation, per day, and what happens at one. Unset: none. */
+  readonly budget?: BudgetConfig;
+  /** What Continue allowed past a budget, by its key (shared/budget.ts budgetKey). */
+  readonly budgetAllow: Readonly<Record<string, number>>;
+  /** Conversations you told to go on cheaper past their budget. */
+  readonly budgetCheaper: readonly string[];
   /** How many chats Your Mac and Sentinel each keep open; 0: no limit (see shared/chat-limit.ts). */
   readonly chatLimit: number;
   /** Your agents may start child threads (core/threads): off means your runs have no thread tools. */
@@ -579,7 +587,7 @@ export interface MyShare {
  * Everything Beluga knows that isn't about a screen: the room, people, projects, conversations,
  * approvals… The core (the daemon) owns it and every client sees the same.
  */
-export interface DomainState extends CollabState, WorkState, NetworkSlice, EarningsSlice, RevenueCatSlice, SupportSlice, StackSlice, ClaudeCodeSlice, GatewaySlice, BoardSlice, SentinelSlice, PlansSlice, DialoguesSlice, CompanionSlice, FriendShareSlice, TeamSlice {
+export interface DomainState extends CollabState, WorkState, NetworkSlice, EarningsSlice, RevenueCatSlice, SupportSlice, StackSlice, SpendSlice, ClaudeCodeSlice, GatewaySlice, BoardSlice, SentinelSlice, PlansSlice, DialoguesSlice, CompanionSlice, FriendShareSlice, TeamSlice {
   readonly room: string;
   readonly projects: readonly Project[];
   readonly projectGroups: readonly ProjectGroup[];
@@ -784,7 +792,8 @@ export type Action =
   | DialoguesAction
   | TeamAction
   | SupportAction
-  | StackAction;
+  | StackAction
+  | SpendAction;
 
 const LOG_LIMIT = 1000;
 const TRANSFER_LIMIT = 20;
@@ -821,6 +830,8 @@ export const DEFAULT_PREFS: Prefs = {
   autoContinueOff: [],
   autoContinueSkip: 0,
   parallelRuns: PARALLEL_RUNS_DEFAULT,
+  budgetAllow: {},
+  budgetCheaper: [],
   chatLimit: CHAT_LIMIT_DEFAULT,
   agentThreads: false,
   threadLimits: THREAD_LIMITS_DEFAULT,
@@ -846,7 +857,7 @@ export const DEFAULT_PREFS: Prefs = {
 
 /** The preference fields out of saved settings. */
 export function prefsFrom(settings: Partial<Settings>): Prefs {
-  const picked = Object.fromEntries(Object.keys(DEFAULT_PREFS).concat(['model', 'effort', 'defaultAgent', 'projectAgents', 'combos', 'difficultyCombos', 'roleCombos', 'categoryCombos', 'orchestrator', 'savingsBaseline', 'shell', 'earningsCurrency', 'commitLanguages', 'autoCompactChosen']).filter((k) => settings[k as keyof Settings] !== undefined).map((k) => [k, settings[k as keyof Settings]]));
+  const picked = Object.fromEntries(Object.keys(DEFAULT_PREFS).concat(['model', 'effort', 'defaultAgent', 'projectAgents', 'combos', 'difficultyCombos', 'roleCombos', 'categoryCombos', 'orchestrator', 'savingsBaseline', 'budget', 'shell', 'earningsCurrency', 'commitLanguages', 'autoCompactChosen']).filter((k) => settings[k as keyof Settings] !== undefined).map((k) => [k, settings[k as keyof Settings]]));
   return { ...DEFAULT_PREFS, ...picked };
 }
 
@@ -896,6 +907,7 @@ export function initialState(room: string, policy: Policy = 'ask', prefs: Partia
     ...initialRevenueCat,
     ...initialSupport,
     ...initialStack,
+    ...initialSpend,
     ...initialClaudeCode,
     ...initialGateway,
     ...initialFriendShare,
@@ -1018,8 +1030,6 @@ export function orderQueued(log: readonly LogItem[], owner: string, ids: readonl
  * Workbench.onUsage works out the growth from running totals). No card for it: nothing.
  */
 function reduceRunUsage(state: DomainState, a: Extract<Action, { type: 'agent_event' }>): DomainState {
-  const idx = state.log.findIndex((l) => l.type === 'agent' && l.requestId === a.requestId && l.owner === a.owner);
-  if (idx < 0) return state;
   let add: { tokens?: unknown; cost?: unknown; executorTokens?: unknown };
   try {
     add = JSON.parse(a.text) as { tokens?: unknown; cost?: unknown; executorTokens?: unknown };
@@ -1028,10 +1038,14 @@ function reduceRunUsage(state: DomainState, a: Extract<Action, { type: 'agent_ev
   }
   const num = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : 0);
   if (!num(add.tokens) && !num(add.cost)) return state;
-  const card = state.log[idx] as Extract<LogItem, { type: 'agent' }>;
+  // Your runs outside a workspace: the budgets' ledger (core/budget/store.ts); a workspace keeps its own.
+  const spent = a.owner === state.selfId && a.channel && ledgerCounts(a.channel) ? { ...state, spend: addSpend(state.spend, a.channel, num(add.tokens), a.ts) } : state;
+  const idx = spent.log.findIndex((l) => l.type === 'agent' && l.requestId === a.requestId && l.owner === a.owner);
+  if (idx < 0) return spent;
+  const card = spent.log[idx] as Extract<LogItem, { type: 'agent' }>;
   const executorTokens = (card.usage?.executorTokens ?? 0) + Math.min(num(add.executorTokens), num(add.tokens));
   const usage = { tokens: (card.usage?.tokens ?? 0) + num(add.tokens), cost: (card.usage?.cost ?? 0) + num(add.cost), ...(executorTokens ? { executorTokens } : {}) };
-  return { ...state, log: state.log.map((l, i) => (i === idx ? { ...card, usage } : l)) };
+  return { ...spent, log: spent.log.map((l, i) => (i === idx ? { ...card, usage } : l)) };
 }
 
 function reduceAgent(state: DomainState, raw: Extract<Action, { type: 'agent_event' }>): DomainState {
@@ -1426,6 +1440,8 @@ export function reduceDomain(state: DomainState, action: Action): DomainState {
       return { ...state, ...reduceNetwork(state, action) };
     case 'support':
       return { ...state, support: action.support };
+    case 'spend':
+      return { ...state, spend: action.spend };
     case 'stack':
       return { ...state, stack: action.stack };
     case 'assistant_chats':

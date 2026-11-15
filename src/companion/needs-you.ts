@@ -19,6 +19,7 @@ import { isAssistant } from '../shared/assistant.js';
 import { type ChecklistItem, checklistNumber, checklistProblems, stackKey, stackProblems } from '../core/stack-store.js';
 import { canStartFresh } from '../core/context-log.js';
 import { LONG_CONTEXT_WINDOW, compactLimit, formatTokenCount } from '../shared/context-usage.js';
+import { budgetAsks } from '../core/budget/model.js';
 
 /**
  * Everything waiting for you, each with the API calls its buttons make: the phone's Needs You
@@ -656,6 +657,7 @@ export function waitingNeeds(state: DomainState): NeedsYou[] {
     ...stackItems(state),
     ...autoCompactItems(state),
     ...compactItems(state),
+    ...budgetItems(state),
   ];
 }
 
@@ -720,6 +722,24 @@ function comboItems(state: DomainState): NeedsYou[] {
     ...(convTopic(stop.channel) ? { topic: convTopic(stop.channel)! } : {}),
     askedAt: Math.round(stop.at),
     actions: [btn('daemon.needs.tryAgain', 'main', 'routing.retry', [stop.channel])],
+  }));
+}
+
+/**
+ * A token budget set to ask (docs/budget.md, shared/budget.ts) stopped a run of yours: Continue (half
+ * the budget again), Cheaper (on past it, on a cheaper target) or Stop. Its id names the run, so
+ * Stop dismisses this one only: the next run there that reaches it asks again.
+ */
+function budgetItems(state: DomainState): NeedsYou[] {
+  return budgetAsks(state, Date.now()).map(({ channel, requestId, at, line }) => ({
+    id: `budget:${channel}:${requestId}`,
+    kind: 'budget',
+    ...keyed(`budget.needs.${line.scope}`, { name: line.name ?? '', used: formatTokenCount(line.used), limit: formatTokenCount(line.limit) }),
+    detail: clip(t('budget.needs.detail', { used: formatTokenCount(line.used), limit: formatTokenCount(line.limit), pct: line.pct }), 64_000),
+    ...(line.name ? { from: clip(line.name, 100) } : {}),
+    ...(convTopic(channel) ? { topic: convTopic(channel)! } : {}),
+    askedAt: Math.round(at),
+    actions: [btn('budget.needs.continue', 'main', 'budget.answer', [channel, 'continue']), btn('budget.needs.cheaper', 'plain', 'budget.answer', [channel, 'cheaper']), btn('budget.needs.stop', 'danger', 'budget.answer', [channel, 'stop'])],
   }));
 }
 

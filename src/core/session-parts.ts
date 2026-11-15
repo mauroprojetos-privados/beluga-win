@@ -27,6 +27,7 @@ import { sentinelOf } from './sentinel/registry.js';
 import { needPlans, plansOf } from './plans/registry.js';
 import { assistantOf } from './assistant/registry.js';
 import { botsOf } from './bots/registry.js';
+import { budgetOf } from './budget/registry.js';
 import { companionOf } from '../companion/registry.js';
 import { stopTestProcesses } from '../workspaces/test-procs.js';
 import { ghRepoEnv } from '../workspaces/github.js';
@@ -237,6 +238,8 @@ export function createSessionParts(session: Session, opts: SessionOptions): Sess
       assistant: (channel, from) => assistantOf(session)?.forRun(channel, from) ?? botsOf(session)?.forRun(channel, from) ?? assistantOf(session)?.forChat(channel, from),
       // A worktree doing a task its plan handed to a bot: that bot's tools, persona and folder go with the run.
       botWork: (channel) => botsOf(session)?.workFor(channel),
+      // Token budgets (docs/budget.md): past one, a run of yours goes on cheaper or doesn't start.
+      budget: (channel, place, requestId) => budgetOf(session)?.gate(channel, place, requestId) ?? { place },
       phone: (scratchDir) => companionOf(session)?.control.toolsFor(scratchDir),
       callNotes: () => callNotesToolsOf(session),
       phoneUse: () => companionOf(session)?.control.useLevel() ?? 'off',

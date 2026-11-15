@@ -7,6 +7,7 @@ import { Breakdown } from './usage/Breakdown.js';
 import { CleanupCard } from './usage/CleanupCard.js';
 import { EarningsSummaryCard } from './usage/EarningsSummaryCard.js';
 import { PlanCard } from './usage/PlanCard.js';
+import { BudgetCard } from './usage/BudgetCard.js';
 import { type PlanLimit, SessionsCard } from './usage/SessionsCard.js';
 import { usagesOf } from '@beluga/agent/usage.js';
 import type { AppState } from '@beluga/core/store.js';
@@ -108,6 +109,8 @@ export function UsageView() {
             <div className={s.summary}>
               <PlanCard state={state} now={now} />
               <ActivityCard state={state} now={now} />
+              {/* Token budgets (docs/budget.md): today against yours, each project's and bot's. */}
+              <BudgetCard state={state} now={now} />
               <SessionsCard windows={got.stats?.plan ?? []} limits={planLimits(state)} now={got.at} />
               <EarningsSummaryCard />
             </div>

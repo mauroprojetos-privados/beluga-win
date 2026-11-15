@@ -235,6 +235,10 @@ export const PhoneCalls = {
   // 1.55: a bot's own chats, started and deleted from the phone (which is open is the Mac's).
   'bots.newChat': entry('bots.newChat', z.string()),
   'bots.deleteChat': entry('bots.deleteChat', done),
+  // 1.57 (docs/budget.md): token budgets, read-only; a budget's Needs You answered (Continue, Go On Cheaper, Stop).
+  // The phone reads them from Home and the conversation (`HomeView.budget`, `ConvView.budget`); `budget.status` is the Mac's own shape.
+  'budget.status': entry('budget.status', z.object({ day: z.unknown(), conversation: z.unknown().optional() })),
+  'budget.answer': entry('budget.answer', z.string()),
   // Your stack (docs/stack.md): its Needs You card's Check Again (the view comes back in Home's needs).
   'stack.check': entry('stack.check', done),
   // Its checklist's Check Again (docs/stack.md › Checklist): runs it again; the phone shows, never fixes.

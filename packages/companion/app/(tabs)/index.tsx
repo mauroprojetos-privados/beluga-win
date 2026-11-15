@@ -14,6 +14,7 @@ import { SentinelHome } from '../../components/Sentinels';
 import { AwayBand, Screen, StatusShade, useScrolled } from '../../components/Screen';
 import { UpdatePill, UpdateSheet } from '../../components/Update';
 import { UsageCard, UsageSheet } from '../../components/Usage';
+import { BudgetCard } from '../../components/Budget';
 import { Card, IconBadge, Pill, Press, Section, StatusDot, T } from '../../components/ui';
 import { useLink, useSupports, useView, useAllNeeds } from '../../lib/hooks';
 import { formatRelative, useT } from '../../lib/language';
@@ -161,6 +162,8 @@ export default function Home() {
             {h.usage.length ? (
               <Section title={t('phone.home.usage')}>
                 <UsageCard usage={h.usage} onOpen={() => setUsageOpen(true)} />
+                {/* The day's token budgets (1.57, docs/budget.md), under the allowance they protect. */}
+                {h.budget ? <BudgetCard budget={h.budget} style={{ marginHorizontal: 16, marginTop: 12 }} /> : null}
               </Section>
             ) : null}
           </>

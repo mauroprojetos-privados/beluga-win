@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Check, CircleCheck, Flag, Gauge, Hand, Monitor, MessageCircleQuestion, PenLine, PhoneIncoming, Plug, Shrink, SquareTerminal, X } from 'lucide-react-native';
+import { Check, CircleCheck, Flag, Gauge, Hand, Monitor, MessageCircleQuestion, PenLine, PhoneIncoming, Plug, Shrink, SquareTerminal, Wallet, X } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
@@ -21,7 +21,7 @@ import { Button, Card, haptic, IconBadge, More, Pill, Press, T, type Tone, toneB
  * card that says "Open on your Mac" (docs/companion.md, staying in step).
  */
 
-export const KNOWN = new Set(['approval', 'question', 'request', 'decision', 'confirm', 'call', 'combo', 'stack', 'autocompact', 'compact']);
+export const KNOWN = new Set(['approval', 'question', 'request', 'decision', 'confirm', 'call', 'combo', 'stack', 'autocompact', 'compact', 'budget']);
 
 export const kindOf = (kind: string): { label: string; tone: Tone; Icon: typeof Monitor } => {
   switch (kind) {
@@ -51,6 +51,9 @@ export const kindOf = (kind: string): { label: string; tone: Tone; Icon: typeof 
     // A summary still past the threshold after compacting: Start Fresh begins a new conversation from it.
     case 'compact':
       return { label: t('phone.needs.kindCompact'), tone: 'butter', Icon: Shrink };
+    // A token budget reached (docs/budget.md): Continue, Go On Cheaper or Stop.
+    case 'budget':
+      return { label: t('budget.phone.kind'), tone: 'butter', Icon: Wallet };
     default:
       return { label: t('phone.needs.kindOther'), tone: 'plain', Icon: Monitor };
   }
