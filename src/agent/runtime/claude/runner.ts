@@ -3,6 +3,7 @@ import path from 'node:path';
 import { query, type McpServerConfig, type Options } from '@anthropic-ai/claude-agent-sdk';
 import { MAX_ATTACHMENT_BYTES, linkedImages, mediaTypeOf } from '../../../core/attachments.js';
 import { buildPrompt, summarizeTool } from '../../prompt.js';
+import { buildProjectInstructionsAppend } from '../../project-instructions.js';
 import { runInstructions } from '../../run-instructions.js';
 import { SECRET_DECLINED, decideTool, denyReason } from '../../policy.js';
 import { gateTool } from '../../tool-gate.js';
@@ -58,7 +59,8 @@ const STDERR_KEEP = 40;
  * user settings (~/.claude/settings.json: hooks, permission rules, plugins) and your skills and
  * commands. A project's .claude/ settings are never loaded, for anyone: it sits in the folder a
  * friend with :rw access may write to, so they could plant hooks or permission rules there (its
- * skills and commands come in alone, see skill-plugins.ts). A friend's or a guest's run loads nothing of yours.
+ * skills and commands come in alone, see skill-plugins.ts; its CLAUDE.md as text, see
+ * project-instructions.ts). A friend's or a guest's run loads nothing of yours.
  */
 export function ownerSettings(input: Pick<AgentRunInput, 'ownerMcp' | 'guest'>): { settingSources: Array<'user'>; skills?: 'all' } {
   return input.ownerMcp && !input.guest ? { settingSources: ['user'], skills: 'all' } : { settingSources: [] };
@@ -266,7 +268,9 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
             },
           ],
         },
-        systemPrompt: { type: 'preset', preset: 'claude_code', append: runInstructions(input, opts.bridge.selfName(), opts.agentOf?.(input) ?? input.place?.agent) },
+        // The project's CLAUDE.md never loads by itself here (see ownerSettings): its text comes in this way.
+        // A bot's folder CLAUDE.md is its persona, which the bot's brief already carries (core/bots/bots.ts).
+        systemPrompt: { type: 'preset', preset: 'claude_code', append: runInstructions(input, opts.bridge.selfName(), opts.agentOf?.(input) ?? input.place?.agent) + (place?.mcp ? '' : buildProjectInstructionsAppend(cwd)) },
         ...ownerSettings(input),
         ...skills,
         ...((input.model ?? opts.model) ? { model: input.model ?? opts.model } : {}),

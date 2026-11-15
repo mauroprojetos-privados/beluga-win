@@ -12,7 +12,7 @@ import { findTool, type StackDeps } from './probe.js';
  */
 
 /** What indexes write in a project, kept out of git through .git/info/exclude (never .gitignore). */
-export const STACK_EXCLUDES = ['.gitnexus/', '.graphify-out/', '.graph_loop_run'] as const;
+export const STACK_EXCLUDES = ['.gitnexus/', '.graphify-out/', '.graph_loop_run', '.graph_loop_memory.db'] as const;
 
 /** The project's documentation OpenViking gets (the code is GitNexus's and graphify's). */
 const DOCS = ['AGENTS.md', 'CLAUDE.md', 'docs', 'roadmap'] as const;

@@ -25,9 +25,9 @@ The rules for using these tools (GitNexus before reading code, the reading order
 When a project is added or made, and **Settings › Stack › Set up new projects** (`stackBootstrap`, on by default) is on, it runs in the background (`core/stack/bootstrap.ts`) and never holds up the add:
 
 1. **Git.** A plain folder added in the Add Projects sheet becomes a git project by itself (`projects.initGit`: git on `main`, a .gitignore, a first commit) instead of the sheet offering it. Your home folder and the disk are still refused. `beluga project add` in a terminal still only says how (a first commit of everything is a lot to do unasked from a command).
-2. **Out of git.** `.gitnexus/`, `.graphify-out/` and `.graph_loop_run` go in `.git/info/exclude`, never in `.gitignore`.
+2. **Out of git.** `.gitnexus/`, `.graphify-out/`, `.graph_loop_run` and `.graph_loop_memory.db` go in `.git/info/exclude`, never in `.gitignore`.
 3. **beluga.json**, only when the project has none (nor `klaud.json` or `conductor.json`): its `setup` is the install Beluga detects, then `gitnexus analyze --index-only`, then `gls graphify ensure`, each only when its tool is installed. Each new worktree then installs and indexes itself.
-4. **CLAUDE.md**, only when the project has none and has an `AGENTS.md`: `@AGENTS.md`, so Claude Code reads the project's own rules.
+4. **CLAUDE.md**, only when the project has none and has an `AGENTS.md`: `@AGENTS.md`, so the agent reads the project's own rules. Beluga never loads a project's `.claude/` settings, so on a Claude run it adds the project's `CLAUDE.md` (and `CLAUDE.local.md`, or `AGENTS.md` alone) to the run's instructions itself, `@imports` filled in, inside the folder and never a secret file (`agent/project-instructions.ts`). Codex reads `AGENTS.md` on its own.
 5. **Indexes.** `gitnexus analyze --index-only` and `gls graphify ensure` in the project.
 6. **OpenViking** gets the documentation only (README*, AGENTS.md, CLAUDE.md, `docs/`, `roadmap/`) under `viking://resources/<project>`, queued without waiting. The code is GitNexus's and graphify's.
 
