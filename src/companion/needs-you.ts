@@ -16,7 +16,7 @@ import { exhaustedCombos } from '../core/routing/model.js';
 import { hhmm } from '../shared/clock.js';
 import { botBehind } from '../core/bots/schema.js';
 import { isAssistant } from '../shared/assistant.js';
-import { stackKey, stackProblems } from '../core/stack-store.js';
+import { type ChecklistItem, checklistNumber, checklistProblems, stackKey, stackProblems } from '../core/stack-store.js';
 
 /**
  * Everything waiting for you, each with the API calls its buttons make: the phone's Needs You
@@ -678,6 +678,34 @@ function comboItems(state: DomainState): NeedsYou[] {
  * set it names, so dismissing it hides that set only: a new outage asks again. Check Again looks now.
  */
 function stackItems(state: DomainState): NeedsYou[] {
+  return [...stackCheckItems(state), ...checklistItems(state)];
+}
+
+/**
+ * The stack's checklist (docs/stack.md › Checklist): only what didn't fix itself, grouped by project
+ * (this computer first). The phone shows it; Fix is the Mac's (Settings › Stack). One item, its id
+ * the set it names; Check Again runs the checklist again.
+ */
+function checklistItems(state: DomainState): NeedsYou[] {
+  const groups = checklistProblems(state.stack.checklist);
+  if (!groups.length) return [];
+  const count = groups.reduce((n, g) => n + g.items.length, 0);
+  const line = (i: ChecklistItem): string =>
+    t('stack.needs.itemLine', { n: checklistNumber(i.id), name: t(`stack.item.${i.id}` as Key), why: i.why ? t(`stack.why.${i.why}` as Key) : '' }) + (i.detail ? ` (${plainLine(i.detail).slice(0, 300)})` : '');
+  const detail = groups.map((g) => [g.place ? g.place.name : t('stack.needs.thisComputer'), ...g.items.map((i) => `· ${line(i)}`)].join('\n')).join('\n\n');
+  return [
+    {
+      id: `stack:list:${groups.flatMap((g) => g.items.map((i) => `${g.place?.id ?? ''}.${i.id}`)).sort().join(',')}`,
+      kind: 'stack',
+      ...keyed('stack.needs.checklistTitle', { count }),
+      detail: clip(detail, 64_000),
+      ...(state.stack.checklist?.checkedAt ? { askedAt: Math.round(state.stack.checklist.checkedAt) } : {}),
+      actions: [btn('stack.needs.checkAgain', 'main', 'stack.checklist', [])],
+    },
+  ];
+}
+
+function stackCheckItems(state: DomainState): NeedsYou[] {
   const problems = stackProblems(state.stack);
   if (!problems.length) return [];
   const names = problems.map((p) => t(`stack.name.${stackKey(p.id)}` as Key));

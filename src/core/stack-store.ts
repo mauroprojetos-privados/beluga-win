@@ -33,6 +33,8 @@ export interface StackView {
   readonly checkedAt?: number;
   /** A look is under way. */
   readonly checking: boolean;
+  /** The checklist, as it was last run (unset until then). */
+  readonly checklist?: StackChecklist;
 }
 
 export interface StackSlice {
@@ -50,3 +52,128 @@ export const stackProblems = (view: StackView): readonly StackCheck[] => view.ch
 
 /** The i18n key part for a check's id (`token-goat` → `tokenGoat`). */
 export const stackKey = (id: StackCheckId): string => id.replace(/-(\w)/g, (_, c: string) => c.toUpperCase());
+
+/**
+ * The stack's checklist (docs/stack.md › Checklist, core/stack/checklist.ts): 19 items that say whether
+ * the stack works on this computer (1–7), in each project and worktree (8–14) and for sub-agents
+ * (15–19), not only whether it's installed. Numbered in this order.
+ */
+export const CHECKLIST_ITEMS = [
+  'tools',
+  'services',
+  'ollamaNeeded',
+  'rtkHook',
+  'gitnexusHooks',
+  'mcps',
+  'claudeMd',
+  'gitnexusIndex',
+  'graphifyIndex',
+  'tokenGoatMap',
+  'excludes',
+  'belugaJson',
+  'docs',
+  'gitnexusRegistry',
+  'agentTools',
+  'agentModels',
+  'subagentHooks',
+  'subagentRules',
+  'otherRuntimes',
+] as const;
+export type ChecklistItemId = (typeof CHECKLIST_ITEMS)[number];
+
+/** An item's number in the checklist (1–19). */
+export const checklistNumber = (id: ChecklistItemId): number => CHECKLIST_ITEMS.indexOf(id) + 1;
+
+/** `ok` ✓, `warn` ⚠ (works, but less), `fail` ✗ (doesn't work), `skip`: doesn't apply here. */
+export type ChecklistState = 'ok' | 'warn' | 'fail' | 'skip';
+
+/**
+ * How it's fixed: `auto` it fixes itself (the project's own, nothing of yours changes: indexes,
+ * excludes, docs in OpenViking, GitNexus's registry); `ask` only on your yes (Fix), with a backup,
+ * since it changes a file of yours (~/.claude/settings.json, ~/.claude/CLAUDE.md, .claude/agents/*.md,
+ * beluga.json).
+ */
+export type ChecklistFix = 'auto' | 'ask';
+
+/** Why an item isn't ✓: the i18n key part `stack.why.<why>`. */
+export const CHECKLIST_WHYS = [
+  'missing',
+  'down',
+  'ollamaOff',
+  'noToolsModel',
+  'noHook',
+  'hookFileGone',
+  'notRegistered',
+  'notAnswering',
+  'noBlock',
+  'brokenImport',
+  'stale',
+  'notBuilt',
+  'rebuilding',
+  'rebuildFailed',
+  'noTool',
+  'notExcluded',
+  'noFile',
+  'noIndexSetup',
+  'notSent',
+  'old',
+  'sendFailed',
+  'leftovers',
+  'noStack',
+  'inheritsLead',
+  'noRules',
+  'missingConfig',
+] as const;
+export type ChecklistWhy = (typeof CHECKLIST_WHYS)[number];
+
+export interface ChecklistItem {
+  readonly id: ChecklistItemId;
+  readonly state: ChecklistState;
+  /** Why it isn't ✓ (unset when it is). */
+  readonly why?: ChecklistWhy;
+  /** What it found, as the tool or file says it (names, paths, a tool's last lines): not translated. */
+  readonly detail?: string;
+  /** How it's fixed, when it can be. */
+  readonly fix?: ChecklistFix;
+  /** It's fixing itself now (an index rebuilding in the background). */
+  readonly fixing?: boolean;
+  /** Only advice: shown in Settings › Stack, never in Needs You. */
+  readonly advisory?: boolean;
+}
+
+/** One project's checkout (its main folder or a worktree, each with its own indexes) and its items. */
+export interface ChecklistPlace {
+  /** The project's id for its main checkout, the worktree's id for a worktree. */
+  readonly id: string;
+  readonly projectId: string;
+  /** "erp-rewrite", or "erp-rewrite › fix-login" for a worktree. */
+  readonly name: string;
+  readonly dir: string;
+  readonly items: readonly ChecklistItem[];
+}
+
+export interface StackChecklist {
+  /** This computer: 1–7, and 15–19 for your own agents and your bots'. */
+  readonly machine: readonly ChecklistItem[];
+  /** Each project and worktree: 8–14, and 15–16 for the project's own agents. */
+  readonly places: readonly ChecklistPlace[];
+  readonly checkedAt?: number;
+  /** A run is under way (indexes are slow: `gls index --check` can take minutes). */
+  readonly checking?: boolean;
+}
+
+/** What a checklist item makes wait for you: not ✓, not fixing itself, not advice, and not 1–2 (the checks above already say those). */
+export const checklistOpen = (item: ChecklistItem): boolean => (item.state === 'warn' || item.state === 'fail') && !item.fixing && !item.advisory && item.id !== 'tools' && item.id !== 'services';
+
+/** What's waiting for you in the checklist, by place ('' for this computer), in order. */
+export function checklistProblems(list: StackChecklist | undefined): { readonly place?: ChecklistPlace; readonly items: readonly ChecklistItem[] }[] {
+  if (!list) return [];
+  const out: { place?: ChecklistPlace; items: readonly ChecklistItem[] }[] = [];
+  const machine = list.machine.filter(checklistOpen);
+  if (machine.length) out.push({ items: machine });
+  for (const place of list.places) {
+    const items = place.items.filter(checklistOpen);
+    if (items.length) out.push({ place, items });
+  }
+  return out;
+}

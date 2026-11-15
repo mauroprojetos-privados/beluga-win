@@ -16,4 +16,14 @@ export const STACK_HANDLERS = {
     if (!root) throw new Error(t('stack.toast.noProject'));
     return stackOf(s)?.setUp(root);
   },
+  // Started, not waited for (indexes are slow): the state follows as each place is done.
+  'stack.checklist': (s, placeId) => {
+    void stackOf(s)?.runChecklist(placeId ? [placeId] : undefined);
+    return s.store.getState().stack.checklist ?? { machine: [], places: [], checking: true };
+  },
+  'stack.fix': (s, itemId, placeId) => {
+    const monitor = stackOf(s);
+    if (!monitor) return { ok: false, changed: [] };
+    return monitor.fix(itemId, placeId);
+  },
 } satisfies StackHandlers;

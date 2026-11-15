@@ -330,6 +330,10 @@ export const PHONE: Record<Method, Side> = {
   // setting a project up writes files in it, so it's the Mac's.
   'stack.check': 'phone',
   'stack.setupProject': 'mac',
+  // The checklist (docs/stack.md › Checklist): the phone reads it (Needs You's card); fixing changes
+  // files of yours (with a backup, on your yes), so Fix is the Mac's.
+  'stack.checklist': 'phone',
+  'stack.fix': 'mac',
   'settings.commitLanguage': 'mac',
   // ---- your stats: the Usage tab's charts and what the composer saw (the phone keeps its plan meters)
   'stats.get': 'mac',

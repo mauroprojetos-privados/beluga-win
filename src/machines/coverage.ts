@@ -367,6 +367,8 @@ export const MACHINE: Record<Method, MachineSide> = {
   // ---- your stack (docs/stack.md): the computer's own services and projects, as the rest
   'stack.check': 'drive',
   'stack.setupProject': 'drive',
+  'stack.checklist': 'drive',
+  'stack.fix': 'drive',
   'settings.commitLanguage': 'drive',
   // ---- stats
   'stats.get': 'drive',

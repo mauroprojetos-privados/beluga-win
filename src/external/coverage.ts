@@ -327,6 +327,8 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   // Your stack: a person's computer, its services started and its projects set up from Settings.
   'stack.check': { refused: NO_TOOL },
   'stack.setupProject': { refused: NO_TOOL },
+  'stack.checklist': { refused: NO_TOOL },
+  'stack.fix': { refused: NO_TOOL },
   'settings.commitLanguage': { refused: LANGUAGE },
   'claudeCode.steps': 'gated',
   'claudeCode.step': 'gated',

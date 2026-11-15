@@ -1,12 +1,14 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { findViking } from '../bots/knowledge.js';
+import { botsOf } from '../bots/registry.js';
 import { belugaHome } from '../home.js';
 import { claudeByKind } from '../routing/presets.js';
 import type { Session } from '../session.js';
 import type { Store } from '../store.js';
+import type { ChecklistDeps, PlaceInput } from './checklist.js';
 import { StackMonitor } from './monitor.js';
-import { realStackDeps } from './probe.js';
+import { type StackDeps, realStackDeps } from './probe.js';
 
 /** Which stack monitor serves a session (the daemon's), so the API and the projects reach it. */
 const all = new WeakMap<object, StackMonitor>();
@@ -82,16 +84,69 @@ export function launchStack(host: { readonly session: Session; readonly store: S
     bootstrap: { ...stack, viking: () => findViking() },
     notify: (e) => session.notifier.notify(e),
     toast: (text, level) => session.toast(text, level),
+    checklist: {
+      deps: realChecklistDeps(stack),
+      places: () => checklistPlaces(store),
+      botDirs: () => {
+        const bots = botsOf(session);
+        return bots ? store.getState().bots.bots.map((b) => bots.dirOf(b.id)) : [];
+      },
+      recordFile: path.join(belugaHome(), 'stack-checklist.json'),
+    },
   });
   all.set(session, monitor);
   const offAdded = session.workspaces?.onProjectAdded((root) => monitor.projectAdded(root));
   // Only a worktree's index: the project's own (its main checkout) stays.
   const offGoing = session.workspaces?.onWorktreeGoing((ws) => ws.kind === 'worktree' && monitor.worktreeGone(ws.path));
+  // A new worktree has indexes of its own; a merge moves its project's main checkout on.
+  const offWorktree = session.workspaces?.onWorktree((e) => {
+    if (e.kind === 'created' && e.ws.kind === 'worktree') void monitor.runChecklist([e.ws.id]);
+    if (e.kind === 'merged') {
+      const project = store.getState().projects.find((p) => p.workspaces.some((w) => w.id === e.id));
+      if (project) void monitor.runChecklist([project.id]);
+    }
+  });
   monitor.start();
+  // The checklist once a minute after start (the first look comes first), then once a day.
+  const first = setTimeout(() => void monitor.runChecklist(), 60_000);
+  first.unref?.();
+  const daily = setInterval(() => void monitor.runChecklist(), 24 * 60 * 60_000);
+  daily.unref?.();
   return () => {
+    clearTimeout(first);
+    clearInterval(daily);
     offAdded?.();
     offGoing?.();
+    offWorktree?.();
     all.delete(session);
     monitor.stop();
+  };
+}
+
+/** Each project's main checkout and its live worktrees, for the checklist. */
+export function checklistPlaces(store: Store): PlaceInput[] {
+  return store.getState().projects.flatMap((p) => [
+    { id: p.id, projectId: p.id, name: p.name, dir: p.root },
+    ...p.workspaces.filter((w) => w.kind === 'worktree' && !w.archived && !w.pending).map((w) => ({ id: w.id, projectId: p.id, name: `${p.name} › ${w.name}`, dir: w.path, worktree: true })),
+  ]);
+}
+
+/** The checklist's touch of this computer: the stack's, plus listing folders and writing files. */
+export function realChecklistDeps(stack: StackDeps): ChecklistDeps {
+  return {
+    ...stack,
+    listDir: (dir) => {
+      try {
+        return readdirSync(dir);
+      } catch {
+        return [];
+      }
+    },
+    writeFile: (file, text) => {
+      mkdirSync(path.dirname(file), { recursive: true });
+      writeFileSync(file, text);
+    },
+    viking: () => findViking(),
+    now: () => Date.now(),
   };
 }

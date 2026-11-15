@@ -86,6 +86,13 @@ function useStackItem(p: Project): readonly ActionItem[] {
       onSelect: () =>
         void api.stack.setupProject(p.id).catch((err: unknown) => client.store.dispatch({ type: 'toast', text: err instanceof Error ? err.message : String(err), level: 'error' })),
     },
+    // The checklist for this project (docs/stack.md › Checklist): Settings › Stack shows it.
+    {
+      label: t('stack.menu.check'),
+      icon: 'plug',
+      onSelect: () =>
+        void api.stack.checklist(p.id).catch((err: unknown) => client.store.dispatch({ type: 'toast', text: err instanceof Error ? err.message : String(err), level: 'error' })),
+    },
   ];
 }
 
