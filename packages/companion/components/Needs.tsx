@@ -42,6 +42,7 @@ export const kindOf = (kind: string): { label: string; tone: Tone; Icon: typeof 
     case 'combo':
       return { label: t('phone.needs.kindCombo'), tone: 'butter', Icon: Gauge };
     // Your stack (docs/stack.md): what's down or missing on the Mac, how to fix each; Check Again looks now.
+    // Also its checklist (› Checklist): what didn't fix itself, by project. Shown here, fixed on the Mac.
     case 'stack':
       return { label: t('phone.needs.kindStack'), tone: 'peach', Icon: Plug };
     default:

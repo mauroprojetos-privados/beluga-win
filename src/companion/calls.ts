@@ -227,6 +227,8 @@ export const PhoneCalls = {
   'bots.deleteChat': entry('bots.deleteChat', done),
   // Your stack (docs/stack.md): its Needs You card's Check Again (the view comes back in Home's needs).
   'stack.check': entry('stack.check', done),
+  // Its checklist's Check Again (docs/stack.md › Checklist): runs it again; the phone shows, never fixes.
+  'stack.checklist': entry('stack.checklist', done),
 } as const;
 
 export type PhoneMethod = keyof typeof PhoneCalls;
