@@ -229,6 +229,9 @@ export const PhoneCalls = {
   'stack.check': entry('stack.check', done),
   // Its checklist's Check Again (docs/stack.md › Checklist): runs it again; the phone shows, never fixes.
   'stack.checklist': entry('stack.checklist', done),
+  // Auto-compact (docs/compaction.md): Needs You's one-time question, and Start Fresh From the Summary.
+  'session.chooseAutoCompact': entry('session.chooseAutoCompact', done),
+  'session.freshFromSummary': entry('session.freshFromSummary', done),
 } as const;
 
 export type PhoneMethod = keyof typeof PhoneCalls;

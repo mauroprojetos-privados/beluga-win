@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { AgentRef } from '../protocol.js';
 import { CategoryCombos, DifficultyCombos, RoleCombos, SavedCombos } from '../core/routing/model.js';
 import { SAVINGS_BASELINES } from '../core/routing/outcomes.js';
-import { AUTO_COMPACT_DEFAULT, AUTO_COMPACT_MAX, AUTO_COMPACT_MIN } from './context-usage.js';
+import { AUTO_COMPACT_DEFAULT, AUTO_COMPACT_MAX, AUTO_COMPACT_MIN, AUTO_COMPACT_TOKENS_MAX, AUTO_COMPACT_TOKENS_MIN } from './context-usage.js';
 import { PARALLEL_RUNS_DEFAULT, PARALLEL_RUNS_MAX, PARALLEL_RUNS_MIN } from './run-slots.js';
 import { CHAT_LIMIT_DEFAULT, CHAT_LIMIT_MAX } from './chat-limit.js';
 import { AUTO_CONTINUE_OFF_MAX } from './auto-continue.js';
@@ -104,6 +104,10 @@ export const ThreadLimitsSchema = z.object({
   macRunning: threadLimit(THREAD_LIMITS_MAX.macRunning),
 });
 
+/** Auto-compact's threshold: a percent of the window, or tokens (with an optional percent too); whichever comes first (shared/context-usage.ts). */
+const AutoCompactPct = z.number().int().min(AUTO_COMPACT_MIN).max(AUTO_COMPACT_MAX);
+export const AutoCompactAtSchema = z.union([AutoCompactPct, z.object({ tokens: z.number().int().min(AUTO_COMPACT_TOKENS_MIN).max(AUTO_COMPACT_TOKENS_MAX), pct: AutoCompactPct.optional() })]);
+
 /** Choices that persist between runs in ~/.beluga/settings.json. */
 export const Settings = z.object({
   name: z.string().regex(/^[\w.-]{1,32}$/).optional(),
@@ -156,8 +160,8 @@ export const Settings = z.object({
   autoCompact: z.boolean().default(false),
   /** You chose auto-compact yourself. Older files saved `autoCompact: true` as a default nobody picked, so without this it reads as off. */
   autoCompactChosen: z.boolean().optional(),
-  /** How full (percent) a conversation gets before it's compacted. */
-  autoCompactAt: z.number().int().min(AUTO_COMPACT_MIN).max(AUTO_COMPACT_MAX).catch(AUTO_COMPACT_DEFAULT),
+  /** How full a conversation gets before it's compacted: a percent of its window, or `{ tokens, pct? }` (whichever comes first; docs/compaction.md). */
+  autoCompactAt: AutoCompactAtSchema.catch(AUTO_COMPACT_DEFAULT),
   /** After your usage limit resets, tell the agent that stopped on it to continue (shared/auto-continue.ts). On until you turn it off. */
   autoContinue: z.boolean().default(true),
   /** Chats it's off in (the limit card's "Not in this chat"). */

@@ -24,6 +24,10 @@ export const PHONE: Record<Method, Side> = {
   'session.copyLastAnswer': 'mac',
   'session.copyText': 'mac',
   'session.setPrefs': 'mac',
+  // Answering Needs You's one-time question (docs/compaction.md): turn auto-compact on, or keep it off.
+  'session.chooseAutoCompact': 'phone',
+  // Needs You's Start Fresh From the Summary, for a summary still past the threshold: answering it.
+  'session.freshFromSummary': 'phone',
   'session.setPlanMode': 'mac',
   'session.setClaudeSharing': 'mac',
   'session.rename': 'mac',

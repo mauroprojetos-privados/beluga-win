@@ -19,6 +19,20 @@ const LONG_CONTEXT_ALIAS = /^(?:opus|sonnet|haiku|fable|opusplan)$/i;
 export const AUTO_COMPACT_MIN = 70;
 export const AUTO_COMPACT_MAX = 95;
 export const AUTO_COMPACT_DEFAULT = 85;
+/**
+ * The token threshold on a long (1M) window when you didn't set one: a percent of 1M would wait until
+ * ~850k, and every turn until then re-reads all of it. Windows of 200k or less keep the percent.
+ */
+export const AUTO_COMPACT_TOKENS_DEFAULT = 160_000;
+/** The token threshold the setting allows. */
+export const AUTO_COMPACT_TOKENS_MIN = 20_000;
+export const AUTO_COMPACT_TOKENS_MAX = LONG_CONTEXT_WINDOW;
+
+/**
+ * Settings' `autoCompactAt`: a percent of the window (70–95), or a token count (with the percent it
+ * also keeps, else the default). Whichever is reached first fires.
+ */
+export type AutoCompactAt = number | { readonly tokens: number; readonly pct?: number };
 
 /** Where the meter turns amber, then red (percent used). */
 export const CONTEXT_WARN_PCT = 70;
@@ -92,18 +106,51 @@ export const contextTone = (pct: number): ContextTone => (pct >= CONTEXT_FULL_PC
 export const clampThreshold = (pct: number | undefined): number =>
   Math.min(AUTO_COMPACT_MAX, Math.max(AUTO_COMPACT_MIN, Math.round(Number.isFinite(pct) ? (pct as number) : AUTO_COMPACT_DEFAULT)));
 
+const clampTokens = (n: number): number => Math.min(AUTO_COMPACT_TOKENS_MAX, Math.max(AUTO_COMPACT_TOKENS_MIN, Math.round(n)));
+
+/** The percent part of a threshold (the default when only tokens were set). */
+export const thresholdPct = (at: AutoCompactAt | undefined): number => clampThreshold(typeof at === 'object' && at ? at.pct : at);
+
 /**
- * Should Beluga compact this conversation now? Only with auto-compact on, the context known and at
- * or past the threshold, nothing compacting already, and not again before Claude has run since
- * the last try (a conversation whose summary is still big would otherwise loop).
+ * The token part of a threshold for a window: the one you set, else 160k on a window past 200k
+ * (a 1M model), else none (the percent alone).
  */
-export function autoCompactDue(opts: { readonly on: boolean; readonly at: number; readonly info?: { readonly used: number; readonly window: number; readonly compacting?: boolean }; readonly triedSinceRun?: boolean }): boolean {
-  if (!opts.on || !opts.info || opts.info.compacting || opts.triedSinceRun) return false;
-  return contextPct(opts.info) >= clampThreshold(opts.at);
+export function thresholdTokens(at: AutoCompactAt | undefined, window: number): number | undefined {
+  if (typeof at === 'object' && at && Number.isFinite(at.tokens)) return clampTokens(at.tokens);
+  return window > DEFAULT_CONTEXT_WINDOW ? AUTO_COMPACT_TOKENS_DEFAULT : undefined;
 }
 
-/** Environment for Claude Code so its own auto-compact follows the same threshold. */
-export const compactEnv = (on: boolean, at: number): Record<string, string> => (on ? { CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: String(clampThreshold(at)) } : {});
+/** Where a conversation on this window is compacted, in tokens: the percent or the tokens, whichever comes first. */
+export function compactLimit(at: AutoCompactAt | undefined, window: number): number {
+  const w = window > 0 ? window : DEFAULT_CONTEXT_WINDOW;
+  const byPct = Math.round((w * thresholdPct(at)) / 100);
+  const tokens = thresholdTokens(at, w);
+  return tokens === undefined ? byPct : Math.min(byPct, tokens);
+}
+
+/**
+ * Should Beluga compact this conversation now? Only with auto-compact on, the context known and at
+ * or past the threshold (tokens or percent, whichever comes first), nothing compacting already, and
+ * not again before Claude has run since the last try (a conversation whose summary is still big
+ * would otherwise loop).
+ */
+export function autoCompactDue(opts: { readonly on: boolean; readonly at: AutoCompactAt; readonly info?: { readonly used: number; readonly window: number; readonly compacting?: boolean }; readonly triedSinceRun?: boolean }): boolean {
+  if (!opts.on || !opts.info || opts.info.compacting || opts.triedSinceRun) return false;
+  return opts.info.used > 0 && opts.info.used >= compactLimit(opts.at, opts.info.window);
+}
+
+/**
+ * Environment for Claude Code so its own auto-compact follows the same threshold: the window it
+ * compacts against, in tokens (`CLAUDE_CODE_AUTO_COMPACT_WINDOW`, which Claude Code caps at the
+ * model's), and the percent of it (`CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`). Together they make the limit above.
+ */
+export function compactEnv(on: boolean, at: AutoCompactAt, window: number = DEFAULT_CONTEXT_WINDOW): Record<string, string> {
+  if (!on) return {};
+  const w = window > 0 ? window : DEFAULT_CONTEXT_WINDOW;
+  const pct = thresholdPct(at);
+  const limit = compactLimit(at, w);
+  return { CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(Math.min(w, Math.ceil((limit * 100) / pct))), CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: String(pct) };
+}
 
 /** "128k", "1.2M", "940". */
 export function formatTokenCount(n: number): string {

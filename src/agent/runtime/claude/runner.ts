@@ -13,7 +13,7 @@ import { RunFailedError, classifyRun } from '../../../shared/run-failure.js';
 import { SubAgentTracker, withAgentScratch } from './subagents.js';
 import { type RecorderMessage, StepRecorder } from '../../step-recorder.js';
 import { type ContextMessage, ContextReport, breakdownReader, isCompactCommand } from '../../context-report.js';
-import { compactEnv } from '../../../shared/context-usage.js';
+import { compactEnv, contextWindowFor } from '../../../shared/context-usage.js';
 import { progressCount } from '../../../shared/progress-count.js';
 import { resultText } from '../../../shared/steps.js';
 import { BackgroundAgents, type PromptContent, PromptQueue, TurnRouter, startedPrompt } from './live-run.js';
@@ -277,7 +277,7 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
         ...(input.effort ? { effort: input.effort } : {}),
         // Set, this replaces Claude Code's whole environment, so it starts from ours.
         // Claude Code's own auto-compact follows Beluga's threshold (see shared/context-usage.ts).
-        ...((input.env && Object.keys(input.env).length) || input.autoCompactAt ? { env: { ...process.env, ...input.env, ...compactEnv(Boolean(input.autoCompactAt), input.autoCompactAt ?? 0) } } : {}),
+        ...((input.env && Object.keys(input.env).length) || input.autoCompactAt ? { env: { ...process.env, ...input.env, ...compactEnv(input.autoCompactAt !== undefined, input.autoCompactAt ?? 0, contextWindowFor(input.model ?? opts.model, input.contextWindow)) } } : {}),
         ...claudeExecutable(opts.claudePath),
         // Its last words, so a crash says why (see shared/run-failure.ts): read by our own spawn when there is one.
         ...(tracked ? { spawnClaudeCodeProcess: tracked.spawn } : { stderr: keepStderr }),

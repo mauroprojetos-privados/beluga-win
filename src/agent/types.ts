@@ -6,6 +6,7 @@ import type { AgentRef, ClaudeAnswer, ClaudeQuestion, FsEntry, PeerInfo, Usage }
 import type { UsageUpdate } from './usage.js';
 import type { Effort } from '../shared/settings-schema.js';
 import type { StepRecord } from '../shared/steps.js';
+import type { AutoCompactAt } from '../shared/context-usage.js';
 import type { ArgsRuntime } from '../shared/agent-args.js';
 
 /** How far a request may reach on the owner's computer. */
@@ -49,8 +50,10 @@ export interface AgentRunInput {
   readonly env?: Readonly<Record<string, string>>;
   /** Your own runs: your own MCP servers from Claude Code (agent/owner-mcp.ts); never a friend's or a guest's. */
   readonly ownerMcp?: boolean;
-  /** Auto-compact threshold (percent) for Claude Code's own compaction; unset: auto-compact is off. */
-  readonly autoCompactAt?: number;
+  /** Auto-compact threshold (percent, or tokens: shared/context-usage.ts) for Claude Code's own compaction; unset: auto-compact is off. */
+  readonly autoCompactAt?: AutoCompactAt;
+  /** The conversation's window as Beluga last saw it (Claude Code reported it), for the threshold in tokens; unset: from the model. */
+  readonly contextWindow?: number;
   /** A folder (relative to the run's folder, git-ignored) for screenshots and scratch output; the owner watches it live. */
   readonly scratchDir?: string;
   /** Where to run: a workspace folder with its own Claude conversation. Defaults to the room's folder. */

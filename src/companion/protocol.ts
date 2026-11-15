@@ -9,7 +9,7 @@ import { z } from 'zod';
  * ignores what it doesn't know. A breaking change bumps the major, and the Mac keeps answering the
  * previous major for a release.
  */
-export const COMPANION_PROTO = { major: 1, minor: 56 } as const;
+export const COMPANION_PROTO = { major: 1, minor: 57 } as const;
 
 /**
  * What came in which minor, for a phone talking to an older Mac: it subscribes to a topic (and
@@ -756,6 +756,8 @@ export const ConvView = z.object({
   terminal: z.object({ label: z.string().max(80) }).optional(),
   /** 1.41 (BLG-702): your quick reactions, for a reactable turn's long-press (the room's or a workspace's chat). */
   quick: z.array(z.string().min(1).max(32)).max(8).optional(),
+  /** 1.57 (docs/compaction.md): how full its context is, in tokens, and where it compacts (the percent or the tokens, whichever comes first); none when it was never measured. */
+  context: z.object({ used: z.number().int().min(0), window: z.number().int().min(0), compactAt: z.number().int().min(0).optional(), compacting: z.boolean().optional() }).optional(),
 });
 export type ConvView = z.infer<typeof ConvView>;
 

@@ -35,6 +35,7 @@ import { AgentStrip, SubAgentSheet } from '../../components/SubAgents';
 import { store } from '../../lib/store';
 import { upload } from '../../lib/pick';
 import { color } from '../../lib/theme';
+import { formatTokenCount } from '../../../../src/shared/context-usage';
 import { router } from 'expo-router';
 import { useT } from '../../lib/language';
 
@@ -266,6 +267,7 @@ function Conversation() {
               </Animated.View>
             ))}
           </ScrollView>
+          {c?.context ? <ContextLine context={c.context} /> : null}
           {c?.terminal ? <TerminalBand label={c.terminal.label} onTakeOver={() => void call(calls.takeOver(topic)).catch((e: Error) => store.toast({ text: e.message, tone: 'error' }))} /> : null}
           <Composer
             {...(refill ? { refill } : {})}
@@ -580,5 +582,26 @@ function TerminalBand({ label, onTakeOver }: { readonly label: string; readonly 
         <T v="caption" style={{ fontWeight: '600' }}>{say('phoneApp.conv.takeOver')}</T>
       </Press>
     </Card>
+  );
+}
+
+/**
+ * How full the conversation's context is, in tokens, and where it compacts (1.57, docs/compaction.md):
+ * a quiet line above the composer once it's past half of that, so a long conversation says why it's
+ * about to compact (or that it's compacting now).
+ */
+function ContextLine({ context }: { readonly context: NonNullable<ConvView['context']> }) {
+  const say = useT();
+  const limit = context.compactAt ?? context.window;
+  if (!context.compacting && context.used < limit / 2) return null;
+  const words = context.compacting
+    ? say('phoneApp.conv.contextCompacting')
+    : context.compactAt
+      ? say('phoneApp.conv.contextAt', { used: formatTokenCount(context.used), at: formatTokenCount(context.compactAt) })
+      : say('phoneApp.conv.context', { used: formatTokenCount(context.used), window: formatTokenCount(context.window) });
+  return (
+    <T v="caption" c={color.text3} style={{ marginHorizontal: 20, marginBottom: 6 }} accessibilityLabel={words}>
+      {words}
+    </T>
   );
 }

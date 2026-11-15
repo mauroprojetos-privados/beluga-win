@@ -229,6 +229,9 @@ export const en = {
   'prefs.context.autoSwitch': 'Auto-compact',
   'prefs.context.at': 'Compact at',
   'prefs.context.atDetail': 'When a conversation is {percent}% full',
+  'prefs.context.atTokens': 'Or at (tokens)',
+  'prefs.context.atTokensDetail': 'Whichever comes first: {tokens}, or the percent above. Unset, 1M-window models compact at 160k.',
+  'prefs.context.tokensDefault': 'Default (160k on 1M models)',
 
   // MCP servers (dialogs/McpSettings.tsx)
   'prefs.mcp.claudeWhere': 'Yours, your projects’ and your plugins’, as Claude Code has them.',
@@ -493,6 +496,9 @@ export const ptBR: { readonly [K in keyof typeof en]?: Message } = {
   'prefs.context.autoSwitch': 'Compactar sozinho',
   'prefs.context.at': 'Compactar em',
   'prefs.context.atDetail': 'Quando uma conversa está {percent}% cheia',
+  'prefs.context.atTokens': 'Ou em (tokens)',
+  'prefs.context.atTokensDetail': 'O que vier primeiro: {tokens}, ou a porcentagem acima. Sem escolha, modelos com janela de 1M compactam em 160k.',
+  'prefs.context.tokensDefault': 'Padrão (160k em modelos de 1M)',
 
   // MCP servers
   'prefs.mcp.claudeWhere': 'Os seus, os dos seus projetos e os dos seus plugins, como o Claude Code os tem.',

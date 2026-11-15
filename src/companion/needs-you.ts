@@ -17,6 +17,8 @@ import { hhmm } from '../shared/clock.js';
 import { botBehind } from '../core/bots/schema.js';
 import { isAssistant } from '../shared/assistant.js';
 import { type ChecklistItem, checklistNumber, checklistProblems, stackKey, stackProblems } from '../core/stack-store.js';
+import { canStartFresh } from '../core/context-log.js';
+import { LONG_CONTEXT_WINDOW, compactLimit, formatTokenCount } from '../shared/context-usage.js';
 
 /**
  * Everything waiting for you, each with the API calls its buttons make: the phone's Needs You
@@ -652,7 +654,55 @@ export function waitingNeeds(state: DomainState): NeedsYou[] {
     ...dialogueItems(state),
     ...comboItems(state),
     ...stackItems(state),
+    ...autoCompactItems(state),
+    ...compactItems(state),
   ];
+}
+
+/**
+ * Auto-compact, asked once (docs/compaction.md): on by default again, but as your choice. Shown
+ * until you answer here, on the phone or in Settings (`autoCompactChosen`), and only once your agent
+ * has worked (a conversation has a context number), so a new install isn't asked about nothing.
+ */
+function autoCompactItems(state: DomainState): NeedsYou[] {
+  const prefs = state.prefs;
+  if (prefs.autoCompactChosen || prefs.autoCompact) return [];
+  if (!Object.values(state.context).some((c) => c.used > 0)) return [];
+  return [
+    {
+      id: 'autocompact',
+      kind: 'autocompact',
+      ...keyed('daemon.needs.autoCompactAsk'),
+      detail: t('daemon.needs.autoCompactDetail', { limit: formatTokenCount(compactLimit(prefs.autoCompactAt, LONG_CONTEXT_WINDOW)) }),
+      actions: [btn('daemon.needs.turnOn', 'main', 'session.chooseAutoCompact', [true]), btn('daemon.needs.keepOff', 'danger', 'session.chooseAutoCompact', [false])],
+    },
+  ];
+}
+
+/**
+ * A conversation whose summary is still past the threshold after compacting (docs/compaction.md):
+ * compacting again wouldn't help, a fresh conversation from the summary would. Only where a
+ * conversation can start fresh; it leaves once it has (its context starts over).
+ */
+function compactItems(state: DomainState): NeedsYou[] {
+  return Object.entries(state.compactions).flatMap(([channel, c]) => {
+    const info = state.context[channel];
+    if (!info || !canStartFresh(channel)) return [];
+    const limit = compactLimit(state.prefs.autoCompactAt, info.window);
+    if (c.post < limit || info.used < limit) return [];
+    return [
+      {
+        id: `compact:${channel}`,
+        kind: 'compact',
+        ...keyed('daemon.needs.compactStillBig'),
+        detail: t('daemon.needs.compactStillBigDetail', { used: formatTokenCount(c.post), limit: formatTokenCount(limit) }),
+        ...threadPlace(state, channel),
+        ...(convTopic(channel) ? { topic: convTopic(channel)! } : {}),
+        askedAt: Math.round(c.at),
+        actions: [btn('daemon.needs.freshFromSummary', 'main', 'session.freshFromSummary', [channel])],
+      },
+    ];
+  });
 }
 
 /**

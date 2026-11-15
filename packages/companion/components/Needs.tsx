@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Check, CircleCheck, Flag, Gauge, Hand, Monitor, MessageCircleQuestion, PenLine, PhoneIncoming, Plug, SquareTerminal, X } from 'lucide-react-native';
+import { Check, CircleCheck, Flag, Gauge, Hand, Monitor, MessageCircleQuestion, PenLine, PhoneIncoming, Plug, Shrink, SquareTerminal, X } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
@@ -21,7 +21,7 @@ import { Button, Card, haptic, IconBadge, More, Pill, Press, T, type Tone, toneB
  * card that says "Open on your Mac" (docs/companion.md, staying in step).
  */
 
-export const KNOWN = new Set(['approval', 'question', 'request', 'decision', 'confirm', 'call', 'combo', 'stack']);
+export const KNOWN = new Set(['approval', 'question', 'request', 'decision', 'confirm', 'call', 'combo', 'stack', 'autocompact', 'compact']);
 
 export const kindOf = (kind: string): { label: string; tone: Tone; Icon: typeof Monitor } => {
   switch (kind) {
@@ -45,6 +45,12 @@ export const kindOf = (kind: string): { label: string; tone: Tone; Icon: typeof 
     // Also its checklist (› Checklist): what didn't fix itself, by project. Shown here, fixed on the Mac.
     case 'stack':
       return { label: t('phone.needs.kindStack'), tone: 'peach', Icon: Plug };
+    // Auto-compact, asked once (docs/compaction.md): Turn On compacts long conversations, Keep Off doesn't.
+    case 'autocompact':
+      return { label: t('phone.needs.kindAutoCompact'), tone: 'mint', Icon: Shrink };
+    // A summary still past the threshold after compacting: Start Fresh begins a new conversation from it.
+    case 'compact':
+      return { label: t('phone.needs.kindCompact'), tone: 'butter', Icon: Shrink };
     default:
       return { label: t('phone.needs.kindOther'), tone: 'plain', Icon: Monitor };
   }

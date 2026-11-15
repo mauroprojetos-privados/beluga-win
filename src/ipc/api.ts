@@ -1,8 +1,7 @@
 import { z } from 'zod';
 import { AgentRef, ClaudeAnswer, GuestCan, WsRole } from '../protocol.js';
 import { EmojiSchema } from '../shared/reactions.js';
-import { BRANCH_PREFIX_RE, EFFORTS, KEEP_AWAKE, LOW_POWER, NotifySettings, RUN_ON, SETTLE_IDLE_DAYS_MAX, THEMES, ThreadLimitsSchema, TRUST_LEVELS } from '../shared/settings-schema.js';
-import { AUTO_COMPACT_MAX, AUTO_COMPACT_MIN } from '../shared/context-usage.js';
+import { AutoCompactAtSchema, BRANCH_PREFIX_RE, EFFORTS, KEEP_AWAKE, LOW_POWER, NotifySettings, RUN_ON, SETTLE_IDLE_DAYS_MAX, THEMES, ThreadLimitsSchema, TRUST_LEVELS } from '../shared/settings-schema.js';
 import { PARALLEL_RUNS_MAX, PARALLEL_RUNS_MIN } from '../shared/run-slots.js';
 import { CHAT_LIMIT_MAX } from '../shared/chat-limit.js';
 import { AUTO_CONTINUE_OFF_MAX } from '../shared/auto-continue.js';
@@ -122,7 +121,7 @@ export const PrefsPatch = z
     branchPrefix: z.string().regex(BRANCH_PREFIX_RE, 'Use letters, digits and . _ - / only'),
     contextMeter: bool,
     autoCompact: bool,
-    autoCompactAt: z.number().int().min(AUTO_COMPACT_MIN).max(AUTO_COMPACT_MAX),
+    autoCompactAt: AutoCompactAtSchema,
     autoContinue: bool,
     autoContinueOff: z.array(z.string().max(200)).max(AUTO_CONTINUE_OFF_MAX),
     autoContinueSkip: z.number().int().min(0),
@@ -176,6 +175,8 @@ export const API = {
   'session.copyLastAnswer': args(),
   'session.copyText': args(str, z.string().max(500)),
   'session.setPrefs': args(PrefsPatch),
+  // Needs You's one-time question (docs/compaction.md): auto-compact on or off, as your choice (sets autoCompactChosen).
+  'session.chooseAutoCompact': args(bool),
   'session.setPlanMode': args(channel, bool),
   'session.setClaudeSharing': args(Policy),
   'session.rename': args(z.string().max(64)),
@@ -195,6 +196,8 @@ export const API = {
   'session.runOnPeerByHand': args(z.string().max(64), str, opt(channel)),
   'session.stopAgent': args(),
   'session.compact': args(channel, opt(z.string().max(2000))),
+  // A conversation whose summary is still past the threshold: start it fresh from that summary (docs/compaction.md).
+  'session.freshFromSummary': args(channel),
   // A side question (/btw): answered beside the conversation, never part of it; resolves once answered.
   'session.btw': args(channel, z.string().min(1).max(4000)),
   'session.btwDismiss': args(channel),
