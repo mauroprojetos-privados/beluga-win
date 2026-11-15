@@ -9,7 +9,7 @@ import { z } from 'zod';
  * ignores what it doesn't know. A breaking change bumps the major, and the Mac keeps answering the
  * previous major for a release.
  */
-export const COMPANION_PROTO = { major: 1, minor: 57 } as const;
+export const COMPANION_PROTO = { major: 1, minor: 58 } as const;
 
 /**
  * What came in which minor, for a phone talking to an older Mac: it subscribes to a topic (and
@@ -153,8 +153,11 @@ export const COMPANION_PROTO = { major: 1, minor: 57 } as const;
  * 1.57 (docs/budget.md): token budgets against what they counted: a conversation's (`ConvView.budget`) and
  * the day's (`HomeView.budget`), and a budget's Needs You (`kind: 'budget'`, Continue / Cheaper / Stop
  * through `budget.answer`, SINCE.budget). An older Mac sends none; an older phone ignores them and shows the card plainly.
+ * 1.58 (docs/routing.md "Lead and executors", orchestrator mode phase 5): `routing.leadUsage`, your tokens split
+ * between the lead and its executors by conversation and by day, what the executors saved, and the context a run
+ * starts with per project (`LeadReportView`, SINCE.leadUsage). An older Mac doesn't answer it: the phone leaves the section out.
  */
-export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, routing: 52, bots: 53, language: 54, botChats: 55, botTriggers: 55, budget: 57 } as const;
+export const SINCE = { tasks: 4, openOnMac: 4, icon: 4, merge: 4, draftTask: 4, viewFetch: 4, assistant: 5, askModes: 5, files: 7, terminal: 7, branchSteps: 8, subAgent: 10, gone: 11, worktreePhotos: 12, keepAwake: 13, awayBeat: 13, macChats: 14, voice: 16, control: 17, video: 18, proof: 19, sentinel: 21, dashboard: 22, sentinelChat: 23, severalTasks: 24, documents: 25, widgets: 26, forget: 27, dismiss: 27, editPrompt: 28, docRefs: 29, keptData: 29, chatEdits: 30, agentPicker: 32, providers: 33, dialogues: 34, workAgents: 35, terminalView: 36, reactions: 41, cancelSteer: 43, triage: 44, draftReview: 45, threads: 47, threadAgents: 47, seen: 48, computers: 49, externalAgents: 50, routing: 52, bots: 53, language: 54, botChats: 55, botTriggers: 55, budget: 57, leadUsage: 58 } as const;
 
 /** One frame's biggest payload, and a file piece. */
 export const MAX_COMPANION_FRAME = 1024 * 1024;
@@ -991,6 +994,26 @@ export const ComboReportView = z
   })
   .passthrough();
 export type ComboReportView = z.infer<typeof ComboReportView>;
+
+/**
+ * 1.58 (docs/routing.md "Lead and executors"): `routing.leadUsage`: what the lead spent and what its
+ * executors (the sub-agents it started) took off it, in all, by conversation and by day; `saved` in
+ * USD at the price table's rates (negative: cost more); and per project the context a run starts with
+ * (averaged over its latest runs; `system` is the fixed part skills and MCP servers make).
+ */
+const LeadSplitFields = { lead: z.number(), executors: z.number(), saved: z.number() };
+export const LeadReportView = z
+  .object({
+    ...LeadSplitFields,
+    baseline: z.string().max(20),
+    conversations: z.array(z.object({ ...LeadSplitFields, channel: z.string().max(200), name: z.string().max(200), runs: z.number() }).passthrough()).max(20),
+    days: z.array(z.object({ ...LeadSplitFields, day: z.string().max(10) }).passthrough()).max(31),
+    openings: z
+      .array(z.object({ project: z.string().max(200), name: z.string().max(200), runs: z.number(), used: z.number(), system: z.number().optional(), tools: z.number().optional(), conversation: z.number().optional(), last: z.number() }).passthrough())
+      .max(50),
+  })
+  .passthrough();
+export type LeadReportView = z.infer<typeof LeadReportView>;
 
 /** 1.21 (BLG-237): a sentinel run's state (src/core/sentinel/model.ts RUN_STATES); one a phone doesn't know is drawn plain. */
 export const SentinelRunState = z.union([z.enum(['queued', 'running', 'needs-you', 'done', 'skipped', 'failed', 'stopped']), z.string().max(20)]);

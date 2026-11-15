@@ -225,6 +225,7 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'routing.resetCombos': { refused: NO_TOOL },
   'routing.retry': { refused: NO_TOOL },
   'routing.usage': { refused: STATS },
+  'routing.leadUsage': { refused: STATS },
   'routing.useClaudeByKind': { refused: NO_TOOL },
   'routing.orchestrator': { refused: NO_TOOL },
   'routing.setOrchestrator': { refused: NO_TOOL },

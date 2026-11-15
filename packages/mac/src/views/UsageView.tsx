@@ -13,6 +13,7 @@ import { usagesOf } from '@beluga/agent/usage.js';
 import type { AppState } from '@beluga/core/store.js';
 import { StatsSection } from './usage/StatsSection.js';
 import { CombosCard } from './usage/CombosCard.js';
+import { LeadCard } from './usage/LeadCard.js';
 import { YourCard } from './usage/YourCard.js';
 import { Chapter } from './usage/parts.js';
 import { useStats } from './usage/use-stats.js';
@@ -119,6 +120,8 @@ export function UsageView() {
         <StatsSection state={state} got={got} />
         {/* Combos (docs/routing.md): what each spent, by the agent each run went to. */}
         <CombosCard />
+        {/* Orchestrator mode (docs/routing.md "Lead and executors"): the lead against its executors, and the opening context per project. */}
+        <LeadCard />
         <Chapter title={t('views.usage.disk')} sub={t('views.usage.diskSub')}>
           <StorageCard rows={rows} measuring={measuring} measured={measured} onMeasure={measure} />
           {measured ? <CleanupCard items={cleanups(state, rows, now)} state={state} onDone={measure} /> : null}

@@ -8,7 +8,7 @@ import { botAgentNames, orchestratorAt, runOrchestrator } from '../src/core/rout
 import { buildOrchestratorAppend, delegateRefusal, executorTools, orchestratorAgents, orchestratorEnv } from '../src/agent/orchestrator-agents.js';
 import { parseBotFile } from '../src/core/bots/schema.js';
 import { ProjectFile } from '../src/workspaces/scripts.js';
-import { executorTokensOf } from '../src/agent/runtime/claude/runner.js';
+import { SubAgentTracker } from '../src/agent/runtime/claude/subagents.js';
 import type { RuntimeChoice } from '../src/shared/agent-runtimes.js';
 
 const claude = { id: 'claude', label: 'Claude', available: true, state: 'ready', models: [] } as unknown as RuntimeChoice;
@@ -144,11 +144,34 @@ describe('the executors as the SDK’s agents (agent/orchestrator-agents.ts)', (
 });
 
 describe('Usage, lead and executors apart', () => {
-  it('counts the tokens of models only executors ran on', () => {
-    const u = (n: number) => ({ inputTokens: n, outputTokens: 1, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 });
-    expect(executorTokensOf({ 'claude-opus-4-7': u(100), 'claude-haiku-4-5-20251001': u(40) }, ['haiku'], 'opus')).toBe(41);
-    // The lead on Haiku too: it can't be told apart, so it's the lead's.
-    expect(executorTokensOf({ 'claude-haiku-4-5': u(40) }, ['haiku'], 'haiku')).toBe(0);
+  const usage = (input: number, output = 0, write = 0) => ({ input_tokens: input, output_tokens: output, cache_creation_input_tokens: write, cache_read_input_tokens: 9999 });
+  const launch = (id: string, input: Record<string, unknown> = {}) => [{ type: 'tool_use', id, name: 'Agent', input: { subagent_type: 'explore', prompt: 'find it', ...input } }];
+
+  it('counts what the sub-agents the lead started spent, once per response, and nothing else', () => {
+    const t = new SubAgentTracker('/tmp', { delegate: 'suggest', executors: [{ name: 'explore', can: 'read', model: 'haiku' }] });
+    // Not a sub-agent's (no launch): Claude Code's own side call, or a stray id.
+    t.spent('nobody', { id: 'm0', model: 'claude-haiku-4-5', usage: usage(500) });
+    expect(t.takeSpend()).toEqual({ tokens: 0 });
+    t.assistant(null, launch('call1'));
+    // One response streamed in two pieces, each with its usage so far (cache reads never count).
+    t.spent('call1', { id: 'm1', model: 'claude-haiku-4-5', usage: usage(100, 5) });
+    t.spent('call1', { id: 'm1', model: 'claude-haiku-4-5', usage: usage(100, 20, 30) });
+    t.spent('call1', { id: 'm2', model: 'claude-haiku-4-5', usage: usage(40) });
+    expect(t.takeSpend()).toEqual({ tokens: 190, model: 'claude-haiku-4-5' });
+    // Taken: the next turn starts from nothing.
+    expect(t.takeSpend()).toEqual({ tokens: 0 });
+  });
+
+  it('counts a sub-agent’s own sub-agents, and a background one by its final report when its messages never came', () => {
+    const t = new SubAgentTracker('/tmp');
+    t.assistant(null, launch('call1'));
+    t.assistant('call1', [{ type: 'tool_use', id: 'nested', name: 'Task', input: { prompt: 'deeper' } }]);
+    t.spent('nested', { id: 'n1', model: 'claude-haiku-4-5', usage: usage(70) });
+    expect(t.takeSpend().tokens).toBe(70);
+    t.assistant(null, launch('bg', { run_in_background: true, model: 'haiku' }));
+    t.task({ subtype: 'task_started', task_id: 'task1', tool_use_id: 'bg' });
+    t.task({ subtype: 'task_notification', task_id: 'task1', tool_use_id: 'bg', status: 'completed', usage: { total_tokens: 800 } });
+    expect(t.takeSpend()).toEqual({ tokens: 800, model: 'haiku' });
   });
 
   it('splits your runs’ tokens between the lead and its executors', () => {

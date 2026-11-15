@@ -595,6 +595,13 @@ budget set to ask as a Needs You card (`kind: 'budget'`: Continue, Go On Cheaper
 `budget.answer`, both `budget.*` methods `phone`). It never sets a budget: that's Settings on the
 Mac, `beluga.json` and `bot.json` ([budget.md](budget.md)).
 
+## Lead and executors (1.58)
+
+Settings › Routing on the phone also shows the lead against the sub-agents it started (`routing.leadUsage`,
+`LeadReportView`, SINCE.leadUsage): tokens in all, by conversation and by day, what the executors saved at the
+lead's price, and the context a run starts with per project. Read-only, as on the Mac (Usage › Combos); an
+older Mac doesn't answer it and the phone leaves the section out ([routing.md](routing.md) "Lead and executors").
+
 ## Using it: the screens
 
 Small screen, thumbs, one hand. Friendly and calm: soft pastels (sky, mint, peach, lavender,

@@ -28,6 +28,10 @@ export const ROUTING_API = {
   // Your runs through combos, by combo and by the target each went to (runs, at a limit, time),
   // from `since` (ms) on. → ComboUsage[]
   'routing.usage': { args: z.tuple([z.number().int().min(0).optional()]) },
+  // Orchestrator mode, phase 5 (core/routing/measure.ts): your runs' tokens split between the lead and
+  // its executors, by conversation and by day, what the executors saved at the price table's rates, and
+  // each project's opening context (first number and breakdown, averaged), from `since` (ms) on. → LeadReport
+  'routing.leadUsage': { args: z.tuple([z.number().int().min(0).optional()]) },
   // "Claude by kind of work" (core/routing/presets.ts, docs/stack.md): the three Claude combos added to
   // yours, and each kind of work's and each plan role's combo set to them. → your combos
   'routing.useClaudeByKind': { args: z.tuple([]) },
