@@ -98,16 +98,11 @@ export function launchStack(host: { readonly session: Session; readonly store: S
   const offAdded = session.workspaces?.onProjectAdded((root) => monitor.projectAdded(root));
   // Only a worktree's index: the project's own (its main checkout) stays.
   const offGoing = session.workspaces?.onWorktreeGoing((ws) => ws.kind === 'worktree' && monitor.worktreeGone(ws.path));
-  // A new worktree has indexes of its own; a merge moves its project's main checkout on.
-  const offWorktree = session.workspaces?.onWorktree((e) => {
-    if (e.kind === 'created' && e.ws.kind === 'worktree') void monitor.runChecklist([e.ws.id]);
-    if (e.kind === 'merged') {
-      const project = store.getState().projects.find((p) => p.workspaces.some((w) => w.id === e.id));
-      if (project) void monitor.runChecklist([project.id]);
-    }
-  });
+  // Worktrees and merges start no checklist: plans, bots and sentinels make worktrees all day, and a
+  // look per worktree (its `gls index --check`, its index rebuilds) is what kept a busy computer pinned.
+  // A worktree's indexes are its setup's (beluga.json); Settings › Stack › Check Again looks at them.
   monitor.start();
-  // The checklist once a minute after start (the first look comes first), then once a day.
+  // The checklist, light (this computer's items, nothing that starts Claude Code), a minute after start, then once a day.
   const first = setTimeout(() => void monitor.runChecklist(), 60_000);
   first.unref?.();
   const daily = setInterval(() => void monitor.runChecklist(), 24 * 60 * 60_000);
@@ -117,7 +112,6 @@ export function launchStack(host: { readonly session: Session; readonly store: S
     clearInterval(daily);
     offAdded?.();
     offGoing?.();
-    offWorktree?.();
     all.delete(session);
     monitor.stop();
   };

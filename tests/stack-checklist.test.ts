@@ -134,7 +134,7 @@ describe('the stack’s checklist: Ollama', () => {
 });
 
 describe('the stack’s checklist: indexes fix themselves', () => {
-  it('rebuilds a stale GitNexus index in the background, with nothing in Needs You', async () => {
+  it('asked, rebuilds a stale GitNexus index in the background, with nothing in Needs You', async () => {
     let indexed = 'aaaa1111';
     let release: () => void = () => undefined;
     const done = new Promise<void>((r) => (release = r));
@@ -156,7 +156,7 @@ describe('the stack’s checklist: indexes fix themselves', () => {
       },
     });
     const { store, monitor } = monitorFor(c);
-    const first = await monitor.runChecklist(['p1']);
+    const first = await monitor.runChecklist(['p1'], { manual: true });
     const item = first!.places[0]!.items.find((i) => i.id === 'gitnexusIndex');
     expect(item).toMatchObject({ state: 'warn', why: 'rebuilding', fixing: true });
     expect(c.runs.find((r) => r.args[0] === 'analyze')).toMatchObject({ args: ['analyze', '--index-only'], cwd: ERP });
@@ -164,7 +164,7 @@ describe('the stack’s checklist: indexes fix themselves', () => {
     expect(needsYou(store.getState()).filter((n) => n.kind === 'stack')).toEqual([]);
     release();
     await settle();
-    const after = await monitor.runChecklist(['p1']);
+    const after = await monitor.runChecklist(['p1'], { manual: true });
     expect(after!.places[0]!.items.find((i) => i.id === 'gitnexusIndex')?.state).toBe('ok');
     expect(needsYou(store.getState()).filter((n) => n.kind === 'stack')).toEqual([]);
     monitor.stop();
@@ -179,13 +179,30 @@ describe('the stack’s checklist: indexes fix themselves', () => {
       run: (bin, args) => (bin === 'git' ? { code: 0, out: 'bbbb\n' } : args[0] === 'analyze' ? { code: 1, out: 'out of memory' } : { code: 0, out: '' }),
     });
     const { store, monitor } = monitorFor(c);
-    await monitor.runChecklist(['p1']);
+    await monitor.runChecklist(['p1'], { manual: true });
     await settle();
-    await monitor.runChecklist(['p1']);
+    await monitor.runChecklist(['p1'], { manual: true });
     const card = needsYou(store.getState()).find((n) => n.id.startsWith('stack:list:'));
     expect(card?.detail).toContain('erp');
     expect(card?.detail).toContain('out of memory');
     expect(card?.actions[0]).toMatchObject({ method: 'stack.checklist' });
+    monitor.stop();
+  });
+
+  it('by itself stays light: no index rebuilt, no Claude Code started, no place looked at, and a rebuild never leads to another', async () => {
+    const files = { ...READY, [`${HOME}/.gitnexus/registry.json`]: JSON.stringify([{ name: 'erp', path: ERP, lastCommit: 'aaaa' }]) };
+    const c = computer({ tools: ['gitnexus', 'rtk', 'claude'], files, ollama: OLLAMA_OK, run: (bin) => (bin === 'git' ? { code: 0, out: 'bbbb\n' } : { code: 0, out: '' }) });
+    const { monitor } = monitorFor(c);
+    const daily = await monitor.runChecklist();
+    expect(daily!.places).toEqual([]);
+    expect(c.runs.some((r) => r.args[0] === 'mcp')).toBe(false);
+    expect(c.runs.some((r) => r.args[0] === 'analyze')).toBe(false);
+    const light = await monitor.runChecklist(['p1']);
+    expect(light!.places[0]!.items.find((i) => i.id === 'gitnexusIndex')).toMatchObject({ state: 'warn', fix: 'auto' });
+    expect(light!.places[0]!.items.find((i) => i.id === 'gitnexusIndex')?.fixing).toBeUndefined();
+    expect(c.runs.some((r) => r.args[0] === 'analyze' || r.args[0] === 'mcp')).toBe(false);
+    await monitor.runChecklist(undefined, { manual: true });
+    expect(c.runs.some((r) => r.args[0] === 'mcp' && r.args[1] === 'list')).toBe(true);
     monitor.stop();
   });
 });

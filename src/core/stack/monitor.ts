@@ -237,9 +237,10 @@ export class StackMonitor {
     }
   }
 
-  private context(): ChecklistContext {
+  private context(quick = false): ChecklistContext {
     const cl = this.deps.checklist;
     return {
+      ...(quick ? { quick: true } : {}),
       checks: this.view().checks,
       combos: this.deps.store.getState().prefs.combos ?? DEFAULT_COMBOS,
       botDirs: cl?.botDirs?.() ?? [],
@@ -254,23 +255,29 @@ export class StackMonitor {
 
   /**
    * Run the checklist: this computer's items, and each place in `only` (a project's or worktree's id,
-   * or its folder; `[]`: none), else every project's main checkout (worktrees are checked as they're
-   * made). What's the project's own fixes itself; indexes rebuild in the background, off the agents'
-   * queue. Runs one after another; resolves when this one is done.
+   * or its folder; `[]`: none), else every project's main checkout. Runs one after another; resolves
+   * when this one is done.
+   *
+   * Asked (`manual`: Check Again, Fix, Settings › Stack) it does everything: `claude mcp list`, each
+   * place's `gls index --check`, and what's the project's own fixes itself (indexes rebuild in the
+   * background). By itself (at start, daily, after a rebuild) it stays light, because on a busy
+   * computer the heavy part was the problem: it never starts Claude Code, never rebuilds an index nor
+   * sends docs, and without `only` it looks at this computer only. A rebuild that ends re-checks its
+   * place lightly, so one rebuild never leads to another.
    */
-  runChecklist(only?: readonly string[]): Promise<StackChecklist | undefined> {
-    const next = this.listing.then(() => this.list(only));
+  runChecklist(only?: readonly string[], opts: { readonly manual?: boolean } = {}): Promise<StackChecklist | undefined> {
+    const next = this.listing.then(() => this.list(only, opts.manual === true));
     this.listing = next.catch(() => undefined);
     return next;
   }
 
-  private async list(only?: readonly string[]): Promise<StackChecklist | undefined> {
+  private async list(only: readonly string[] | undefined, manual: boolean): Promise<StackChecklist | undefined> {
     const cl = this.deps.checklist;
     if (!cl || this.stopped) return undefined;
     const started = this.now();
-    if (only === undefined) for (const [key, r] of this.rebuilds) if (r.failed) this.rebuilds.delete(key); // a new day tries again
+    if (manual && only === undefined) for (const [key, r] of this.rebuilds) if (r.failed) this.rebuilds.delete(key); // asked again: try again
     const all = cl.places();
-    const places = only ? all.filter((p) => only.includes(p.id) || only.includes(p.dir)) : all.filter((p) => !p.worktree);
+    const places = only ? all.filter((p) => only.includes(p.id) || only.includes(p.dir)) : manual ? all.filter((p) => !p.worktree) : [];
     const before = this.view().checklist;
     const ordered = (done: ReadonlyMap<string, ChecklistPlace>): ChecklistPlace[] =>
       all.flatMap((p) => {
@@ -278,12 +285,14 @@ export class StackMonitor {
         return place ? [place] : [];
       });
     this.publishList({ machine: before?.machine ?? [], places: before?.places ?? [], ...(before?.checkedAt ? { checkedAt: before.checkedAt } : {}), checking: true });
-    const ctx = this.context();
-    const machine = await machineChecklist(ctx, cl.deps);
+    const ctx = this.context(!manual);
+    // A light look after a rebuild keeps this computer's items as they were.
+    const machine = !manual && only?.length && before?.machine.length ? before.machine : await machineChecklist(ctx, cl.deps);
     const done = new Map<string, ChecklistPlace>();
     for (const place of places) {
       if (this.stopped) return undefined;
-      const items = await this.selfFix(place, await placeChecklist(place, ctx, cl.deps));
+      const checked = await placeChecklist(place, ctx, cl.deps);
+      const items = manual ? await this.selfFix(place, checked) : await this.selfFix(place, checked, { light: true });
       done.set(place.id, { id: place.id, projectId: place.projectId, name: place.name, dir: place.dir, items });
       this.publishList({ machine, places: ordered(done), checking: true });
     }
@@ -296,11 +305,13 @@ export class StackMonitor {
   }
 
   /** What's the place's own fixes itself now: excludes, docs, GitNexus's leftovers; indexes start rebuilding. */
-  private async selfFix(place: PlaceInput, items: readonly ChecklistItem[]): Promise<ChecklistItem[]> {
+  private async selfFix(place: PlaceInput, items: readonly ChecklistItem[], opts: { readonly light?: boolean } = {}): Promise<ChecklistItem[]> {
     const cl = this.deps.checklist!;
     const out: ChecklistItem[] = [];
     for (const item of items) {
-      if (item.fix !== 'auto' || (item.state !== 'warn' && item.state !== 'fail') || item.fixing) {
+      // Light: only what costs nothing (the excludes, GitNexus's registry); indexes and docs wait for Fix.
+      const heavy = INDEX_ITEMS.has(item.id) || item.id === 'docs';
+      if (item.fix !== 'auto' || (item.state !== 'warn' && item.state !== 'fail') || item.fixing || (opts.light && heavy)) {
         out.push(item);
         continue;
       }
@@ -364,7 +375,7 @@ export class StackMonitor {
       }
     } else result = { ok: false, changed: [], why: `${id} has no fix` };
     blackbox.record('log', `stack fix ${id}: ${result.ok ? 'ok' : 'failed'}${result.changed.length ? ` (${result.changed.length} file(s), backed up)` : ''}`);
-    void this.runChecklist(place ? [place.id] : []);
+    void this.runChecklist(place ? [place.id] : [], { manual: true });
     return result;
   }
 

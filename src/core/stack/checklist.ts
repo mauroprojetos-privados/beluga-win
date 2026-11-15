@@ -39,6 +39,8 @@ export interface ChecklistContext {
   readonly docsSentAt?: (dir: string) => number | undefined;
   /** An index being rebuilt right now, or the last rebuild's failure. */
   readonly rebuild?: (dir: string, id: ChecklistItemId) => { readonly running?: boolean; readonly failed?: string } | undefined;
+  /** A look Beluga takes by itself: nothing that starts Claude Code (`claude mcp list` starts every MCP and plugin). */
+  readonly quick?: boolean;
 }
 
 /** A place to check: a project's main checkout or one of its worktrees. */
@@ -202,7 +204,7 @@ export async function mcpsItem(ctx: ChecklistContext, deps: StackDeps): Promise<
   const missing = want.filter((id) => !(id in servers));
   if (missing.length) return bad('mcps', 'fail', 'notRegistered', missing.join(', '));
   const claude = findTool('claude', deps);
-  if (!claude) return ok('mcps');
+  if (!claude || ctx.quick) return ok('mcps');
   const r = await deps.run(claude, ['mcp', 'list'], { timeoutMs: 90_000 });
   if (r.code !== 0) return ok('mcps');
   const failing = want.flatMap((id) => {
