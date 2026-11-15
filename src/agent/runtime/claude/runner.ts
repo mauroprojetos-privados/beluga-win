@@ -36,6 +36,7 @@ import { claudeHome } from '../../../core/claude-code/launch.js';
 import { belugaHome } from '../../../core/home.js';
 import { expandCommand, mayBeCommand, skillOptions } from './skill-plugins.js';
 import { BACKGROUND_LIMIT_MS, INTERRUPT_TIMEOUT_MS } from '../types.js';
+import { delegateRefusal, orchestratorAgents, orchestratorEnv } from '../../orchestrator-agents.js';
 
 const USAGE_TIMEOUT_MS = 20_000;
 /**
@@ -97,6 +98,19 @@ export function usageOf(modelUsage: Record<string, { inputTokens: number; output
   const all = Object.values(modelUsage);
   const sum = (pick: (u: (typeof all)[number]) => number): number => all.reduce((n, u) => n + (pick(u) || 0), 0);
   return { input: sum((u) => u.inputTokens), output: sum((u) => u.outputTokens), cacheRead: sum((u) => u.cacheReadInputTokens), cacheWrite: sum((u) => u.cacheCreationInputTokens), cost, session };
+}
+
+/**
+ * Orchestrator mode: the tokens (input, output, cache writes) of the models only executors ran on, as
+ * running totals like modelUsage's. A model the lead runs on too counts as the lead's: it can't be told apart.
+ */
+export function executorTokensOf(modelUsage: Record<string, { inputTokens: number; outputTokens: number; cacheCreationInputTokens: number }>, executorModels: readonly string[], leadModel: string | undefined): number {
+  const lead = (leadModel ?? '').toLowerCase();
+  const isExecutor = (id: string): boolean => {
+    const key = id.toLowerCase();
+    return executorModels.some((m) => key.includes(m.toLowerCase())) && !(lead && key.includes(lead));
+  };
+  return Object.entries(modelUsage).reduce((n, [id, u]) => (isExecutor(id) ? n + (u.inputTokens || 0) + (u.outputTokens || 0) + (u.cacheCreationInputTokens || 0) : n), 0);
 }
 
 /** Claude Code's name for a model, without its "(recommended)": the picker says "Default", not "Default (recommended)". */
@@ -175,7 +189,7 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
       const askOnly = place?.askOnly;
       const autoEdit = !askOnly && (place?.autoEdit ?? opts.autoEdit);
       const remember = (id: string): void => (place ? place.onSession(id) : void (sessionId = id));
-      const subagents = new SubAgentTracker(cwd);
+      const subagents = new SubAgentTracker(cwd, input.orchestrator);
       // Views Claude shows (mcp__beluga_view__show) go into its answers where it puts their tokens.
       const shelf = new ViewShelf();
       const scratchRoot = input.scratchDir ? path.resolve(cwd, input.scratchDir) : undefined;
@@ -212,6 +226,10 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
       };
       // Your `claude` flags (Settings › Agents): how it asks, in the SDK's words; the rest as they are.
       const launch = claudeLaunch(input.launchArgs?.claude ?? [], { plan: Boolean(input.plan), autoEdit });
+      // Orchestrator mode (unset: off, and the options are as before): its sub-agents and their model.
+      const executors = orchestratorAgents(input.orchestrator);
+      const subEnv = executors ? orchestratorEnv(input.orchestrator) : {};
+      const executorEnv = Object.keys(subEnv).length ? subEnv : undefined;
       const options: Options = {
         cwd,
         additionalDirectories: [...extraDirs, ...(fixup ? [fixup] : [])],
@@ -236,6 +254,9 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
                   if (hookInput.hook_event_name !== 'PreToolUse') return {};
                   if (INTERACTIVE.has(hookInput.tool_name)) return {}; // answered in canUseTool
                   const toolInput = (hookInput.tool_input ?? {}) as Record<string, unknown>;
+                  // Orchestrator mode, delegating always: a broad search or a test run is the executors', not the lead's.
+                  const delegated = hookInput.agent_id ? undefined : delegateRefusal(input.orchestrator, hookInput.tool_name, toolInput);
+                  if (delegated) return verdict('deny', delegated);
                   const veto = input.vetTool?.(hookInput.tool_name, toolInput);
                   if (veto) return verdict('deny', veto);
                   const decision = decideTool(hookInput.tool_name, toolInput, policy);
@@ -273,7 +294,9 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
         ...(input.effort ? { effort: input.effort } : {}),
         // Set, this replaces Claude Code's whole environment, so it starts from ours.
         // Claude Code's own auto-compact follows Beluga's threshold (see shared/context-usage.ts).
-        ...((input.env && Object.keys(input.env).length) || input.autoCompactAt ? { env: { ...process.env, ...input.env, ...compactEnv(Boolean(input.autoCompactAt), input.autoCompactAt ?? 0) } } : {}),
+        ...((input.env && Object.keys(input.env).length) || input.autoCompactAt || executorEnv ? { env: { ...process.env, ...input.env, ...compactEnv(Boolean(input.autoCompactAt), input.autoCompactAt ?? 0), ...executorEnv } } : {}),
+        // Orchestrator mode: the executors as the SDK's own sub-agents, each on its own model (orchestrator-agents.ts).
+        ...(executors ? { agents: executors } : {}),
         ...claudeExecutable(opts.claudePath),
         // Its last words, so a crash says why (see shared/run-failure.ts): read by our own spawn when there is one.
         ...(tracked ? { spawnClaudeCodeProcess: tracked.spawn } : { stderr: keepStderr }),
@@ -338,6 +361,8 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
       };
       /** The model the session runs on, so a message picked for another one switches it first. */
       let model = input.model ?? opts.model;
+      /** Orchestrator mode: the executors' running total last reported (see executorTokensOf). */
+      let execSeen = 0;
       /** A message into the live session. `steer`: Claude works on a turn, and takes it in at its next step. */
       const deliver = (followUp: FollowUp, steer: boolean): string | false => {
         if (prompts.closed) return false;
@@ -534,7 +559,11 @@ export function createClaudeBackend(opts: ClaudeBackendOptions): AgentBackend {
             remember(msg.session_id);
             await report.result(msg.modelUsage, breakdownReader(q));
             const turn = turns.current();
-            turn.onEvent('usage', JSON.stringify(usageOf(msg.modelUsage ?? {}, msg.total_cost_usd ?? 0, msg.session_id)));
+            // Orchestrator mode: what its executors spent this turn, for Usage to set apart from the lead's.
+            const execTotal = input.orchestrator ? executorTokensOf(msg.modelUsage ?? {}, input.orchestrator.executors.flatMap((e) => (e.model ? [e.model] : [])), model) : 0;
+            const execAdded = execTotal >= execSeen ? execTotal - execSeen : execTotal;
+            execSeen = execTotal;
+            turn.onEvent('usage', JSON.stringify({ ...usageOf(msg.modelUsage ?? {}, msg.total_cost_usd ?? 0, msg.session_id), ...(execAdded ? { executorTokens: execAdded } : {}) }));
             // A turn that ended on an API error (a usage limit, an outage) is a failure, whatever its subtype.
             const ok = msg.subtype === 'success' && !msg.is_error;
             if (!ok) failedResult = msg.subtype === 'success' ? msg.result : [`Agent stopped: ${msg.subtype.replace(/_/g, ' ')}`, ...(msg.errors ?? [])].join('\n');

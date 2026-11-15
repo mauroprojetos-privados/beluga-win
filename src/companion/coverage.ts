@@ -734,6 +734,11 @@ export const PHONE: Record<Method, Side> = {
   'routing.usage': 'phone',
   // A preset for Settings › Agents › Combos: settings stay the Mac's.
   'routing.useClaudeByKind': 'mac',
+  // Orchestrator mode (core/routing/orchestrator.ts): the phone shows it (the conversation's header, the
+  // executor on each sub-agent); turning it on, off or changing it is the Mac's (settings, /orquestrador).
+  'routing.orchestrator': 'phone',
+  'routing.setOrchestrator': 'mac',
+  'routing.setConversationOrchestrator': 'mac',
 
   // ---- bots (docs/bots.md): seeing them and what they do is the phone's (chatting is session.submit in
   // their conversation); making, editing, knowledge, tools, versions, export and import are Bot Studio's, on the Mac

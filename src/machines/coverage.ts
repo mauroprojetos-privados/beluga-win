@@ -26,6 +26,9 @@ export const MACHINE: Record<Method, MachineSide> = {
   'routing.retry': 'drive',
   'routing.usage': 'drive',
   'routing.useClaudeByKind': 'drive',
+  'routing.orchestrator': 'drive',
+  'routing.setOrchestrator': 'drive',
+  'routing.setConversationOrchestrator': 'drive',
   // ---- bots (docs/bots.md): that computer's bots, as if you sat at it
   'bots.list': 'drive',
   'bots.status': 'drive',

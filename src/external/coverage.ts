@@ -223,6 +223,9 @@ export const EXTERNAL_ACCESS: Record<Method, ExternalAccess> = {
   'routing.retry': { refused: NO_TOOL },
   'routing.usage': { refused: STATS },
   'routing.useClaudeByKind': { refused: NO_TOOL },
+  'routing.orchestrator': { refused: NO_TOOL },
+  'routing.setOrchestrator': { refused: NO_TOOL },
+  'routing.setConversationOrchestrator': { refused: NO_TOOL },
   // Bots (docs/bots.md): the person's own orchestrators and their files (secrets among them), set up in Bot Studio.
   'bots.list': { refused: BOTS },
   'bots.status': { refused: BOTS },

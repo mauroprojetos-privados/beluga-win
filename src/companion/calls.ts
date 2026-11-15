@@ -34,6 +34,14 @@ export const CombosResult = z.object({
   custom: z.boolean(),
 });
 /** The combo and target a run used ("Economy · Codex"); none when it ran on no combo. */
+/** routing.orchestrator, the part the phone reads: on, who leads, each executor on what (or why not), the header's words. */
+export const OrchestratorResult = z.object({
+  on: z.boolean(),
+  delegate: z.enum(['suggest', 'always']),
+  words: z.string().optional(),
+  lead: z.object({ label: z.string(), why: z.string().optional() }).optional(),
+  executors: z.array(z.object({ name: z.string(), can: z.enum(['read', 'run', 'edit']), label: z.string(), runtime: z.string(), model: z.string().optional(), why: z.string().optional() })),
+});
 export const RunRouteResult = z.object({ requestId: z.string(), combo: z.string(), name: z.string(), runtime: z.string(), model: z.string().optional(), target: z.string(), words: z.string() }).optional();
 /** 1.53 (docs/bots.md): a bot as `bots.list` gives it (src/core/bots/schema.ts BotInfo; more fields pass through). */
 const BotResult = z.object({ id: z.string(), name: z.string(), icon: z.string(), channel: z.string(), mac: z.boolean(), orchestrates: z.boolean(), autonomy: z.string(), problems: z.array(z.string()), status: z.object({ planId: z.string(), planTitle: z.string(), done: z.number(), total: z.number(), waiting: z.string().optional(), draft: z.literal(true).optional() }).optional() }).passthrough();
@@ -215,6 +223,8 @@ export const PhoneCalls = {
   // 1.51 (docs/routing.md): combos, read-only on the phone.
   'routing.combos': entry('routing.combos', CombosResult),
   'routing.runRoute': entry('routing.runRoute', RunRouteResult),
+  // Orchestrator mode (docs/routing.md): what applies in a conversation, for its header; turning it on is the Mac's.
+  'routing.orchestrator': entry('routing.orchestrator', OrchestratorResult),
   // Needs You's Try Again for a used-up combo: the target that goes on ("Economy · Codex").
   'routing.retry': entry('routing.retry', z.string()),
   // Runs through combos, by combo and target; 1.52: with how tasks went, savings and suggestions.

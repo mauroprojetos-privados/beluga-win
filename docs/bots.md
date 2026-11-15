@@ -50,6 +50,7 @@ Beluga too: everything but `bot.json` is in Claude Code's own formats.
 | `autonomy` | `ask`, `run-stop-on-fail` or `autopilot` |
 | `projects` | project ids it acts in (their folders are added to its runs); empty: like Your Mac |
 | `triggers` | what it does on its own: Sentinels' trigger shapes, each with the message it gets ([Triggers](#triggers)) |
+| `orchestrator` | orchestrator mode in its conversations, the same block as Settings' and `beluga.json`'s, over both ([routing.md › Orchestrator mode](routing.md#orchestrator-mode)); its own `.claude/agents/<name>.md` wins over an executor of the same name |
 
 A field that doesn't fit (a hand edit's typo) is dropped alone and named in the bot's problems; an
 unreadable file reads as a bot with nothing set.

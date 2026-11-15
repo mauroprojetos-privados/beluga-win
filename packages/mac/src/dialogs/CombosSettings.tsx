@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { type CategoryRoute, type Combo, type ComboPrivacy, type Difficulty, type Role, type RouteTarget, type WorkCategory, WORK_CATEGORIES, DIFFICULTIES, ROLES, DEFAULT_COMBOS, MAX_COMBOS, MAX_TARGETS, comboIdFor, comboUsage, comboUsageWords, combosOf, targetLabel } from '@beluga/core/routing/model.js';
+import { type CategoryRoute, type Combo, type ComboPrivacy, type Difficulty, type Role, type RouteTarget, type WorkCategory, WORK_CATEGORIES, DIFFICULTIES, ROLES, DEFAULT_COMBOS, MAX_COMBOS, MAX_TARGETS, comboIdFor, comboUsage, comboUsageWords, combosOf, shortTokens, targetLabel, worldOf } from '@beluga/core/routing/model.js';
+import { type DelegateMode, type ExecutorBlock, type ExecutorCan, type OrchestratorBlock, DEFAULT_EXECUTORS, orchestratorUsage, resolveOrchestrator } from '@beluga/core/routing/orchestrator.js';
 import { LOCAL_RUNTIME, OLLAMA_ID, parseLocalModel } from '@beluga/shared/local-endpoints.js';
 import { DEFAULT_BASELINE, SAVINGS_BASELINES, baselineWords } from '@beluga/core/routing/outcomes.js';
 import type { RuntimeChoice } from '@beluga/shared/agent-runtimes.js';
@@ -9,7 +10,7 @@ import { Button, Dot } from '../components/ui.js';
 import { useApi, useApp } from '../lib/beluga.js';
 import { say, useT } from '../lib/i18n.js';
 import { t as tr } from '@beluga/shared/i18n/index.js';
-import { Group, Row } from './settings-controls.js';
+import { Group, Row, Switch } from './settings-controls.js';
 import s from './settings.module.css';
 import { categoryHint, categoryLabel } from '@beluga/shared/i18n/words.js';
 
@@ -252,6 +253,66 @@ export function CombosSettings() {
           ))}
         </div>
       </Row>
+      <OrchestratorSection combos={combos} />
     </Group>
+  );
+}
+
+/**
+ * Settings › Agents › Combos › Orchestrator mode (core/routing/orchestrator.ts, docs/routing.md):
+ * who thinks, the executors with their combo and what they may do, and when to delegate. Settings'
+ * own block; a project, a bot or one conversation can say otherwise.
+ */
+function OrchestratorSection({ combos }: { readonly combos: readonly Combo[] }) {
+  const t = useT();
+  const api = useApi();
+  const block = useApp((st) => st.prefs.orchestrator);
+  // What applies now, each executor on the target it would run (the same answer the daemon resolves).
+  const resolved = useApp((st) => resolveOrchestrator({ ...st, prefs: { ...st.prefs, orchestrator: { ...st.prefs.orchestrator, on: true } } }, worldOf(st, Date.now())), (a, b) => JSON.stringify(a) === JSON.stringify(b));
+  const split = useApp((st) => orchestratorUsage(st.log, st.selfId), (a, b) => a.lead === b.lead && a.executors === b.executors);
+  const save = (next: OrchestratorBlock): void => void api.routing.setOrchestrator(next);
+  const executors = block?.executors ?? DEFAULT_EXECUTORS;
+  const setExecutor = (name: string, patch: ExecutorBlock): void => {
+    const own = executors[name] ?? {};
+    const merged = { ...own, ...patch };
+    const clean = Object.fromEntries(Object.entries(merged).filter(([, v]) => v !== undefined && v !== '')) as ExecutorBlock;
+    save({ ...block, executors: { ...executors, [name]: clean } });
+  };
+  const CAN = [
+    { value: 'read', label: t('routing.orchestrator.canRead') },
+    { value: 'run', label: t('routing.orchestrator.canRun') },
+    { value: 'edit', label: t('routing.orchestrator.canEdit') },
+  ];
+  return (
+    <>
+      <Row label={t('routing.orchestrator.title')} detail={t('routing.orchestrator.onDetail')}>
+        <Switch label={t('routing.orchestrator.on')} on={Boolean(block?.on)} onChange={(on) => save({ ...block, on })} />
+      </Row>
+      {block?.on ? (
+        <>
+          <Row label={t('routing.orchestrator.lead')} detail={t('routing.orchestrator.leadDetail')}>
+            <Select label={t('routing.orchestrator.lead')} value={block.lead ?? ''} options={[{ value: '', label: t('routing.orchestrator.leadYours') }, ...combos.map((c) => ({ value: c.id, label: c.name }))]} onChange={(v) => save({ ...block, lead: v || undefined })} />
+          </Row>
+          <Row label={t('routing.orchestrator.executors')} detail={`${t('routing.orchestrator.executorsDetail')}${split.executors ? ` ${t('routing.orchestrator.usage', { lead: shortTokens(split.lead), executors: shortTokens(split.executors) })}` : ''}`}>
+            <div style={STACK}>
+              {Object.entries(executors).flatMap(([name, e]) => {
+                if (!e) return [];
+                const now = resolved.executors.find((x) => x.name === name);
+                return [
+                  <div key={name} style={PAIR}>
+                    <Select label={t('routing.orchestrator.executorCombo', { name })} value={e.combo ?? ''} options={[{ value: '', label: t('routing.orchestrator.byKind') }, ...combos.map((c) => ({ value: c.id, label: c.name }))]} onChange={(v) => setExecutor(name, { combo: v || undefined })} />
+                    <Select label={t('routing.orchestrator.executorCan', { name })} value={e.can ?? 'read'} options={CAN} onChange={(v) => setExecutor(name, { can: v as ExecutorCan })} />
+                    {now ? <span className={s.rowLabel}>{now.why ? t('routing.orchestrator.cant', { name, why: now.why }) : t('routing.orchestrator.now', { name, label: now.label })}</span> : null}
+                  </div>,
+                ];
+              })}
+            </div>
+          </Row>
+          <Row label={t('routing.orchestrator.delegate')} detail={t('routing.orchestrator.delegateDetail')}>
+            <Select label={t('routing.orchestrator.delegate')} value={block.delegate ?? 'suggest'} options={[{ value: 'suggest', label: t('routing.orchestrator.suggest') }, { value: 'always', label: t('routing.orchestrator.always') }]} onChange={(v) => save({ ...block, delegate: v as DelegateMode })} />
+          </Row>
+        </>
+      ) : null}
+    </>
   );
 }

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Combo, MAX_COMBOS } from '../core/routing/model.js';
+import { OrchestratorBlock } from '../core/routing/orchestrator.js';
 
 /**
  * Combos (core/routing, docs/routing.md): named, ordered chains of agents and models a conversation
@@ -30,4 +31,11 @@ export const ROUTING_API = {
   // "Claude by kind of work" (core/routing/presets.ts, docs/stack.md): the three Claude combos added to
   // yours, and each kind of work's and each plan role's combo set to them. → your combos
   'routing.useClaudeByKind': { args: z.tuple([]) },
+  // Orchestrator mode (core/routing/orchestrator.ts): what applies in a conversation (or, none named,
+  // Settings' own), with the lead and each executor on the target it would run now. → ResolvedOrchestrator & { words? }
+  'routing.orchestrator': { args: z.tuple([channel.optional()]) },
+  // Settings' block (Settings › Agents › Combos › Orchestrator mode); null: off and unset. → the block
+  'routing.setOrchestrator': { args: z.tuple([OrchestratorBlock.nullish()]) },
+  // One conversation on or off (/orquestrador, the chat's •••); null: as Settings, the project and the bot say. → true
+  'routing.setConversationOrchestrator': { args: z.tuple([channel, z.boolean().nullish()]) },
 } as const;

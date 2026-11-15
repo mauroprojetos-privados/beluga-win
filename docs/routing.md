@@ -208,6 +208,72 @@ by kind, then the suggestions. `routing.usage` returns the same (`comboReport`: 
 with `judged`, `good`, `categories`, `baselineCost`, `spent`, `saved`, `baseline`, `suggestions`),
 and the phone draws it in Settings › Routing.
 
+## Orchestrator mode
+
+Everything above picks the model of a **whole run**. Orchestrator mode picks who works **inside**
+it: a strong model (the lead) thinks, decides and makes every edit, and cheap executors (Haiku, by
+default) do the searching, reading and test runs and hand back a summary
+(`roadmap/modo-orquestrador.md`, phase 2). Off by default; nothing changes for a run without it (a
+snapshot of the SDK's options says so: `tests/orchestrator-runner.test.ts`).
+
+The same `orchestrator` block sits in four places, and the most specific wins, field by field:
+Settings (Settings › Agent › Combos › Orchestrator mode), the project's `beluga.json`, the bot's
+`bot.json` ([bots.md](bots.md)), and the conversation (`/orquestrador on|off|default`, which only
+turns it on or off). Executors merge by name; `null` drops one a less specific place set.
+
+```json
+"orchestrator": {
+  "on": true,
+  "lead": "claude-opus",
+  "executors": {
+    "explore": { "combo": "claude-haiku", "can": "read" },
+    "test":    { "combo": "claude-haiku", "can": "run" },
+    "docs":    { "can": "read" }
+  },
+  "delegate": "suggest"
+}
+```
+
+- **`lead`**: the combo the lead runs on, resolved like any combo, when the conversation picked no
+  model or agent of its own. Unset: the conversation's agent, as now.
+- **`executors`**: unset, `explore` and `docs` (read) and `test` (read and run). Each runs on the first
+  target of its `combo` that can run now (as `routePlace` resolves a run). An executor with no
+  `combo` takes the combo of the kind of work of its name (`categoryCombos.explore`), else Claude ·
+  Haiku. One whose combo can't run now is left out, with why; never put on the lead's model.
+- **`can`**: `read` (Glob, Grep, Read, and Beluga's read tools: a task, the plan, the computer),
+  `run` (also Bash, for typecheck and tests; never Edit or Write), `edit` (also Edit and Write; only
+  when you choose it).
+- **`delegate`**: `suggest` (the lead decides) or `always`: the `PreToolUse` gate refuses the lead a
+  broad Grep or Glob (no folder named) and a test or typecheck run, naming the executor to send it
+  to. Executors' own calls are never refused this way (their hook carries `agent_id`).
+- **`compactAt`** and **`budget`** are read here too, for phases 1 and 4.
+
+`core/routing/orchestrator.ts` (pure, browser-safe) merges and resolves; `orchestrator-run.ts` reads
+the files. On a Claude run (`agent/orchestrator-agents.ts`), each Claude executor becomes one of the
+SDK's `agents` (`description`, a short fixed `prompt` per role, `tools` from `can`, `model`,
+`maxTurns`), `CLAUDE_CODE_SUBAGENT_MODEL` is set to the `explore` executor's model so Claude Code's
+built-in sub-agents (Explore, general-purpose) don't inherit the lead's, and the run's instructions
+gain the lead's paragraph (delegate wide searches, long reads and test runs; do yourself what takes a
+call or two, and every edit; write the request in full; check the critical lines before editing; send
+independent pieces in parallel). Executors of other runtimes (Codex, a local model) come with phase 3.
+Only your own runs get it, never a friend's or an external agent's.
+
+**Names.** An executor is the sub-agent of its name in Beluga's runs. The SDK's `agents` rank above
+your own `~/.claude/agents/*.md`, which Beluga's runs load (`settingSources: ['user']`): an executor
+named like one of yours replaces it there. So the defaults (`explore`, `test`, `docs`) sit beside
+agents of other names (`explorador`, `testador`, `documentador`) and both are offered to the lead; to
+have Beluga's definition used instead of yours, name the executor the same as yours. A bot's own
+`.claude/agents/<name>.md` wins: the executor of that name is left out of that bot's runs. The
+built-in `Explore` is another agent from `explore`.
+
+**Screens.** A sub-agent that is one of the run's executors starts as "explore · Haiku · <what it was
+asked>", with `runtime` and `model` on its `sub` event, on the Mac and the phone (`SubAgentView.model`).
+A run's card keeps the executors' share of its tokens (`RunUsage.executorTokens`, from the models only
+executors ran on: a model the lead runs on too can't be told apart and counts as the lead's), and
+Settings › Agent › Combos › Orchestrator mode says lead × executors so far. API: `routing.orchestrator`
+(phone: what applies, `words` for a header), `routing.setOrchestrator` and
+`routing.setConversationOrchestrator` (Mac).
+
 ## Bots (Phases 6, 6b and 6c)
 
 A bot plans and dispatches with all of the above: its own combo for its conversation, and a map of

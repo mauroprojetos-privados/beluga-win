@@ -8,7 +8,7 @@ import { runRouteOf } from '../core/routing/model.js';
 import { taskKindLine } from '../core/routing/outcomes.js';
 import { roomAgentTags } from '../shared/agent-tags.js';
 import { type Approval, type DomainState, type LogItem, type SubAgent, isRunning } from '../core/store.js';
-import { agentLabel, agentName } from '../shared/agent-label.js';
+import { agentLabel, agentName, modelName } from '../shared/agent-label.js';
 import { waitingNote } from '../core/friend-share-people.js';
 import { criteria, tally } from '../core/board/criteria.js';
 import { OFFER_DETAIL, offerWords, waitingOn, waitingWords, workingOn, workingWords } from '../core/team/model.js';
@@ -404,6 +404,7 @@ function subView(sub: SubAgent, outputs: readonly OutputView[], cc?: CcAgent): S
     ...((sub.startedAt ?? cc?.startedAt) !== undefined ? { startedAt: Math.round((sub.startedAt ?? cc?.startedAt)!) } : {}),
     ...(cc?.endedAt !== undefined && status !== 'running' ? { endTs: Math.round(cc.endedAt) } : {}),
     count: Math.max(steps.length, cc?.steps ?? 0),
+    ...(sub.model ? { model: clip(modelName(sub.model), 60) } : {}),
   };
 }
 

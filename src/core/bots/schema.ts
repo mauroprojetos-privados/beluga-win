@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { COMBO_ID, DIFFICULTIES, type Difficulty, DifficultyCombos } from '../routing/model.js';
+import { OrchestratorBlock } from '../routing/orchestrator.js';
 import { ASSISTANT_CHANNEL, CHAT_ID } from '../../shared/assistant.js';
 import { TriggerSchema } from '../sentinel/schema.js';
 import type { Trigger } from '../sentinel/model.js';
@@ -140,6 +141,8 @@ export const BotFile = z.object({
   projects: z.array(z.string().min(1).max(200)).max(50).optional(),
   /** What it does on its own: on a schedule or an event (Sentinels' triggers), each with its message. */
   triggers: z.array(BotTrigger).max(MAX_BOT_TRIGGERS).optional(),
+  /** Orchestrator mode in its conversations (core/routing/orchestrator.ts): over Settings' and the project's. Its own .claude/agents/<name>.md wins over an executor of that name. */
+  orchestrator: OrchestratorBlock.optional(),
 });
 export type BotFile = z.infer<typeof BotFile>;
 
