@@ -122,6 +122,33 @@ describe('the runtimes as the pickers have them', () => {
     wb.stop();
   });
 
+  it('one not ready is asked about again less and less often while nothing changes (each look at Codex is a process and a git clone)', async () => {
+    vi.useFakeTimers();
+    try {
+      const found: Array<{ id: string } & RuntimeStatus> = [{ id: 'codex', state: 'signed_out', fix: CODEX_SIGN_IN, models: [] }];
+      const { wb, status } = bench(found, { on: false });
+      await wb.checkAgents();
+      expect(status).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(status).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(status).toHaveBeenCalledTimes(2); // nothing changed: two minutes this time
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(status).toHaveBeenCalledTimes(3);
+      await vi.advanceTimersByTimeAsync(6 * 60 * 60_000);
+      expect(status.mock.calls.length).toBeLessThan(20); // at most every half hour, never once a minute
+      const asked = status.mock.calls.length;
+      found.splice(0, 1, { id: 'codex', state: 'ready', models: [] });
+      await vi.advanceTimersByTimeAsync(30 * 60_000);
+      expect(status).toHaveBeenCalledTimes(asked + 1);
+      await vi.advanceTimersByTimeAsync(6 * 60 * 60_000);
+      expect(status).toHaveBeenCalledTimes(asked + 1); // ready: not asked again by itself
+      wb.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('a run that ends signed out (a login that ran out while ready) asks again at once; another failure does not', async () => {
     const found: Array<{ id: string } & RuntimeStatus> = [{ id: 'claude', state: 'ready', models: [] }];
     const { wb, store, status } = bench(found, { on: false }, { hasGh: async () => false, listShells: () => [] });

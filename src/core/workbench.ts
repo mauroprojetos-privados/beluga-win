@@ -141,8 +141,14 @@ export function withRuntimeStatus(runtimes: readonly RuntimeChoice[], found: Rea
   });
 }
 
-/** An agent that isn't ready yet (Codex not signed in) is asked about again this often. */
+/**
+ * An agent that isn't ready yet (Codex not signed in) is asked about again after a minute, then twice
+ * as long each time nothing changed, up to half an hour. Asking Codex starts `codex app-server`, and
+ * each start syncs its plugins with a fresh git clone: once a minute forever was ~1,400 clones a day.
+ * Check Again (Settings › Agent) still asks at once.
+ */
 const RUNTIME_RECHECK_MS = 60_000;
+const RUNTIME_RECHECK_MAX_MS = 30 * 60_000;
 const DISK_EVERY_MS = 5 * 60_000;
 /** Claude Code updates: first looked for a minute after start (not in the way of the first run), then every six hours. */
 const AGENT_FIRST_CHECK_MS = 60_000;
@@ -292,6 +298,9 @@ export class Workbench {
   private measuring?: Promise<void>;
   private prTimer?: NodeJS.Timeout;
   private runtimeTimer?: NodeJS.Timeout;
+  /** The wait before the next unasked look, and what the last look found (states by runtime). */
+  private runtimeWait = RUNTIME_RECHECK_MS;
+  private runtimeSeen = '';
   /** What the runtimes last said about themselves, kept so a new list (a local endpoint answering) doesn't wipe it. */
   private runtimeFound: ReadonlyArray<{ readonly id: string } & RuntimeStatus> = [];
   private runtimeCheck?: Promise<void>;
@@ -1872,8 +1881,12 @@ export class Workbench {
     this.runtimeFound = [...found, ...this.runtimeFound.filter((old) => !found.some((f) => f.id === old.id))];
     this.runtimesChanged();
     clearTimeout(this.runtimeTimer);
+    // Nothing changed since the last look: wait twice as long before the next one.
+    const seen = found.map((r) => `${r.id}:${r.state}`).sort().join(',');
+    this.runtimeWait = seen === this.runtimeSeen ? Math.min(this.runtimeWait * 2, RUNTIME_RECHECK_MAX_MS) : RUNTIME_RECHECK_MS;
+    this.runtimeSeen = seen;
     if (found.some((r) => r.state !== 'ready')) {
-      this.runtimeTimer = setTimeout(() => void this.checkRuntimes(), RUNTIME_RECHECK_MS);
+      this.runtimeTimer = setTimeout(() => void this.checkRuntimes(), this.runtimeWait);
       this.runtimeTimer.unref();
     }
   }
