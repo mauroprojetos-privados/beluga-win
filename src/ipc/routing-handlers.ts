@@ -6,6 +6,8 @@ import { comboStops, routeOf, routeWords } from '../core/routing/model.js';
 import { sendAutomatic } from '../core/triage/launch.js';
 import { comboReport, strongerOf } from '../core/routing/outcomes.js';
 import { claudeByKind } from '../core/routing/presets.js';
+import { orchestratorWords, resolveOrchestrator } from '../core/routing/orchestrator.js';
+import { orchestratorAt } from '../core/routing/orchestrator-run.js';
 import type { Args, Method } from './api.js';
 
 /** What each `routing.*` method does (see routing-api.ts). */
@@ -53,6 +55,22 @@ export const ROUTING_HANDLERS = {
   'routing.useClaudeByKind': (s) => {
     s.setPrefs(claudeByKind(s.store.getState().prefs.combos));
     return combosIn(s.store.getState());
+  },
+  'routing.orchestrator': (s, channel) => {
+    const st = s.store.getState();
+    const world = worldOf(st, Date.now(), hhmm);
+    const ws = channel ? s.workspaces?.inChannel(channel) : undefined;
+    const o = ws ? orchestratorAt(st, world, { cwd: ws.path, ...(ws.orchestrator !== undefined ? { conversation: ws.orchestrator } : {}) }) : resolveOrchestrator(st, world);
+    const words = orchestratorWords(o);
+    return { ...o, ...(words ? { words } : {}) };
+  },
+  'routing.setOrchestrator': (s, block) => {
+    s.setPrefs({ orchestrator: block ?? null });
+    return s.store.getState().prefs.orchestrator ?? null;
+  },
+  'routing.setConversationOrchestrator': (s, channel, on) => {
+    if (!s.workbench?.setOrchestrator(channel, on ?? undefined)) throw new Error('Orchestrator mode is turned on per conversation of a project or worktree');
+    return true;
   },
   'routing.resetCombos': (s) => {
     s.setPrefs({ combos: null });

@@ -378,6 +378,8 @@ export const SubAgentView = z.object({
   endTs: ts.optional(),
   /** Steps it has taken in all (the trail keeps the last 30). */
   count: z.number().int().min(0).optional(),
+  /** An orchestrator executor's model in words ("Haiku"): the phone says "explore · Haiku". */
+  model: z.string().max(60).optional(),
 });
 export type SubAgentView = z.infer<typeof SubAgentView>;
 

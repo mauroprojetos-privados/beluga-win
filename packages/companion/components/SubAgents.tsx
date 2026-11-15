@@ -148,6 +148,8 @@ export function SubAgentSheet({ topic, turn, agent, onClose }: { readonly topic:
               <IconBadge Icon={Bot} tone="lavender" size={30} />
               <T v="callout" style={{ flex: 1 }} numberOfLines={1}>
                 {a.type ? tx('phoneParts.subs.ofType', { type: a.type }) : tx('phoneParts.subs.subAgent')}
+                {/* An orchestrator executor says the model it runs on ("explore · Haiku"). */}
+                {a.model ? ` · ${a.model}` : ''}
               </T>
               <Pill label={agentWord(a.status)} tone={tone} />
             </View>

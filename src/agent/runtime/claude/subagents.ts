@@ -2,7 +2,8 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { AGENT_SCRATCH_MARK, buildAgentScratchNote, summarizeTool } from '../../prompt.js';
 import { agentScratchName } from '../../../shared/scratch-dir.js';
-import type { SubAgentEvent } from '../../types.js';
+import type { RunOrchestrator, SubAgentEvent } from '../../types.js';
+import { modelName } from '../../../shared/agent-label.js';
 
 /** Tools that launch a sub-agent in Claude Code. */
 export const SUBAGENT_TOOLS = new Set(['Task', 'Agent']);
@@ -45,7 +46,15 @@ export class SubAgentTracker {
   private readonly background = new Set<string>();
   private readonly taskCall = new Map<string, string>();
 
-  constructor(private readonly cwd?: string) {}
+  /** Orchestrator mode's executors by name: their sub-agents start with the model they run on. */
+  private readonly executors: ReadonlyMap<string, string | undefined>;
+
+  constructor(
+    private readonly cwd?: string,
+    orchestrator?: RunOrchestrator,
+  ) {
+    this.executors = new Map((orchestrator?.executors ?? []).map((e) => [e.name, e.model]));
+  }
 
   /** Returns true if the tool_use is a sub-agent launch (so callers can skip it as a normal step). */
   isLaunch(block: Block): boolean {
@@ -60,8 +69,11 @@ export class SubAgentTracker {
       if (parentToolUseId === null && this.isLaunch(block) && block.id) {
         this.open.add(block.id);
         if (input.run_in_background === true) this.background.add(block.id);
-        const title = [input.subagent_type, input.description].filter((v): v is string => typeof v === 'string' && v.length > 0).join(' · ');
-        events.push({ id: block.id, phase: 'start', title: title || 'sub-agent' });
+        const type = typeof input.subagent_type === 'string' ? input.subagent_type : undefined;
+        // One of the run's executors: "explore · Haiku · <what it was asked>".
+        const model = type && this.executors.has(type) ? this.executors.get(type) : undefined;
+        const title = [type, model ? modelName(model) : undefined, input.description].filter((v): v is string => typeof v === 'string' && v.length > 0).join(' · ');
+        events.push({ id: block.id, phase: 'start', title: title || 'sub-agent', ...(model ? { runtime: 'claude', model } : {}) });
       } else if (parentToolUseId && this.open.has(parentToolUseId)) {
         events.push({ id: parentToolUseId, phase: 'step', step: summarizeTool(block.name ?? 'tool', input, this.cwd) });
       }

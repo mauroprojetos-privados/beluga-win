@@ -1328,6 +1328,12 @@ export class WorkspaceManager {
     this.patchRecord(id, { thread });
   }
 
+  /** Orchestrator mode for one conversation (undefined: as its project, bot and Settings say). */
+  setOrchestrator(id: string, on: boolean | undefined): void {
+    this.require(id);
+    this.patchRecord(id, { orchestrator: on });
+  }
+
   /** Pick the thinking effort for one workspace's conversation (undefined: Settings'). */
   setEffort(id: string, effort: Effort | undefined): void {
     this.require(id);

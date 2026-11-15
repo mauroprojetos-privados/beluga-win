@@ -1,5 +1,6 @@
 import type { AgentRef } from '../protocol.js';
 import { buildGraphAppend } from './graph-prompt.js';
+import { buildOrchestratorAppend } from './orchestrator-agents.js';
 import { buildAskOnlyAppend, buildCommitAppend, buildKeepAppend, buildLanguageAppend, buildScratchAppend, buildShippedAppend, buildSystemAppend } from './prompt.js';
 import { buildSyncMainAppend } from './sync-main.js';
 import { buildTerminalAppend } from './terminal-prompt.js';
@@ -36,7 +37,9 @@ export function runInstructions(input: AgentRunInput, ownerName: string, agent?:
     (place?.shipped && !askOnly ? buildShippedAppend(place.shipped) : '') +
     (askOnly ? (syncMain ? buildSyncMainAppend(askOnly.project, syncMain.branch, syncMain.upstream) : buildAskOnlyAppend(askOnly.project, Boolean(input.continueInWorktree), Boolean(input.board))) : '') +
     (input.terminal ? buildTerminalAppend() : '') +
-    (input.env?.BELUGA_REMOTE_CLIENT ? buildRemoteClientAppend() : '')
+    (input.env?.BELUGA_REMOTE_CLIENT ? buildRemoteClientAppend() : '') +
+    // Orchestrator mode: the lead hands the legwork to its executors (agent/orchestrator-agents.ts).
+    (input.terminal ? '' : buildOrchestratorAppend(input.orchestrator))
   );
 }
 

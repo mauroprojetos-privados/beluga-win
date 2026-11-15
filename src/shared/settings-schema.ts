@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { AgentRef } from '../protocol.js';
 import { CategoryCombos, DifficultyCombos, RoleCombos, SavedCombos } from '../core/routing/model.js';
 import { SAVINGS_BASELINES } from '../core/routing/outcomes.js';
+import { SavedOrchestrator } from '../core/routing/orchestrator.js';
 import { AUTO_COMPACT_DEFAULT, AUTO_COMPACT_MAX, AUTO_COMPACT_MIN, AUTO_COMPACT_TOKENS_MAX, AUTO_COMPACT_TOKENS_MIN } from './context-usage.js';
 import { PARALLEL_RUNS_DEFAULT, PARALLEL_RUNS_MAX, PARALLEL_RUNS_MIN } from './run-slots.js';
 import { CHAT_LIMIT_DEFAULT, CHAT_LIMIT_MAX } from './chat-limit.js';
@@ -148,6 +149,8 @@ export const Settings = z.object({
   roleCombos: RoleCombos.optional().catch(undefined),
   /** Which combo (and effort) a task of each kind of work starts on when it names no agent (docs/routing.md). */
   categoryCombos: CategoryCombos.optional().catch(undefined),
+  /** Orchestrator mode (core/routing/orchestrator.ts, docs/routing.md): a lead that thinks and edits, cheap executors for the legwork. Unset: off. */
+  orchestrator: SavedOrchestrator,
   /** What routing's savings are measured against (docs/routing.md); unset: everything on Opus. */
   savingsBaseline: z.enum(SAVINGS_BASELINES).optional().catch(undefined),
   /** What new worktrees' branches start with (`beluga/<name>`); empty: no prefix. */

@@ -4,7 +4,7 @@ import type { Locale } from '../shared/i18n/locales.js';
 import { randomUUID } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import path from 'node:path';
-import type { AgentBackend, AgentPlace, AgentRunInput, BoardTools, FollowUp, LiveStatus, MacTools, RunProcess, Steer, TerminalLaunch, TerminalSink } from '../agent/types.js';
+import type { AgentBackend, AgentPlace, AgentRunInput, RunOrchestrator, BoardTools, FollowUp, LiveStatus, MacTools, RunProcess, Steer, TerminalLaunch, TerminalSink } from '../agent/types.js';
 import { ALWAYS_ASK_YOU, writesCode } from '../agent/policy.js';
 import { type AgentRef, type BodyInput, type BodyOf, CLAUDE_AGENT, MAX_TEXT, type MessageVia } from '../protocol.js';
 import type { People } from './people.js';
@@ -26,7 +26,8 @@ import { PHONE_LOOK_TOOLS } from '../agent/phone-tools.js';
 import type { StepPage, StepRecord } from '../shared/steps.js';
 import { READS_AFTER_STEP, STEERED_IN, STOPPING_FOR, TAKEN_BACK } from '../shared/claude-notices.js';
 import { hhmm, span } from '../shared/clock.js';
-import { routeOf } from './routing/model.js';
+import { routeOf, worldOf } from './routing/model.js';
+import { botAgentNames, orchestratorAt, runOrchestrator } from './routing/orchestrator-run.js';
 import { TERM_BUSY } from '../shared/terminal-keys.js';
 import { RunFailedError, decodeFailure } from '../shared/run-failure.js';
 import { e2eLockedIn, keepsRunning, mayLeaveProcesses } from '../workspaces/test-procs.js';
@@ -1508,6 +1509,8 @@ export class AgentHost {
       // The plan's head Claude orchestrates: it may change things where it runs (your approvals and
       // Beluga's secrets rules still apply), not only read like other main-folder chats.
       const runPlace = plans?.tools && place?.askOnly && !place.syncMain ? withoutAskOnly(place) : place;
+      // Orchestrator mode (core/routing/orchestrator.ts): your own Claude runs hand the legwork to cheap executors.
+      const orchestrated = from === this.selfId && !external ? this.orchestratorFor(body.channel, place, botWork?.dir, other ? (named?.runtime ?? CLAUDE_AGENT.runtime) : (place?.agent?.runtime ?? (this.deps.agentRef?.(body.channel) ?? CLAUDE_AGENT).runtime)) : {};
       const final = await Promise.race([gone, exited, agent.run({
         ...(scratch ? { scratchDir: scratch } : {}),
         ...(place ? { language: this.languagesFor(place) } : {}),
@@ -1575,6 +1578,9 @@ export class AgentHost {
           if (send) lane.waiting = lane.waiting.filter((w) => !this.sendFollowUp(lane, w.from, w.body));
         },
         ...this.modelFor(place?.model, place?.agent ?? named, place?.effort),
+        // The lead's model, when the conversation picked none of its own.
+        ...(orchestrated.leadModel ? { model: orchestrated.leadModel } : {}),
+        ...(orchestrated.run ? { orchestrator: orchestrated.run } : {}),
         // Your MCP servers (your logins: Figma, Linear…) are for runs you asked for, never a friend's.
         ...(yours ? { ownerMcp: true } : {}),
         // Your own flags for `claude` and `codex` (Settings › Agents), never on a friend's run or an agent's below full.
@@ -1720,6 +1726,30 @@ export class AgentHost {
     const { model: _m, effort: _e, ...rest } = place;
     const { ready } = routed;
     return { ...rest, agent: ready.agent, ...(ready.model ? { model: ready.model } : {}), ...((ready.effort ?? place.effort) ? { effort: ready.effort ?? place.effort } : {}), route: { combo: routed.combo.id, index: routed.index } };
+  }
+
+  /**
+   * Orchestrator mode for a run of yours: its executors (Claude ones, run in-process as sub-agents;
+   * a bot's own .claude/agents win over an executor of the same name), and the lead's model when the
+   * conversation picked no model or agent of its own. Off, or another runtime: nothing.
+   */
+  private orchestratorFor(channel: string, place: AgentPlace | undefined, botDir: string | undefined, runtime: string): { run?: RunOrchestrator; leadModel?: string } {
+    try {
+      return this.orchestratorAt(channel, place, botDir, runtime);
+    } catch {
+      // A file that can't be read, a conversation gone: the run goes on as without the mode.
+      return {};
+    }
+  }
+
+  private orchestratorAt(channel: string, place: AgentPlace | undefined, botDir: string | undefined, runtime: string): { run?: RunOrchestrator; leadModel?: string } {
+    const st = this.store.getState();
+    const ws = this.deps.workspaces?.inChannel?.(channel);
+    const o = orchestratorAt(st, worldOf(st, Date.now(), hhmm), { ...(place?.cwd ? { cwd: place.cwd } : {}), ...(botDir ? { botDir } : {}), ...(ws?.orchestrator !== undefined ? { conversation: ws.orchestrator } : {}) });
+    if (!o.on || runtime !== CLAUDE_AGENT.runtime) return {};
+    const run = runOrchestrator(o, botAgentNames(botDir ?? place?.cwd));
+    const leadModel = o.lead && !o.lead.why && o.lead.agent.runtime === runtime && !ws?.model && !ws?.agent ? o.lead.model : undefined;
+    return { ...(run ? { run } : {}), ...(leadModel ? { leadModel } : {}) };
   }
 
   /** Your launch flags per runtime (Settings › Agents › Launch flags), when you set any. */

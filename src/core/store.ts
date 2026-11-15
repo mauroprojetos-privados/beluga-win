@@ -9,6 +9,7 @@ import { BRANCH_PREFIX_DEFAULT, NotifySettings as NotifySchema, SETTLE_IDLE_DAYS
 import type { Review } from '../workspaces/git.js';
 import type { CategoryCombos, Combo, DifficultyCombos, RoleCombos } from './routing/model.js';
 import type { SavingsBaseline } from './routing/outcomes.js';
+import type { OrchestratorBlock } from './routing/orchestrator.js';
 import type { LanguageChoice, Locale } from '../shared/i18n/locales.js';
 import type { Project, ProjectGroup } from '../workspaces/types.js';
 import type { EnvChange } from '../workspaces/env.js';
@@ -54,6 +55,8 @@ export interface SubAgent {
   readonly kind?: 'agent' | 'background';
   /** When it started (missing on items saved before it was kept): where it sits among the steps. */
   readonly startedAt?: number;
+  /** An orchestrator executor's model ("haiku"): the lead's own sub-agents say what they ran on. */
+  readonly model?: string;
 }
 
 /**
@@ -144,6 +147,8 @@ export type LogItem =
 export interface RunUsage {
   readonly tokens: number;
   readonly cost: number;
+  /** Orchestrator mode: the part of 	okens its executors spent (the rest is the lead's). */
+  readonly executorTokens?: number;
 }
 
 /** Words Claude said between its steps, and when (a step came after them, so they aren't its answer). */
@@ -347,6 +352,8 @@ export interface Prefs {
   readonly roleCombos?: RoleCombos;
   /** Which combo (and effort) a task of each kind starts on (core/routing/model.ts); unset: by difficulty, else your agent. */
   readonly categoryCombos?: CategoryCombos;
+  /** Orchestrator mode's block from Settings (core/routing/orchestrator.ts); unset: off. */
+  readonly orchestrator?: OrchestratorBlock;
   /** What routing's savings are measured against (core/routing/outcomes.ts); unset: everything on Opus. */
   readonly savingsBaseline?: SavingsBaseline;
   readonly autoSetup: boolean;
@@ -839,7 +846,7 @@ export const DEFAULT_PREFS: Prefs = {
 
 /** The preference fields out of saved settings. */
 export function prefsFrom(settings: Partial<Settings>): Prefs {
-  const picked = Object.fromEntries(Object.keys(DEFAULT_PREFS).concat(['model', 'effort', 'defaultAgent', 'projectAgents', 'combos', 'difficultyCombos', 'roleCombos', 'categoryCombos', 'savingsBaseline', 'shell', 'earningsCurrency', 'commitLanguages', 'autoCompactChosen']).filter((k) => settings[k as keyof Settings] !== undefined).map((k) => [k, settings[k as keyof Settings]]));
+  const picked = Object.fromEntries(Object.keys(DEFAULT_PREFS).concat(['model', 'effort', 'defaultAgent', 'projectAgents', 'combos', 'difficultyCombos', 'roleCombos', 'categoryCombos', 'orchestrator', 'savingsBaseline', 'shell', 'earningsCurrency', 'commitLanguages', 'autoCompactChosen']).filter((k) => settings[k as keyof Settings] !== undefined).map((k) => [k, settings[k as keyof Settings]]));
   return { ...DEFAULT_PREFS, ...picked };
 }
 
@@ -1013,16 +1020,17 @@ export function orderQueued(log: readonly LogItem[], owner: string, ids: readonl
 function reduceRunUsage(state: DomainState, a: Extract<Action, { type: 'agent_event' }>): DomainState {
   const idx = state.log.findIndex((l) => l.type === 'agent' && l.requestId === a.requestId && l.owner === a.owner);
   if (idx < 0) return state;
-  let add: { tokens?: unknown; cost?: unknown };
+  let add: { tokens?: unknown; cost?: unknown; executorTokens?: unknown };
   try {
-    add = JSON.parse(a.text) as { tokens?: unknown; cost?: unknown };
+    add = JSON.parse(a.text) as { tokens?: unknown; cost?: unknown; executorTokens?: unknown };
   } catch {
     return state;
   }
   const num = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : 0);
   if (!num(add.tokens) && !num(add.cost)) return state;
   const card = state.log[idx] as Extract<LogItem, { type: 'agent' }>;
-  const usage = { tokens: (card.usage?.tokens ?? 0) + num(add.tokens), cost: (card.usage?.cost ?? 0) + num(add.cost) };
+  const executorTokens = (card.usage?.executorTokens ?? 0) + Math.min(num(add.executorTokens), num(add.tokens));
+  const usage = { tokens: (card.usage?.tokens ?? 0) + num(add.tokens), cost: (card.usage?.cost ?? 0) + num(add.cost), ...(executorTokens ? { executorTokens } : {}) };
   return { ...state, log: state.log.map((l, i) => (i === idx ? { ...card, usage } : l)) };
 }
 
@@ -1106,7 +1114,7 @@ export const formatTokens = (n: number): string => (n >= 1000 ? `${Math.round(n 
 
 /** Apply one sub-agent event (JSON from the runner) to the list. */
 function applySub(list: readonly SubAgent[], json: string, ts: number): readonly SubAgent[] {
-  let e: { id?: string; phase?: string; title?: string; step?: string; kind?: 'agent' | 'background'; failed?: boolean };
+  let e: { id?: string; phase?: string; title?: string; step?: string; kind?: 'agent' | 'background'; failed?: boolean; model?: string };
   try {
     e = JSON.parse(json) as typeof e;
   } catch {
@@ -1114,7 +1122,7 @@ function applySub(list: readonly SubAgent[], json: string, ts: number): readonly
   }
   if (!e.id) return list;
   const existing = list.find((s) => s.id === e.id);
-  if (e.phase === 'start' && !existing) return [...list, { id: e.id, title: e.title ?? 'sub-agent', steps: [], status: 'running', kind: e.kind ?? 'agent', startedAt: ts }];
+  if (e.phase === 'start' && !existing) return [...list, { id: e.id, title: e.title ?? 'sub-agent', steps: [], status: 'running', kind: e.kind ?? 'agent', startedAt: ts, ...(typeof e.model === 'string' ? { model: e.model.slice(0, 80) } : {}) }];
   return list.map((s) => {
     if (s.id !== e.id) return s;
     if (e.phase === 'step' && e.step) return { ...s, steps: [...s.steps, e.step].slice(-MAX_STEPS) };

@@ -90,6 +90,8 @@ export interface WorkspaceRecord {
   readonly model?: string;
   /** Thinking effort picked for this conversation (a Sentinel step's, BLG-498; unset: Settings'). */
   readonly effort?: Effort;
+  /** Orchestrator mode turned on or off for this conversation alone (/orquestrador on|off); unset: as its project, bot and Settings say. */
+  readonly orchestrator?: boolean;
   readonly usage?: WorkspaceUsage;
   /** Handed off to a friend (their name), who continues it on their computer. */
   readonly handedTo?: string;

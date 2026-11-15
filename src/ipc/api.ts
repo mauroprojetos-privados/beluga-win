@@ -45,6 +45,7 @@ import { AGENT_TERM_API } from './agent-term-api.js';
 import { HANDOFF_MODES } from '../shared/agent-handoff.js';
 import { CategoryCombos, Combo, DifficultyCombos, MAX_COMBOS, RoleCombos } from '../core/routing/model.js';
 import { SAVINGS_BASELINES } from '../core/routing/outcomes.js';
+import { OrchestratorBlock } from '../core/routing/orchestrator.js';
 import { ROUTING_API } from './routing-api.js';
 import { BOTS_API } from './bots-api.js';
 
@@ -115,6 +116,8 @@ export const PrefsPatch = z
     roleCombos: RoleCombos.nullable(),
     // Which combo (and effort) a task of each kind starts on; null: none (by difficulty, else your agent).
     categoryCombos: CategoryCombos.nullable(),
+    // Orchestrator mode's block (core/routing/orchestrator.ts); null: off, back to unset.
+    orchestrator: OrchestratorBlock.nullable(),
     // What Usage › Combos measures savings against ("everything on Opus"); null: the default.
     savingsBaseline: z.enum(SAVINGS_BASELINES).nullable(),
     autoSetup: bool,

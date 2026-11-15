@@ -408,6 +408,16 @@ export class Workbench {
     this.deps.toast(t('toasts.workbench.modelNew', { model: label }), 'success');
   }
 
+  /** Orchestrator mode for one conversation (/orquestrador on|off; undefined: as Settings, the project and the bot say). False when it isn't a conversation of a workspace. */
+  setOrchestrator(channel: string, on: boolean | undefined): boolean {
+    const id = channel.startsWith('ws:') ? channel.slice(3) : undefined;
+    if (!id || !this.manager.find(id)) return false;
+    this.manager.setOrchestrator(id, on);
+    void this.deps.controller.refresh();
+    this.deps.toast(t(on === undefined ? 'toasts.workbench.orchestratorDefault' : on ? 'toasts.workbench.orchestratorOn' : 'toasts.workbench.orchestratorOff'), 'success');
+    return true;
+  }
+
   /**
    * Pick the agent for one conversation (undefined: your default); every run from there uses it.
    * `mode`: when the new agent can't read the session, switch quietly or have the old one write a note (BLG-592).
@@ -1801,11 +1811,11 @@ export class Workbench {
 
   /** Claude reported tokens and cost for a run in a workspace. */
   /** A run's usage report, added to its workspace. → what it added (tokens and cost), for the run's card; undefined: not a workspace's, or not usage. */
-  onUsage(channel: string, json: string): { readonly tokens: number; readonly cost: number } | undefined {
+  onUsage(channel: string, json: string): { readonly tokens: number; readonly cost: number; readonly executorTokens?: number } | undefined {
     const id = channel.startsWith('ws:') ? channel.slice(3) : undefined;
     if (!id) return undefined;
     try {
-      const u = JSON.parse(json) as { input?: number; output?: number; cacheRead?: number; cacheWrite?: number; cost?: number; session?: string; free?: boolean; tps?: number };
+      const u = JSON.parse(json) as { input?: number; output?: number; cacheRead?: number; cacheWrite?: number; cost?: number; session?: string; free?: boolean; tps?: number; executorTokens?: number };
       const num = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : 0);
       const before = this.manager.find(id)?.usage;
       const after = this.manager.addUsage(id, { input: num(u.input), output: num(u.output), cacheRead: num(u.cacheRead), cacheWrite: num(u.cacheWrite), cost: num(u.cost), session: typeof u.session === 'string' ? u.session : undefined, ...(u.free === true ? { free: true, ...(num(u.tps) ? { tps: num(u.tps) } : {}) } : {}) });
@@ -1813,7 +1823,10 @@ export class Workbench {
       if (!after) return undefined;
       // The growth: the reports are running totals per conversation (manager.addUsage works it out).
       const total = (x: { input: number; output: number; cacheWrite: number } | undefined): number => (x ? x.input + x.output + x.cacheWrite : 0);
-      return { tokens: Math.max(0, total(after) - total(before)), cost: Math.max(0, after.cost - (before?.cost ?? 0)) };
+      const tokens = Math.max(0, total(after) - total(before));
+      // Orchestrator mode: the part its executors spent (the runner's own growth), never more than the whole.
+      const executorTokens = Math.min(tokens, num(u.executorTokens));
+      return { tokens, cost: Math.max(0, after.cost - (before?.cost ?? 0)), ...(executorTokens ? { executorTokens } : {}) };
     } catch {
       // Not usage we understand.
       return undefined;

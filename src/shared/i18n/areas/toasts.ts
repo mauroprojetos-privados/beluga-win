@@ -4,6 +4,10 @@ import type { Message } from '../message.js';
 export const en = {
   'toasts.workbench.modelHere': '{model} in this conversation from the next message',
   'toasts.workbench.modelNew': 'New conversations use {model}',
+  'toasts.workbench.orchestratorOn': 'Orchestrator mode on in this conversation from the next message',
+  'toasts.workbench.orchestratorOff': 'Orchestrator mode off in this conversation from the next message',
+  'toasts.workbench.orchestratorDefault': 'This conversation follows Settings, the project and the bot for orchestrator mode again',
+  'toasts.commands.usageOrchestrator': 'Usage: /orquestrador on, off or default',
   'toasts.workbench.prForWorktrees': 'Pull requests are for worktrees (a branch of their own)',
   'toasts.workbench.installGh': 'Install the GitHub CLI first: brew install gh, then gh auth login',
   'toasts.workbench.preparingPr': '{agent} is preparing the pull request…',
@@ -431,6 +435,10 @@ export const en = {
 export const ptBR: { readonly [K in keyof typeof en]?: Message } = {
   'toasts.workbench.modelHere': '{model} nesta conversa a partir da próxima mensagem',
   'toasts.workbench.modelNew': 'Conversas novas usam {model}',
+  'toasts.workbench.orchestratorOn': 'Modo orquestrador ligado nesta conversa a partir da próxima mensagem',
+  'toasts.workbench.orchestratorOff': 'Modo orquestrador desligado nesta conversa a partir da próxima mensagem',
+  'toasts.workbench.orchestratorDefault': 'Esta conversa volta a seguir Settings, o projeto e o bot no modo orquestrador',
+  'toasts.commands.usageOrchestrator': 'Uso: /orquestrador on, off ou default',
   'toasts.workbench.prForWorktrees': 'Pull requests são para worktrees (uma branch própria)',
   'toasts.workbench.installGh': 'Instale primeiro o GitHub CLI: brew install gh, depois gh auth login',
   'toasts.workbench.preparingPr': '{agent} está preparando o pull request…',

@@ -34,6 +34,7 @@ export const COMMANDS: readonly CommandSpec[] = [
   { name: 'setup', desc: "run the project's setup command again in this workspace" },
   { name: 'handoff', args: '<name>', desc: 'hand this workspace to someone; their agent continues it' },
   { name: 'model', args: '[name | agent[:model]]', desc: 'pick the agent and model for this conversation (another agent hands the conversation off)' },
+  { name: 'orquestrador', args: 'on | off | default', desc: 'orchestrator mode in this conversation: a strong model leads, cheap executors search and run tests (docs/routing.md)' },
   { name: 'search', args: '<words>', desc: 'search every conversation' },
   { name: 'usage', desc: 'disk space and agent usage per workspace' },
   { name: 'inbox', desc: 'what happened while you were elsewhere' },
@@ -182,6 +183,14 @@ export function runCommand(session: Session, name: string, args: readonly string
     case 'handoff':
       runWorkspaceCommand(session, name, args, channel);
       return;
+    case 'orquestrador':
+    case 'orchestrator': {
+      // Orchestrator mode for this conversation alone (core/routing/orchestrator.ts): on, off, or back to what Settings, the project and the bot say.
+      const pick = (arg ?? '').toLowerCase();
+      const on = ['on', 'ligar', 'ligado', 'sim'].includes(pick) ? true : ['off', 'desligar', 'desligado', 'nao', 'não'].includes(pick) ? false : pick === 'default' || pick === 'padrao' || pick === 'padrão' ? undefined : null;
+      if (on === null || !session.workbench?.setOrchestrator(channel, on)) return session.toast(t('toasts.commands.usageOrchestrator'), 'warn');
+      return;
+    }
     case 'model': {
       // "/model codex" or "/model codex:gpt-5": another runtime for this conversation (a handoff when it's live).
       const [rt = '', ...rest] = (arg ?? '').split(':');

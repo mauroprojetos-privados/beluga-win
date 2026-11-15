@@ -20,6 +20,7 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `/setup` | `session.submit` → `runCommand` | typed in the composer · the panel terminal's Commands… |
 | `/handoff` | `session.submit` → `runCommand` | typed in the composer · Toolbar ⋯ › Hand off |
 | `/model` | `session.submit` → `runCommand` | typed in the composer (`/model codex:gpt-5` picks another agent: a live conversation is handed off) · Composer agent picker (runtimes as groups, BLG-446) |
+| `/orquestrador` | `session.submit` → `runCommand` (also `/orchestrator`) → `workbench.setOrchestrator` | typed in the composer: `on`, `off` or `default` turns orchestrator mode on or off in this conversation alone (docs/routing.md › Orchestrator mode); the phone shows it but doesn't change it |
 | `/search` | `session.submit` → `runCommand` | typed in the composer · Sidebar › Search · ⌘⇧F |
 | `/usage` | `session.submit` → `runCommand` | typed in the composer · Sidebar › Usage (⌘5) |
 | `/inbox` | `session.submit` → `runCommand` | typed in the composer · toolbar bell (notification centre) · the right panel's Info › Notifications · Go › Inbox · ⌘K › Notifications |
@@ -328,6 +329,9 @@ Columns: **Core** is the API method or intent it uses; **Mac** is where you find
 | `routing.usage` | Usage › Combos (runs, tokens and cost by the target each went to; how tasks went, by kind too; savings against the baseline Settings › Agent › Combos › Savings against picks; read-only suggestions), and under each combo in Settings › Agent › Combos; the phone's Settings › Routing |
 | `routing.resetCombos` | Settings › Agent › Combos › Use the Defaults |
 | `routing.useClaudeByKind` | Settings › Agent › Combos › By kind of work › Claude by Kind of Work (the three Claude combos added, each kind and plan role on them); set once by itself when you never chose kinds or roles (docs/stack.md) |
+| `routing.orchestrator` | – read by the phone (what applies in a conversation, "Claude · Opus leads · 3 executors"); Settings › Agent › Combos › Orchestrator mode resolves the same in the window (each executor on the target it would run now, or why it can't) |
+| `routing.setOrchestrator` | Settings › Agent › Combos › Orchestrator mode: on, Who thinks, Executors (combo and what each may do), When to delegate (docs/routing.md) |
+| `routing.setConversationOrchestrator` | `/orquestrador on\|off\|default` in a conversation (the same as the command); Mac only |
 | `bots.list` | the sidebar (Your Mac's row says what it's doing; with bots of your own, a Bots section, Your Mac first, each with its line) and Settings › Bots, from the shared state's `bots`; the phone's Home › Bots (docs/bots.md) |
 | `bots.status` | – read by the phone; on the Mac the sidebar's line and the plan beside a bot's chat show it |
 | `bots.newChat` | A bot’s chat › + (a new tab, like Your Mac’s); also the phone’s long-press on a bot › New chat |

@@ -1,0 +1,47 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`a Claude run in orchestrator mode > changes nothing in the SDK options when the mode is off 1`] = `
+{
+  "abortController": "[object]",
+  "additionalDirectories": [],
+  "canUseTool": "[fn canUseTool]",
+  "cwd": "/tmp",
+  "hooks": {
+    "PostCompact": [
+      {
+        "hooks": [
+          "[fn 0]",
+        ],
+      },
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          "[fn 0]",
+        ],
+      },
+    ],
+  },
+  "mcpServers": {
+    "beluga": {
+      "instance": "[object]",
+      "name": "beluga",
+      "type": "sdk",
+    },
+    "beluga_view": {
+      "instance": "[object]",
+      "name": "beluga_view",
+      "type": "sdk",
+    },
+  },
+  "model": "opus",
+  "permissionMode": "default",
+  "settingSources": [],
+  "stderr": "[fn stderr]",
+  "systemPrompt": {
+    "append": "[the run’s instructions]",
+    "preset": "claude_code",
+    "type": "preset",
+  },
+}
+`;

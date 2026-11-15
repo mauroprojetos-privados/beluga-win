@@ -9,6 +9,20 @@ import type { StepRecord } from '../shared/steps.js';
 import type { AutoCompactAt } from '../shared/context-usage.js';
 import type { ArgsRuntime } from '../shared/agent-args.js';
 
+/** One executor a run's lead may hand work to (orchestrator mode): its name, what it may do and its model. */
+export interface RunExecutor {
+  readonly name: string;
+  readonly can: 'read' | 'run' | 'edit';
+  readonly model?: string;
+  readonly description?: string;
+}
+
+/** Orchestrator mode for one run (resolved by core/routing/orchestrator.ts): only executors this runtime can run in-process. */
+export interface RunOrchestrator {
+  readonly executors: readonly RunExecutor[];
+  readonly delegate: 'suggest' | 'always';
+}
+
 /** How far a request may reach on the owner's computer. */
 export type AccessScope = 'folder' | 'full';
 
@@ -54,6 +68,8 @@ export interface AgentRunInput {
   readonly autoCompactAt?: AutoCompactAt;
   /** The conversation's window as Beluga last saw it (Claude Code reported it), for the threshold in tokens; unset: from the model. */
   readonly contextWindow?: number;
+  /** Orchestrator mode (core/routing/orchestrator.ts): the executors this run's lead hands work to. Unset: off, and nothing about the run changes. */
+  readonly orchestrator?: RunOrchestrator;
   /** A folder (relative to the run's folder, git-ignored) for screenshots and scratch output; the owner watches it live. */
   readonly scratchDir?: string;
   /** Where to run: a workspace folder with its own Claude conversation. Defaults to the room's folder. */
@@ -563,6 +579,9 @@ export interface SubAgentEvent {
   /** 'agent' for sub-agents, 'background' for background terminals/agents. */
   readonly kind?: 'agent' | 'background';
   readonly failed?: boolean;
+  /** An orchestrator executor's runtime and model (on its start), so screens say "explore · Haiku". */
+  readonly runtime?: string;
+  readonly model?: string;
 }
 
 /** Something that can run an agent turn and return its final answer. */
