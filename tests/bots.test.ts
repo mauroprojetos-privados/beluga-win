@@ -13,6 +13,7 @@ import { BOT_FILE_VERSION, MAC_BOT, botChannel, botFileText, botOfChannel, botSt
 import { applyDraft, draftFiles, exportBot, importBot, patchBot, saveFile, saveSkill } from '../src/core/bots/studio.js';
 import { readZip, safeName, writeZip } from '../src/core/bots/zip.js';
 import { Store, initialState } from '../src/core/store.js';
+import { Channel } from '../src/protocol.js';
 import { ASSISTANT_CHANNEL } from '../src/shared/assistant.js';
 import type { Project } from '../src/workspaces/types.js';
 
@@ -110,6 +111,14 @@ describe('channels, status and checks', () => {
     expect(botOfChannel('bot:supa:main')).toBeUndefined();
     expect(botOfChannel('bot:supa:a:b')).toBeUndefined();
     expect(botOfChannel('ws:1')).toBeUndefined();
+  });
+
+  it('lets a bot’s chats through the agent request’s channel check, so its agent hears them', () => {
+    for (const channel of [botChannel('supa'), botChannel('supa', 'ab12c'), botTestChannel('supa'), botChannel('my-bot-2')]) {
+      expect(Channel.safeParse(channel).success, channel).toBe(true);
+    }
+    expect(Channel.safeParse('bot:Supa').success).toBe(false);
+    expect(Channel.safeParse('bot:supa:a:b').success).toBe(false);
   });
 
   it('says what a bot is doing in a line', () => {
